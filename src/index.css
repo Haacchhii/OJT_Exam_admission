@@ -1,0 +1,150 @@
+@import "tailwindcss";
+
+@theme {
+  /* ═══ Forest Green — Primary Brand (#166534) ═══ */
+  --color-forest-50: #f0fdf4;
+  --color-forest-100: #dcfce7;
+  --color-forest-200: #b8e8cc;
+  --color-forest-300: #7ac49a;
+  --color-forest-400: #3d9b6a;
+  --color-forest-500: #166534;
+  --color-forest-600: #14532d;
+  --color-forest-700: #0f3d22;
+  --color-forest-800: #0a2e1a;
+  --color-forest-900: #052e16;
+
+  /* ═══ Gold — Accent (#ffd700) ═══ */
+  --color-gold-50: #fffbeb;
+  --color-gold-100: #fef3c7;
+  --color-gold-200: #fde68a;
+  --color-gold-300: #fcd34d;
+  --color-gold-400: #ffd700;
+  --color-gold-500: #eab308;
+  --color-gold-600: #ca8a04;
+  --color-gold-700: #a16207;
+  --color-gold-800: #854d0e;
+  --color-gold-900: #713f12;
+
+  /* ═══ Shadows ═══ */
+  --shadow-soft: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-card: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-card-hover: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-forest: 0 4px 14px 0 rgb(22 101 52 / 0.25);
+  --shadow-forest-lg: 0 10px 24px 0 rgb(22 101 52 / 0.35);
+
+  /* ═══ Border Radius Tokens ═══ */
+  --radius-card: 0.75rem;
+  --radius-button: 0.5rem;
+  --radius-input: 0.5rem;
+
+  /* ═══ Extra Spacing ═══ */
+  --spacing-18: 4.5rem;
+  --spacing-22: 5.5rem;
+  --spacing-26: 6.5rem;
+  --spacing-30: 7.5rem;
+  --spacing-34: 8.5rem;
+}
+
+/* ═══ CSS Custom Properties (non-Tailwind) ═══ */
+:root {
+  --gk-green: #166534;
+  --gk-green-light: #15803d;
+  --gk-green-dark: #14532d;
+  --gk-gold: #ffd700;
+  --gk-gold-light: #ffef7a;
+  --gk-slate: #1e293b;
+  --gk-slate-light: #334155;
+  --gk-gray: #64748b;
+  --gk-gray-light: #94a3b8;
+  --gk-paper: #fefefe;
+  --gk-soft-bg: #f8fafc;
+  --sentiment-positive: #059669;
+  --sentiment-positive-bg: #ecfdf5;
+  --sentiment-neutral: #0891b2;
+  --sentiment-neutral-bg: #ecfeff;
+  --sentiment-negative: #dc2626;
+  --sentiment-negative-bg: #fef2f2;
+}
+
+@layer base {
+  body {
+    @apply bg-[#f8fafc] text-gray-800 antialiased;
+    font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    min-height: 100vh;
+  }
+}
+
+@layer components {
+  /* ═══ Gold Shimmer Sweep on Buttons ═══ */
+  .btn-shimmer {
+    @apply relative overflow-hidden;
+  }
+  .btn-shimmer::after {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%; width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 215, 0, 0.25), transparent);
+    transition: left 0.5s;
+  }
+  .btn-shimmer:hover::after { left: 100%; }
+
+  /* ═══ Card Component Base ═══ */
+  .lpu-card {
+    @apply bg-white rounded-[0.75rem] shadow-card border-l-4 border-l-transparent;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .lpu-card:hover {
+    @apply shadow-card-hover border-l-[#166534];
+    transform: translateY(-2px);
+  }
+
+  /* ═══ Stat Number Gradient Text ═══ */
+  .stat-value {
+    background: linear-gradient(135deg, #166534 0%, #15803d 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* ═══ Progress Bar Gradient ═══ */
+  .progress-gradient {
+    background: linear-gradient(90deg, #166534 0%, #ffd700 100%);
+  }
+
+  /* ═══ Green Gradient for Headers/Buttons ═══ */
+  .bg-forest-gradient {
+    background: linear-gradient(135deg, #166534 0%, #15803d 100%);
+  }
+
+  /* ═══ Focus Visible Ring ═══ */
+  .lpu-focus:focus-visible {
+    outline: 2px solid #166534;
+    outline-offset: 2px;
+  }
+}
+
+@keyframes fadeInUp {
+  from { transform: translateY(8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* ═══ Reduced Motion Support ═══ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ═══ Print Styles ═══ */
+@media print {
+  nav, button, .no-print { display: none !important; }
+  .lpu-card { box-shadow: none !important; border: 1px solid #e5e7eb !important; }
+}
