@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { getExamResults, getEssayAnswers, scoreEssay } from '../../api/results.js';
 import { getExamRegistrations, getExamSchedules, getExams } from '../../api/exams.js';
 import { getUsers } from '../../api/users.js';
+import { useAuth } from '../../context/AuthContext.jsx';
 import { showToast } from '../../components/Toast.jsx';
 import Modal from '../../components/Modal.jsx';
 import { PageHeader, StatCard, Badge, Pagination, usePaginationSlice } from '../../components/UI.jsx';
@@ -10,6 +11,8 @@ import { formatDate } from '../../utils/helpers.js';
 const RESULTS_PER_PAGE = 10;
 
 export default function EmployeeResults() {
+  const { user: authUser } = useAuth();
+  const canScoreEssays = authUser?.role === 'administrator' || authUser?.role === 'teacher';
   const [tab, setTab] = useState('results');
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
@@ -131,7 +134,9 @@ export default function EmployeeResults() {
     <div>
       <div className="flex gap-2 mb-6 flex-wrap">
         <button onClick={() => setTab('results')} className={`px-4 py-2 rounded-lg text-sm font-medium transition ${tab === 'results' ? 'bg-[#166534] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>📊 All Results</button>
-        <button onClick={() => setTab('essays')} className={`px-4 py-2 rounded-lg text-sm font-medium transition ${tab === 'essays' ? 'bg-[#166534] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>📝 Essay Review ({pending.length})</button>
+        {canScoreEssays && (
+          <button onClick={() => setTab('essays')} className={`px-4 py-2 rounded-lg text-sm font-medium transition ${tab === 'essays' ? 'bg-[#166534] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>📝 Essay Review ({pending.length})</button>
+        )}
       </div>
 
       {tab === 'results' && (
@@ -193,7 +198,7 @@ export default function EmployeeResults() {
         </div>
       )}
 
-      {tab === 'essays' && (
+      {tab === 'essays' && canScoreEssays && (
         <div>
           <PageHeader title="Essay Review" subtitle="Score pending essay responses from applicants." />
           {pending.length === 0 && scored.length === 0 ? (

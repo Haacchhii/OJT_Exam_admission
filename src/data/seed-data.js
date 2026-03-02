@@ -69,6 +69,7 @@ export const defaultData = {
   users: [
     { id: 1, firstName: "Admin", lastName: "Staff", email: "admin@goldenkey.edu", password: "admin123", role: "administrator", status: "Active", isActive: true, createdAt: "2026-01-01T00:00:00" },
     { id: 2, firstName: "Registrar", lastName: "Office", email: "registrar@goldenkey.edu", password: "admin123", role: "registrar", status: "Active", isActive: true, createdAt: "2026-01-01T00:00:00" },
+    { id: 9, firstName: "Teacher", lastName: "Examiner", email: "teacher@goldenkey.edu", password: "admin123", role: "teacher", status: "Active", isActive: true, createdAt: "2026-01-01T00:00:00" },
     { id: 3, firstName: "Maria", lastName: "Santos", email: "maria.santos@email.com", password: "student123", role: "applicant", status: "Active", isActive: true, createdAt: "2026-02-18T09:30:00" },
     { id: 4, firstName: "Juan", lastName: "Dela Cruz", email: "juan.dc@email.com", password: "student123", role: "applicant", status: "Active", isActive: true, createdAt: "2026-02-20T14:15:00" },
     { id: 5, firstName: "Ana", lastName: "Reyes", email: "ana.reyes@email.com", password: "student123", role: "applicant", status: "Active", isActive: true, createdAt: "2026-02-19T11:00:00" },
@@ -76,7 +77,7 @@ export const defaultData = {
     { id: 7, firstName: "Isabella", lastName: "Torres", email: "bella.t@email.com", password: "student123", role: "applicant", status: "Active", isActive: true, createdAt: "2026-02-22T08:20:00" },
     { id: 8, firstName: "Miguel", lastName: "Ramos", email: "m.ramos@email.com", password: "student123", role: "applicant", status: "Active", isActive: true, createdAt: "2026-02-23T10:00:00" },
   ],
-  nextUserId: 9,
+  nextUserId: 10,
   submittedAnswers: [
     { registrationId: 1, questionId: 1, selectedChoiceId: 2, essayText: null },
     { registrationId: 1, questionId: 2, selectedChoiceId: 6, essayText: null },

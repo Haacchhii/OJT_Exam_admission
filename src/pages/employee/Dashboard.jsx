@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { getAdmissions, getStats } from '../../api/admissions.js';
-import { getExams, getExamRegistrations } from '../../api/exams.js';
+import { getExams, getExamSchedules, getExamRegistrations } from '../../api/exams.js';
 import { getExamResults, getEssayAnswers } from '../../api/results.js';
 import { StatCard, PageHeader, Badge, Pagination, usePaginationSlice, SkeletonPage } from '../../components/UI.jsx';
 import { formatDate, badgeClass } from '../../utils/helpers.js';
@@ -10,7 +10,7 @@ import { formatDate, badgeClass } from '../../utils/helpers.js';
 const PER_PAGE = 5;
 
 export default function EmployeeDashboard() {
-  const { user } = useAuth();
+  const { user, canAccess, roleLabel } = useAuth();
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -24,6 +24,7 @@ export default function EmployeeDashboard() {
     const stats = getStats();
     const admissions = getAdmissions();
     const exams = getExams();
+    const schedules = getExamSchedules();
     const regs = getExamRegistrations();
     const results = getExamResults();
     const pendingEssays = getEssayAnswers().filter(e => !e.scored).length;
@@ -45,7 +46,7 @@ export default function EmployeeDashboard() {
       rejected: pct(thisWeek.filter(a => a.status === 'Rejected').length, lastWeek.filter(a => a.status === 'Rejected').length),
     };
 
-    return { stats, admissions, exams, regs, results, pendingEssays, completed, avgScore, grades, trends };
+    return { stats, admissions, exams, schedules, regs, results, pendingEssays, completed, avgScore, grades, trends };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataTick]);
 
@@ -71,20 +72,36 @@ export default function EmployeeDashboard() {
 
   return (
     <div>
-      <PageHeader title="Dashboard Overview" subtitle="Monitor admission applications and exam activity." />
+      <PageHeader title={`${roleLabel} Dashboard`} subtitle={
+        user.role === 'administrator' ? 'Full system overview — admissions, exams, and user management.' :
+        user.role === 'registrar' ? 'Monitor and manage admission applications.' :
+        user.role === 'teacher' ? 'Monitor exam registrations, scores, and essay reviews.' :
+        'Monitor admission applications and exam activity.'
+      } />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <Link to="/employee/admissions"><StatCard icon="🎓" value={data.stats.total} label="Total Applicants" color="blue" trend={data.trends.total} trendLabel="vs last week" /></Link>
-        <Link to="/employee/admissions?status=Accepted"><StatCard icon="✅" value={data.stats.accepted} label="Accepted" color="emerald" trend={data.trends.accepted} trendLabel="vs last week" /></Link>
-        <Link to="/employee/admissions"><StatCard icon="⏳" value={(data.stats.submitted || 0) + (data.stats.underScreening || 0) + (data.stats.underEvaluation || 0)} label="In Progress" color="amber" trend={data.trends.inProgress} trendLabel="vs last week" /></Link>
-        <Link to="/employee/admissions?status=Rejected"><StatCard icon="❌" value={data.stats.rejected} label="Rejected" color="red" trend={data.trends.rejected} trendLabel="vs last week" /></Link>
-        <Link to="/employee/exams"><StatCard icon="📖" value={data.exams.length} label="Total Exams" color="blue" /></Link>
-        <Link to="/employee/exams"><StatCard icon="📊" value={data.completed} label="Exams Taken" color="amber" /></Link>
-        <Link to="/employee/reports"><StatCard icon="📈" value={`${data.avgScore}%`} label="Avg Score" color="emerald" /></Link>
-        <Link to="/employee/results"><StatCard icon="📝" value={data.pendingEssays} label="Pending Essays" color={data.pendingEssays > 0 ? 'amber' : 'emerald'} /></Link>
+        {/* Admission stats — visible to administrator and registrar */}
+        {canAccess('admissions') && <>
+          <Link to="/employee/admissions"><StatCard icon="🎓" value={data.stats.total} label="Total Applicants" color="blue" trend={data.trends.total} trendLabel="vs last week" /></Link>
+          <Link to="/employee/admissions?status=Accepted"><StatCard icon="✅" value={data.stats.accepted} label="Accepted" color="emerald" trend={data.trends.accepted} trendLabel="vs last week" /></Link>
+          <Link to="/employee/admissions"><StatCard icon="⏳" value={(data.stats.submitted || 0) + (data.stats.underScreening || 0) + (data.stats.underEvaluation || 0)} label="In Progress" color="amber" trend={data.trends.inProgress} trendLabel="vs last week" /></Link>
+          <Link to="/employee/admissions?status=Rejected"><StatCard icon="❌" value={data.stats.rejected} label="Rejected" color="red" trend={data.trends.rejected} trendLabel="vs last week" /></Link>
+        </>}
+        {/* Exam stats — visible to administrator and teacher */}
+        {canAccess('exams') && <>
+          <Link to="/employee/exams"><StatCard icon="📖" value={data.exams.length} label="Total Exams" color="blue" /></Link>
+          <Link to="/employee/exams"><StatCard icon="📊" value={data.completed} label="Exams Taken" color="amber" /></Link>
+        </>}
+        {/* Results stats — visible to all employee roles */}
+        {canAccess('results') && <>
+          <Link to="/employee/reports"><StatCard icon="📈" value={`${data.avgScore}%`} label="Avg Score" color="emerald" /></Link>
+          <Link to="/employee/results"><StatCard icon="📝" value={data.pendingEssays} label="Pending Essays" color={data.pendingEssays > 0 ? 'amber' : 'emerald'} /></Link>
+        </>}
       </div>
 
-      <div className="lpu-card p-6">
+      {/* Recent Admissions — for admin & registrar */}
+      {canAccess('admissions') && (
+      <div className="lpu-card p-6 mb-6">
         <h3 className="text-lg font-bold text-forest-500 mb-4">Recent Admission Submissions</h3>
 
         {/* Filter bar */}
@@ -137,6 +154,45 @@ export default function EmployeeDashboard() {
         </div>
         <Pagination currentPage={safePage} totalPages={totalPages} onPageChange={setPage} totalItems={totalItems} itemsPerPage={PER_PAGE} />
       </div>
+      )}
+
+      {/* Exam Activity — for admin & teacher */}
+      {canAccess('exams') && (
+      <div className="lpu-card p-6">
+        <h3 className="text-lg font-bold text-forest-500 mb-4">Exam Activity Overview</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-200 text-left text-gray-400 uppercase text-xs">
+                <th scope="col" className="py-3 px-2">Exam</th>
+                <th scope="col" className="py-3 px-2">Grade Level</th>
+                <th scope="col" className="py-3 px-2">Questions</th>
+                <th scope="col" className="py-3 px-2">Registrations</th>
+                <th scope="col" className="py-3 px-2">Status</th>
+                <th scope="col" className="py-3 px-2">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.exams.map(exam => {
+                const schedIds = data.schedules.filter(s => s.examId === exam.id).map(s => s.id);
+                const regCount = data.regs.filter(r => schedIds.includes(r.scheduleId)).length;
+                return (
+                  <tr key={exam.id} className="border-b border-gray-50 hover:bg-gray-50">
+                    <td className="py-3 px-2 font-medium text-forest-500">{exam.title}</td>
+                    <td className="py-3 px-2">{exam.gradeLevel}</td>
+                    <td className="py-3 px-2">{exam.questions.length}</td>
+                    <td className="py-3 px-2">{regCount}</td>
+                    <td className="py-3 px-2"><Badge className={exam.isActive ? 'bg-forest-100 text-forest-700' : 'bg-gray-100 text-gray-500'}>{exam.isActive ? 'Active' : 'Inactive'}</Badge></td>
+                    <td className="py-3 px-2"><Link to="/employee/exams" className="text-[#166534] hover:underline text-xs font-medium">Manage</Link></td>
+                  </tr>
+                );
+              })}
+              {data.exams.length === 0 && <tr><td colSpan={6} className="text-center text-gray-400 py-8">No exams created yet.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      )}
     </div>
   );
 }

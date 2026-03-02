@@ -1,5 +1,6 @@
 import { useState, useEffect, createContext, useContext } from 'react';
 import Modal from './Modal.jsx';
+import { ROLE_PERMISSIONS } from '../context/AuthContext.jsx';
 
 /* ===== Keyboard Shortcuts Context ===== */
 const ShortcutsContext = createContext(null);
@@ -16,6 +17,7 @@ const SHORTCUTS = [
 
 export function KeyboardShortcutsProvider({ children, navigate, role }) {
   const [helpOpen, setHelpOpen] = useState(false);
+  const perms = ROLE_PERMISSIONS[role] || [];
 
   useEffect(() => {
     const handler = (e) => {
@@ -31,16 +33,16 @@ export function KeyboardShortcutsProvider({ children, navigate, role }) {
       const base = role === 'applicant' ? '/student' : '/employee';
 
       if (e.altKey && e.key.toLowerCase() === 'd') { e.preventDefault(); navigate(base); }
-      else if (e.altKey && e.key.toLowerCase() === 'a') { e.preventDefault(); navigate(`${base}/${role === 'applicant' ? 'admission' : 'admissions'}`); }
-      else if (e.altKey && e.key.toLowerCase() === 'e') { e.preventDefault(); navigate(`${base}/${role === 'applicant' ? 'exam' : 'exams'}`); }
-      else if (e.altKey && e.key.toLowerCase() === 'r') { e.preventDefault(); navigate(`${base}/results`); }
-      else if (e.altKey && e.key.toLowerCase() === 'u' && role !== 'applicant') { e.preventDefault(); navigate(`${base}/users`); }
+      else if (e.altKey && e.key.toLowerCase() === 'a' && perms.includes('admissions')) { e.preventDefault(); navigate(`${base}/${role === 'applicant' ? 'admission' : 'admissions'}`); }
+      else if (e.altKey && e.key.toLowerCase() === 'e' && perms.includes('exams')) { e.preventDefault(); navigate(`${base}/${role === 'applicant' ? 'exam' : 'exams'}`); }
+      else if (e.altKey && e.key.toLowerCase() === 'r' && perms.includes('results')) { e.preventDefault(); navigate(`${base}/results`); }
+      else if (e.altKey && e.key.toLowerCase() === 'u' && perms.includes('users')) { e.preventDefault(); navigate(`${base}/users`); }
       else if (e.key === '?' && !e.altKey && !e.ctrlKey && !e.metaKey) { setHelpOpen(true); }
     };
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [navigate, role]);
+  }, [navigate, role, perms]);
 
   return (
     <ShortcutsContext.Provider value={{ openHelp: () => setHelpOpen(true) }}>

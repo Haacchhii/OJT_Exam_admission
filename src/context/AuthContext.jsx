@@ -1,7 +1,23 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useCallback } from 'react';
 import { getUserByEmail } from '../api/users.js';
 
 const AuthContext = createContext(null);
+
+/* ===== Role-Based Access Control ===== */
+const ROLE_PERMISSIONS = {
+  administrator: ['dashboard', 'admissions', 'exams', 'results', 'reports', 'users'],
+  registrar:     ['dashboard', 'admissions', 'results', 'reports'],
+  teacher:       ['dashboard', 'exams', 'results', 'reports'],
+};
+
+const ROLE_LABELS = {
+  administrator: 'Administrator',
+  registrar: 'Registrar',
+  teacher: 'Teacher',
+  applicant: 'Student',
+};
+
+export { ROLE_PERMISSIONS, ROLE_LABELS };
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
@@ -43,8 +59,16 @@ export function AuthProvider({ children }) {
 
   const isEmployee = user && user.role !== 'applicant';
 
+  const canAccess = useCallback((page) => {
+    if (!user || user.role === 'applicant') return false;
+    const perms = ROLE_PERMISSIONS[user.role];
+    return perms ? perms.includes(page) : false;
+  }, [user]);
+
+  const roleLabel = ROLE_LABELS[user?.role] || user?.role || '';
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, refreshUser, isEmployee }}>
+    <AuthContext.Provider value={{ user, login, logout, refreshUser, isEmployee, canAccess, roleLabel }}>
       {children}
     </AuthContext.Provider>
   );

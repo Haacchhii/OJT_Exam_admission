@@ -9,23 +9,29 @@ const studentLinks = [
   { to: '/student/results', icon: '🏆', label: 'My Results' },
 ];
 
-const employeeLinks = [
-  { to: '/employee', icon: '📊', label: 'Dashboard', end: true },
-  { to: '/employee/admissions', icon: '📋', label: 'Admissions' },
-  { to: '/employee/exams', icon: '📖', label: 'Exams' },
-  { to: '/employee/results', icon: '🧮', label: 'Results' },
-  { to: '/employee/reports', icon: '📤', label: 'Reports' },
-  { to: '/employee/users', icon: '👥', label: 'Users' },
+const allEmployeeLinks = [
+  { to: '/employee', icon: '📊', label: 'Dashboard', end: true, page: 'dashboard' },
+  { to: '/employee/admissions', icon: '📋', label: 'Admissions', page: 'admissions' },
+  { to: '/employee/exams', icon: '📖', label: 'Exams', page: 'exams' },
+  { to: '/employee/results', icon: '🧮', label: 'Results', page: 'results' },
+  { to: '/employee/reports', icon: '📤', label: 'Reports', page: 'reports' },
+  { to: '/employee/users', icon: '👥', label: 'Users', page: 'users' },
 ];
 
 export default function Sidebar({ open, onClose, role, collapsed, onToggleCollapse }) {
-  const { logout } = useAuth();
+  const { logout, canAccess, roleLabel } = useAuth();
   const navigate = useNavigate();
   const confirm = useConfirm();
-  const links = role === 'employee' ? employeeLinks : studentLinks;
+  const links = role === 'employee'
+    ? allEmployeeLinks.filter(l => canAccess(l.page))
+    : studentLinks;
   const roleBadge = role === 'employee'
     ? 'bg-forest-500 text-gold-300'
     : 'bg-gold-400 text-forest-600';
+  const roleBadgeText = role === 'employee' ? roleLabel : 'Student';
+  const roleBadgeShort = role === 'employee'
+    ? (roleLabel === 'Administrator' ? 'AD' : roleLabel === 'Registrar' ? 'RG' : roleLabel === 'Teacher' ? 'TC' : 'EM')
+    : 'ST';
 
   return (
     <>
@@ -40,7 +46,7 @@ export default function Sidebar({ open, onClose, role, collapsed, onToggleCollap
         {/* Role Badge */}
         <div className={`px-5 py-3 ${collapsed ? 'lg:flex lg:justify-center lg:px-2' : ''}`}>
           <span className={`text-xs font-bold uppercase px-3 py-1 rounded-full ${roleBadge} ${collapsed ? 'lg:px-1.5 lg:text-[9px]' : ''}`}>
-            {collapsed ? (role === 'employee' ? 'EM' : 'ST') : (role === 'employee' ? 'Employee' : 'Student')}
+            {collapsed ? roleBadgeShort : roleBadgeText}
           </span>
         </div>
 

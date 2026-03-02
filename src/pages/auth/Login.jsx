@@ -99,15 +99,20 @@ export default function Login() {
         {/* Test Credentials */}
         <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-dashed border-gray-300 text-xs">
           <strong className="text-forest-500 block mb-2">Test Accounts</strong>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div>
               <span className="text-gray-400 uppercase text-[10px] font-semibold">Student</span>
               <p className="text-gray-600">maria.santos@email.com</p>
               <p className="text-gray-400">pw: <code className="bg-gray-200 px-1 rounded">student123</code></p>
             </div>
             <div>
-              <span className="text-gray-400 uppercase text-[10px] font-semibold">Employee</span>
+              <span className="text-gray-400 uppercase text-[10px] font-semibold">Admin</span>
               <p className="text-gray-600">admin@goldenkey.edu</p>
+              <p className="text-gray-400">pw: <code className="bg-gray-200 px-1 rounded">admin123</code></p>
+            </div>
+            <div>
+              <span className="text-gray-400 uppercase text-[10px] font-semibold">Teacher</span>
+              <p className="text-gray-600">teacher@goldenkey.edu</p>
               <p className="text-gray-400">pw: <code className="bg-gray-200 px-1 rounded">admin123</code></p>
             </div>
           </div>

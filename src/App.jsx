@@ -1,11 +1,13 @@
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext.jsx';
+import { ROLE_PERMISSIONS } from './context/AuthContext.jsx';
 import { ToastContainer } from './components/Toast.jsx';
 import { ConfirmProvider } from './components/ConfirmDialog.jsx';
 import { StudentLayout, EmployeeLayout } from './components/Layout.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import ScrollToTop from './components/ScrollToTop.jsx';
 import NotFound from './pages/NotFound.jsx';
+import { useAuth } from './context/AuthContext.jsx';
 
 /* Auth pages */
 import Login from './pages/auth/Login.jsx';
@@ -26,6 +28,15 @@ import EmployeeExams from './pages/employee/Exams.jsx';
 import EmployeeResults from './pages/employee/Results.jsx';
 import EmployeeReports from './pages/employee/Reports.jsx';
 import EmployeeUsers from './pages/employee/Users.jsx';
+
+/* Route guard: redirects to /employee if user doesn't have permission for the page */
+function RoleGuard({ page, children }) {
+  const { user } = useAuth();
+  if (!user || user.role === 'applicant') return <Navigate to="/login" replace />;
+  const perms = ROLE_PERMISSIONS[user.role] || [];
+  if (!perms.includes(page)) return <Navigate to="/employee" replace />;
+  return children;
+}
 
 export default function App() {
   return (
@@ -54,11 +65,11 @@ export default function App() {
           <Route path="/employee" element={<EmployeeLayout />}>
             <Route index element={<EmployeeDashboard />} />
             <Route path="dashboard" element={<EmployeeDashboard />} />
-            <Route path="admissions" element={<EmployeeAdmissions />} />
-            <Route path="exams" element={<EmployeeExams />} />
-            <Route path="results" element={<EmployeeResults />} />
-            <Route path="reports" element={<EmployeeReports />} />
-            <Route path="users" element={<EmployeeUsers />} />
+            <Route path="admissions" element={<RoleGuard page="admissions"><EmployeeAdmissions /></RoleGuard>} />
+            <Route path="exams" element={<RoleGuard page="exams"><EmployeeExams /></RoleGuard>} />
+            <Route path="results" element={<RoleGuard page="results"><EmployeeResults /></RoleGuard>} />
+            <Route path="reports" element={<RoleGuard page="reports"><EmployeeReports /></RoleGuard>} />
+            <Route path="users" element={<RoleGuard page="users"><EmployeeUsers /></RoleGuard>} />
           </Route>
 
           {/* Root redirect */}

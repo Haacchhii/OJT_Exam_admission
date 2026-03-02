@@ -11,7 +11,7 @@ const USERS_PER_PAGE = 10;
 const ROLES = [
   { value: 'administrator', label: 'Administrator' },
   { value: 'registrar', label: 'Registrar' },
-  { value: 'exam_coordinator', label: 'Exam Coordinator' },
+  { value: 'teacher', label: 'Teacher' },
   { value: 'applicant', label: 'Applicant' },
 ];
 
@@ -50,6 +50,7 @@ export default function EmployeeUsers() {
     total: users.length,
     admins: users.filter(u => u.role === 'administrator').length,
     registrars: users.filter(u => u.role === 'registrar').length,
+    teachers: users.filter(u => u.role === 'teacher').length,
     applicants: users.filter(u => u.role === 'applicant').length,
   }), [users]);
 
@@ -126,10 +127,11 @@ export default function EmployeeUsers() {
       </PageHeader>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <StatCard label="Total Users" value={stats.total} icon="👥" />
         <StatCard label="Administrators" value={stats.admins} icon="🛡️" />
         <StatCard label="Registrars" value={stats.registrars} icon="📋" />
+        <StatCard label="Teachers" value={stats.teachers} icon="📚" />
         <StatCard label="Applicants" value={stats.applicants} icon="🎓" />
       </div>
 
