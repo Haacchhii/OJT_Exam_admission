@@ -1,9 +1,10 @@
 import { useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { getAdmissions, getAdmission, getStats, updateAdmissionStatus } from '../../api/admissions.js';
+import { useAsync } from '../../hooks/useAsync.js';
+import { getAdmissions, getStats, updateAdmissionStatus, VALID_TRANSITIONS } from '../../api/admissions.js';
 import { showToast } from '../../components/Toast.jsx';
 import { useConfirm } from '../../components/ConfirmDialog.jsx';
-import { PageHeader, Badge, EmptyState, Pagination, usePaginationSlice } from '../../components/UI.jsx';
+import { PageHeader, Badge, EmptyState, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert } from '../../components/UI.jsx';
 import { formatDate, badgeClass } from '../../utils/helpers.js';
 
 const PER_PAGE = 10;
@@ -12,38 +13,29 @@ export default function EmployeeAdmissions() {
   const confirm = useConfirm();
   const [searchParams, setSearchParams] = useSearchParams();
   const directId = searchParams.get('id');
+  const directStatus = searchParams.get('status');
   const [detailId, setDetailId] = useState(directId ? parseInt(directId) : null);
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState('all');
+  const [filter, setFilter] = useState(directStatus || 'all');
   const [gradeFilter, setGradeFilter] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
   const [statusVal, setStatusVal] = useState('');
   const [notes, setNotes] = useState('');
   const [page, setPage] = useState(1);
-  const [renderKey, forceRender] = useState(0);
   const [selected, setSelected] = useState(new Set());
   const [bulkStatus, setBulkStatus] = useState('Submitted');
+  const [saving, setSaving] = useState(false);
 
-  const stats = useMemo(() => getStats(), [renderKey]);
+  const { data: rawData, loading, error, refetch } = useAsync(async () => {
+    const [stats, admissions] = await Promise.all([getStats(), getAdmissions()]);
+    const grades = [...new Set(admissions.map(a => a.gradeLevel).filter(Boolean))].sort();
+    return { stats, admissions, grades };
+  });
 
   const ADMISSION_STATUSES = ['Submitted', 'Under Screening', 'Under Evaluation', 'Accepted', 'Rejected'];
 
-  // Define valid status transitions
-  const VALID_TRANSITIONS = {
-    'Submitted': ['Under Screening', 'Rejected'],
-    'Under Screening': ['Under Evaluation', 'Rejected'],
-    'Under Evaluation': ['Accepted', 'Rejected'],
-    'Accepted': [],
-    'Rejected': ['Submitted'],
-  };
-
-  const grades = useMemo(() => {
-    const all = getAdmissions();
-    return [...new Set(all.map(a => a.gradeLevel).filter(Boolean))].sort();
-  }, [renderKey]);
-
   const admissions = useMemo(() => {
-    let list = getAdmissions();
+    let list = rawData?.admissions || [];
     if (filter !== 'all') list = list.filter(a => a.status === filter);
     if (gradeFilter !== 'all') list = list.filter(a => a.gradeLevel === gradeFilter);
     if (search) list = list.filter(a => `${a.firstName} ${a.lastName} ${a.email}`.toLowerCase().includes(search.toLowerCase()));
@@ -53,7 +45,7 @@ export default function EmployeeAdmissions() {
     else if (sortBy === 'name') list = [...list].sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`));
     else if (sortBy === 'status') list = [...list].sort((a, b) => a.status.localeCompare(b.status));
     return list;
-  }, [search, filter, gradeFilter, sortBy, renderKey]);
+  }, [rawData, search, filter, gradeFilter, sortBy]);
 
   const { paginated, totalPages, safePage, totalItems } = usePaginationSlice(admissions, page, PER_PAGE);
 
@@ -68,12 +60,12 @@ export default function EmployeeAdmissions() {
     }
   };
   const handleBulkAction = async () => {
-    if (selected.size === 0) return;
+    if (selected.size === 0 || saving) return;
     // Check which items can legally transition to bulkStatus
     const validIds = [];
     const skippedIds = [];
     selected.forEach(id => {
-      const adm = getAdmission(id);
+      const adm = (rawData?.admissions || []).find(a => a.id === id);
       if (!adm) return;
       const allowed = VALID_TRANSITIONS[adm.status] || [];
       if (adm.status === bulkStatus || allowed.includes(bulkStatus)) {
@@ -94,14 +86,21 @@ export default function EmployeeAdmissions() {
       variant: bulkStatus === 'Rejected' ? 'danger' : 'info',
     });
     if (!ok) return;
-    validIds.forEach(id => updateAdmissionStatus(id, bulkStatus, ''));
-    showToast(`${validIds.length} application(s) updated to ${bulkStatus}.${skippedIds.length ? ` ${skippedIds.length} skipped.` : ''}`, 'success');
-    setSelected(new Set());
-    forceRender(v => v + 1);
+    setSaving(true);
+    try {
+      await Promise.all(validIds.map(id => updateAdmissionStatus(id, bulkStatus, '')));
+      showToast(`${validIds.length} application(s) updated to ${bulkStatus}.${skippedIds.length ? ` ${skippedIds.length} skipped.` : ''}`, 'success');
+      setSelected(new Set());
+      refetch();
+    } catch (err) {
+      showToast('Bulk update failed: ' + (err.message || 'Unknown error'), 'error');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const showDetail = (id) => {
-    const adm = getAdmission(id);
+    const adm = (rawData?.admissions || []).find(a => a.id === id);
     if (!adm) return;
     setDetailId(id);
     setStatusVal(adm.status);
@@ -111,22 +110,34 @@ export default function EmployeeAdmissions() {
 
   const backToList = () => { setDetailId(null); setSearchParams({}); };
 
-  const saveStatus = () => {
-    if (!detailId) return;
-    const adm = getAdmission(detailId);
+  const saveStatus = async () => {
+    if (!detailId || saving) return;
+    const adm = (rawData?.admissions || []).find(a => a.id === detailId);
+    if (!adm) return;
     const allowed = VALID_TRANSITIONS[adm.status] || [];
     if (statusVal !== adm.status && !allowed.includes(statusVal)) {
       showToast(`Cannot transition from "${adm.status}" to "${statusVal}".`, 'error');
       return;
     }
-    updateAdmissionStatus(detailId, statusVal, notes);
-    showToast(`Application ${statusVal.toLowerCase()} successfully!`, 'success');
-    forceRender(v => v + 1);
+    setSaving(true);
+    try {
+      await updateAdmissionStatus(detailId, statusVal, notes);
+      showToast(`Application ${statusVal.toLowerCase()} successfully!`, 'success');
+      refetch();
+    } catch (err) {
+      showToast('Update failed: ' + (err.message || 'Unknown error'), 'error');
+    } finally {
+      setSaving(false);
+    }
   };
+
+  // Loading guard
+  if (loading && !rawData) return <SkeletonPage />;
+  if (error) return <ErrorAlert error={error} onRetry={refetch} />;
 
   // Detail View
   if (detailId) {
-    const adm = getAdmission(detailId);
+    const adm = (rawData?.admissions || []).find(a => a.id === detailId);
     if (!adm) return <p>Application not found.</p>;
 
     const handlePrint = () => {
@@ -236,7 +247,7 @@ export default function EmployeeAdmissions() {
             </div>
           </div>
           <div className="flex gap-3">
-            <button onClick={saveStatus} className="bg-forest-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-forest-600">💾 Save Changes</button>
+            <button onClick={saveStatus} disabled={saving} className="bg-forest-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-forest-600 disabled:opacity-50 disabled:cursor-not-allowed">{saving ? '⏳ Saving…' : '💾 Save Changes'}</button>
             <button onClick={backToList} className="border border-gray-300 text-gray-700 px-5 py-2 rounded-lg hover:bg-gray-50">Cancel</button>
           </div>
         </div>
@@ -246,12 +257,12 @@ export default function EmployeeAdmissions() {
 
   // List View
   const tabs = [
-    { key: 'all', label: 'All', count: stats.total },
-    { key: 'Submitted', label: 'Submitted', count: stats.submitted },
-    { key: 'Under Screening', label: 'Screening', count: stats.underScreening },
-    { key: 'Under Evaluation', label: 'Evaluation', count: stats.underEvaluation },
-    { key: 'Accepted', label: 'Accepted', count: stats.accepted },
-    { key: 'Rejected', label: 'Rejected', count: stats.rejected },
+    { key: 'all', label: 'All', count: rawData?.stats?.total || 0 },
+    { key: 'Submitted', label: 'Submitted', count: rawData?.stats?.submitted || 0 },
+    { key: 'Under Screening', label: 'Screening', count: rawData?.stats?.underScreening || 0 },
+    { key: 'Under Evaluation', label: 'Evaluation', count: rawData?.stats?.underEvaluation || 0 },
+    { key: 'Accepted', label: 'Accepted', count: rawData?.stats?.accepted || 0 },
+    { key: 'Rejected', label: 'Rejected', count: rawData?.stats?.rejected || 0 },
   ];
 
   return (
@@ -267,7 +278,7 @@ export default function EmployeeAdmissions() {
         </select>
         <select value={gradeFilter} onChange={e => { setGradeFilter(e.target.value); resetPage(); }} aria-label="Filter by grade" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#166534]/20 outline-none bg-white">
           <option value="all">All Grades</option>
-          {grades.map(g => <option key={g} value={g}>{g}</option>)}
+          {(rawData?.grades || []).map(g => <option key={g} value={g}>{g}</option>)}
         </select>
         <select value={sortBy} onChange={e => { setSortBy(e.target.value); resetPage(); }} aria-label="Sort by" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#166534]/20 outline-none bg-white">
           <option value="newest">Newest First</option>
@@ -277,9 +288,9 @@ export default function EmployeeAdmissions() {
         </select>
       </div>
 
-      <div className="flex gap-2 mb-4 flex-wrap">
+      <div className="flex gap-2 mb-4 flex-wrap" role="tablist">
         {tabs.map(t => (
-          <button key={t.key} onClick={() => { setFilter(t.key); resetPage(); }} className={`px-4 py-2 rounded-lg text-sm font-medium transition ${filter === t.key ? 'bg-[#166534] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+          <button key={t.key} role="tab" aria-selected={filter === t.key} onClick={() => { setFilter(t.key); resetPage(); }} className={`px-4 py-2 rounded-lg text-sm font-medium transition ${filter === t.key ? 'bg-[#166534] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
             {t.label} ({t.count})
           </button>
         ))}
@@ -292,7 +303,7 @@ export default function EmployeeAdmissions() {
           <select value={bulkStatus} onChange={e => setBulkStatus(e.target.value)} className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-[#166534]/20 outline-none">
             {ADMISSION_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
-          <button onClick={handleBulkAction} className="bg-forest-500 text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-forest-600 transition">Apply</button>
+          <button onClick={handleBulkAction} disabled={saving} className="bg-forest-500 text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-forest-600 transition disabled:opacity-50 disabled:cursor-not-allowed">{saving ? '⏳ Applying…' : 'Apply'}</button>
           <button onClick={() => setSelected(new Set())} className="text-gray-500 text-sm hover:underline ml-auto">Clear selection</button>
         </div>
       )}
@@ -300,7 +311,7 @@ export default function EmployeeAdmissions() {
       <div className="lpu-card p-4">
         {paginated.length > 0 ? (
           <>
-            <div className="overflow-x-auto">
+            <div className="table-scroll">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-200 text-left text-gray-400 uppercase text-xs">

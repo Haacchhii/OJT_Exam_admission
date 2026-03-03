@@ -1,40 +1,50 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useAsync } from '../../hooks/useAsync.js';
 import { getExams, getExamSchedules, getExamRegistrations, registerForExam, getExam, startExam as apiStartExam } from '../../api/exams.js';
 import { getExamResults, submitExamAnswers } from '../../api/results.js';
 import { showToast } from '../../components/Toast.jsx';
 import Modal from '../../components/Modal.jsx';
 import { useConfirm } from '../../components/ConfirmDialog.jsx';
-import { PageHeader } from '../../components/UI.jsx';
+import { PageHeader, SkeletonPage, ErrorAlert } from '../../components/UI.jsx';
 import { formatTime } from '../../utils/helpers.js';
 
 export default function StudentExam() {
   const [view, setView] = useState('schedule'); // schedule | lobby | exam
   const [currentExam, setCurrentExam] = useState(null);
-  const [tick, refresh] = useState(0);
   const navigate = useNavigate();
 
   const { user } = useAuth();
-  const { myReg, myResult } = useMemo(() => {
-    const registrations = getExamRegistrations();
+  const { data: rawData, loading, error, refetch } = useAsync(async () => {
+    const [registrations, results] = await Promise.all([
+      getExamRegistrations(), getExamResults()
+    ]);
     const myReg = registrations.find(r => r.userEmail === user?.email) || null;
-    const results = getExamResults();
     const myResult = myReg ? results.find(r => r.registrationId === myReg.id) : null;
     return { myReg, myResult };
-  }, [user, tick]);
+  }, [user]);
+
+  const myReg = rawData?.myReg || null;
+  const myResult = rawData?.myResult || null;
 
   const showLobby = (exam) => { setCurrentExam(exam); setView('lobby'); };
-  const startExam = () => { apiStartExam(myReg.id); setView('exam'); };
+  const handleStartExam = async () => { await apiStartExam(myReg.id); refetch(); setView('exam'); };
 
   // Crash recovery: if registration is 'started' but not 'done', resume exam
   useEffect(() => {
     if (myReg?.status === 'started') {
-      const schedule = getExamSchedules().find(s => s.id === myReg.scheduleId);
-      const exam = schedule ? getExam(schedule.examId) : null;
-      if (exam) { setCurrentExam(exam); setView('exam'); }
+      (async () => {
+        const schedules = await getExamSchedules();
+        const schedule = schedules.find(s => s.id === myReg.scheduleId);
+        const exam = schedule ? await getExam(schedule.examId) : null;
+        if (exam) { setCurrentExam(exam); setView('exam'); }
+      })();
     }
   }, [myReg]);
+
+  if (loading && !rawData) return <SkeletonPage />;
+  if (error) return <ErrorAlert error={error} onRetry={refetch} />;
 
   if (view === 'exam' && currentExam && myReg) {
     return <LiveExam exam={currentExam} registration={myReg} />;
@@ -62,20 +72,28 @@ export default function StudentExam() {
               <li>Ensure a stable internet connection before starting.</li>
             </ul>
           </div>
-          <button onClick={startExam} className="bg-gradient-to-r from-forest-500 to-forest-400 text-white px-8 py-3 rounded-lg font-semibold text-lg hover:from-gold-500 hover:to-gold-600 shadow-md">🚀 Start Exam</button>
+          <button onClick={handleStartExam} className="bg-gradient-to-r from-forest-500 to-forest-400 text-white px-8 py-3 rounded-lg font-semibold text-lg hover:from-gold-500 hover:to-gold-600 shadow-md">🚀 Start Exam</button>
         </div>
       </div>
     );
   }
 
   // Schedule view
-  return <ScheduleView myReg={myReg} myResult={myResult} onLobby={showLobby} onRefresh={() => refresh(v => v + 1)} user={user} />;
+  return <ScheduleView myReg={myReg} myResult={myResult} onLobby={showLobby} onRefresh={refetch} user={user} />;
 }
 
 /* ===== Schedule View ===== */
 function ScheduleView({ myReg, myResult, onLobby, onRefresh, user }) {
   // All hooks must be called before any early returns (Rules of Hooks)
   const confirm = useConfirm();
+
+  const { data: schedData } = useAsync(async () => {
+    const [schedules, exams] = await Promise.all([getExamSchedules(), getExams()]);
+    return { schedules, exams };
+  });
+
+  const schedules = schedData?.schedules || [];
+  const exams = schedData?.exams || [];
 
   if (myReg?.status === 'done') {
     return (
@@ -92,8 +110,8 @@ function ScheduleView({ myReg, myResult, onLobby, onRefresh, user }) {
   }
 
   if (myReg) {
-    const schedule = getExamSchedules().find(s => s.id === myReg.scheduleId);
-    const exam = schedule ? getExam(schedule.examId) : null;
+    const schedule = schedules.find(s => s.id === myReg.scheduleId);
+    const exam = schedule ? exams.find(e => e.id === schedule.examId) : null;
     // Time gate: only allow starting exam when current time >= scheduled date+start time
     const now = new Date();
     const schedStart = schedule ? new Date(`${schedule.scheduledDate}T${schedule.startTime}:00`) : null;
@@ -121,8 +139,6 @@ function ScheduleView({ myReg, myResult, onLobby, onRefresh, user }) {
   }
 
   // Not registered - show available slots
-  const schedules = getExamSchedules();
-  const exams = getExams();
   const available = schedules.filter(s => s.slotsTaken < s.maxSlots);
 
   const bookSlot = async (scheduleId) => {
@@ -135,9 +151,13 @@ function ScheduleView({ myReg, myResult, onLobby, onRefresh, user }) {
       variant: 'info',
     });
     if (!ok) return;
-    const reg = registerForExam(user.email, scheduleId);
-    if (reg) { showToast('Exam slot booked successfully!', 'success'); onRefresh(); }
-    else showToast('Slot is full or you are already registered. Please choose another.', 'error');
+    try {
+      const reg = await registerForExam(user.email, scheduleId);
+      if (reg) { showToast('Exam slot booked successfully!', 'success'); onRefresh(); }
+      else showToast('Slot is full or you are already registered. Please choose another.', 'error');
+    } catch {
+      showToast('Failed to book slot. Please try again.', 'error');
+    }
   };
 
   return (
@@ -217,11 +237,13 @@ function LiveExam({ exam, registration }) {
   const answersRef = useRef(answers);
   answersRef.current = answers;
 
-  const doSubmit = useCallback((title, msg) => {
+  const doSubmit = useCallback(async (title, msg) => {
     if (submittedRef.current) return; // Prevent double-fire
     submittedRef.current = true;
     clearInterval(timerRef.current);
-    submitExamAnswers(registration.id, answersRef.current, questions);
+    try {
+      await submitExamAnswers(registration.id, answersRef.current, questions);
+    } catch {}
     try { sessionStorage.removeItem(`gk_exam_answers_${registration.id}`); } catch {}
     if (title) setAutoModal({ title, msg });
     else { showToast('Exam submitted successfully!', 'success'); setTimeout(() => navigate('/student/results'), 1500); }
@@ -276,6 +298,8 @@ function LiveExam({ exam, registration }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Skip link for accessibility — LiveExam renders outside Layout */}
+      <a href="#exam-content" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:bg-white focus:p-2 focus:rounded focus:shadow focus:z-[100]">Skip to exam content</a>
       {/* Exam Top Bar */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-50 px-4 py-3">
         <div className="flex items-center justify-between mb-2">
@@ -298,7 +322,7 @@ function LiveExam({ exam, registration }) {
       </div>
 
       {/* Question */}
-      <div className="max-w-3xl mx-auto p-4">
+      <div id="exam-content" className="max-w-3xl mx-auto p-4">
         <div className="lpu-card p-6 mb-4">
           <div className="flex items-center gap-3 mb-4">
             <span className="text-sm font-bold text-gray-400">Question {currentQ + 1} of {questions.length}</span>

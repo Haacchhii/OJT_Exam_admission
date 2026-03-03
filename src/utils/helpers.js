@@ -1,3 +1,11 @@
+/** Generate a unique ID string, safe for high-frequency calls (CSV import). */
+let _uidCounter = 0;
+export function uid() {
+  return typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}-${++_uidCounter}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 export function formatDate(isoString) {
   if (!isoString) return '—';
   const d = new Date(isoString);

@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { addUser, getUserByEmail } from '../../api/users.js';
 import { showToast } from '../../components/Toast.jsx';
 import Modal from '../../components/Modal.jsx';
+import { getPasswordStrength } from '../../utils/passwordStrength.js';
 
 export default function Register() {
   const { user } = useAuth();
@@ -17,18 +18,7 @@ export default function Register() {
 
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
 
-  const strength = (() => {
-    const v = form.password;
-    let s = 0;
-    if (v.length >= 8) s++;
-    if (v.length >= 12) s++;
-    if (/[A-Z]/.test(v)) s++;
-    if (/[0-9]/.test(v)) s++;
-    if (/[^A-Za-z0-9]/.test(v)) s++;
-    const levels = ['', 'Very Weak', 'Weak', 'Fair', 'Strong', 'Very Strong'];
-    const colors = ['bg-gray-200', 'bg-red-500', 'bg-gold-500', 'bg-gold-500', 'bg-forest-500', 'bg-forest-500'];
-    return { score: s, text: levels[s], color: colors[s], width: `${s * 20}%` };
-  })();
+  const strength = getPasswordStrength(form.password);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -36,12 +26,14 @@ export default function Register() {
     if (strength.score < 3) { showToast('Password is too weak. Include uppercase, numbers, or symbols.', 'error'); return; }
     if (form.password !== form.confirmPassword) { showToast('Passwords do not match', 'error'); return; }
     if (!/\S+@\S+\.\S+/.test(form.email)) { showToast('Please enter a valid email address.', 'error'); return; }
-    if (getUserByEmail(form.email)) { showToast('Email already registered.', 'error'); return; }
+    if (await getUserByEmail(form.email)) { showToast('Email already registered.', 'error'); return; }
     setLoading(true);
     try {
-      const result = addUser({ firstName: form.firstName, lastName: form.lastName, email: form.email, role: 'applicant', password: form.password });
+      const result = await addUser({ firstName: form.firstName, lastName: form.lastName, email: form.email, role: 'applicant', password: form.password });
       if (result?.error) { showToast(result.error, 'error'); return; }
       setSuccess(true);
+    } catch (err) {
+      showToast(err.message || 'Registration failed. Please try again.', 'error');
     } finally {
       setLoading(false);
     }
@@ -92,7 +84,7 @@ export default function Register() {
             </div>
             {form.confirmPassword && form.confirmPassword !== form.password && <p className="text-red-500 text-xs mt-1">Passwords do not match</p>}
           </div>
-          <button type="submit" disabled={loading} className="w-full bg-gradient-to-r from-forest-500 to-forest-400 text-white font-semibold py-2.5 rounded-lg hover:from-gold-500 hover:to-gold-600 shadow-md btn-shimmer disabled:opacity-60 disabled:cursor-not-allowed">{loading ? 'Creating Account…' : 'Create Account'}</button>
+          <button type="submit" disabled={loading} data-testid="register-submit" className="w-full bg-gradient-to-r from-forest-500 to-forest-400 text-white font-semibold py-2.5 rounded-lg hover:from-gold-500 hover:to-gold-600 shadow-md btn-shimmer disabled:opacity-60 disabled:cursor-not-allowed">{loading ? 'Creating Account…' : 'Create Account'}</button>
         </form>
         <p className="text-sm text-gray-500 text-center mt-6">Already have an account? <Link to="/login" className="text-[#166534] font-medium">Sign in</Link></p>
       </div>

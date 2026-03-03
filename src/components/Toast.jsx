@@ -16,10 +16,12 @@ export function showToast(message, type = 'success') {
     toastStore.toasts = toastStore.toasts.slice(-MAX_TOASTS);
   }
   toastStore.listeners.forEach(fn => fn([...toastStore.toasts]));
+  // Errors/warnings stay longer so users can read them
+  const duration = (type === 'error' || type === 'warning') ? 5000 : 3000;
   setTimeout(() => {
     toastStore.toasts = toastStore.toasts.filter(t => t.id !== id);
     toastStore.listeners.forEach(fn => fn([...toastStore.toasts]));
-  }, 3000);
+  }, duration);
 }
 
 function dismissToast(id) {

@@ -1,12 +1,23 @@
 import { load, save } from '../data/store.js';
 import { addNotification } from './notifications.js';
+import { USE_API, client } from './client.js';
 
-export function getExamResults() { return load().examResults; }
-export function getExamResult(registrationId) { return load().examResults.find(r => r.registrationId === registrationId) || null; }
+export async function getExamResults() {
+  if (USE_API) return client.get('/results');
+  return load().examResults;
+}
+export async function getExamResult(registrationId) {
+  if (USE_API) return client.get(`/results/${registrationId}`);
+  return load().examResults.find(r => r.registrationId === registrationId) || null;
+}
 
-export function getEssayAnswers() { return load().essayAnswers; }
+export async function getEssayAnswers() {
+  if (USE_API) return client.get('/results/essays');
+  return load().essayAnswers;
+}
 
-export function scoreEssay(answerId, points) {
+export async function scoreEssay(answerId, points) {
+  if (USE_API) return client.patch(`/results/essays/${answerId}/score`, { points });
   const data = load();
   const answer = data.essayAnswers.find(a => a.id === answerId);
   if (answer) {
@@ -42,7 +53,7 @@ export function scoreEssay(answerId, points) {
           const essayReg2 = data.examRegistrations.find(r => r.id === regId);
           const studentUser = essayReg2 ? data.users.find(u => u.email === essayReg2.userEmail) : null;
           if (studentUser) {
-            addNotification({
+            await addNotification({
               userId: `student_${studentUser.id}`,
               title: 'Essay Review Complete',
               message: `All essay answers have been reviewed. Your final score is ${result.percentage.toFixed(1)}% — ${result.passed ? 'Passed' : 'Failed'}.`,
@@ -57,11 +68,13 @@ export function scoreEssay(answerId, points) {
   return answer;
 }
 
-export function getSubmittedAnswers(registrationId) {
+export async function getSubmittedAnswers(registrationId) {
+  if (USE_API) return client.get(`/results/answers/${registrationId}`);
   return load().submittedAnswers.filter(a => a.registrationId === registrationId);
 }
 
-export function submitExamAnswers(registrationId, answersObj, questions) {
+export async function submitExamAnswers(registrationId, answersObj, questions) {
+  if (USE_API) return client.post('/results/submit', { registrationId, answers: answersObj, questions });
   const data = load();
   data.submittedAnswers = data.submittedAnswers.filter(a => a.registrationId !== registrationId);
   for (const q of questions) {
@@ -99,8 +112,19 @@ export function submitExamAnswers(registrationId, answersObj, questions) {
   const exam = schedule ? data.exams.find(e => e.id === schedule.examId) : null;
   const passingScore = exam ? exam.passingScore : 60;
   const hasEssays = questions.some(q => q.questionType === 'essay');
-  // If there are essay questions, defer pass/fail until essays are scored
-  const passed = hasEssays ? false : percentage >= passingScore;
+  // For exams with essays: calculate MC-only percentage. If MC score meets threshold, mark as pendingEssayReview (not outright failed).
+  // The final pass/fail is deferred until essay scoring is complete.
+  let mcTotalScore = 0, mcMaxPossible = 0;
+  for (const q of questions) {
+    if (q.questionType === 'mc') {
+      mcMaxPossible += q.points;
+      const ua = answersObj[q.id];
+      const cc = q.choices.find(c => c.isCorrect);
+      if (cc && ua === cc.id) mcTotalScore += q.points;
+    }
+  }
+  const mcPercentage = mcMaxPossible > 0 ? (mcTotalScore / mcMaxPossible) * 100 : 0;
+  const passed = hasEssays ? (mcPercentage >= passingScore) : (percentage >= passingScore);
   const existingResult = data.examResults.find(r => r.registrationId === registrationId);
   if (existingResult) {
     Object.assign(existingResult, { totalScore, maxPossible, percentage: parseFloat(percentage.toFixed(1)), passed, essayReviewed: !hasEssays });
@@ -118,7 +142,7 @@ export function submitExamAnswers(registrationId, answersObj, questions) {
   const submittedReg = data.examRegistrations.find(r => r.id === registrationId);
   const submittedUser = submittedReg ? data.users.find(u => u.email === submittedReg.userEmail) : null;
   if (submittedUser) {
-    addNotification({
+    await addNotification({
       userId: 'employee',
       title: 'Exam Submitted',
       message: `${submittedUser.firstName} ${submittedUser.lastName} has completed an entrance examination (Score: ${percentage.toFixed(1)}%).`,

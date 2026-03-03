@@ -1,8 +1,9 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo } from 'react';
+import { useAsync } from '../../hooks/useAsync.js';
 import { getUsers, addUser, updateUser, deleteUser, getUserByEmail } from '../../api/users.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { showToast } from '../../components/Toast.jsx';
-import { PageHeader, StatCard, Badge, EmptyState, Pagination, usePaginationSlice } from '../../components/UI.jsx';
+import { PageHeader, StatCard, Badge, EmptyState, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert } from '../../components/UI.jsx';
 import Modal from '../../components/Modal.jsx';
 import { useConfirm } from '../../components/ConfirmDialog.jsx';
 
@@ -19,7 +20,7 @@ const emptyForm = { firstName: '', lastName: '', email: '', role: 'applicant', s
 
 export default function EmployeeUsers() {
   const { user: authUser } = useAuth();
-  const [users, setUsers] = useState(() => getUsers());
+  const { data: users, loading, error, refetch } = useAsync(() => getUsers());
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -28,12 +29,11 @@ export default function EmployeeUsers() {
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState({ ...emptyForm });
   const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
   const confirm = useConfirm();
 
-  const reload = useCallback(() => setUsers(getUsers()), []);
-
   const filtered = useMemo(() => {
-    let list = users;
+    let list = users || [];
     if (roleFilter !== 'all') list = list.filter(u => u.role === roleFilter);
     if (statusFilter !== 'all') list = list.filter(u => (u.status || 'Active') === statusFilter);
     if (search.trim()) {
@@ -46,43 +46,53 @@ export default function EmployeeUsers() {
   const { paginated, totalPages, safePage, totalItems } = usePaginationSlice(filtered, page, USERS_PER_PAGE);
   const resetPage = () => setPage(1);
 
-  const stats = useMemo(() => ({
-    total: users.length,
-    admins: users.filter(u => u.role === 'administrator').length,
-    registrars: users.filter(u => u.role === 'registrar').length,
-    teachers: users.filter(u => u.role === 'teacher').length,
-    applicants: users.filter(u => u.role === 'applicant').length,
-  }), [users]);
+  const stats = useMemo(() => {
+    const list = users || [];
+    return {
+      total: list.length,
+      admins: list.filter(u => u.role === 'administrator').length,
+      registrars: list.filter(u => u.role === 'registrar').length,
+      teachers: list.filter(u => u.role === 'teacher').length,
+      applicants: list.filter(u => u.role === 'applicant').length,
+    };
+  }, [users]);
 
   const openAdd = () => { setForm({ ...emptyForm }); setEditId(null); setErrors({}); setShowModal(true); };
   const openEdit = (u) => { setForm({ firstName: u.firstName, lastName: u.lastName, email: u.email, role: u.role, status: u.status || 'Active', password: '' }); setEditId(u.id); setErrors({}); setShowModal(true); };
 
-  const validate = () => {
+  const validate = async () => {
     const e = {};
     if (!form.firstName.trim()) e.firstName = 'Required';
     if (!form.lastName.trim()) e.lastName = 'Required';
     if (!form.email.trim()) e.email = 'Required';
     else if (!/\S+@\S+\.\S+/.test(form.email)) e.email = 'Invalid email';
-    else { const dup = getUserByEmail(form.email); if (dup && dup.id !== editId) e.email = 'Email already in use'; }
+    else { const dup = await getUserByEmail(form.email); if (dup && dup.id !== editId) e.email = 'Email already in use'; }
     if (!editId && !form.password.trim()) e.password = 'Required for new users';
     else if (form.password && form.password.length < 8) e.password = 'Min 8 characters';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
-  const handleSave = () => {
-    if (!validate()) return;
-    if (editId) {
-      const upd = { firstName: form.firstName, lastName: form.lastName, email: form.email, role: form.role, status: form.status };
-      if (form.password) upd.password = form.password;
-      updateUser(editId, upd);
-      showToast('User updated!', 'success');
-    } else {
-      addUser({ ...form });
-      showToast('User added!', 'success');
+  const handleSave = async () => {
+    if (!(await validate()) || saving) return;
+    setSaving(true);
+    try {
+      if (editId) {
+        const upd = { firstName: form.firstName, lastName: form.lastName, email: form.email, role: form.role, status: form.status };
+        if (form.password) upd.password = form.password;
+        await updateUser(editId, upd);
+        showToast('User updated!', 'success');
+      } else {
+        await addUser({ ...form });
+        showToast('User added!', 'success');
+      }
+      refetch();
+      setShowModal(false);
+    } catch (err) {
+      showToast('Failed to save user.', 'error');
+    } finally {
+      setSaving(false);
     }
-    reload();
-    setShowModal(false);
   };
 
   const confirmDelete = async (userId) => {
@@ -97,15 +107,22 @@ export default function EmployeeUsers() {
       confirmLabel: 'Delete',
     });
     if (ok) {
-      deleteUser(userId);
-      reload();
-      showToast('User deleted.', 'info');
+      try {
+        await deleteUser(userId);
+        refetch();
+        showToast('User deleted.', 'info');
+      } catch (err) {
+        showToast('Failed to delete user.', 'error');
+      }
     }
   };
 
   const set = (key, val) => setForm(p => ({ ...p, [key]: val }));
 
   const roleLabel = (r) => ROLES.find(ro => ro.value === r)?.label || r;
+
+  if (loading && !users) return <SkeletonPage />;
+  if (error) return <ErrorAlert error={error} onRetry={refetch} />;
 
   // Only administrators can manage users
   if (authUser?.role !== 'administrator') {
@@ -151,7 +168,7 @@ export default function EmployeeUsers() {
 
       {/* Table */}
       {paginated.length > 0 ? (
-        <div className="lpu-card overflow-x-auto">
+        <div className="lpu-card table-scroll">
           <table className="w-full text-sm">
             <thead><tr className="border-b border-gray-200 text-left text-gray-400 uppercase text-xs">
               <th scope="col" className="py-3 px-4">Name</th><th scope="col" className="py-3 px-4">Email</th><th scope="col" className="py-3 px-4">Role</th><th scope="col" className="py-3 px-4">Status</th><th scope="col" className="py-3 px-4 text-right">Actions</th>
@@ -221,7 +238,7 @@ export default function EmployeeUsers() {
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <button onClick={() => setShowModal(false)} className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>
-            <button onClick={handleSave} className="px-4 py-2 text-sm bg-[#166534] text-white rounded-lg font-semibold hover:bg-[#14532d]">{editId ? 'Save Changes' : 'Add User'}</button>
+            <button onClick={handleSave} disabled={saving} className="px-4 py-2 text-sm bg-[#166534] text-white rounded-lg font-semibold hover:bg-[#14532d] disabled:opacity-50 disabled:cursor-not-allowed">{saving ? '⏳ Saving…' : (editId ? 'Save Changes' : 'Add User')}</button>
           </div>
         </div>
       </Modal>

@@ -1,6 +1,9 @@
 // ============================================
 // seed-data.js — Default seed data for localStorage
 // ============================================
+// ⚠️ SECURITY NOTE: Passwords are stored in plaintext for the localStorage demo mode only.
+// In production with a real backend (USE_API=true), the backend handles password hashing
+// with bcrypt/argon2 and these seed passwords are irrelevant.
 export const defaultData = {
   admissions: [
     { id: 1, firstName: "Maria", lastName: "Santos", email: "maria.santos@email.com", phone: "+63 912 345 6789", dob: "2010-05-14", gender: "Female", address: "123 Rizal St, San Jose, Batangas", gradeLevel: "Grade 7", prevSchool: "Manila Elementary School", schoolYear: "2026-2027", lrn: "123456789012", applicantType: "New", guardian: "Elena Santos", guardianRelation: "Mother", guardianPhone: "+63 912 000 1111", guardianEmail: "elena.santos@email.com", status: "Accepted", submittedAt: "2026-02-18T09:30:00", documents: ["PSA Birth Certificate", "2x2 ID Photos", "Baptismal Certificate", "Report Card / Form 138", "Certificate of Good Moral Character", "Latest Income Tax Return"], notes: "Complete requirements. Approved for admission." },

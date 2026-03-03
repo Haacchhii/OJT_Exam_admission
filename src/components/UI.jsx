@@ -1,3 +1,19 @@
+/* ===== ErrorAlert ===== */
+export function ErrorAlert({ error, onRetry }) {
+  return (
+    <div className="lpu-card p-8 text-center" role="alert">
+      <span className="text-4xl block mb-3">⚠️</span>
+      <p className="text-red-600 font-semibold mb-1">Something went wrong</p>
+      <p className="text-gray-500 text-sm mb-4">{error?.message || 'An unexpected error occurred.'}</p>
+      {onRetry && (
+        <button onClick={onRetry} data-testid="error-retry" className="bg-[#166534] text-white px-5 py-2 rounded-lg font-semibold hover:bg-[#14532d] text-sm">
+          Try Again
+        </button>
+      )}
+    </div>
+  );
+}
+
 /* ===== StatCard ===== */
 export function StatCard({ icon, value, label, color = 'blue', trend, trendLabel }) {
   const colors = {
@@ -23,8 +39,9 @@ export function StatCard({ icon, value, label, color = 'blue', trend, trendLabel
         <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">{label}</div>
       </div>
       {trend !== undefined && trend !== null && (
-        <div className={`flex flex-col items-end text-xs font-semibold ${trendUp ? 'text-green-600' : trendDown ? 'text-red-500' : 'text-gray-400'}`}>
-          <span>{trendUp ? '▲' : trendDown ? '▼' : '—'} {Math.abs(trend)}%</span>
+        <div className={`flex flex-col items-end text-xs font-semibold ${trendUp ? 'text-green-600' : trendDown ? 'text-red-500' : 'text-gray-400'}`}
+          aria-label={`${trendUp ? 'Up' : trendDown ? 'Down' : 'No change'} ${Math.abs(trend)}%${trendLabel ? `, ${trendLabel}` : ''}`}>
+          <span aria-hidden="true">{trendUp ? '▲' : trendDown ? '▼' : '—'} {Math.abs(trend)}%</span>
           {trendLabel && <span className="text-[10px] text-gray-400 font-normal">{trendLabel}</span>}
         </div>
       )}

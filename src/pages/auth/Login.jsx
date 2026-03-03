@@ -40,7 +40,7 @@ export default function Login() {
     if (!validate()) return;
     setLoading(true);
     try {
-      const result = login(email, password);
+      const result = await login(email, password);
       if (!result.ok) { showToast(result.msg, 'error'); return; }
       if (remember) localStorage.setItem('gk_remember_email', email);
       else localStorage.removeItem('gk_remember_email');
@@ -67,20 +67,22 @@ export default function Login() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)} required
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)} required aria-describedby={errors.email ? 'email-error' : undefined}
+              data-testid="login-email"
               className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#166534]/20 focus:border-[#166534] outline-none transition ${errors.email ? 'border-red-400' : 'border-gray-300'}`} placeholder="your@email.com" />
-            {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
+            {errors.email && <p id="email-error" className="text-red-500 text-xs mt-1" role="alert">{errors.email}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
             <div className="relative">
-              <input type={showPw ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} required
+              <input type={showPw ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} required aria-describedby={errors.password ? 'password-error' : undefined}
+                data-testid="login-password"
                 className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#166534]/20 focus:border-[#166534] outline-none transition pr-12 ${errors.password ? 'border-red-400' : 'border-gray-300'}`} placeholder="Enter your password" />
               <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                 {showPw ? '🙈' : '👁'}
               </button>
             </div>
-            {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
+            {errors.password && <p id="password-error" className="text-red-500 text-xs mt-1" role="alert">{errors.password}</p>}
           </div>
 
           <div className="flex items-center justify-between text-sm">
@@ -91,12 +93,14 @@ export default function Login() {
           </div>
 
           <button type="submit" disabled={loading}
+            data-testid="login-submit"
             className="w-full bg-gradient-to-r from-forest-500 to-forest-400 text-white font-semibold py-2.5 rounded-lg hover:from-gold-500 hover:to-gold-600 transition-all shadow-md btn-shimmer disabled:opacity-60 disabled:cursor-not-allowed">
             {loading ? 'Signing In…' : 'Sign In'}
           </button>
         </form>
 
-        {/* Test Credentials */}
+        {/* Test Credentials — only shown in development */}
+        {import.meta.env.DEV && (
         <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-dashed border-gray-300 text-xs">
           <strong className="text-forest-500 block mb-2">Test Accounts</strong>
           <div className="grid grid-cols-3 gap-3">
@@ -117,6 +121,7 @@ export default function Login() {
             </div>
           </div>
         </div>
+        )}
 
         <p className="text-sm text-gray-500 text-center mt-6">
           Don't have an account? <Link to="/register" className="text-[#166534] hover:text-[#14532d] font-medium">Create one</Link>

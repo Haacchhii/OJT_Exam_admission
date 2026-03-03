@@ -1,33 +1,27 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useAsync } from '../../hooks/useAsync.js';
 import { getAdmissions, getStats } from '../../api/admissions.js';
 import { getExams, getExamSchedules, getExamRegistrations } from '../../api/exams.js';
 import { getExamResults, getEssayAnswers } from '../../api/results.js';
-import { StatCard, PageHeader, Badge, Pagination, usePaginationSlice, SkeletonPage } from '../../components/UI.jsx';
+import { StatCard, PageHeader, Badge, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert } from '../../components/UI.jsx';
 import { formatDate, badgeClass } from '../../utils/helpers.js';
 
 const PER_PAGE = 5;
 
 export default function EmployeeDashboard() {
   const { user, canAccess, roleLabel } = useAuth();
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [gradeFilter, setGradeFilter] = useState('all');
   const [page, setPage] = useState(1);
-  const [dataTick, setDataTick] = useState(0);
 
-  useEffect(() => { setLoading(false); }, []);
-
-  const data = useMemo(() => {
-    const stats = getStats();
-    const admissions = getAdmissions();
-    const exams = getExams();
-    const schedules = getExamSchedules();
-    const regs = getExamRegistrations();
-    const results = getExamResults();
-    const pendingEssays = getEssayAnswers().filter(e => !e.scored).length;
+  const { data: rawData, loading, error, refetch } = useAsync(async () => {
+    const [stats, admissions, exams, schedules, regs, results, essayAnswers] = await Promise.all([
+      getStats(), getAdmissions(), getExams(), getExamSchedules(), getExamRegistrations(), getExamResults(), getEssayAnswers()
+    ]);
+    const pendingEssays = essayAnswers.filter(e => !e.scored).length;
     const completed = regs.filter(r => r.status === 'done').length;
     const avgScore = results.length > 0 ? (results.reduce((s, r) => s + r.percentage, 0) / results.length).toFixed(0) : 0;
     const grades = [...new Set(admissions.map(a => a.gradeLevel).filter(Boolean))].sort();
@@ -47,11 +41,10 @@ export default function EmployeeDashboard() {
     };
 
     return { stats, admissions, exams, schedules, regs, results, pendingEssays, completed, avgScore, grades, trends };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dataTick]);
+  });
 
   const filtered = useMemo(() => {
-    let list = data.admissions;
+    let list = rawData?.admissions || [];
     if (statusFilter !== 'all') list = list.filter(a => a.status === statusFilter);
     if (gradeFilter !== 'all') list = list.filter(a => a.gradeLevel === gradeFilter);
     if (search.trim()) {
@@ -59,7 +52,7 @@ export default function EmployeeDashboard() {
       list = list.filter(a => `${a.firstName} ${a.lastName} ${a.email}`.toLowerCase().includes(q));
     }
     return list;
-  }, [data.admissions, statusFilter, gradeFilter, search]);
+  }, [rawData, statusFilter, gradeFilter, search]);
 
   const { paginated, totalPages, safePage, totalItems } = usePaginationSlice(filtered, page, PER_PAGE);
 
@@ -68,7 +61,8 @@ export default function EmployeeDashboard() {
   const handleStatus = (v) => { setStatusFilter(v); setPage(1); };
   const handleGrade = (v) => { setGradeFilter(v); setPage(1); };
 
-  if (loading) return <SkeletonPage />;
+  if (loading && !rawData) return <SkeletonPage />;
+  if (error) return <ErrorAlert error={error} onRetry={refetch} />;
 
   return (
     <div>
@@ -82,20 +76,20 @@ export default function EmployeeDashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {/* Admission stats — visible to administrator and registrar */}
         {canAccess('admissions') && <>
-          <Link to="/employee/admissions"><StatCard icon="🎓" value={data.stats.total} label="Total Applicants" color="blue" trend={data.trends.total} trendLabel="vs last week" /></Link>
-          <Link to="/employee/admissions?status=Accepted"><StatCard icon="✅" value={data.stats.accepted} label="Accepted" color="emerald" trend={data.trends.accepted} trendLabel="vs last week" /></Link>
-          <Link to="/employee/admissions"><StatCard icon="⏳" value={(data.stats.submitted || 0) + (data.stats.underScreening || 0) + (data.stats.underEvaluation || 0)} label="In Progress" color="amber" trend={data.trends.inProgress} trendLabel="vs last week" /></Link>
-          <Link to="/employee/admissions?status=Rejected"><StatCard icon="❌" value={data.stats.rejected} label="Rejected" color="red" trend={data.trends.rejected} trendLabel="vs last week" /></Link>
+          <Link to="/employee/admissions"><StatCard icon="🎓" value={rawData?.stats?.total || 0} label="Total Applicants" color="blue" trend={rawData?.trends?.total} trendLabel="vs last week" /></Link>
+          <Link to="/employee/admissions?status=Accepted"><StatCard icon="✅" value={rawData?.stats?.accepted || 0} label="Accepted" color="emerald" trend={rawData?.trends?.accepted} trendLabel="vs last week" /></Link>
+          <Link to="/employee/admissions"><StatCard icon="⏳" value={(rawData?.stats?.submitted || 0) + (rawData?.stats?.underScreening || 0) + (rawData?.stats?.underEvaluation || 0)} label="In Progress" color="amber" trend={rawData?.trends?.inProgress} trendLabel="vs last week" /></Link>
+          <Link to="/employee/admissions?status=Rejected"><StatCard icon="❌" value={rawData?.stats?.rejected || 0} label="Rejected" color="red" trend={rawData?.trends?.rejected} trendLabel="vs last week" /></Link>
         </>}
         {/* Exam stats — visible to administrator and teacher */}
         {canAccess('exams') && <>
-          <Link to="/employee/exams"><StatCard icon="📖" value={data.exams.length} label="Total Exams" color="blue" /></Link>
-          <Link to="/employee/exams"><StatCard icon="📊" value={data.completed} label="Exams Taken" color="amber" /></Link>
+          <Link to="/employee/exams"><StatCard icon="📖" value={rawData?.exams?.length || 0} label="Total Exams" color="blue" /></Link>
+          <Link to="/employee/exams"><StatCard icon="📊" value={rawData?.completed || 0} label="Exams Taken" color="amber" /></Link>
         </>}
         {/* Results stats — visible to all employee roles */}
         {canAccess('results') && <>
-          <Link to="/employee/reports"><StatCard icon="📈" value={`${data.avgScore}%`} label="Avg Score" color="emerald" /></Link>
-          <Link to="/employee/results"><StatCard icon="📝" value={data.pendingEssays} label="Pending Essays" color={data.pendingEssays > 0 ? 'amber' : 'emerald'} /></Link>
+          <Link to="/employee/reports"><StatCard icon="📈" value={`${rawData?.avgScore || 0}%`} label="Avg Score" color="emerald" /></Link>
+          <Link to="/employee/results"><StatCard icon="📝" value={rawData?.pendingEssays || 0} label="Pending Essays" color={(rawData?.pendingEssays || 0) > 0 ? 'amber' : 'emerald'} /></Link>
         </>}
       </div>
 
@@ -121,11 +115,11 @@ export default function EmployeeDashboard() {
           </select>
           <select value={gradeFilter} onChange={e => handleGrade(e.target.value)} className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#166534]/20 outline-none bg-white">
             <option value="all">All Grades</option>
-            {data.grades.map(g => <option key={g} value={g}>{g}</option>)}
+            {(rawData?.grades || []).map(g => <option key={g} value={g}>{g}</option>)}
           </select>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="table-scroll">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 text-left text-gray-400 uppercase text-xs">
@@ -160,7 +154,7 @@ export default function EmployeeDashboard() {
       {canAccess('exams') && (
       <div className="lpu-card p-6">
         <h3 className="text-lg font-bold text-forest-500 mb-4">Exam Activity Overview</h3>
-        <div className="overflow-x-auto">
+        <div className="table-scroll">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 text-left text-gray-400 uppercase text-xs">
@@ -173,9 +167,9 @@ export default function EmployeeDashboard() {
               </tr>
             </thead>
             <tbody>
-              {data.exams.map(exam => {
-                const schedIds = data.schedules.filter(s => s.examId === exam.id).map(s => s.id);
-                const regCount = data.regs.filter(r => schedIds.includes(r.scheduleId)).length;
+              {(rawData?.exams || []).map(exam => {
+                const schedIds = (rawData?.schedules || []).filter(s => s.examId === exam.id).map(s => s.id);
+                const regCount = (rawData?.regs || []).filter(r => schedIds.includes(r.scheduleId)).length;
                 return (
                   <tr key={exam.id} className="border-b border-gray-50 hover:bg-gray-50">
                     <td className="py-3 px-2 font-medium text-forest-500">{exam.title}</td>
@@ -187,7 +181,7 @@ export default function EmployeeDashboard() {
                   </tr>
                 );
               })}
-              {data.exams.length === 0 && <tr><td colSpan={6} className="text-center text-gray-400 py-8">No exams created yet.</td></tr>}
+              {(rawData?.exams || []).length === 0 && <tr><td colSpan={6} className="text-center text-gray-400 py-8">No exams created yet.</td></tr>}
             </tbody>
           </table>
         </div>

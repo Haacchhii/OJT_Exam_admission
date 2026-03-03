@@ -1,8 +1,9 @@
 import { load, save } from '../data/store.js';
 import { addNotification } from './notifications.js';
+import { USE_API, client } from './client.js';
 
 const VALID_STATUSES = ['Submitted', 'Under Screening', 'Under Evaluation', 'Accepted', 'Rejected'];
-const VALID_TRANSITIONS = {
+export const VALID_TRANSITIONS = {
   'Submitted': ['Under Screening', 'Rejected'],
   'Under Screening': ['Under Evaluation', 'Rejected'],
   'Under Evaluation': ['Accepted', 'Rejected'],
@@ -10,11 +11,18 @@ const VALID_TRANSITIONS = {
   'Rejected': ['Submitted'],
 };
 
-export function getAdmissions() { return load().admissions; }
+export async function getAdmissions() {
+  if (USE_API) return client.get('/admissions');
+  return load().admissions;
+}
 
-export function getAdmission(id) { return load().admissions.find(a => a.id === id) || null; }
+export async function getAdmission(id) {
+  if (USE_API) return client.get(`/admissions/${id}`);
+  return load().admissions.find(a => a.id === id) || null;
+}
 
-export function addAdmission(admission) {
+export async function addAdmission(admission) {
+  if (USE_API) return client.post('/admissions', admission);
   const data = load();
   // Input validation: require essential fields
   if (!admission.firstName?.trim() || !admission.lastName?.trim() || !admission.email?.trim() || !admission.gradeLevel?.trim()) {
@@ -40,15 +48,16 @@ export function addAdmission(admission) {
   // Notify student
   const userObj = data.users.find(u => u.email === admission.email);
   if (userObj) {
-    addNotification({ userId: `student_${userObj.id}`, title: 'Application Submitted', message: 'Your admission application has been submitted successfully and is now under review.', type: 'info' });
+    await addNotification({ userId: `student_${userObj.id}`, title: 'Application Submitted', message: 'Your admission application has been submitted successfully and is now under review.', type: 'info' });
   }
   // Notify employees
-  addNotification({ userId: 'employee', title: 'New Application', message: `${admission.firstName} ${admission.lastName} submitted an admission application for ${admission.gradeLevel}.`, type: 'info' });
+  await addNotification({ userId: 'employee', title: 'New Application', message: `${admission.firstName} ${admission.lastName} submitted an admission application for ${admission.gradeLevel}.`, type: 'info' });
 
   return admission;
 }
 
-export function updateAdmissionStatus(id, status, notes) {
+export async function updateAdmissionStatus(id, status, notes) {
+  if (USE_API) return client.patch(`/admissions/${id}/status`, { status, notes });
   if (!VALID_STATUSES.includes(status)) return null;
   const data = load();
   const adm = data.admissions.find(a => a.id === id);
@@ -72,7 +81,7 @@ export function updateAdmissionStatus(id, status, notes) {
         'Accepted': 'Congratulations! Your admission has been accepted.',
         'Rejected': 'Your application has been reviewed. Please contact the registrar for details.',
       };
-      addNotification({
+      await addNotification({
         userId: `student_${userObj.id}`,
         title: `Status Updated: ${status}`,
         message: statusMessages[status] || `Your admission status has been changed from ${oldStatus} to ${status}.`,
@@ -83,8 +92,9 @@ export function updateAdmissionStatus(id, status, notes) {
   return adm;
 }
 
-export function getStats() {
-  const admissions = getAdmissions();
+export async function getStats() {
+  if (USE_API) return client.get('/admissions/stats');
+  const admissions = await getAdmissions();
   return {
     total: admissions.length,
     submitted: admissions.filter(a => a.status === 'Submitted').length,

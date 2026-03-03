@@ -1,11 +1,12 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
+import { useAsync } from '../../hooks/useAsync.js';
 import { getExamResults, getEssayAnswers, scoreEssay } from '../../api/results.js';
 import { getExamRegistrations, getExamSchedules, getExams } from '../../api/exams.js';
 import { getUsers } from '../../api/users.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { showToast } from '../../components/Toast.jsx';
 import Modal from '../../components/Modal.jsx';
-import { PageHeader, StatCard, Badge, Pagination, usePaginationSlice } from '../../components/UI.jsx';
+import { PageHeader, StatCard, Badge, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert } from '../../components/UI.jsx';
 import { formatDate } from '../../utils/helpers.js';
 
 const RESULTS_PER_PAGE = 10;
@@ -20,13 +21,22 @@ export default function EmployeeResults() {
   const [essayStatusFilter, setEssayStatusFilter] = useState('all');
   const [scoreModal, setScoreModal] = useState(null);
   const [scoreVal, setScoreVal] = useState('');
+  const [saving, setSaving] = useState(false);
   const [resultsPage, setResultsPage] = useState(1);
-  const [tick, refresh] = useState(0);
 
-  const { results, regs, users, schedules, exams, essays } = useMemo(() => ({
-    results: getExamResults(), regs: getExamRegistrations(), users: getUsers(),
-    schedules: getExamSchedules(), exams: getExams(), essays: getEssayAnswers(),
-  }), [tick]);
+  const { data: rawData, loading, error, refetch } = useAsync(async () => {
+    const [results, regs, users, schedules, exams, essays] = await Promise.all([
+      getExamResults(), getExamRegistrations(), getUsers(), getExamSchedules(), getExams(), getEssayAnswers()
+    ]);
+    return { results, regs, users, schedules, exams, essays };
+  });
+
+  const results = rawData?.results || [];
+  const regs = rawData?.regs || [];
+  const users = rawData?.users || [];
+  const schedules = rawData?.schedules || [];
+  const exams = rawData?.exams || [];
+  const essays = rawData?.essays || [];
 
   const enriched = results.map(r => {
     const reg = regs.find(rg => rg.id === r.registrationId);
@@ -50,6 +60,9 @@ export default function EmployeeResults() {
   const { paginated: paginatedResults, totalPages: resultsTotalPages, safePage: resultsSafePage, totalItems: resultsTotal } = usePaginationSlice(filtered, resultsPage, RESULTS_PER_PAGE);
   const resetResultsPage = () => setResultsPage(1);
 
+  if (loading && !rawData) return <SkeletonPage />;
+  if (error) return <ErrorAlert error={error} onRetry={refetch} />;
+
   const passed = results.filter(r => r.passed).length;
   const failed = results.filter(r => !r.passed).length;
   const avg = results.length > 0 ? (results.reduce((s, r) => s + r.percentage, 0) / results.length).toFixed(1) : 0;
@@ -67,14 +80,22 @@ export default function EmployeeResults() {
     return 'Unknown question';
   };
 
-  const handleScore = () => {
+  const handleScore = async () => {
+    if (saving) return;
     const s = parseInt(scoreVal);
     if (isNaN(s) || s < 0) { showToast('Enter a valid score.', 'error'); return; }
     if (s > scoreModal.maxPoints) { showToast(`Score cannot exceed ${scoreModal.maxPoints} points.`, 'error'); return; }
-    scoreEssay(scoreModal.id, s);
-    showToast('Essay scored!', 'success');
-    setScoreModal(null);
-    refresh(v => v + 1);
+    setSaving(true);
+    try {
+      await scoreEssay(scoreModal.id, s);
+      showToast('Essay scored!', 'success');
+      setScoreModal(null);
+      refetch();
+    } catch (err) {
+      showToast('Failed to score essay.', 'error');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handlePrintResult = (r) => {
@@ -132,10 +153,10 @@ export default function EmployeeResults() {
 
   return (
     <div>
-      <div className="flex gap-2 mb-6 flex-wrap">
-        <button onClick={() => setTab('results')} className={`px-4 py-2 rounded-lg text-sm font-medium transition ${tab === 'results' ? 'bg-[#166534] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>📊 All Results</button>
+      <div className="flex gap-2 mb-6 flex-wrap" role="tablist">
+        <button role="tab" aria-selected={tab === 'results'} onClick={() => setTab('results')} className={`px-4 py-2 rounded-lg text-sm font-medium transition ${tab === 'results' ? 'bg-[#166534] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>📊 All Results</button>
         {canScoreEssays && (
-          <button onClick={() => setTab('essays')} className={`px-4 py-2 rounded-lg text-sm font-medium transition ${tab === 'essays' ? 'bg-[#166534] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>📝 Essay Review ({pending.length})</button>
+          <button role="tab" aria-selected={tab === 'essays'} onClick={() => setTab('essays')} className={`px-4 py-2 rounded-lg text-sm font-medium transition ${tab === 'essays' ? 'bg-[#166534] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>📝 Essay Review ({pending.length})</button>
         )}
       </div>
 
@@ -167,7 +188,7 @@ export default function EmployeeResults() {
             </div>
             {paginatedResults.length > 0 ? (
               <>
-                <div className="overflow-x-auto">
+                <div className="table-scroll">
                   <table className="w-full text-sm">
                     <thead><tr className="border-b border-gray-200 text-left text-gray-400 uppercase text-xs">
                       <th scope="col" className="py-3 px-2">Student</th><th scope="col" className="py-3 px-2">Exam</th><th scope="col" className="py-3 px-2">Score</th>
@@ -234,7 +255,7 @@ export default function EmployeeResults() {
               <span className="text-gray-500 text-sm">/ {scoreModal.maxPoints} pts</span>
             </div>
             <div className="flex gap-3">
-              <button onClick={handleScore} className="bg-forest-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-forest-600">Save Score</button>
+              <button onClick={handleScore} disabled={saving} className="bg-forest-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-forest-600 disabled:opacity-50 disabled:cursor-not-allowed">{saving ? '⏳ Saving…' : 'Save Score'}</button>
               <button onClick={() => setScoreModal(null)} className="border border-gray-300 text-gray-700 px-5 py-2 rounded-lg hover:bg-gray-50">Cancel</button>
             </div>
           </>

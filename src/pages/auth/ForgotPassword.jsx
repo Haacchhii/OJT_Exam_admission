@@ -10,11 +10,13 @@ export default function ForgotPassword() {
   const navigate = useNavigate();
   if (user) return <Navigate to={user.role === 'applicant' ? '/student' : '/employee'} replace />;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const u = getUserByEmail(email);
+    const u = await getUserByEmail(email);
     if (!u) { showToast('No account found with this email.', 'error'); return; }
-    localStorage.setItem('gk_reset_email', email);
+    // Generate a simple time-limited reset token (in production, backend sends email with real token)
+    const token = btoa(`${email}:${Date.now()}`);
+    localStorage.setItem('gk_reset_token', JSON.stringify({ email, token, expires: Date.now() + 15 * 60 * 1000 }));
     showToast('Email verified! You may now reset your password.', 'success');
     navigate('/reset-password');
   };

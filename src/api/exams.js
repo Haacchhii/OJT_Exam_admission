@@ -1,10 +1,18 @@
 import { load, save } from '../data/store.js';
 import { addNotification } from './notifications.js';
+import { USE_API, client } from './client.js';
 
-export function getExams() { return load().exams; }
-export function getExam(id) { return load().exams.find(e => e.id === id) || null; }
+export async function getExams() {
+  if (USE_API) return client.get('/exams');
+  return load().exams;
+}
+export async function getExam(id) {
+  if (USE_API) return client.get(`/exams/${id}`);
+  return load().exams.find(e => e.id === id) || null;
+}
 
-export function addExam(exam) {
+export async function addExam(exam) {
+  if (USE_API) return client.post('/exams', exam);
   const data = load();
   exam.id = data.nextExamId++;
   exam.isActive = true;
@@ -15,7 +23,8 @@ export function addExam(exam) {
   return exam;
 }
 
-export function updateExam(id, updates) {
+export async function updateExam(id, updates) {
+  if (USE_API) return client.put(`/exams/${id}`, updates);
   const data = load();
   const exam = data.exams.find(e => e.id === id);
   if (exam) {
@@ -26,7 +35,8 @@ export function updateExam(id, updates) {
   return exam;
 }
 
-export function deleteExam(id) {
+export async function deleteExam(id) {
+  if (USE_API) return client.delete(`/exams/${id}`);
   const data = load();
   // Cascade: remove schedules, registrations, and results tied to this exam
   const schedIds = data.examSchedules.filter(s => s.examId === id).map(s => s.id);
@@ -40,12 +50,14 @@ export function deleteExam(id) {
   save(data);
 }
 
-export function getExamSchedules(examId) {
+export async function getExamSchedules(examId) {
+  if (USE_API) return client.get(`/exams/schedules${examId ? `?examId=${examId}` : ''}`);
   const schedules = load().examSchedules;
   return examId ? schedules.filter(s => s.examId === examId) : schedules;
 }
 
-export function addExamSchedule(schedule) {
+export async function addExamSchedule(schedule) {
+  if (USE_API) return client.post('/exams/schedules', schedule);
   const data = load();
   schedule.id = data.nextScheduleId++;
   schedule.slotsTaken = 0;
@@ -54,7 +66,8 @@ export function addExamSchedule(schedule) {
   return schedule;
 }
 
-export function updateExamSchedule(id, updates) {
+export async function updateExamSchedule(id, updates) {
+  if (USE_API) return client.put(`/exams/schedules/${id}`, updates);
   const data = load();
   const sched = data.examSchedules.find(s => s.id === id);
   if (sched) {
@@ -65,7 +78,8 @@ export function updateExamSchedule(id, updates) {
   return sched;
 }
 
-export function deleteExamSchedule(id) {
+export async function deleteExamSchedule(id) {
+  if (USE_API) return client.delete(`/exams/schedules/${id}`);
   const data = load();
   // Cascade: remove registrations tied to this schedule
   const regIds = data.examRegistrations.filter(r => r.scheduleId === id).map(r => r.id);
@@ -77,9 +91,13 @@ export function deleteExamSchedule(id) {
   save(data);
 }
 
-export function getExamRegistrations() { return load().examRegistrations; }
+export async function getExamRegistrations() {
+  if (USE_API) return client.get('/exams/registrations');
+  return load().examRegistrations;
+}
 
-export function registerForExam(userEmail, scheduleId) {
+export async function registerForExam(userEmail, scheduleId) {
+  if (USE_API) return client.post('/exams/registrations', { userEmail, scheduleId });
   const data = load();
   // Prevent duplicate active registration (allow re-registration after completing)
   const existing = data.examRegistrations.find(r => r.userEmail === userEmail && r.status !== 'done');
@@ -98,15 +116,16 @@ export function registerForExam(userEmail, scheduleId) {
   // Notify student about successful booking
   const userObj = data.users.find(u => u.email === userEmail);
   if (userObj) {
-    addNotification({ userId: `student_${userObj.id}`, title: 'Exam Scheduled', message: `You have been scheduled for an exam on ${schedule.scheduledDate} at ${schedule.startTime}.`, type: 'exam' });
+    await addNotification({ userId: `student_${userObj.id}`, title: 'Exam Scheduled', message: `You have been scheduled for an exam on ${schedule.scheduledDate} at ${schedule.startTime}.`, type: 'exam' });
   }
   // Notify employees
-  addNotification({ userId: 'employee', title: 'Exam Registration', message: `${userObj ? `${userObj.firstName} ${userObj.lastName}` : 'A student'} has booked an exam slot for ${schedule.scheduledDate}.`, type: 'exam' });
+  await addNotification({ userId: 'employee', title: 'Exam Registration', message: `${userObj ? `${userObj.firstName} ${userObj.lastName}` : 'A student'} has booked an exam slot for ${schedule.scheduledDate}.`, type: 'exam' });
 
   return reg;
 }
 
-export function startExam(registrationId) {
+export async function startExam(registrationId) {
+  if (USE_API) return client.patch(`/exams/registrations/${registrationId}/start`);
   const data = load();
   const reg = data.examRegistrations.find(r => r.id === registrationId);
   if (!reg) return null;

@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react';
+import { useAsync } from '../../hooks/useAsync.js';
 import { getAdmissions } from '../../api/admissions.js';
 import { getExams, getExamSchedules, getExamRegistrations } from '../../api/exams.js';
 import { getExamResults, getEssayAnswers } from '../../api/results.js';
 import { getUsers } from '../../api/users.js';
 import { showToast } from '../../components/Toast.jsx';
-import { PageHeader } from '../../components/UI.jsx';
+import { PageHeader, SkeletonPage, ErrorAlert } from '../../components/UI.jsx';
 
 function downloadCSV(filename, rows) {
   const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
@@ -20,19 +21,19 @@ export default function EmployeeReports() {
   const [gradeFilter, setGradeFilter] = useState('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [dataTick, setDataTick] = useState(0);
 
-  const rawData = useMemo(() => ({
-    admissions: getAdmissions(), results: getExamResults(), exams: getExams(),
-    schedules: getExamSchedules(), regs: getExamRegistrations(), essays: getEssayAnswers(),
-    users: getUsers(),
-  }), [dataTick]);
+  const { data: rawData, loading, error, refetch } = useAsync(async () => {
+    const [admissions, results, exams, schedules, regs, essays, users] = await Promise.all([
+      getAdmissions(), getExamResults(), getExams(), getExamSchedules(), getExamRegistrations(), getEssayAnswers(), getUsers()
+    ]);
+    return { admissions, results, exams, schedules, regs, essays, users };
+  });
 
-  const grades = useMemo(() => [...new Set(rawData.admissions.map(a => a.gradeLevel).filter(Boolean))].sort(), [rawData.admissions]);
+  const grades = useMemo(() => [...new Set((rawData?.admissions || []).map(a => a.gradeLevel).filter(Boolean))].sort(), [rawData?.admissions]);
 
   // Apply filters to admissions and cascade to results
   const { admissions, results, exams, schedules, regs, essays, users } = useMemo(() => {
-    let adm = rawData.admissions;
+    let adm = rawData?.admissions || [];
     if (statusFilter !== 'all') adm = adm.filter(a => a.status === statusFilter);
     if (gradeFilter !== 'all') adm = adm.filter(a => a.gradeLevel === gradeFilter);
     if (dateFrom) adm = adm.filter(a => new Date(a.submittedAt) >= new Date(dateFrom));
@@ -40,16 +41,19 @@ export default function EmployeeReports() {
 
     // Cascade: filter results to only include registrations whose user has an admission passing filters
     const admEmails = new Set(adm.map(a => a.email));
-    const filteredRegs = rawData.regs.filter(r => admEmails.has(r.userEmail));
+    const filteredRegs = (rawData?.regs || []).filter(r => admEmails.has(r.userEmail));
     const regIds = new Set(filteredRegs.map(r => r.id));
-    const filteredResults = rawData.results.filter(r => regIds.has(r.registrationId));
+    const filteredResults = (rawData?.results || []).filter(r => regIds.has(r.registrationId));
 
     return {
-      admissions: adm, results: filteredResults, exams: rawData.exams,
-      schedules: rawData.schedules, regs: filteredRegs, essays: rawData.essays,
-      users: rawData.users,
+      admissions: adm, results: filteredResults, exams: rawData?.exams || [],
+      schedules: rawData?.schedules || [], regs: filteredRegs, essays: rawData?.essays || [],
+      users: rawData?.users || [],
     };
   }, [rawData, statusFilter, gradeFilter, dateFrom, dateTo]);
+
+  if (loading && !rawData) return <SkeletonPage />;
+  if (error) return <ErrorAlert error={error} onRetry={refetch} />;
 
   const totalApplicants = admissions.length;
   const accepted = admissions.filter(a => a.status === 'Accepted').length;
@@ -124,7 +128,7 @@ export default function EmployeeReports() {
 
       {/* Refresh button */}
       <div className="flex justify-end mb-4">
-        <button onClick={() => setDataTick(t => t + 1)} className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 flex items-center gap-2">🔄 Refresh Data</button>
+        <button onClick={refetch} className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 flex items-center gap-2">🔄 Refresh Data</button>
       </div>
 
       {/* Filters */}
@@ -219,7 +223,7 @@ export default function EmployeeReports() {
       {/* Summary Table */}
       <div className="lpu-card p-6">
         <h3 className="text-lg font-bold text-forest-500 mb-4">📋 Summary Statistics</h3>
-        <div className="overflow-x-auto">
+        <div className="table-scroll">
           <table className="w-full text-sm">
             <thead><tr className="border-b border-gray-200 text-left text-gray-400 uppercase text-xs">
               <th scope="col" className="py-3 px-2">Metric</th><th scope="col" className="py-3 px-2">Value</th><th scope="col" className="py-3 px-2">Change</th>

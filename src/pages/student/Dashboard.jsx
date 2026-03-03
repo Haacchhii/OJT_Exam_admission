@@ -1,27 +1,21 @@
-import { useMemo, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useAsync } from '../../hooks/useAsync.js';
 import { getAdmissions } from '../../api/admissions.js';
 import { getExamRegistrations } from '../../api/exams.js';
 import { getExamResults } from '../../api/results.js';
-import { StatCard, PageHeader, SkeletonPage } from '../../components/UI.jsx';
+import { StatCard, PageHeader, SkeletonPage, ErrorAlert } from '../../components/UI.jsx';
 import { formatDate } from '../../utils/helpers.js';
 
 export default function StudentDashboard() {
   const { user } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [tick, setTick] = useState(0);
 
-  useEffect(() => { setLoading(false); }, []);
-  // Re-fetch data when navigating back to dashboard
-  useEffect(() => { setTick(t => t + 1); }, []);
-
-  const { myApp, myReg, myResult, examStatus } = useMemo(() => {
-    const admissions = getAdmissions();
+  const { data: rawData, loading, error, refetch } = useAsync(async () => {
+    const [admissions, registrations, results] = await Promise.all([
+      getAdmissions(), getExamRegistrations(), getExamResults()
+    ]);
     const myApp = admissions.find(a => a.email === user?.email) || null;
-    const registrations = getExamRegistrations();
     const myReg = registrations.find(r => r.userEmail === user?.email) || null;
-    const results = getExamResults();
     const myResult = myReg ? results.find(r => r.registrationId === myReg.id) : null;
 
     let examText = 'Not Started', examIcon = '📋', examColor = 'blue';
@@ -30,13 +24,19 @@ export default function StudentDashboard() {
     else if (myReg) { examText = 'Scheduled'; examIcon = '📅'; examColor = 'amber'; }
 
     return { myApp, myReg, myResult, examStatus: { text: examText, icon: examIcon, color: examColor } };
-  }, [user, tick]);
+  }, [user]);
+
+  const myApp = rawData?.myApp || null;
+  const myReg = rawData?.myReg || null;
+  const myResult = rawData?.myResult || null;
+  const examStatus = rawData?.examStatus || { text: 'Not Started', icon: '📋', color: 'blue' };
 
   const statusText = myApp ? myApp.status : 'Not Submitted';
   const statusColor = statusText === 'Accepted' ? 'emerald' : statusText === 'Rejected' ? 'red' : 'amber';
   const admissionUnlocked = myResult?.passed === true;
 
-  if (loading) return <SkeletonPage />;
+  if (loading && !rawData) return <SkeletonPage />;
+  if (error) return <ErrorAlert error={error} onRetry={refetch} />;
 
   return (
     <div>

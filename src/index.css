@@ -122,6 +122,21 @@
     outline: 2px solid #166534;
     outline-offset: 2px;
   }
+
+  /* ═══ Scrollable Table Container ═══ */
+  .table-scroll {
+    @apply overflow-x-auto;
+    -webkit-overflow-scrolling: touch;
+    background:
+      linear-gradient(to right, white 30%, rgba(255,255,255,0)),
+      linear-gradient(to left, white 30%, rgba(255,255,255,0)),
+      linear-gradient(to right, rgba(0,0,0,0.08), rgba(0,0,0,0)),
+      linear-gradient(to left, rgba(0,0,0,0.08), rgba(0,0,0,0));
+    background-position: left center, right center, left center, right center;
+    background-repeat: no-repeat;
+    background-size: 20px 100%, 20px 100%, 10px 100%, 10px 100%;
+    background-attachment: local, local, scroll, scroll;
+  }
 }
 
 @keyframes fadeInUp {

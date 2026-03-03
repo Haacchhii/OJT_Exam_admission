@@ -3,6 +3,7 @@ import { Link, useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { getUserByEmail, updateUser } from '../../api/users.js';
 import { showToast } from '../../components/Toast.jsx';
+import { getPasswordStrength } from '../../utils/passwordStrength.js';
 
 export default function ResetPassword() {
   const { user: authUser } = useAuth();
@@ -12,35 +13,35 @@ export default function ResetPassword() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const e = localStorage.getItem('gk_reset_email');
-    if (!e) { navigate('/forgot-password'); return; }
-    setEmail(e);
+    try {
+      const raw = localStorage.getItem('gk_reset_token');
+      if (!raw) { navigate('/forgot-password'); return; }
+      const token = JSON.parse(raw);
+      if (!token.email || !token.expires || Date.now() > token.expires) {
+        localStorage.removeItem('gk_reset_token');
+        showToast('Reset link has expired. Please try again.', 'error');
+        navigate('/forgot-password');
+        return;
+      }
+      setEmail(token.email);
+    } catch {
+      navigate('/forgot-password');
+    }
   }, [navigate]);
 
   if (authUser) return <Navigate to={authUser.role === 'applicant' ? '/student' : '/employee'} replace />;
 
-  const strength = (() => {
-    const v = pw;
-    let s = 0;
-    if (v.length >= 8) s++;
-    if (v.length >= 12) s++;
-    if (/[A-Z]/.test(v)) s++;
-    if (/[0-9]/.test(v)) s++;
-    if (/[^A-Za-z0-9]/.test(v)) s++;
-    const levels = ['', 'Very Weak', 'Weak', 'Fair', 'Strong', 'Very Strong'];
-    const colors = ['bg-gray-200', 'bg-red-500', 'bg-gold-500', 'bg-gold-500', 'bg-forest-500', 'bg-forest-500'];
-    return { score: s, text: levels[s], color: colors[s], width: `${s * 20}%` };
-  })();
+  const strength = getPasswordStrength(pw);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (pw.length < 8) { showToast('Password must be at least 8 characters', 'error'); return; }
     if (strength.score < 3) { showToast('Password is too weak. Include uppercase, numbers, or symbols.', 'error'); return; }
     if (pw !== confirm) { showToast('Passwords do not match', 'error'); return; }
-    const u = getUserByEmail(email);
+    const u = await getUserByEmail(email);
     if (!u) { showToast('User not found', 'error'); return; }
-    updateUser(u.id, { password: pw });
-    localStorage.removeItem('gk_reset_email');
+    await updateUser(u.id, { password: pw });
+    localStorage.removeItem('gk_reset_token');
     showToast('Password updated successfully!', 'success');
     navigate('/login');
   };

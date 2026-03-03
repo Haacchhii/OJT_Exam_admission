@@ -1,10 +1,21 @@
 import { load, save } from '../data/store.js';
+import { USE_API, client } from './client.js';
 
-export function getUsers() { return load().users; }
-export function getUser(id) { return load().users.find(u => u.id === id) || null; }
-export function getUserByEmail(email) { return load().users.find(u => u.email === email) || null; }
+export async function getUsers() {
+  if (USE_API) return client.get('/users');
+  return load().users;
+}
+export async function getUser(id) {
+  if (USE_API) return client.get(`/users/${id}`);
+  return load().users.find(u => u.id === id) || null;
+}
+export async function getUserByEmail(email) {
+  if (USE_API) return client.get(`/users/by-email/${encodeURIComponent(email)}`);
+  return load().users.find(u => u.email === email) || null;
+}
 
-export function addUser(user) {
+export async function addUser(user) {
+  if (USE_API) return client.post('/users', user);
   const data = load();
   // Check email uniqueness
   if (user.email && data.users.some(u => u.email === user.email)) {
@@ -19,14 +30,16 @@ export function addUser(user) {
   return user;
 }
 
-export function updateUser(id, updates) {
+export async function updateUser(id, updates) {
+  if (USE_API) return client.put(`/users/${id}`, updates);
   const data = load();
   const user = data.users.find(u => u.id === id);
   if (user) { Object.assign(user, updates); save(data); }
   return user;
 }
 
-export function deleteUser(id) {
+export async function deleteUser(id) {
+  if (USE_API) return client.delete(`/users/${id}`);
   const data = load();
   const user = data.users.find(u => u.id === id);
   if (user) {

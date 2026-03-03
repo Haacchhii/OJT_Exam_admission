@@ -1,13 +1,14 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useAsync } from '../../hooks/useAsync.js';
 import { getAdmissions, addAdmission } from '../../api/admissions.js';
 import { getExamRegistrations } from '../../api/exams.js';
 import { getExamResults } from '../../api/results.js';
 import { showToast } from '../../components/Toast.jsx';
 import Modal from '../../components/Modal.jsx';
 import { useConfirm } from '../../components/ConfirmDialog.jsx';
-import { PageHeader, Badge } from '../../components/UI.jsx';
+import { PageHeader, Badge, SkeletonPage, ErrorAlert } from '../../components/UI.jsx';
 import { formatDate, badgeClass } from '../../utils/helpers.js';
 import { useUnsavedChanges } from '../../hooks/useUnsavedChanges.js';
 
@@ -88,6 +89,7 @@ export default function StudentAdmission() {
   const [successOpen, setSuccessOpen] = useState(false);
   const [slotFiles, setSlotFiles] = useState({ birthCert: null, idPhoto: null, reportCard: null, goodMoral: null, baptismal: null, eccdChecklist: null, incomeTax: null, escCert: null });
   const [extraFiles, setExtraFiles] = useState([]);
+  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     firstName: '', lastName: '', email: '', phone: '', dob: '', gender: '', address: '',
     guardian: '', guardianRelation: '', guardianPhone: '', guardianEmail: '',
@@ -96,17 +98,20 @@ export default function StudentAdmission() {
 
   const { user } = useAuth();
   const confirmDialog = useConfirm();
-  const existingApp = useMemo(() => { const a = getAdmissions(); return a.find(app => app.email === user?.email) || null; }, [user]);
 
-  // Check if student has passed the entrance exam
-  const examPassed = useMemo(() => {
-    const registrations = getExamRegistrations();
+  const { data: gateData, loading: gateLoading, error: gateError, refetch } = useAsync(async () => {
+    const [admissions, registrations, results] = await Promise.all([
+      getAdmissions(), getExamRegistrations(), getExamResults()
+    ]);
+    const existingApp = admissions.find(app => app.email === user?.email) || null;
     const myReg = registrations.find(r => r.userEmail === user?.email);
-    if (!myReg) return false;
-    const results = getExamResults();
-    const myResult = results.find(r => r.registrationId === myReg.id);
-    return myResult?.passed === true;
+    const myResult = myReg ? results.find(r => r.registrationId === myReg.id) : null;
+    const examPassed = myResult?.passed === true;
+    return { existingApp, examPassed };
   }, [user]);
+
+  const existingApp = gateData?.existingApp || null;
+  const examPassed = gateData?.examPassed || false;
 
   const isDirty = !!(form.firstName || form.lastName || form.email);
   const { restore, clear } = useUnsavedChanges(isDirty, 'gk_admission_draft', form);
@@ -171,6 +176,7 @@ export default function StudentAdmission() {
   const requiredDocs = useMemo(() => getRequiredDocs(form.gradeLevel), [form.gradeLevel]);
 
   const handleSubmit = async () => {
+    if (saving) return;
     const ok = await confirmDialog({
       title: 'Submit Application',
       message: 'Are you sure you want to submit your admission application? This action cannot be undone.',
@@ -182,14 +188,46 @@ export default function StudentAdmission() {
     Object.entries(slotFiles).forEach(([k, f]) => { if (f) docs.push(ALL_SLOT_LABELS[k] || k); });
     extraFiles.forEach(f => docs.push(f.name.replace(/\.[^.]+$/, '')));
 
-    const result = addAdmission({ ...form, documents: docs.length ? docs : ['(No documents uploaded)'] });
-    if (result?.error) { showToast(result.error, 'error'); return; }
-    clear(); // Clear autosaved draft
-    setSuccessOpen(true);
+    setSaving(true);
+    try {
+      const result = await addAdmission({ ...form, documents: docs.length ? docs : ['(No documents uploaded)'] });
+      if (result?.error) { showToast(result.error, 'error'); return; }
+      clear(); // Clear autosaved draft
+      refetch();
+      setSuccessOpen(true);
+    } catch (err) {
+      showToast('Submission failed: ' + (err.message || 'Unknown error'), 'error');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleSlotFile = (slot, file) => setSlotFiles(s => ({ ...s, [slot]: file }));
+  const ALLOWED_FILE_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+  const validateFile = (file) => {
+    if (!ALLOWED_FILE_TYPES.includes(file.type) && !file.name.match(/\.(pdf|jpg|jpeg|png|webp|doc|docx)$/i)) {
+      showToast(`"${file.name}" is not a supported file type. Use PDF, JPG, PNG, or DOC.`, 'error');
+      return false;
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      showToast(`"${file.name}" exceeds the 10MB file size limit.`, 'error');
+      return false;
+    }
+    return true;
+  };
+
+  const handleSlotFile = (slot, file) => {
+    if (!validateFile(file)) return;
+    setSlotFiles(s => ({ ...s, [slot]: file }));
+  };
+  const handleExtraFiles = (files) => {
+    const valid = Array.from(files).filter(validateFile);
+    if (valid.length > 0) setExtraFiles(f => [...f, ...valid]);
+  };
   const removeSlot = (slot) => setSlotFiles(s => ({ ...s, [slot]: null }));
+
+  if (gateLoading && !gateData) return <SkeletonPage />;
+  if (gateError) return <ErrorAlert error={gateError} onRetry={refetch} />;
 
   // Gate: must pass entrance exam first
   if (!existingApp && !examPassed) {
@@ -420,13 +458,13 @@ export default function StudentAdmission() {
             onClick={() => document.getElementById('extraFileInput').click()}
             onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add('border-gold-400'); }}
             onDragLeave={e => e.currentTarget.classList.remove('border-gold-400')}
-            onDrop={e => { e.preventDefault(); e.currentTarget.classList.remove('border-gold-400'); setExtraFiles(f => [...f, ...Array.from(e.dataTransfer.files)]); }}
+            onDrop={e => { e.preventDefault(); e.currentTarget.classList.remove('border-gold-400'); handleExtraFiles(e.dataTransfer.files); }}
           >
             <span className="text-3xl">📁</span>
             <p className="text-gray-500 mt-2">Drag & drop files here or <span className="text-[#166534] font-medium">browse</span></p>
             <p className="text-xs text-gray-400 mt-1">Medical records, recommendation letters, other certificates</p>
           </div>
-          <input id="extraFileInput" type="file" multiple className="hidden" onChange={e => { setExtraFiles(f => [...f, ...Array.from(e.target.files)]); e.target.value = ''; }} />
+          <input id="extraFileInput" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx" className="hidden" onChange={e => { handleExtraFiles(e.target.files); e.target.value = ''; }} />
           {extraFiles.length > 0 && (
             <div className="mt-3 space-y-2">
               {extraFiles.map((f, i) => (
@@ -502,7 +540,7 @@ export default function StudentAdmission() {
 
           <div className="flex justify-between">
             <button onClick={() => goTo(3)} className="border border-gray-300 text-gray-700 px-5 py-2.5 rounded-lg hover:bg-gray-50">← Back</button>
-            <button onClick={handleSubmit} className="bg-forest-500 text-white px-8 py-2.5 rounded-lg font-semibold hover:bg-forest-600 shadow-md text-lg">✅ Submit Application</button>
+            <button onClick={handleSubmit} disabled={saving} className="bg-forest-500 text-white px-8 py-2.5 rounded-lg font-semibold hover:bg-forest-600 shadow-md text-lg disabled:opacity-50 disabled:cursor-not-allowed">{saving ? '⏳ Submitting…' : '✅ Submit Application'}</button>
           </div>
         </div>
       )}

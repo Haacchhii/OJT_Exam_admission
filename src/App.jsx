@@ -1,4 +1,5 @@
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
 import { AuthProvider } from './context/AuthContext.jsx';
 import { ROLE_PERMISSIONS } from './context/AuthContext.jsx';
 import { ToastContainer } from './components/Toast.jsx';
@@ -8,31 +9,33 @@ import ErrorBoundary from './components/ErrorBoundary.jsx';
 import ScrollToTop from './components/ScrollToTop.jsx';
 import NotFound from './pages/NotFound.jsx';
 import { useAuth } from './context/AuthContext.jsx';
+import { SkeletonPage } from './components/UI.jsx';
 
-/* Auth pages */
-import Login from './pages/auth/Login.jsx';
-import Register from './pages/auth/Register.jsx';
-import ForgotPassword from './pages/auth/ForgotPassword.jsx';
-import ResetPassword from './pages/auth/ResetPassword.jsx';
+/* Auth pages (lazy) */
+const Login = lazy(() => import('./pages/auth/Login.jsx'));
+const Register = lazy(() => import('./pages/auth/Register.jsx'));
+const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword.jsx'));
+const ResetPassword = lazy(() => import('./pages/auth/ResetPassword.jsx'));
 
-/* Student pages */
-import StudentDashboard from './pages/student/Dashboard.jsx';
-import StudentAdmission from './pages/student/Admission.jsx';
-import StudentExam from './pages/student/Exam.jsx';
-import StudentResults from './pages/student/Results.jsx';
+/* Student pages (lazy) */
+const StudentDashboard = lazy(() => import('./pages/student/Dashboard.jsx'));
+const StudentAdmission = lazy(() => import('./pages/student/Admission.jsx'));
+const StudentExam = lazy(() => import('./pages/student/Exam.jsx'));
+const StudentResults = lazy(() => import('./pages/student/Results.jsx'));
 
-/* Employee pages */
-import EmployeeDashboard from './pages/employee/Dashboard.jsx';
-import EmployeeAdmissions from './pages/employee/Admissions.jsx';
-import EmployeeExams from './pages/employee/Exams.jsx';
-import EmployeeResults from './pages/employee/Results.jsx';
-import EmployeeReports from './pages/employee/Reports.jsx';
-import EmployeeUsers from './pages/employee/Users.jsx';
+/* Employee pages (lazy) */
+const EmployeeDashboard = lazy(() => import('./pages/employee/Dashboard.jsx'));
+const EmployeeAdmissions = lazy(() => import('./pages/employee/Admissions.jsx'));
+const EmployeeExams = lazy(() => import('./pages/employee/Exams.jsx'));
+const EmployeeResults = lazy(() => import('./pages/employee/Results.jsx'));
+const EmployeeReports = lazy(() => import('./pages/employee/Reports.jsx'));
+const EmployeeUsers = lazy(() => import('./pages/employee/Users.jsx'));
 
 /* Route guard: redirects to /employee if user doesn't have permission for the page */
 function RoleGuard({ page, children }) {
   const { user } = useAuth();
-  if (!user || user.role === 'applicant') return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role === 'applicant') return <Navigate to="/student" replace />;
   const perms = ROLE_PERMISSIONS[user.role] || [];
   if (!perms.includes(page)) return <Navigate to="/employee" replace />;
   return children;
@@ -45,6 +48,7 @@ export default function App() {
       <ConfirmProvider>
       <HashRouter>
         <ScrollToTop />
+        <Suspense fallback={<div className="p-6"><SkeletonPage /></div>}>
         <Routes>
           {/* Public auth routes */}
           <Route path="/login" element={<Login />} />
@@ -78,6 +82,7 @@ export default function App() {
           {/* Catch-all 404 */}
           <Route path="*" element={<NotFound />} />
         </Routes>
+        </Suspense>
       </HashRouter>
       </ConfirmProvider>
       <ToastContainer />

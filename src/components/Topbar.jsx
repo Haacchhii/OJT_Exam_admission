@@ -7,15 +7,20 @@ export default function Topbar({ title, onMenuToggle, userId, user }) {
   const [notifs, setNotifs] = useState([]);
   const ref = useRef(null);
 
-  const refresh = useCallback(() => setNotifs(getNotifications(userId)), [userId]);
+  const refresh = useCallback(async () => {
+    try {
+      const result = await getNotifications(userId);
+      setNotifs(result || []);
+    } catch { /* ignore notification fetch errors */ }
+  }, [userId]);
 
-  useEffect(() => { refresh(); }, [userId]);
+  useEffect(() => { refresh(); }, [refresh]);
 
   // Auto-refresh notifications every 30 seconds
   useEffect(() => {
-    const interval = setInterval(() => setNotifs(getNotifications(userId)), 30000);
+    const interval = setInterval(refresh, 30000);
     return () => clearInterval(interval);
-  }, [userId]);
+  }, [refresh]);
 
   useEffect(() => {
     const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setShowNotifs(false); };
@@ -44,6 +49,7 @@ export default function Topbar({ title, onMenuToggle, userId, user }) {
         <button
           onClick={() => { setShowNotifs(!showNotifs); refresh(); }}
           className="relative p-2 rounded-lg hover:bg-gray-100"
+          data-testid="notification-bell"
           aria-label={`Notifications${unread > 0 ? ` (${unread} unread)` : ''}`}
           aria-expanded={showNotifs}
           aria-haspopup="true"
@@ -62,7 +68,7 @@ export default function Topbar({ title, onMenuToggle, userId, user }) {
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
               <span className="font-semibold text-sm text-forest-500">Notifications</span>
               <button
-                onClick={() => { markAllRead(userId); refresh(); }}
+                onClick={async () => { await markAllRead(userId); refresh(); }}
                 className="text-xs text-[#166534] hover:text-[#14532d] font-medium"
               >
                 Mark all read
@@ -77,8 +83,9 @@ export default function Topbar({ title, onMenuToggle, userId, user }) {
                     key={n.id}
                     role="button"
                     tabIndex={0}
-                    onClick={() => { markNotificationRead(n.id); refresh(); }}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); markNotificationRead(n.id); refresh(); } }}
+                    aria-label={`${!n.isRead ? 'Unread: ' : ''}${n.title || ''} ${n.message}`}
+                    onClick={async () => { await markNotificationRead(n.id); refresh(); }}
+                    onKeyDown={async (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); await markNotificationRead(n.id); refresh(); } }}
                     className={`flex items-start gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors ${!n.isRead ? 'bg-gold-50/50' : ''}`}
                   >
                     <span className="text-lg shrink-0">{typeIcon(n.type)}</span>
