@@ -2,8 +2,8 @@ import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useAsync } from '../../hooks/useAsync.js';
-import { getExams, getExamSchedules, getExamRegistrations, registerForExam, getExam, startExam as apiStartExam } from '../../api/exams.js';
-import { getExamResults, submitExamAnswers } from '../../api/results.js';
+import { getExams, getExamSchedules, getMyRegistrations, registerForExam, getExamForStudent, startExam as apiStartExam } from '../../api/exams.js';
+import { getMyResult, submitExamAnswers } from '../../api/results.js';
 import { showToast } from '../../components/Toast.jsx';
 import Modal from '../../components/Modal.jsx';
 import { useConfirm } from '../../components/ConfirmDialog.jsx';
@@ -17,11 +17,10 @@ export default function StudentExam() {
 
   const { user } = useAuth();
   const { data: rawData, loading, error, refetch } = useAsync(async () => {
-    const [registrations, results] = await Promise.all([
-      getExamRegistrations(), getExamResults()
+    const [myRegs, myResult] = await Promise.all([
+      getMyRegistrations(user.email), getMyResult(user.email)
     ]);
-    const myReg = registrations.find(r => r.userEmail === user?.email) || null;
-    const myResult = myReg ? results.find(r => r.registrationId === myReg.id) : null;
+    const myReg = myRegs?.[0] || null;
     return { myReg, myResult };
   }, [user]);
 
@@ -37,7 +36,7 @@ export default function StudentExam() {
       (async () => {
         const schedules = await getExamSchedules();
         const schedule = schedules.find(s => s.id === myReg.scheduleId);
-        const exam = schedule ? await getExam(schedule.examId) : null;
+        const exam = schedule ? await getExamForStudent(schedule.examId) : null;
         if (exam) { setCurrentExam(exam); setView('exam'); }
       })();
     }

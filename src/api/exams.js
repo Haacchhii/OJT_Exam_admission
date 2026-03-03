@@ -1,14 +1,35 @@
 import { load, save } from '../data/store.js';
 import { addNotification } from './notifications.js';
-import { USE_API, client } from './client.js';
+import { USE_API, client, qs } from './client.js';
 
-export async function getExams() {
-  if (USE_API) return client.get('/exams');
+/**
+ * @param {Object} [params] - { search, grade, status, page, limit }
+ */
+export async function getExams(params) {
+  if (USE_API) return client.get(`/exams${qs(params)}`);
   return load().exams;
 }
 export async function getExam(id) {
   if (USE_API) return client.get(`/exams/${id}`);
   return load().exams.find(e => e.id === id) || null;
+}
+
+/**
+ * Fetch an exam with correct answers stripped (safe for students).
+ * Backend should return questions without `isCorrect` on choices.
+ * In localStorage mode, strips correct answers client-side.
+ */
+export async function getExamForStudent(id) {
+  if (USE_API) return client.get(`/exams/${id}/student`);
+  const exam = load().exams.find(e => e.id === id);
+  if (!exam) return null;
+  return {
+    ...exam,
+    questions: exam.questions.map(q => ({
+      ...q,
+      choices: q.choices?.map(({ isCorrect: _, ...c }) => c) || [],
+    })),
+  };
 }
 
 export async function addExam(exam) {
@@ -50,10 +71,27 @@ export async function deleteExam(id) {
   save(data);
 }
 
-export async function getExamSchedules(examId) {
-  if (USE_API) return client.get(`/exams/schedules${examId ? `?examId=${examId}` : ''}`);
+/**
+ * @param {number} [examId] - optionally filter by exam
+ * @param {Object} [params] - { search, page, limit }
+ */
+export async function getExamSchedules(examId, params) {
+  if (USE_API) return client.get(`/exams/schedules${qs({ examId, ...params })}`);
   const schedules = load().examSchedules;
   return examId ? schedules.filter(s => s.examId === examId) : schedules;
+}
+
+/**
+ * Fetch only schedules with available slots (for student registration view).
+ */
+export async function getAvailableSchedules() {
+  if (USE_API) return client.get('/exams/schedules/available');
+  const data = load();
+  return data.examSchedules.filter(s => {
+    const exam = data.exams.find(e => e.id === s.examId);
+    return exam && exam.isActive && s.slotsTaken < s.maxSlots
+      && new Date(`${s.scheduledDate}T${s.endTime}`) > new Date();
+  });
 }
 
 export async function addExamSchedule(schedule) {
@@ -91,9 +129,20 @@ export async function deleteExamSchedule(id) {
   save(data);
 }
 
-export async function getExamRegistrations() {
-  if (USE_API) return client.get('/exams/registrations');
+/**
+ * @param {Object} [params] - { search, status, page, limit }
+ */
+export async function getExamRegistrations(params) {
+  if (USE_API) return client.get(`/exams/registrations${qs(params)}`);
   return load().examRegistrations;
+}
+
+/**
+ * Fetch only the current student's registrations (scoped endpoint).
+ */
+export async function getMyRegistrations(email) {
+  if (USE_API) return client.get('/exams/registrations/mine');
+  return load().examRegistrations.filter(r => r.userEmail === email);
 }
 
 export async function registerForExam(userEmail, scheduleId) {

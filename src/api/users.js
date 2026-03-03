@@ -1,8 +1,11 @@
 import { load, save } from '../data/store.js';
-import { USE_API, client } from './client.js';
+import { USE_API, client, qs } from './client.js';
 
-export async function getUsers() {
-  if (USE_API) return client.get('/users');
+/**
+ * @param {Object} [params] - { search, role, status, page, limit }
+ */
+export async function getUsers(params) {
+  if (USE_API) return client.get(`/users${qs(params)}`);
   return load().users;
 }
 export async function getUser(id) {

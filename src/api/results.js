@@ -1,9 +1,12 @@
 import { load, save } from '../data/store.js';
 import { addNotification } from './notifications.js';
-import { USE_API, client } from './client.js';
+import { USE_API, client, qs } from './client.js';
 
-export async function getExamResults() {
-  if (USE_API) return client.get('/results');
+/**
+ * @param {Object} [params] - { search, passed, examId, page, limit }
+ */
+export async function getExamResults(params) {
+  if (USE_API) return client.get(`/results${qs(params)}`);
   return load().examResults;
 }
 export async function getExamResult(registrationId) {
@@ -11,8 +14,22 @@ export async function getExamResult(registrationId) {
   return load().examResults.find(r => r.registrationId === registrationId) || null;
 }
 
-export async function getEssayAnswers() {
-  if (USE_API) return client.get('/results/essays');
+/**
+ * Fetch the current student's own result (scoped endpoint).
+ */
+export async function getMyResult(email) {
+  if (USE_API) return client.get('/results/mine');
+  const data = load();
+  const myReg = data.examRegistrations.find(r => r.userEmail === email && r.status === 'done');
+  if (!myReg) return null;
+  return data.examResults.find(r => r.registrationId === myReg.id) || null;
+}
+
+/**
+ * @param {Object} [params] - { status, page, limit } — status: 'pending'|'scored'|'all'
+ */
+export async function getEssayAnswers(params) {
+  if (USE_API) return client.get(`/results/essays${qs(params)}`);
   return load().essayAnswers;
 }
 
@@ -73,8 +90,25 @@ export async function getSubmittedAnswers(registrationId) {
   return load().submittedAnswers.filter(a => a.registrationId === registrationId);
 }
 
+/**
+ * Submit exam answers.
+ *
+ * SECURITY NOTE (API mode):
+ *   Only `registrationId` and `answers` are sent to the backend.
+ *   The `questions` parameter is NOT sent — the backend MUST look up the
+ *   exam questions from its own database to prevent clients from injecting
+ *   modified correct answers.  The `questions` param is only used by the
+ *   localStorage fallback for offline grading.
+ *
+ * @param {number} registrationId
+ * @param {Record<string|number, any>} answersObj — { [questionId]: choiceId | essayText }
+ * @param {Array}  questions — full question list (used in localStorage mode ONLY)
+ */
 export async function submitExamAnswers(registrationId, answersObj, questions) {
-  if (USE_API) return client.post('/results/submit', { registrationId, answers: answersObj, questions });
+  if (USE_API) {
+    // Only send registrationId + answers — server grades from its own questions
+    return client.post('/results/submit', { registrationId, answers: answersObj });
+  }
   const data = load();
   data.submittedAnswers = data.submittedAnswers.filter(a => a.registrationId !== registrationId);
   for (const q of questions) {

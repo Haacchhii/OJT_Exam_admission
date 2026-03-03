@@ -2,55 +2,16 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useAsync } from '../../hooks/useAsync.js';
-import { getAdmissions, addAdmission } from '../../api/admissions.js';
-import { getExamRegistrations } from '../../api/exams.js';
-import { getExamResults } from '../../api/results.js';
+import { getMyAdmission, addAdmission, uploadAdmissionDocuments } from '../../api/admissions.js';
+import { getMyRegistrations } from '../../api/exams.js';
+import { getMyResult } from '../../api/results.js';
 import { showToast } from '../../components/Toast.jsx';
 import Modal from '../../components/Modal.jsx';
 import { useConfirm } from '../../components/ConfirmDialog.jsx';
 import { PageHeader, Badge, SkeletonPage, ErrorAlert } from '../../components/UI.jsx';
 import { formatDate, badgeClass } from '../../utils/helpers.js';
 import { useUnsavedChanges } from '../../hooks/useUnsavedChanges.js';
-
-const GRADE_OPTIONS = [
-  { group: 'Preschool', items: ['Nursery', 'Kinder'] },
-  { group: 'Grade School', items: ['Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6'] },
-  { group: 'Junior High School', items: ['Grade 7','Grade 8','Grade 9','Grade 10'] },
-  { group: 'Senior High School', items: ['Grade 11 — ABM','Grade 11 — STEM','Grade 11 — HUMSS','Grade 12 — ABM','Grade 12 — STEM','Grade 12 — HUMSS'] },
-];
-
-/* ===== Document requirements per grade level (from school policy) ===== */
-const DOC_REQUIREMENTS = {
-  'Nursery':    { idPhoto: true, baptismal: true, birthCert: true },
-  'Kinder':     { idPhoto: true, baptismal: true, birthCert: true },
-  'Grade 1':    { idPhoto: true, baptismal: true, birthCert: true, eccdChecklist: true },
-  'Grade 2':    { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true },
-  'Grade 3':    { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true },
-  'Grade 4':    { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true },
-  'Grade 5':    { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true },
-  'Grade 6':    { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true },
-  'Grade 7':    { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true, incomeTax: true },
-  'Grade 8':    { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true, escCert: true },
-  'Grade 9':    { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true, escCert: true },
-  'Grade 10':   { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true, escCert: true },
-  'Grade 11 — ABM':  { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true, escCert: true },
-  'Grade 11 — STEM': { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true, escCert: true },
-  'Grade 11 — HUMSS':{ idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true, escCert: true },
-  'Grade 12 — ABM':  { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true, escCert: true },
-  'Grade 12 — STEM': { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true, escCert: true },
-  'Grade 12 — HUMSS':{ idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true, escCert: true },
-};
-
-const ALL_SLOT_LABELS = {
-  birthCert: 'PSA Birth Certificate (original & photocopy)',
-  idPhoto: '2x2 ID Photos (2 copies)',
-  reportCard: 'Report Card / Form 138',
-  goodMoral: 'Certificate of Good Moral Character',
-  baptismal: 'Baptismal Certificate',
-  eccdChecklist: 'ECCD Checklist',
-  incomeTax: 'Latest Income Tax Return / Certificate of Tax Exemption / Municipal Cert. of Unemployment',
-  escCert: 'ESC Certificate (if applicable)',
-};
+import { GRADE_OPTIONS, DOC_REQUIREMENTS, DOC_SLOT_LABELS, ALLOWED_FILE_TYPES, MAX_FILE_SIZE } from '../../utils/constants.js';
 
 function getRequiredDocs(gradeLevel) {
   const reqs = DOC_REQUIREMENTS[gradeLevel] || DOC_REQUIREMENTS['Grade 2']; // default fallback
@@ -100,12 +61,9 @@ export default function StudentAdmission() {
   const confirmDialog = useConfirm();
 
   const { data: gateData, loading: gateLoading, error: gateError, refetch } = useAsync(async () => {
-    const [admissions, registrations, results] = await Promise.all([
-      getAdmissions(), getExamRegistrations(), getExamResults()
+    const [existingApp, myRegs, myResult] = await Promise.all([
+      getMyAdmission(user.email), getMyRegistrations(user.email), getMyResult(user.email)
     ]);
-    const existingApp = admissions.find(app => app.email === user?.email) || null;
-    const myReg = registrations.find(r => r.userEmail === user?.email);
-    const myResult = myReg ? results.find(r => r.registrationId === myReg.id) : null;
     const examPassed = myResult?.passed === true;
     return { existingApp, examPassed };
   }, [user]);
@@ -164,7 +122,7 @@ export default function StudentAdmission() {
       if (step === 3) {
         const missingDocs = requiredDocs.filter(k => !slotFiles[k]);
         if (missingDocs.length > 0) {
-          showToast(`Please upload all required documents. Missing: ${missingDocs.map(k => ALL_SLOT_LABELS[k]?.split('(')[0]?.trim() || k).join(', ')}`, 'error');
+          showToast(`Please upload all required documents. Missing: ${missingDocs.map(k => DOC_SLOT_LABELS[k]?.split('(')[0]?.trim() || k).join(', ')}`, 'error');
           return;
         }
       }
@@ -185,7 +143,7 @@ export default function StudentAdmission() {
     });
     if (!ok) return;
     const docs = [];
-    Object.entries(slotFiles).forEach(([k, f]) => { if (f) docs.push(ALL_SLOT_LABELS[k] || k); });
+    Object.entries(slotFiles).forEach(([k, f]) => { if (f) docs.push(DOC_SLOT_LABELS[k] || k); });
     extraFiles.forEach(f => docs.push(f.name.replace(/\.[^.]+$/, '')));
 
     setSaving(true);
@@ -202,8 +160,6 @@ export default function StudentAdmission() {
     }
   };
 
-  const ALLOWED_FILE_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
   const validateFile = (file) => {
     if (!ALLOWED_FILE_TYPES.includes(file.type) && !file.name.match(/\.(pdf|jpg|jpeg|png|webp|doc|docx)$/i)) {
       showToast(`"${file.name}" is not a supported file type. Use PDF, JPG, PNG, or DOC.`, 'error');
@@ -397,7 +353,7 @@ export default function StudentAdmission() {
                 {requiredDocs.map(docKey => (
                   <li key={docKey} className="flex items-center gap-1.5">
                     {slotFiles[docKey] ? <span className="text-forest-500">✅</span> : <span className="text-gray-400">◻️</span>}
-                    {ALL_SLOT_LABELS[docKey]}
+                    {DOC_SLOT_LABELS[docKey]}
                   </li>
                 ))}
               </ul>
@@ -432,7 +388,7 @@ export default function StudentAdmission() {
             {requiredDocs.map(docKey => (
               <UploadSlot
                 key={docKey}
-                label={`📄 ${ALL_SLOT_LABELS[docKey]}`}
+                label={`📄 ${DOC_SLOT_LABELS[docKey]}`}
                 required
                 slot={docKey}
                 file={slotFiles[docKey]}
@@ -447,7 +403,7 @@ export default function StudentAdmission() {
           <div className="space-y-2 mb-6">
             {requiredDocs.map(docKey => (
               <div key={docKey} className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg ${slotFiles[docKey] ? 'bg-forest-50 text-forest-700' : 'bg-red-50 text-red-500'}`}>
-                {slotFiles[docKey] ? '✅' : '⚠️'} {ALL_SLOT_LABELS[docKey]} — <span className="text-xs">{slotFiles[docKey] ? 'Uploaded' : 'Not yet uploaded'}</span>
+                {slotFiles[docKey] ? '✅' : '⚠️'} {DOC_SLOT_LABELS[docKey]} — <span className="text-xs">{slotFiles[docKey] ? 'Uploaded' : 'Not yet uploaded'}</span>
               </div>
             ))}
           </div>
@@ -518,7 +474,7 @@ export default function StudentAdmission() {
             <h4 className="font-semibold text-forest-500 mb-3">📄 Uploaded Documents</h4>
             <div className="space-y-2">
               {Object.entries(slotFiles).filter(([,f]) => f).map(([k, f]) => (
-                <div key={k} className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-lg text-sm">📄 <strong>{ALL_SLOT_LABELS[k] || k}:</strong> {f.name} <span className="text-gray-400 text-xs">({(f.size/1024).toFixed(1)} KB)</span></div>
+                <div key={k} className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-lg text-sm">📄 <strong>{DOC_SLOT_LABELS[k] || k}:</strong> {f.name} <span className="text-gray-400 text-xs">({(f.size/1024).toFixed(1)} KB)</span></div>
               ))}
               {extraFiles.map((f, i) => (
                 <div key={`e${i}`} className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-lg text-sm">📄 <strong>Additional:</strong> {f.name} <span className="text-gray-400 text-xs">({(f.size/1024).toFixed(1)} KB)</span></div>
@@ -528,7 +484,7 @@ export default function StudentAdmission() {
             {/* Missing required docs warning */}
             {requiredDocs.filter(k => !slotFiles[k]).length > 0 && (
               <div className="bg-gold-50 border border-gold-200 text-gold-700 rounded-lg px-4 py-3 mt-3 text-sm">
-                ⚠️ Missing required documents: {requiredDocs.filter(k => !slotFiles[k]).map(k => ALL_SLOT_LABELS[k]).join(', ')}. You may still submit but your application may be delayed.
+                ⚠️ Missing required documents: {requiredDocs.filter(k => !slotFiles[k]).map(k => DOC_SLOT_LABELS[k]).join(', ')}. You may still submit but your application may be delayed.
               </div>
             )}
           </div>

@@ -8,6 +8,7 @@ import { showToast } from '../../components/Toast.jsx';
 import Modal from '../../components/Modal.jsx';
 import { useConfirm } from '../../components/ConfirmDialog.jsx';
 import { useUnsavedChanges } from '../../hooks/useUnsavedChanges.js';
+import { EXAM_GRADE_LEVELS } from '../../utils/constants.js';
 import { PageHeader, StatCard, Badge, EmptyState, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert } from '../../components/UI.jsx';
 import { formatTime, badgeClass, uid } from '../../utils/helpers.js';
 
@@ -500,7 +501,7 @@ function ExamBuilder({ editExam, onDone }) {
             <label className="block text-sm font-medium text-gray-700 mb-1">Grade Level</label>
             <select value={grade} onChange={e => setGrade(e.target.value)} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#166534]/20 outline-none bg-white">
               <option value="">Select grade level</option>
-              <option>Grade 7-10</option><option>Grade 11-12</option><option>All Levels</option>
+              {EXAM_GRADE_LEVELS.map(g => <option key={g}>{g}</option>)}
             </select>
           </div>
           <FormInput label="Duration (minutes)" type="number" value={duration} onChange={e => setDuration(e.target.value)} placeholder="60" />

@@ -1,6 +1,6 @@
 import { load, save } from '../data/store.js';
 import { addNotification } from './notifications.js';
-import { USE_API, client } from './client.js';
+import { USE_API, client, qs } from './client.js';
 
 const VALID_STATUSES = ['Submitted', 'Under Screening', 'Under Evaluation', 'Accepted', 'Rejected'];
 export const VALID_TRANSITIONS = {
@@ -11,9 +11,24 @@ export const VALID_TRANSITIONS = {
   'Rejected': ['Submitted'],
 };
 
-export async function getAdmissions() {
-  if (USE_API) return client.get('/admissions');
+/**
+ * Fetch admissions list.
+ * In API mode, supports server-side filtering/pagination via query params.
+ * @param {Object} [params] - { status, grade, search, sort, page, limit }
+ */
+export async function getAdmissions(params) {
+  if (USE_API) return client.get(`/admissions${qs(params)}`);
   return load().admissions;
+}
+
+/**
+ * Fetch the current student's own admission (scoped endpoint).
+ * In localStorage mode, falls back to filtering by email.
+ */
+export async function getMyAdmission(email) {
+  if (USE_API) return client.get('/admissions/mine');
+  const all = load().admissions;
+  return all.find(a => a.email === email) || null;
 }
 
 export async function getAdmission(id) {
@@ -56,6 +71,24 @@ export async function addAdmission(admission) {
   return admission;
 }
 
+/**
+ * Upload admission documents (files) for a given admission.
+ * In localStorage mode, documents are stored as name strings.
+ * In API mode, sends multipart/form-data to the server.
+ * @param {number|string} admissionId
+ * @param {File[]} files
+ * @returns {Promise<{ urls: string[] }>}
+ */
+export async function uploadAdmissionDocuments(admissionId, files) {
+  if (USE_API) {
+    const formData = new FormData();
+    files.forEach(f => formData.append('documents', f));
+    return client.upload(`/admissions/${admissionId}/documents`, formData);
+  }
+  // localStorage mode: just return file names (no real upload)
+  return { urls: files.map(f => f.name) };
+}
+
 export async function updateAdmissionStatus(id, status, notes) {
   if (USE_API) return client.patch(`/admissions/${id}/status`, { status, notes });
   if (!VALID_STATUSES.includes(status)) return null;
@@ -92,8 +125,25 @@ export async function updateAdmissionStatus(id, status, notes) {
   return adm;
 }
 
-export async function getStats() {
-  if (USE_API) return client.get('/admissions/stats');
+/**
+ * Bulk update admission statuses.
+ * In API mode, sends a single request. In localStorage mode, loops.
+ * @param {number[]} ids
+ * @param {string} status
+ * @returns {Promise<{ updated: number }>}
+ */
+export async function bulkUpdateStatus(ids, status) {
+  if (USE_API) return client.patch('/admissions/bulk-status', { ids, status });
+  let updated = 0;
+  for (const id of ids) {
+    const result = await updateAdmissionStatus(id, status, '');
+    if (result) updated++;
+  }
+  return { updated };
+}
+
+export async function getStats(params) {
+  if (USE_API) return client.get(`/admissions/stats${qs(params)}`);
   const admissions = await getAdmissions();
   return {
     total: admissions.length,

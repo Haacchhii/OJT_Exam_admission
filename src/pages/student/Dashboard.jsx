@@ -1,9 +1,9 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useAsync } from '../../hooks/useAsync.js';
-import { getAdmissions } from '../../api/admissions.js';
-import { getExamRegistrations } from '../../api/exams.js';
-import { getExamResults } from '../../api/results.js';
+import { getMyAdmission } from '../../api/admissions.js';
+import { getMyRegistrations } from '../../api/exams.js';
+import { getMyResult } from '../../api/results.js';
 import { StatCard, PageHeader, SkeletonPage, ErrorAlert } from '../../components/UI.jsx';
 import { formatDate } from '../../utils/helpers.js';
 
@@ -11,12 +11,10 @@ export default function StudentDashboard() {
   const { user } = useAuth();
 
   const { data: rawData, loading, error, refetch } = useAsync(async () => {
-    const [admissions, registrations, results] = await Promise.all([
-      getAdmissions(), getExamRegistrations(), getExamResults()
+    const [myApp, myRegs, myResult] = await Promise.all([
+      getMyAdmission(user.email), getMyRegistrations(user.email), getMyResult(user.email)
     ]);
-    const myApp = admissions.find(a => a.email === user?.email) || null;
-    const myReg = registrations.find(r => r.userEmail === user?.email) || null;
-    const myResult = myReg ? results.find(r => r.registrationId === myReg.id) : null;
+    const myReg = myRegs?.[0] || null;
 
     let examText = 'Not Started', examIcon = '📋', examColor = 'blue';
     if (myResult) { examText = myResult.passed ? 'Passed' : 'Failed'; examIcon = myResult.passed ? '✅' : '❌'; examColor = myResult.passed ? 'emerald' : 'red'; }

@@ -1,8 +1,12 @@
 import { load, save } from '../data/store.js';
-import { USE_API, client } from './client.js';
+import { USE_API, client, qs } from './client.js';
 
-export async function getNotifications(userId) {
-  if (USE_API) return client.get(`/notifications/${encodeURIComponent(userId)}`);
+/**
+ * @param {string} userId
+ * @param {Object} [params] - { page, limit }
+ */
+export async function getNotifications(userId, params) {
+  if (USE_API) return client.get(`/notifications/${encodeURIComponent(userId)}${qs(params)}`);
   // Match exact userId only — e.g. 'student_3' or 'employee'
   return load().notifications.filter(n => n.userId === userId);
 }

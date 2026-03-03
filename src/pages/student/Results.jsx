@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
-import { getExamRegistrations, getExamSchedules, getExam } from '../../api/exams.js';
-import { getExamResults, getEssayAnswers, getSubmittedAnswers } from '../../api/results.js';
+import { getMyRegistrations, getExamSchedules, getExam } from '../../api/exams.js';
+import { getMyResult, getEssayAnswers, getSubmittedAnswers } from '../../api/results.js';
 import { PageHeader, SkeletonPage, ErrorAlert } from '../../components/UI.jsx';
 import { formatDate } from '../../utils/helpers.js';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -11,11 +11,10 @@ export default function StudentResults() {
   const { user } = useAuth();
 
   const { data: rawData, loading, error, refetch } = useAsync(async () => {
-    const [registrations, results, schedules, essayAnswersAll] = await Promise.all([
-      getExamRegistrations(), getExamResults(), getExamSchedules(), getEssayAnswers()
+    const [myRegs, myResult, schedules, essayAnswersAll] = await Promise.all([
+      getMyRegistrations(user.email), getMyResult(user.email), getExamSchedules(), getEssayAnswers()
     ]);
-    const myReg = registrations.find(r => r.userEmail === user?.email) || null;
-    const myResult = myReg ? results.find(r => r.registrationId === myReg.id) : null;
+    const myReg = myRegs?.[0] || null;
     const schedule = myReg ? schedules.find(s => s.id === myReg.scheduleId) : null;
     const exam = schedule ? await getExam(schedule.examId) : null;
     const essayAnswers = myReg ? essayAnswersAll.filter(a => a.registrationId === myReg.id) : [];

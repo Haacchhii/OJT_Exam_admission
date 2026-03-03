@@ -4,7 +4,7 @@
 // When VITE_API_URL is set, all API modules use this client.
 // When empty, API modules fall back to localStorage.
 
-const BASE_URL = import.meta.env.VITE_API_URL || '';
+const BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
 
 /** True when a backend URL is configured */
 export const USE_API = !!BASE_URL;
@@ -35,9 +35,23 @@ export class ApiError extends Error {
   }
 }
 
+// ---- Query string builder ----
+/**
+ * Build a query string from an object, omitting null/undefined/empty values.
+ * @param {Record<string, any>} params
+ * @returns {string} e.g. "?page=1&limit=10&status=Accepted" or "" if no params
+ */
+export function qs(params = {}) {
+  const entries = Object.entries(params)
+    .filter(([, v]) => v !== undefined && v !== null && v !== '');
+  if (entries.length === 0) return '';
+  return '?' + new URLSearchParams(entries).toString();
+}
+
 // ---- Core request function ----
-async function request(method, path, body) {
-  const headers = { 'Content-Type': 'application/json' };
+async function request(method, path, body, { isFormData = false } = {}) {
+  const headers = {};
+  if (!isFormData) headers['Content-Type'] = 'application/json';
   if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
 
   let res;
@@ -45,7 +59,9 @@ async function request(method, path, body) {
     res = await fetch(`${BASE_URL}${path}`, {
       method,
       headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: isFormData ? body
+        : body !== undefined ? JSON.stringify(body)
+        : undefined,
     });
   } catch {
     throw new ApiError('Network error. Please check your connection and try again.', 0);
@@ -91,4 +107,12 @@ export const client = {
   put:    (path, body) => request('PUT', path, body),
   patch:  (path, body) => request('PATCH', path, body),
   delete: (path)       => request('DELETE', path),
+
+  /**
+   * Upload files using multipart/form-data.
+   * @param {string} path    — endpoint
+   * @param {FormData} formData — a FormData instance with files + fields
+   * @returns {Promise<any>}
+   */
+  upload: (path, formData) => request('POST', path, formData, { isFormData: true }),
 };
