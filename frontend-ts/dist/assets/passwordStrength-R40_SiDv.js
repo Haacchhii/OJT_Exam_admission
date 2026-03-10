@@ -1,0 +1,1 @@
+function s(o){const e=o||"";let t=0;e.length>=8&&t++,e.length>=12&&t++,/[A-Z]/.test(e)&&t++,/[0-9]/.test(e)&&t++,/[^A-Za-z0-9]/.test(e)&&t++;const r=["","Very Weak","Weak","Fair","Strong","Very Strong"],g=["bg-gray-200","bg-red-500","bg-gold-500","bg-gold-500","bg-forest-500","bg-forest-500"];return{score:t,text:r[t],color:g[t],width:`${t*20}%`}}export{s as g};
