@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import compression from 'compression';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
@@ -120,10 +121,11 @@ app.get('/api/health', async (_req, res) => {
 });
 
 // ─── Serve frontend in production ─────────────────────
-if (env.NODE_ENV === 'production') {
-  const frontendDist = path.resolve(__dirname, '../../frontend/dist');
+// Only serve static frontend if the dist folder exists (monolith deploy).
+// When frontend is deployed separately (e.g. Railway), this is skipped.
+const frontendDist = path.resolve(__dirname, '../../frontend/dist');
+if (fs.existsSync(frontendDist)) {
   app.use(express.static(frontendDist));
-  // SPA fallback — any non-API GET returns index.html
   app.get('/{*path}', (_req, res) => {
     res.sendFile(path.join(frontendDist, 'index.html'));
   });
