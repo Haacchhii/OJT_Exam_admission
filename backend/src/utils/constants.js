@@ -7,6 +7,13 @@ export const VALID_TRANSITIONS = {
   'Accepted':         [],
 };
 
+// All valid status values (for validation)
+export const ADMISSION_STATUSES = Object.keys(VALID_TRANSITIONS);
+export const EXAM_REG_STATUSES = ['scheduled', 'started', 'done'];
+export const USER_STATUSES = ['Active', 'Inactive'];
+export const ENROLLMENT_STATUSES = ['Enrolled', 'Dropped', 'Transferred', 'Graduated'];
+export const PAYMENT_STATUSES = ['Pending', 'Paid', 'Cancelled', 'Refunded'];
+
 export const ROLES = {
   ADMIN:     'administrator',
   REGISTRAR: 'registrar',

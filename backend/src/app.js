@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import env from './config/env.js';
+import prisma from './config/db.js';
 import { errorHandler } from './middleware/errors.js';
 import { authenticate } from './middleware/auth.js';
 
@@ -34,8 +35,10 @@ app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(compression());
 
 // ─── Global middleware ────────────────────────────────
+// Support comma-separated CORS origins (e.g. "https://frontend.up.railway.app,http://localhost:5174")
+const allowedOrigins = env.CORS_ORIGIN.split(',').map(o => o.trim()).filter(Boolean);
 app.use(cors({
-  origin: env.CORS_ORIGIN,
+  origin: allowedOrigins.length === 1 ? allowedOrigins[0] : allowedOrigins,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
@@ -63,6 +66,31 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// ─── Rate limiters for sensitive operations ───────────
+const uploadLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 30,                   // 30 uploads per hour
+  message: { error: 'Too many uploads, please try again later.', code: 'RATE_LIMIT' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const examSubmitLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10,                   // 10 exam submissions per hour
+  message: { error: 'Too many exam submissions, please try again later.', code: 'RATE_LIMIT' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const bulkOpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10,                   // 10 bulk operations per 15 min
+  message: { error: 'Too many bulk operations, please try again later.', code: 'RATE_LIMIT' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // Serve uploaded files — require authentication
 app.use('/uploads', authenticate, express.static(path.resolve(env.UPLOAD_DIR)));
 
@@ -76,8 +104,20 @@ app.use('/api/notifications', notificationsRoutes);
 app.use('/api/audit-logs',    auditLogRoutes);
 app.use('/api/academic-years', academicYearsRoutes);
 
-// Health check
-app.get('/api/health', (_req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
+// Apply specific rate limiters to sensitive operations
+app.use('/api/admissions/bulk-status', bulkOpLimiter);
+app.use('/api/admissions/:id/documents', uploadLimiter);
+app.use('/api/exams/registrations', examSubmitLimiter);
+
+// Health check (includes DB connectivity)
+app.get('/api/health', async (_req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({ status: 'ok', uptime: process.uptime(), db: 'connected' });
+  } catch {
+    res.status(503).json({ status: 'degraded', uptime: process.uptime(), db: 'disconnected' });
+  }
+});
 
 // ─── Serve frontend in production ─────────────────────
 if (env.NODE_ENV === 'production') {

@@ -29,8 +29,16 @@ if (env.NODE_ENV === 'production') {
     console.error('FATAL: JWT_SECRET must be set in production');
     process.exit(1);
   }
+  if (env.JWT_SECRET.length < 32) {
+    console.error('FATAL: JWT_SECRET must be at least 32 characters in production');
+    process.exit(1);
+  }
   if (env.CORS_ORIGIN.includes('localhost')) {
     console.warn('WARNING: CORS_ORIGIN contains "localhost" in production — set it to your deployed URL');
+  }
+} else {
+  if (env.JWT_SECRET === 'dev-secret') {
+    console.warn('WARNING: Using default JWT_SECRET — set a strong secret via JWT_SECRET env var');
   }
 }
 

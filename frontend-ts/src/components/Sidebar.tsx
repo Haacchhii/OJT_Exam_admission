@@ -88,6 +88,7 @@ export default function Sidebar({ open, onClose, role, collapsed, onToggleCollap
                 end={l.end}
                 onClick={onClose}
                 title={collapsed ? l.label : undefined}
+                aria-label={l.label}
                 className={({ isActive }) =>
                   `group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-200 ${collapsed ? 'lg:justify-center lg:px-0' : ''} ${
                     isActive ? 'bg-white/12 text-white shadow-sm' : 'text-gray-400 hover:bg-white/6 hover:text-gray-200'

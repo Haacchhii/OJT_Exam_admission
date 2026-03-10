@@ -5,6 +5,7 @@ import { ToastContainer } from './components/Toast';
 import { ConfirmProvider } from './components/ConfirmDialog';
 import { StudentLayout, EmployeeLayout } from './components/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
+import PageErrorBoundary from './components/PageErrorBoundary';
 import ScrollToTop from './components/ScrollToTop';
 import NotFound from './pages/NotFound';
 import { useAuth } from './context/AuthContext';
@@ -67,24 +68,24 @@ export default function App() {
 
           {/* Student routes */}
           <Route path="/student" element={<StudentGuard><StudentLayout /></StudentGuard>}>
-            <Route index element={<StudentDashboard />} />
-            <Route path="dashboard" element={<StudentDashboard />} />
-            <Route path="admission" element={<StudentAdmission />} />
-            <Route path="exam" element={<StudentExam />} />
-            <Route path="results" element={<StudentResults />} />
+            <Route index element={<PageErrorBoundary pageName="Dashboard"><StudentDashboard /></PageErrorBoundary>} />
+            <Route path="dashboard" element={<PageErrorBoundary pageName="Dashboard"><StudentDashboard /></PageErrorBoundary>} />
+            <Route path="admission" element={<PageErrorBoundary pageName="Admission"><StudentAdmission /></PageErrorBoundary>} />
+            <Route path="exam" element={<PageErrorBoundary pageName="Exam"><StudentExam /></PageErrorBoundary>} />
+            <Route path="results" element={<PageErrorBoundary pageName="Results"><StudentResults /></PageErrorBoundary>} />
           </Route>
 
           {/* Employee routes */}
           <Route path="/employee" element={<EmployeeLayout />}>
-            <Route index element={<EmployeeDashboard />} />
-            <Route path="dashboard" element={<EmployeeDashboard />} />
-            <Route path="admissions" element={<RoleGuard page="admissions"><EmployeeAdmissions /></RoleGuard>} />
-            <Route path="exams" element={<RoleGuard page="exams"><EmployeeExams /></RoleGuard>} />
-            <Route path="results" element={<RoleGuard page="results"><EmployeeResults /></RoleGuard>} />
-            <Route path="reports" element={<RoleGuard page="reports"><EmployeeReports /></RoleGuard>} />
-            <Route path="users" element={<RoleGuard page="users"><EmployeeUsers /></RoleGuard>} />
-            <Route path="audit" element={<RoleGuard page="audit"><EmployeeAuditLog /></RoleGuard>} />
-            <Route path="settings" element={<RoleGuard page="settings"><EmployeeSettings /></RoleGuard>} />
+            <Route index element={<PageErrorBoundary pageName="Dashboard"><EmployeeDashboard /></PageErrorBoundary>} />
+            <Route path="dashboard" element={<PageErrorBoundary pageName="Dashboard"><EmployeeDashboard /></PageErrorBoundary>} />
+            <Route path="admissions" element={<RoleGuard page="admissions"><PageErrorBoundary pageName="Admissions"><EmployeeAdmissions /></PageErrorBoundary></RoleGuard>} />
+            <Route path="exams" element={<RoleGuard page="exams"><PageErrorBoundary pageName="Exams"><EmployeeExams /></PageErrorBoundary></RoleGuard>} />
+            <Route path="results" element={<RoleGuard page="results"><PageErrorBoundary pageName="Results"><EmployeeResults /></PageErrorBoundary></RoleGuard>} />
+            <Route path="reports" element={<RoleGuard page="reports"><PageErrorBoundary pageName="Reports"><EmployeeReports /></PageErrorBoundary></RoleGuard>} />
+            <Route path="users" element={<RoleGuard page="users"><PageErrorBoundary pageName="Users"><EmployeeUsers /></PageErrorBoundary></RoleGuard>} />
+            <Route path="audit" element={<RoleGuard page="audit"><PageErrorBoundary pageName="Audit Log"><EmployeeAuditLog /></PageErrorBoundary></RoleGuard>} />
+            <Route path="settings" element={<RoleGuard page="settings"><PageErrorBoundary pageName="Settings"><EmployeeSettings /></PageErrorBoundary></RoleGuard>} />
           </Route>
 
           {/* Root redirect */}

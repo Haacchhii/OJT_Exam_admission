@@ -9,8 +9,8 @@ import { sendExamBookingEmail } from '../utils/email.js';
 // EXAMS CRUD
 // ═══════════════════════════════════════════════════════
 
-// Helper: include questions + choices + creator
-const examInclude = {
+// Helper: include questions + choices + creator (for detail views)
+const examDetailInclude = {
   createdBy: { select: { firstName: true, lastName: true } },
   academicYear: { select: { id: true, year: true } },
   semester: { select: { id: true, name: true } },
@@ -20,19 +20,35 @@ const examInclude = {
   },
 };
 
+// Lightweight include for list views (no nested questions/choices)
+const examListInclude = {
+  createdBy: { select: { firstName: true, lastName: true } },
+  academicYear: { select: { id: true, year: true } },
+  semester: { select: { id: true, name: true } },
+  _count: { select: { questions: true, schedules: true } },
+};
+
 function shapeExam(exam) {
   if (!exam) return null;
-  const { createdBy: creator, createdById, academicYear, semester, ...rest } = exam;
-  return {
+  const { createdBy: creator, createdById, academicYear, semester, _count, ...rest } = exam;
+  const shaped = {
     ...rest,
     createdBy: creator ? `${creator.firstName} ${creator.lastName}`.trim() : 'Unknown',
     academicYear: academicYear || null,
     semester: semester || null,
-    questions: exam.questions?.map(q => ({
+  };
+  // List shape: replace nested questions with counts
+  if (_count) {
+    shaped.questionCount = _count.questions;
+    shaped.scheduleCount = _count.schedules;
+    shaped.questions = [];
+  } else {
+    shaped.questions = exam.questions?.map(q => ({
       ...q,
       choices: q.choices || [],
-    })) || [],
-  };
+    })) || [];
+  }
+  return shaped;
 }
 
 // Strip isCorrect for student view
@@ -67,7 +83,7 @@ export async function getExams(req, res, next) {
     }
 
     const [exams, total] = await Promise.all([
-      prisma.exam.findMany({ where, ...(pg && { skip: pg.skip, take: pg.take }), orderBy: { createdAt: 'desc' }, include: examInclude }),
+      prisma.exam.findMany({ where, ...(pg && { skip: pg.skip, take: pg.take }), orderBy: { createdAt: 'desc' }, include: examListInclude }),
       prisma.exam.count({ where }),
     ]);
 
@@ -81,7 +97,7 @@ export async function getExams(req, res, next) {
 // GET /api/exams/:id  (full — with isCorrect)
 export async function getExam(req, res, next) {
   try {
-    const exam = await prisma.exam.findUnique({ where: { id: Number(req.params.id) }, include: examInclude });
+    const exam = await prisma.exam.findUnique({ where: { id: Number(req.params.id) }, include: examDetailInclude });
     if (!exam) return res.status(404).json({ error: 'Exam not found', code: 'NOT_FOUND' });
     res.json(shapeExam(exam));
   } catch (err) { next(err); }
@@ -90,7 +106,7 @@ export async function getExam(req, res, next) {
 // GET /api/exams/:id/student  (safe — no isCorrect)
 export async function getExamForStudent(req, res, next) {
   try {
-    const exam = await prisma.exam.findUnique({ where: { id: Number(req.params.id) }, include: examInclude });
+    const exam = await prisma.exam.findUnique({ where: { id: Number(req.params.id) }, include: examDetailInclude });
     if (!exam) return res.status(404).json({ error: 'Exam not found', code: 'NOT_FOUND' });
     res.json(stripAnswers(shapeExam(exam)));
   } catch (err) { next(err); }
@@ -111,7 +127,7 @@ export async function getExamForReview(req, res, next) {
     if (!reg) {
       return res.status(403).json({ error: 'You must complete this exam before viewing the review', code: 'FORBIDDEN' });
     }
-    const exam = await prisma.exam.findUnique({ where: { id: examId }, include: examInclude });
+    const exam = await prisma.exam.findUnique({ where: { id: examId }, include: examDetailInclude });
     if (!exam) return res.status(404).json({ error: 'Exam not found', code: 'NOT_FOUND' });
     res.json(shapeExam(exam)); // full exam with correct answers
   } catch (err) { next(err); }
@@ -151,7 +167,7 @@ export async function createExam(req, res, next) {
           })),
         } : undefined,
       },
-      include: examInclude,
+      include: examDetailInclude,
     });
 
     res.status(201).json(shapeExam(exam));
@@ -198,7 +214,7 @@ export async function updateExam(req, res, next) {
               })),
             },
           },
-          include: examInclude,
+          include: examDetailInclude,
         });
       });
       return res.json(shapeExam(result));
@@ -207,7 +223,7 @@ export async function updateExam(req, res, next) {
     const exam = await prisma.exam.update({
       where: { id },
       data,
-      include: examInclude,
+      include: examDetailInclude,
     });
 
     res.json(shapeExam(exam));
@@ -223,6 +239,19 @@ export async function deleteExam(req, res, next) {
     logAudit({ userId: req.user.id, action: 'exam.delete', entity: 'exam', entityId: id, ipAddress: req.ip });
 
     res.status(204).end();
+  } catch (err) { next(err); }
+}
+
+// POST /api/exams/bulk-delete
+export async function bulkDeleteExams(req, res, next) {
+  try {
+    const { ids } = req.body;
+
+    await prisma.exam.deleteMany({ where: { id: { in: ids } } });
+
+    logAudit({ userId: req.user.id, action: 'exam.bulkDelete', entity: 'exam', details: { count: ids.length, ids }, ipAddress: req.ip });
+
+    res.json({ deleted: ids.length });
   } catch (err) { next(err); }
 }
 
@@ -409,7 +438,7 @@ export async function createRegistration(req, res, next) {
         throw Object.assign(new Error('Schedule is full'), { statusCode: 400, code: 'VALIDATION_ERROR' });
       }
       const reg = await tx.examRegistration.create({
-        data: { trackingId, userEmail: email, scheduleId, status: 'scheduled' },
+        data: { trackingId, userEmail: email, userId: req.user.id, scheduleId, status: 'scheduled' },
       });
       await tx.examSchedule.update({
         where: { id: scheduleId },

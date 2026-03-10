@@ -131,3 +131,27 @@ export async function deleteUser(req, res, next) {
     res.status(204).end();
   } catch (err) { next(err); }
 }
+
+// POST /api/users/bulk-delete
+export async function bulkDeleteUsers(req, res, next) {
+  try {
+    const { ids } = req.body;
+    // Prevent self-deletion
+    const safeIds = ids.filter(id => id !== req.user.id);
+    if (safeIds.length === 0) {
+      return res.status(400).json({ error: 'No valid users to delete (you cannot delete yourself).', code: 'VALIDATION_ERROR' });
+    }
+
+    const users = await prisma.user.findMany({ where: { id: { in: safeIds } } });
+    const emails = users.map(u => u.email);
+
+    await prisma.$transaction([
+      prisma.examRegistration.deleteMany({ where: { userEmail: { in: emails } } }),
+      prisma.user.deleteMany({ where: { id: { in: safeIds } } }),
+    ]);
+
+    logAudit({ userId: req.user.id, action: 'user.bulkDelete', entity: 'user', details: { count: users.length, ids: safeIds }, ipAddress: req.ip });
+
+    res.json({ deleted: users.length });
+  } catch (err) { next(err); }
+}

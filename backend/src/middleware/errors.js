@@ -4,6 +4,11 @@
 export function errorHandler(err, _req, res, _next) {
   console.error('[ERROR]', err.message || err);
 
+  // Zod / validation errors (thrown via validate middleware)
+  if (err.code === 'VALIDATION_ERROR' && err.status === 400) {
+    return res.status(400).json({ error: err.message, code: 'VALIDATION_ERROR' });
+  }
+
   // Multer file-size error
   if (err.code === 'LIMIT_FILE_SIZE') {
     return res.status(400).json({ error: 'File too large', code: 'VALIDATION_ERROR' });

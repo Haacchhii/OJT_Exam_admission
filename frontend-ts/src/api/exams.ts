@@ -37,6 +37,10 @@ export async function deleteExam(id: number) {
   return client.delete<void>(`/exams/${id}`);
 }
 
+export async function bulkDeleteExams(ids: number[]) {
+  return client.post<{ deleted: number }>('/exams/bulk-delete', { ids });
+}
+
 export async function getExamSchedules(examId?: number, params?: ExamParams) {
   return client.get<ExamSchedule[]>(
     `/exams/schedules${qs({ examId, ...params })}`

@@ -8,7 +8,18 @@ export function paginate(page, limit) {
 }
 
 export function paginatedResponse(data, total, pg) {
-  if (!pg) return data; // no pagination → return raw array
+  if (!pg) {
+    // No pagination requested → return envelope with all records
+    return {
+      data,
+      pagination: {
+        page: 1,
+        limit: total,
+        total,
+        totalPages: 1,
+      },
+    };
+  }
   return {
     data,
     pagination: {

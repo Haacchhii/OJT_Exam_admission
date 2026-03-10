@@ -4,6 +4,16 @@ import prisma from '../config/db.js';
 import env from '../config/env.js';
 import { sendWelcomeEmail } from '../utils/email.js';
 
+// ─── Password complexity ──────────────────────────────
+function validatePassword(password) {
+  if (password.length < 8) return 'Password must be at least 8 characters';
+  if (!/[A-Z]/.test(password)) return 'Password must contain at least one uppercase letter';
+  if (!/[a-z]/.test(password)) return 'Password must contain at least one lowercase letter';
+  if (!/[0-9]/.test(password)) return 'Password must contain at least one number';
+  if (!/[^A-Za-z0-9]/.test(password)) return 'Password must contain at least one special character';
+  return null;
+}
+
 
 function signToken(user) {
   return jwt.sign({ sub: user.id, role: user.role }, env.JWT_SECRET, {
@@ -88,8 +98,9 @@ export async function register(req, res, next) {
       return res.status(400).json({ error: 'Invalid email format', code: 'VALIDATION_ERROR' });
     }
     // Password strength
-    if (password.length < 8) {
-      return res.status(400).json({ error: 'Password must be at least 8 characters', code: 'VALIDATION_ERROR' });
+    const pwErr = validatePassword(password);
+    if (pwErr) {
+      return res.status(400).json({ error: pwErr, code: 'VALIDATION_ERROR' });
     }
 
     // Check duplicate
@@ -149,8 +160,9 @@ export async function resetPassword(req, res, next) {
     if (!resetToken || !password) {
       return res.status(400).json({ error: 'Reset token and new password are required', code: 'VALIDATION_ERROR' });
     }
-    if (password.length < 8) {
-      return res.status(400).json({ error: 'Password must be at least 8 characters', code: 'VALIDATION_ERROR' });
+    const pwErr = validatePassword(password);
+    if (pwErr) {
+      return res.status(400).json({ error: pwErr, code: 'VALIDATION_ERROR' });
     }
     // Verify the signed reset token
     const payload = verifyResetToken(resetToken);

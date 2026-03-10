@@ -46,6 +46,10 @@ export async function bulkUpdateStatus(ids: number[], status: string) {
   return client.patch<{ updated: number }>('/admissions/bulk-status', { ids, status });
 }
 
+export async function bulkDeleteAdmissions(ids: number[]) {
+  return client.post<{ deleted: number }>('/admissions/bulk-delete', { ids });
+}
+
 export async function getStats(params?: Record<string, unknown>) {
   return client.get<AdmissionStats>(`/admissions/stats${qs(params)}`);
 }

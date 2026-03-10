@@ -1,7 +1,7 @@
 import { useState, useMemo, type ChangeEvent, type FormEvent, type DragEvent } from 'react';
 import * as XLSX from 'xlsx';
 import { useAsync } from '../../hooks/useAsync';
-import { getExams, addExam, updateExam, deleteExam, getExamSchedules, addExamSchedule, updateExamSchedule, deleteExamSchedule, getExamRegistrations } from '../../api/exams';
+import { getExams, addExam, updateExam, deleteExam, bulkDeleteExams, getExamSchedules, addExamSchedule, updateExamSchedule, deleteExamSchedule, getExamRegistrations } from '../../api/exams';
 import { getAcademicYears, getSemesters } from '../../api/academicYears';
 import { getExamResults } from '../../api/results';
 import { getUsers } from '../../api/users';
@@ -9,6 +9,8 @@ import { showToast } from '../../components/Toast';
 import Modal from '../../components/Modal';
 import { useConfirm } from '../../components/ConfirmDialog';
 import { useUnsavedChanges } from '../../hooks/useUnsavedChanges';
+import { useSelection } from '../../hooks/useSelection';
+import BulkActionBar from '../../components/BulkActionBar';
 import { EXAM_GRADE_LEVELS } from '../../utils/constants';
 import { PageHeader, StatCard, Badge, EmptyState, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert } from '../../components/UI';
 import Icon from '../../components/Icons';
@@ -72,6 +74,8 @@ function ExamsList({ onEdit }: { onEdit: (exam: Exam) => void }) {
   const [readSearch, setReadSearch] = useState('');
   const [readStatusFilter, setReadStatusFilter] = useState('all');
   const [readPage, setReadPage] = useState(1);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const { selected, toggle, togglePage, clear: clearSelection, isAllSelected, count: selectedCount } = useSelection();
 
   const { data, loading, error, refetch } = useAsync(async () => {
     const [rawExm, rawSched, rawRegs, rawUsers, rawRes] = await Promise.all([
@@ -114,6 +118,29 @@ function ExamsList({ onEdit }: { onEdit: (exam: Exam) => void }) {
 
   const { paginated: paginatedExams, totalPages: examTotalPages, safePage: examSafePage, totalItems: examTotal } = usePaginationSlice(filteredExams, examPage, EXAMS_PER_PAGE);
   const resetExamPage = () => setExamPage(1);
+
+  const handleBulkDelete = async () => {
+    if (selectedCount === 0 || bulkDeleting) return;
+    const ids = [...selected];
+    const ok = await confirm({
+      title: 'Delete Selected Exams',
+      message: `Are you sure you want to delete ${ids.length} exam(s)? All related schedules, registrations, and results will also be deleted. This cannot be undone.`,
+      variant: 'danger',
+      confirmLabel: `Delete ${ids.length} Exam(s)`,
+    });
+    if (!ok) return;
+    setBulkDeleting(true);
+    try {
+      await bulkDeleteExams(ids);
+      showToast(`${ids.length} exam(s) deleted.`, 'info');
+      clearSelection();
+      refetch();
+    } catch {
+      showToast('Failed to delete exams.', 'error');
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
 
   const readinessRows = useMemo(() => {
     return regs.map(r => {
@@ -246,19 +273,23 @@ function ExamsList({ onEdit }: { onEdit: (exam: Exam) => void }) {
         </select>
       </div>
 
+      <BulkActionBar count={selectedCount} onDelete={handleBulkDelete} onClear={clearSelection} deleting={bulkDeleting} />
+
       <div className="gk-card p-4 mb-6">
         {paginatedExams.length > 0 ? (
           <>
             <div className="table-scroll">
               <table className="w-full text-sm">
                 <thead><tr className="border-b border-gray-200 text-left text-gray-400 uppercase text-xs">
+                  <th scope="col" className="py-3 px-2 w-8"><input type="checkbox" checked={isAllSelected(paginatedExams)} onChange={() => togglePage(paginatedExams)} className="accent-forest-500 rounded" aria-label="Select all exams" /></th>
                   <th scope="col" className="py-3 px-2">ID</th><th scope="col" className="py-3 px-2">Title</th><th scope="col" className="py-3 px-2">Grade</th>
                   <th scope="col" className="py-3 px-2">Duration</th><th scope="col" className="py-3 px-2">Questions</th><th scope="col" className="py-3 px-2">Passing</th>
                   <th scope="col" className="py-3 px-2">Status</th><th scope="col" className="py-3 px-2">Actions</th>
                 </tr></thead>
                 <tbody>
                   {paginatedExams.map(e => (
-                    <tr key={e.id} className="border-b border-gray-50 hover:bg-gray-50">
+                    <tr key={e.id} className={`border-b border-gray-50 hover:bg-gray-50 ${selected.has(e.id) ? 'bg-gold-50/50' : ''}`}>
+                      <td className="py-3 px-2"><input type="checkbox" checked={selected.has(e.id)} onChange={() => toggle(e.id)} className="accent-forest-500 rounded" aria-label={`Select ${e.title}`} /></td>
                       <td className="py-3 px-2 text-gray-400">{e.id}</td>
                       <td className="py-3 px-2 font-medium text-forest-500">{e.title}</td>
                       <td className="py-3 px-2">{e.gradeLevel}</td>

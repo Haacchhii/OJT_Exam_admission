@@ -41,6 +41,26 @@ export function qs(params: Record<string, any> = {}): string {
   return '?' + new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString();
 }
 
+// ---- Retry with exponential backoff ----
+const MAX_RETRIES = 2;
+const RETRY_BASE_MS = 500;
+const RETRYABLE_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
+
+async function withRetry<T>(fn: () => Promise<T>, retries = MAX_RETRIES): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
+      const isRetryable = err instanceof ApiError && (err.status === 0 || RETRYABLE_STATUSES.has(err.status));
+      if (!isRetryable || attempt >= retries) throw err;
+      await new Promise(r => setTimeout(r, RETRY_BASE_MS * Math.pow(2, attempt)));
+    }
+  }
+  throw lastError;
+}
+
 // ---- Core request function ----
 async function request<T = unknown>(
   method: string,
@@ -97,7 +117,7 @@ async function request<T = unknown>(
 
 // ---- Public client interface ----
 export const client = {
-  get:    <T = unknown>(path: string) => request<T>('GET', path),
+  get:    <T = unknown>(path: string) => withRetry(() => request<T>('GET', path)),
   post:   <T = unknown>(path: string, body?: unknown) => request<T>('POST', path, body),
   put:    <T = unknown>(path: string, body?: unknown) => request<T>('PUT', path, body),
   patch:  <T = unknown>(path: string, body?: unknown) => request<T>('PATCH', path, body),

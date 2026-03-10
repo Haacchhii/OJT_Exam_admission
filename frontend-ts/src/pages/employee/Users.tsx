@@ -1,12 +1,14 @@
 import { useState, useMemo } from 'react';
 import { useAsync } from '../../hooks/useAsync';
-import { getUsers, addUser, updateUser, deleteUser, getUserByEmail } from '../../api/users';
+import { getUsers, addUser, updateUser, deleteUser, getUserByEmail, bulkDeleteUsers } from '../../api/users';
 import { useAuth } from '../../context/AuthContext';
 import { showToast } from '../../components/Toast';
 import { PageHeader, StatCard, Badge, EmptyState, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert } from '../../components/UI';
 import Icon from '../../components/Icons';
 import Modal from '../../components/Modal';
 import { useConfirm } from '../../components/ConfirmDialog';
+import BulkActionBar from '../../components/BulkActionBar';
+import { useSelection } from '../../hooks/useSelection';
 import { USER_ROLE_OPTIONS } from '../../utils/constants';
 import { asArray } from '../../utils/helpers';
 import type { User } from '../../types';
@@ -37,7 +39,9 @@ export default function EmployeeUsers() {
   const [form, setForm] = useState<UserForm>({ ...emptyForm });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const confirm = useConfirm();
+  const { selected, toggle, togglePage, clear: clearSelection, isAllSelected, count: selectedCount } = useSelection();
 
   const filtered = useMemo(() => {
     let list = users || [];
@@ -133,6 +137,33 @@ export default function EmployeeUsers() {
 
   const set = (key: keyof UserForm, val: string) => setForm(p => ({ ...p, [key]: val }));
 
+  const handleBulkDelete = async () => {
+    if (selectedCount === 0 || bulkDeleting) return;
+    const ids = [...selected].filter(id => id !== authUser?.id);
+    if (ids.length === 0) {
+      showToast('You cannot delete your own account.', 'error');
+      return;
+    }
+    const ok = await confirm({
+      title: 'Delete Selected Users',
+      message: `Are you sure you want to delete ${ids.length} user(s)? This action cannot be undone.`,
+      variant: 'danger',
+      confirmLabel: `Delete ${ids.length} User(s)`,
+    });
+    if (!ok) return;
+    setBulkDeleting(true);
+    try {
+      await bulkDeleteUsers(ids);
+      showToast(`${ids.length} user(s) deleted.`, 'info');
+      clearSelection();
+      refetch();
+    } catch {
+      showToast('Failed to delete users.', 'error');
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
   const roleLabel = (r: string) => ROLES.find(ro => ro.value === r)?.label || r;
 
   if (loading && !users) return <SkeletonPage />;
@@ -178,14 +209,18 @@ export default function EmployeeUsers() {
       </div>
 
       {paginated.length > 0 ? (
+        <>
+        <BulkActionBar count={selectedCount} onDelete={handleBulkDelete} onClear={clearSelection} deleting={bulkDeleting} />
         <div className="gk-card table-scroll">
           <table className="w-full text-sm">
             <thead><tr className="border-b border-gray-200 text-left text-gray-400 uppercase text-xs">
+              <th scope="col" className="py-3 px-2 w-8"><input type="checkbox" checked={isAllSelected(paginated)} onChange={() => togglePage(paginated)} className="accent-forest-500 rounded" aria-label="Select all users" /></th>
               <th scope="col" className="py-3 px-4">Name</th><th scope="col" className="py-3 px-4">Email</th><th scope="col" className="py-3 px-4">Role</th><th scope="col" className="py-3 px-4">Status</th><th scope="col" className="py-3 px-4 text-right">Actions</th>
             </tr></thead>
             <tbody>
               {paginated.map(u => (
-                <tr key={u.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                <tr key={u.id} className={`border-b border-gray-50 hover:bg-gray-50/50 ${selected.has(u.id) ? 'bg-gold-50/50' : ''}`}>
+                  <td className="py-3 px-2"><input type="checkbox" checked={selected.has(u.id)} onChange={() => toggle(u.id)} className="accent-forest-500 rounded" aria-label={`Select ${u.firstName} ${u.lastName}`} /></td>
                   <td className="py-3 px-4 font-medium text-forest-500">{u.firstName} {u.lastName}</td>
                   <td className="py-3 px-4 text-gray-500">{u.email}</td>
                   <td className="py-3 px-4"><Badge variant="info">{roleLabel(u.role)}</Badge></td>
@@ -202,6 +237,7 @@ export default function EmployeeUsers() {
             <Pagination currentPage={safePage} totalPages={totalPages} onPageChange={setPage} totalItems={totalItems} itemsPerPage={USERS_PER_PAGE} />
           </div>
         </div>
+        </>
       ) : (
         <EmptyState icon="users" title="No users found" text="Try adjusting your search or filter." />
       )}

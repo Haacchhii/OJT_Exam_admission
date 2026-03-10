@@ -76,7 +76,7 @@ export default function Topbar({ title, onMenuToggle, userId, user }: TopbarProp
         </button>
 
         {showNotifs && (
-          <div className="absolute top-14 right-4 w-80 bg-white/95 backdrop-blur-xl rounded-2xl shadow-elevated border border-gray-200/60 overflow-hidden z-50 animate-[scaleIn_0.15s_ease-out]" role="menu" aria-label="Notifications">
+          <div className="absolute top-14 right-4 w-80 bg-white/95 backdrop-blur-xl rounded-2xl shadow-elevated border border-gray-200/60 overflow-hidden z-50 animate-[scaleIn_0.15s_ease-out]" role="region" aria-label="Notifications">
             <div className="flex items-center justify-between px-4 py-3.5 border-b border-gray-100/80">
               <span className="font-semibold text-sm text-gray-800">Notifications</span>
               <button

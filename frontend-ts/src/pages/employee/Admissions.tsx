@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAsync } from '../../hooks/useAsync';
-import { getAdmissions, getStats, updateAdmissionStatus, bulkUpdateStatus, VALID_TRANSITIONS } from '../../api/admissions';
+import { getAdmissions, getStats, updateAdmissionStatus, bulkUpdateStatus, bulkDeleteAdmissions, VALID_TRANSITIONS } from '../../api/admissions';
 import { getAcademicYears, getSemesters } from '../../api/academicYears';
 import { showToast } from '../../components/Toast';
 import { useConfirm } from '../../components/ConfirmDialog';
@@ -43,6 +43,7 @@ export default function EmployeeAdmissions() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [bulkStatus, setBulkStatus] = useState<string>('Submitted');
   const [saving, setSaving] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [viewMode, setViewMode] = useState<'applications' | 'track'>('applications');
 
   const { data: rawData, loading, error, refetch } = useAsync<RawData>(async () => {
@@ -134,6 +135,29 @@ export default function EmployeeAdmissions() {
     setStatusVal(adm.status);
     setNotes(adm.notes || '');
     setSearchParams({ id: String(id) });
+  };
+
+  const handleBulkDelete = async () => {
+    if (selected.size === 0 || bulkDeleting) return;
+    const ids = [...selected];
+    const ok = await confirm({
+      title: 'Delete Selected Applications',
+      message: `Are you sure you want to delete ${ids.length} application(s)? This action cannot be undone.`,
+      variant: 'danger',
+      confirmLabel: `Delete ${ids.length} Application(s)`,
+    });
+    if (!ok) return;
+    setBulkDeleting(true);
+    try {
+      await bulkDeleteAdmissions(ids);
+      showToast(`${ids.length} application(s) deleted.`, 'info');
+      setSelected(new Set());
+      refetch();
+    } catch {
+      showToast('Failed to delete applications.', 'error');
+    } finally {
+      setBulkDeleting(false);
+    }
   };
 
   const backToList = () => { setDetailId(null); setSearchParams({}); };
@@ -371,7 +395,8 @@ export default function EmployeeAdmissions() {
           <select value={bulkStatus} onChange={e => setBulkStatus(e.target.value)} className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-forest-500/20 outline-none">
             {ADMISSION_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
-          <button onClick={handleBulkAction} disabled={saving} className="bg-forest-500 text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-forest-600 transition disabled:opacity-50 disabled:cursor-not-allowed">{saving ? 'Applying…' : 'Apply'}</button>
+          <button onClick={handleBulkAction} disabled={saving} className="bg-forest-500 text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-forest-600 transition disabled:opacity-50 disabled:cursor-not-allowed">{saving ? 'Applying…' : 'Apply Status'}</button>
+          <button onClick={handleBulkDelete} disabled={bulkDeleting} className="bg-red-600 text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"><Icon name="trash" className="w-3.5 h-3.5" />{bulkDeleting ? 'Deleting…' : 'Delete Selected'}</button>
           <button onClick={() => setSelected(new Set())} className="text-gray-500 text-sm hover:underline ml-auto">Clear selection</button>
         </div>
       )}

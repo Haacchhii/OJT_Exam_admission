@@ -29,6 +29,7 @@ model User {
   enrollments     Enrollment[]
   payments        PaymentRecord[]
   announcements   Announcement[]     @relation("AnnouncementAuthor")
+  examRegistrations ExamRegistration[] @relation("ExamRegistrationUser")
 
   applicantProfile  ApplicantProfile?
   staffProfile      StaffProfile?
@@ -175,6 +176,7 @@ model ExamRegistration {
   id          Int       @id @default(autoincrement())
   trackingId  String    @unique @map("tracking_id") // e.g. GK-EXM-2026-00001
   userEmail   String    @map("user_email")
+  userId      Int?      @map("user_id")
   scheduleId  Int       @map("schedule_id")
   status      String    @default("scheduled") // scheduled | started | done
   startedAt   DateTime? @map("started_at")
@@ -182,13 +184,16 @@ model ExamRegistration {
   createdAt   DateTime  @default(now()) @map("created_at")
 
   schedule         ExamSchedule      @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  user             User?             @relation("ExamRegistrationUser", fields: [userId], references: [id], onDelete: Cascade)
   result           ExamResult?
   submittedAnswers SubmittedAnswer[]
   essayAnswers     EssayAnswer[]
 
   @@index([userEmail])
+  @@index([userId])
   @@index([scheduleId])
   @@index([status])
+  @@index([userEmail, status])
   @@map("exam_registrations")
 }
 
@@ -282,6 +287,7 @@ model AuditLog {
   @@index([action])
   @@index([entity])
   @@index([createdAt])
+  @@index([action, entity, createdAt])
   @@map("audit_logs")
 }
 

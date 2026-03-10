@@ -268,6 +268,9 @@ export async function bulkUpdateStatus(req, res, next) {
     if (!ids?.length || !status) {
       return res.status(400).json({ error: 'ids and status are required', code: 'VALIDATION_ERROR' });
     }
+    if (ids.length > 100) {
+      return res.status(400).json({ error: 'Cannot process more than 100 records at once', code: 'VALIDATION_ERROR' });
+    }
 
     // Validate each admission's transition
     const admissions = await prisma.admission.findMany({ where: { id: { in: ids } } });
@@ -391,5 +394,21 @@ export async function trackApplication(req, res, next) {
     }
 
     res.json(results);
+  } catch (err) { next(err); }
+}
+
+// POST /api/admissions/bulk-delete
+export async function bulkDeleteAdmissions(req, res, next) {
+  try {
+    const { ids } = req.body;
+
+    await prisma.$transaction([
+      prisma.admissionDocument.deleteMany({ where: { admissionId: { in: ids } } }),
+      prisma.admission.deleteMany({ where: { id: { in: ids } } }),
+    ]);
+
+    logAudit({ userId: req.user.id, action: 'admission.bulkDelete', entity: 'admission', details: { count: ids.length, ids }, ipAddress: req.ip });
+
+    res.json({ deleted: ids.length });
   } catch (err) { next(err); }
 }

@@ -28,3 +28,7 @@ export async function updateUser(id: number, updates: Record<string, unknown>) {
 export async function deleteUser(id: number) {
   return client.delete<void>(`/users/${id}`);
 }
+
+export async function bulkDeleteUsers(ids: number[]) {
+  return client.post<{ deleted: number }>('/users/bulk-delete', { ids });
+}

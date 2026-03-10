@@ -1,5 +1,6 @@
 import prisma from '../config/db.js';
 import { logAudit } from '../utils/auditLog.js';
+import { cached, invalidatePrefix } from '../utils/cache.js';
 
 // ──────────────────────────────────────────────────────
 // ACADEMIC YEARS
@@ -8,13 +9,15 @@ import { logAudit } from '../utils/auditLog.js';
 // GET /api/academic-years
 export async function getAcademicYears(_req, res, next) {
   try {
-    const years = await prisma.academicYear.findMany({
-      orderBy: { year: 'desc' },
-      include: {
-        semesters: { orderBy: { id: 'asc' } },
-        _count: { select: { admissions: true, exams: true } },
-      },
-    });
+    const years = await cached('ay:all', () =>
+      prisma.academicYear.findMany({
+        orderBy: { year: 'desc' },
+        include: {
+          semesters: { orderBy: { id: 'asc' } },
+          _count: { select: { admissions: true, exams: true } },
+        },
+      })
+    );
     res.json(years);
   } catch (err) { next(err); }
 }
@@ -22,10 +25,12 @@ export async function getAcademicYears(_req, res, next) {
 // GET /api/academic-years/active
 export async function getActiveAcademicYear(_req, res, next) {
   try {
-    const year = await prisma.academicYear.findFirst({
-      where: { isActive: true },
-      include: { semesters: { orderBy: { id: 'asc' } } },
-    });
+    const year = await cached('ay:active', () =>
+      prisma.academicYear.findFirst({
+        where: { isActive: true },
+        include: { semesters: { orderBy: { id: 'asc' } } },
+      })
+    );
     res.json(year || null);
   } catch (err) { next(err); }
 }
@@ -55,6 +60,7 @@ export async function createAcademicYear(req, res, next) {
     });
 
     await logAudit(req, 'academic_year.create', 'academic_year', created.id, { year });
+    invalidatePrefix('ay:');
     res.status(201).json(created);
   } catch (err) {
     if (err.code === 'P2002') return res.status(409).json({ error: 'A school year with that name already exists', code: 'CONFLICT' });
@@ -87,6 +93,7 @@ export async function updateAcademicYear(req, res, next) {
     });
 
     await logAudit(req, 'academic_year.update', 'academic_year', id, { year });
+    invalidatePrefix('ay:');
     res.json(updated);
   } catch (err) {
     if (err.code === 'P2025') return res.status(404).json({ error: 'Academic year not found', code: 'NOT_FOUND' });
@@ -100,6 +107,7 @@ export async function deleteAcademicYear(req, res, next) {
     const id = Number(req.params.id);
     await prisma.academicYear.delete({ where: { id } });
     await logAudit(req, 'academic_year.delete', 'academic_year', id);
+    invalidatePrefix('ay:');
     res.json({ message: 'Academic year deleted' });
   } catch (err) {
     if (err.code === 'P2025') return res.status(404).json({ error: 'Academic year not found', code: 'NOT_FOUND' });
