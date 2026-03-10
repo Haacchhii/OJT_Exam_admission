@@ -1,1 +1,0 @@
-import{c as s,q as r}from"./index-D055oXa1.js";async function u(e){return s.get(`/users${r(e)}`)}async function a(e){return s.get(`/users/by-email/${encodeURIComponent(e)}`)}async function c(e){return s.post("/users",e)}async function o(e,n){return s.put(`/users/${e}`,n)}async function i(e){return s.delete(`/users/${e}`)}export{c as a,a as b,i as d,u as g,o as u};
