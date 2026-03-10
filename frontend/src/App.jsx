@@ -1,7 +1,6 @@
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
-import { AuthProvider } from './context/AuthContext.jsx';
-import { ROLE_PERMISSIONS } from './context/AuthContext.jsx';
+import { AuthProvider, ROLE_PERMISSIONS } from './context/AuthContext.jsx';
 import { ToastContainer } from './components/Toast.jsx';
 import { ConfirmProvider } from './components/ConfirmDialog.jsx';
 import { StudentLayout, EmployeeLayout } from './components/Layout.jsx';
@@ -30,6 +29,8 @@ const EmployeeExams = lazy(() => import('./pages/employee/Exams.jsx'));
 const EmployeeResults = lazy(() => import('./pages/employee/Results.jsx'));
 const EmployeeReports = lazy(() => import('./pages/employee/Reports.jsx'));
 const EmployeeUsers = lazy(() => import('./pages/employee/Users.jsx'));
+const EmployeeAuditLog = lazy(() => import('./pages/employee/AuditLog.jsx'));
+const EmployeeSettings = lazy(() => import('./pages/employee/Settings.jsx'));
 
 /* Route guard: redirects to /employee if user doesn't have permission for the page */
 function RoleGuard({ page, children }) {
@@ -38,6 +39,14 @@ function RoleGuard({ page, children }) {
   if (user.role === 'applicant') return <Navigate to="/student" replace />;
   const perms = ROLE_PERMISSIONS[user.role] || [];
   if (!perms.includes(page)) return <Navigate to="/employee" replace />;
+  return children;
+}
+
+/* Route guard: ensures only applicants can access student routes */
+function StudentGuard({ children }) {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== 'applicant') return <Navigate to="/employee" replace />;
   return children;
 }
 
@@ -74,6 +83,8 @@ export default function App() {
             <Route path="results" element={<RoleGuard page="results"><EmployeeResults /></RoleGuard>} />
             <Route path="reports" element={<RoleGuard page="reports"><EmployeeReports /></RoleGuard>} />
             <Route path="users" element={<RoleGuard page="users"><EmployeeUsers /></RoleGuard>} />
+            <Route path="audit" element={<RoleGuard page="audit"><EmployeeAuditLog /></RoleGuard>} />
+            <Route path="settings" element={<RoleGuard page="settings"><EmployeeSettings /></RoleGuard>} />
           </Route>
 
           {/* Root redirect */}

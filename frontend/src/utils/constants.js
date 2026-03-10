@@ -5,7 +5,7 @@
 export const SCHOOL_NAME = 'GOLDEN KEY Integrated School of St. Joseph';
 export const SCHOOL_ADDRESS = 'Lapolapo 1st, San Jose, Batangas, Philippines';
 export const SCHOOL_PHONE = '(043)-702-2153';
-export const SCHOOL_YEAR = '2026';
+export const SCHOOL_YEAR = String(new Date().getFullYear());
 export const SCHOOL_COPYRIGHT = `\u00A9 ${SCHOOL_YEAR} ${SCHOOL_NAME}`;
 export const SCHOOL_SYSTEM_TITLE = 'Online Exam & Admission System';
 
@@ -32,9 +32,19 @@ export const ALL_GRADE_LEVELS = GRADE_OPTIONS.flatMap(g => g.items);
 export const EXAM_GRADE_LEVELS = ['Preschool', 'Grade 1-6', 'Grade 7-10', 'Grade 11-12', 'All Levels'];
 
 /**
+ * Semester name options for academic period selectors.
+ */
+export const SEMESTER_NAMES = ['First Semester', 'Second Semester', 'Summer'];
+
+/**
  * User roles known to the system.
  */
 export const USER_ROLES = ['administrator', 'registrar', 'teacher', 'applicant'];
+
+/**
+ * Role options formatted for dropdowns ({ value, label }).
+ */
+export const USER_ROLE_OPTIONS = USER_ROLES.map(r => ({ value: r, label: r.charAt(0).toUpperCase() + r.slice(1) }));
 
 /**
  * Admission status values and their allowed transitions.
@@ -42,9 +52,65 @@ export const USER_ROLES = ['administrator', 'registrar', 'teacher', 'applicant']
 export const ADMISSION_STATUSES = ['Submitted', 'Under Screening', 'Under Evaluation', 'Accepted', 'Rejected'];
 
 /**
+ * Admission progress steps (excludes Rejected — used for status timeline UI).
+ */
+export const ADMISSION_PROGRESS_STEPS = ['Submitted', 'Under Screening', 'Under Evaluation', 'Accepted'];
+
+/**
+ * "In-progress" statuses (neither accepted nor rejected).
+ */
+export const ADMISSION_IN_PROGRESS = ['Submitted', 'Under Screening', 'Under Evaluation'];
+
+/**
  * Per-page defaults used across list views.
  */
 export const DEFAULT_PAGE_SIZE = 10;
+
+/**
+ * Dynamic school year — derives from current date.
+ * Before June → current year is the first year (e.g. 2026-2027).
+ * June or later → next year cycle (e.g. 2026-2027 if accessed in June 2026).
+ */
+export function getCurrentSchoolYear() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth(); // 0-indexed: 0=Jan, 5=Jun
+  const startYear = month >= 5 ? year : year - 1; // School year starts in June in PH
+  return `${startYear}-${startYear + 1}`;
+}
+
+/**
+ * Gender options for admission form.
+ */
+export const GENDER_OPTIONS = [
+  { v: '', l: 'Select gender' },
+  { v: 'Male', l: 'Male' },
+  { v: 'Female', l: 'Female' },
+  { v: 'Other', l: 'Other' },
+];
+
+/**
+ * Guardian relationship options.
+ */
+export const GUARDIAN_RELATIONS = [
+  { v: '', l: 'Select relationship' },
+  { v: 'Mother', l: 'Mother' },
+  { v: 'Father', l: 'Father' },
+  { v: 'Legal Guardian', l: 'Legal Guardian' },
+  { v: 'Grandparent', l: 'Grandparent' },
+  { v: 'Sibling', l: 'Sibling' },
+  { v: 'Other', l: 'Other' },
+];
+
+/**
+ * Applicant type options.
+ */
+export const APPLICANT_TYPES = [
+  { v: 'New', l: 'New Student' },
+  { v: 'Transferee', l: 'Transferee' },
+  { v: 'Returning', l: 'Returning Student' },
+  { v: 'Continuing', l: 'Continuing Student (Current Enrollee)' },
+];
 
 /**
  * Document requirements per grade level (school policy).
@@ -93,6 +159,8 @@ export const ALLOWED_FILE_TYPES = [
   'image/jpeg',
   'image/png',
   'image/webp',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ];
 
 /** Max upload file size in bytes (10 MB) */

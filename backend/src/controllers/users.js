@@ -1,0 +1,133 @@
+import bcrypt from 'bcryptjs';
+import prisma from '../config/db.js';
+import { paginate, paginatedResponse } from '../utils/pagination.js';
+import { logAudit } from '../utils/auditLog.js';
+
+function safifyUser(user) {
+  if (!user) return null;
+  const { passwordHash, ...rest } = user;
+  return rest;
+}
+
+// GET /api/users?search=&role=&status=&page=&limit=
+export async function getUsers(req, res, next) {
+  try {
+    const { search, role, status, page, limit } = req.query;
+    const pg = paginate(page, limit);
+
+    const where = {};
+    if (role)   where.role = role;
+    if (status) where.status = status;
+    if (search) {
+      where.OR = [
+        { firstName: { contains: search, mode: 'insensitive' } },
+        { lastName:  { contains: search, mode: 'insensitive' } },
+        { email:     { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({ where, ...(pg && { skip: pg.skip, take: pg.take }), orderBy: { createdAt: 'desc' } }),
+      prisma.user.count({ where }),
+    ]);
+
+    res.json(paginatedResponse(users.map(safifyUser), total, pg));
+  } catch (err) { next(err); }
+}
+
+// GET /api/users/:id
+export async function getUser(req, res, next) {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: Number(req.params.id) } });
+    if (!user) return res.status(404).json({ error: 'User not found', code: 'NOT_FOUND' });
+    res.json(safifyUser(user));
+  } catch (err) { next(err); }
+}
+
+// GET /api/users/by-email/:email
+export async function getUserByEmail(req, res, next) {
+  try {
+    const user = await prisma.user.findUnique({ where: { email: req.params.email } });
+    if (!user) return res.status(404).json({ error: 'User not found', code: 'NOT_FOUND' });
+    res.json(safifyUser(user));
+  } catch (err) { next(err); }
+}
+
+// POST /api/users
+export async function createUser(req, res, next) {
+  try {
+    const { firstName, lastName, email, role, status, password } = req.body;
+    if (!firstName || !lastName || !email || !password) {
+      return res.status(400).json({ error: 'firstName, lastName, email, and password are required', code: 'VALIDATION_ERROR' });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    const user = await prisma.user.create({
+      data: { firstName, lastName, email, passwordHash, role: role || 'applicant', status: status || 'Active' },
+    });
+
+    res.status(201).json(safifyUser(user));
+
+    logAudit({ userId: req.user.id, action: 'user.create', entity: 'user', entityId: user.id, details: { email, role: role || 'applicant' }, ipAddress: req.ip });
+  } catch (err) { next(err); }
+}
+
+// PUT /api/users/:id
+export async function updateUser(req, res, next) {
+  try {
+    const { firstName, lastName, email, role, status, password } = req.body;
+    const id = Number(req.params.id);
+    const data = {};
+    if (firstName !== undefined) data.firstName = firstName;
+    if (lastName  !== undefined) data.lastName  = lastName;
+    if (email     !== undefined) data.email     = email;
+    if (role      !== undefined) data.role      = role;
+    if (status    !== undefined) data.status    = status;
+    if (password) data.passwordHash = await bcrypt.hash(password, 12);
+
+    // If email is changing, also update ExamRegistration.userEmail to keep the link intact
+    if (email !== undefined) {
+      const existing = await prisma.user.findUnique({ where: { id }, select: { email: true } });
+      if (existing && existing.email !== email) {
+        const [, user] = await prisma.$transaction([
+          prisma.examRegistration.updateMany({
+            where: { userEmail: existing.email },
+            data: { userEmail: email },
+          }),
+          prisma.user.update({ where: { id }, data }),
+        ]);
+        return res.json(safifyUser(user));
+      }
+    }
+
+    const user = await prisma.user.update({
+      where: { id },
+      data,
+    });
+
+    logAudit({ userId: req.user.id, action: 'user.update', entity: 'user', entityId: id, details: { fields: Object.keys(data) }, ipAddress: req.ip });
+
+    res.json(safifyUser(user));
+  } catch (err) { next(err); }
+}
+
+// DELETE /api/users/:id  — cascade deletes
+export async function deleteUser(req, res, next) {
+  try {
+    const id = Number(req.params.id);
+    const user = await prisma.user.findUnique({ where: { id } });
+    if (!user) return res.status(404).json({ error: 'User not found', code: 'NOT_FOUND' });
+
+    // ExamRegistration is linked by userEmail (not FK), so cascade manually.
+    // Deleting registrations cascades to results, submitted_answers, essay_answers.
+    await prisma.$transaction([
+      prisma.examRegistration.deleteMany({ where: { userEmail: user.email } }),
+      // Deleting user cascades to: admissions → admission_documents, notifications
+      prisma.user.delete({ where: { id } }),
+    ]);
+
+    logAudit({ userId: req.user.id, action: 'user.delete', entity: 'user', entityId: id, details: { email: user.email, role: user.role }, ipAddress: req.ip });
+
+    res.status(204).end();
+  } catch (err) { next(err); }
+}

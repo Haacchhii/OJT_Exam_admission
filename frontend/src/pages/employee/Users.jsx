@@ -4,17 +4,13 @@ import { getUsers, addUser, updateUser, deleteUser, getUserByEmail } from '../..
 import { useAuth } from '../../context/AuthContext.jsx';
 import { showToast } from '../../components/Toast.jsx';
 import { PageHeader, StatCard, Badge, EmptyState, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert } from '../../components/UI.jsx';
+import Icon from '../../components/Icons.jsx';
 import Modal from '../../components/Modal.jsx';
 import { useConfirm } from '../../components/ConfirmDialog.jsx';
+import { USER_ROLE_OPTIONS } from '../../utils/constants.js';
 
 const USERS_PER_PAGE = 10;
-
-const ROLES = [
-  { value: 'administrator', label: 'Administrator' },
-  { value: 'registrar', label: 'Registrar' },
-  { value: 'teacher', label: 'Teacher' },
-  { value: 'applicant', label: 'Applicant' },
-];
+const ROLES = USER_ROLE_OPTIONS;
 
 const emptyForm = { firstName: '', lastName: '', email: '', role: 'applicant', status: 'Active', password: '' };
 
@@ -66,7 +62,14 @@ export default function EmployeeUsers() {
     if (!form.lastName.trim()) e.lastName = 'Required';
     if (!form.email.trim()) e.email = 'Required';
     else if (!/\S+@\S+\.\S+/.test(form.email)) e.email = 'Invalid email';
-    else { const dup = await getUserByEmail(form.email); if (dup && dup.id !== editId) e.email = 'Email already in use'; }
+    else {
+      try {
+        const dup = await getUserByEmail(form.email);
+        if (dup && dup.id !== editId) e.email = 'Email already in use';
+      } catch {
+        // 404 = email not found = no duplicate — that's fine
+      }
+    }
     if (!editId && !form.password.trim()) e.password = 'Required for new users';
     else if (form.password && form.password.length < 8) e.password = 'Min 8 characters';
     setErrors(e);
@@ -128,7 +131,7 @@ export default function EmployeeUsers() {
   if (authUser?.role !== 'administrator') {
     return (
       <div className="text-center py-16">
-        <div className="text-4xl mb-3">🔒</div>
+        <div className="w-14 h-14 rounded-2xl bg-forest-50 flex items-center justify-center mx-auto mb-3"><Icon name="lock" className="w-7 h-7 text-forest-500" /></div>
         <h3 className="font-bold text-forest-500 mb-1">Access Restricted</h3>
         <p className="text-gray-500 text-sm">Only administrators can manage user accounts.</p>
       </div>
@@ -138,28 +141,28 @@ export default function EmployeeUsers() {
   return (
     <div>
       <PageHeader title="User Management" subtitle="Manage system user accounts.">
-        <button onClick={openAdd} className="bg-[#166534] text-white px-4 py-2 rounded-lg font-semibold hover:bg-[#14532d] flex items-center gap-2">
+        <button onClick={openAdd} className="bg-forest-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-forest-600 flex items-center gap-2">
           <span>＋</span> Add User
         </button>
       </PageHeader>
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-        <StatCard label="Total Users" value={stats.total} icon="👥" />
-        <StatCard label="Administrators" value={stats.admins} icon="🛡️" />
-        <StatCard label="Registrars" value={stats.registrars} icon="📋" />
-        <StatCard label="Teachers" value={stats.teachers} icon="📚" />
-        <StatCard label="Applicants" value={stats.applicants} icon="🎓" />
+        <StatCard label="Total Users" value={stats.total} icon="users" />
+        <StatCard label="Administrators" value={stats.admins} icon="shieldCheck" />
+        <StatCard label="Registrars" value={stats.registrars} icon="clipboard" />
+        <StatCard label="Teachers" value={stats.teachers} icon="graduationCap" />
+        <StatCard label="Applicants" value={stats.applicants} icon="userCircle" />
       </div>
 
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
-        <input value={search} onChange={e => { setSearch(e.target.value); resetPage(); }} placeholder="Search users…" aria-label="Search users" className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#166534]/20 outline-none" />
-        <select value={roleFilter} onChange={e => { setRoleFilter(e.target.value); resetPage(); }} aria-label="Filter by role" className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#166534]/20 outline-none">
+        <input value={search} onChange={e => { setSearch(e.target.value); resetPage(); }} placeholder="Search users…" aria-label="Search users" className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-forest-500/20 outline-none" />
+        <select value={roleFilter} onChange={e => { setRoleFilter(e.target.value); resetPage(); }} aria-label="Filter by role" className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-forest-500/20 outline-none">
           <option value="all">All Roles</option>
           {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
         </select>
-        <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); resetPage(); }} aria-label="Filter by status" className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#166534]/20 outline-none">
+        <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); resetPage(); }} aria-label="Filter by status" className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-forest-500/20 outline-none">
           <option value="all">All Status</option>
           <option value="Active">Active</option>
           <option value="Inactive">Inactive</option>
@@ -168,7 +171,7 @@ export default function EmployeeUsers() {
 
       {/* Table */}
       {paginated.length > 0 ? (
-        <div className="lpu-card table-scroll">
+        <div className="gk-card table-scroll">
           <table className="w-full text-sm">
             <thead><tr className="border-b border-gray-200 text-left text-gray-400 uppercase text-xs">
               <th scope="col" className="py-3 px-4">Name</th><th scope="col" className="py-3 px-4">Email</th><th scope="col" className="py-3 px-4">Role</th><th scope="col" className="py-3 px-4">Status</th><th scope="col" className="py-3 px-4 text-right">Actions</th>
@@ -181,8 +184,8 @@ export default function EmployeeUsers() {
                   <td className="py-3 px-4"><Badge variant="info">{roleLabel(u.role)}</Badge></td>
                   <td className="py-3 px-4"><Badge variant={(u.status || 'Active') === 'Active' ? 'success' : 'danger'}>{u.status || 'Active'}</Badge></td>
                   <td className="py-3 px-4 text-right space-x-1">
-                    <button onClick={() => openEdit(u)} className="text-forest-500 hover:bg-forest-50 px-2 py-1 rounded text-xs font-medium">✏️ Edit</button>
-                    <button onClick={() => confirmDelete(u.id)} className="text-red-600 hover:bg-red-50 px-2 py-1 rounded text-xs font-medium">🗑️ Delete</button>
+                    <button onClick={() => openEdit(u)} className="text-forest-500 hover:bg-forest-50 px-2 py-1 rounded text-xs font-medium inline-flex items-center gap-0.5"><Icon name="edit" className="w-3.5 h-3.5" /> Edit</button>
+                    <button onClick={() => confirmDelete(u.id)} className="text-red-600 hover:bg-red-50 px-2 py-1 rounded text-xs font-medium inline-flex items-center gap-0.5"><Icon name="trash" className="w-3.5 h-3.5" /> Delete</button>
                   </td>
                 </tr>
               ))}
@@ -193,7 +196,7 @@ export default function EmployeeUsers() {
           </div>
         </div>
       ) : (
-        <EmptyState icon="👥" title="No users found" text="Try adjusting your search or filter." />
+        <EmptyState icon="users" title="No users found" text="Try adjusting your search or filter." />
       )}
 
       {/* Add / Edit Modal */}
@@ -202,30 +205,30 @@ export default function EmployeeUsers() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
-              <input value={form.firstName} onChange={e => set('firstName', e.target.value)} className={`w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#166534]/20 ${errors.firstName ? 'border-red-400' : 'border-gray-200'}`} />
+              <input value={form.firstName} onChange={e => set('firstName', e.target.value)} className={`w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-forest-500/20 ${errors.firstName ? 'border-red-400' : 'border-gray-200'}`} />
               {errors.firstName && <p className="text-red-500 text-xs mt-1">{errors.firstName}</p>}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
-              <input value={form.lastName} onChange={e => set('lastName', e.target.value)} className={`w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#166534]/20 ${errors.lastName ? 'border-red-400' : 'border-gray-200'}`} />
+              <input value={form.lastName} onChange={e => set('lastName', e.target.value)} className={`w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-forest-500/20 ${errors.lastName ? 'border-red-400' : 'border-gray-200'}`} />
               {errors.lastName && <p className="text-red-500 text-xs mt-1">{errors.lastName}</p>}
             </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-            <input type="email" value={form.email} onChange={e => set('email', e.target.value)} className={`w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#166534]/20 ${errors.email ? 'border-red-400' : 'border-gray-200'}`} />
+            <input type="email" value={form.email} onChange={e => set('email', e.target.value)} className={`w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-forest-500/20 ${errors.email ? 'border-red-400' : 'border-gray-200'}`} />
             {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-              <select value={form.role} onChange={e => set('role', e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#166534]/20">
+              <select value={form.role} onChange={e => set('role', e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-forest-500/20">
                 {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
               </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-              <select value={form.status} onChange={e => set('status', e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#166534]/20">
+              <select value={form.status} onChange={e => set('status', e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-forest-500/20">
                 <option value="Active">Active</option>
                 <option value="Inactive">Inactive</option>
               </select>
@@ -233,12 +236,12 @@ export default function EmployeeUsers() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">{editId ? 'New Password (leave blank to keep)' : 'Password'}</label>
-            <input type="password" value={form.password} onChange={e => set('password', e.target.value)} className={`w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#166534]/20 ${errors.password ? 'border-red-400' : 'border-gray-200'}`} />
+            <input type="password" value={form.password} onChange={e => set('password', e.target.value)} className={`w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-forest-500/20 ${errors.password ? 'border-red-400' : 'border-gray-200'}`} />
             {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <button onClick={() => setShowModal(false)} className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>
-            <button onClick={handleSave} disabled={saving} className="px-4 py-2 text-sm bg-[#166534] text-white rounded-lg font-semibold hover:bg-[#14532d] disabled:opacity-50 disabled:cursor-not-allowed">{saving ? '⏳ Saving…' : (editId ? 'Save Changes' : 'Add User')}</button>
+            <button onClick={handleSave} disabled={saving} className="px-4 py-2 text-sm bg-forest-500 text-white rounded-lg font-semibold hover:bg-forest-600 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5">{saving ? <><Icon name="spinner" className="w-4 h-4 animate-spin" /> Saving…</> : (editId ? 'Save Changes' : 'Add User')}</button>
           </div>
         </div>
       </Modal>

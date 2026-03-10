@@ -1,13 +1,10 @@
 // ============================================
 // client.js — HTTP client for backend API
 // ============================================
-// When VITE_API_URL is set, all API modules use this client.
-// When empty, API modules fall back to localStorage.
+// All API modules use this client to communicate with the backend.
+// Set VITE_API_URL in .env to point to the backend (e.g. /api).
 
 const BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
-
-/** True when a backend URL is configured */
-export const USE_API = !!BASE_URL;
 
 // ---- Token management ----
 let authToken = null;

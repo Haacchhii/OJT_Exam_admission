@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { getNotifications, markNotificationRead, markAllRead } from '../api/notifications.js';
 import { formatDate } from '../utils/helpers.js';
+import Icon from './Icons.jsx';
 
 export default function Topbar({ title, onMenuToggle, userId, user }) {
   const [showNotifs, setShowNotifs] = useState(false);
@@ -31,52 +32,58 @@ export default function Topbar({ title, onMenuToggle, userId, user }) {
   const unread = notifs.filter(n => !n.isRead).length;
   const initials = user ? `${(user.firstName || '')[0] || ''}${(user.lastName || '')[0] || ''}`.toUpperCase() : 'U';
   const isEmployee = user && user.role !== 'applicant';
-  const avatarCls = isEmployee ? 'bg-forest-500 text-gold-300' : 'bg-gold-400 text-forest-600';
+  const avatarCls = isEmployee ? 'bg-forest-500 text-gold-300' : 'bg-gold-400 text-forest-700';
+  const fullName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : '';
 
   const typeIcon = (type) => {
-    const map = { admission: '📋', exam: '📝', scoring: '🧮', status: '🔔', info: '📋', success: '✅', warning: '⚠️' };
-    return map[type] || '🔔';
+    const map = { admission: 'admissions', exam: 'exam', scoring: 'results', status: 'bell', info: 'info', success: 'checkCircle', warning: 'exclamation' };
+    return map[type] || 'bell';
   };
 
   return (
-    <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-gray-200 px-4 lg:px-6 h-16 flex items-center justify-between" role="banner">
+    <header className="sticky top-0 z-30 bg-white/70 backdrop-blur-xl border-b border-gray-200/60 px-4 lg:px-6 h-16 flex items-center justify-between" role="banner">
       <div className="flex items-center gap-3">
-        <button onClick={onMenuToggle} className="lg:hidden p-2 rounded-lg hover:bg-gray-100 text-xl" aria-label="Toggle navigation menu">☰</button>
-        <h1 className="text-lg font-bold text-forest-500">{title}</h1>
+        <button onClick={onMenuToggle} className="lg:hidden p-2 rounded-xl hover:bg-gray-100 transition-colors" aria-label="Toggle navigation menu">
+          <Icon name="menu" className="w-5 h-5 text-gray-600" />
+        </button>
+        <div>
+          <h1 className="text-base font-bold text-gray-800">{title}</h1>
+        </div>
       </div>
-      <div className="flex items-center gap-3" ref={ref}>
+      <div className="flex items-center gap-2" ref={ref}>
         {/* Notification Bell */}
         <button
           onClick={() => { setShowNotifs(!showNotifs); refresh(); }}
-          className="relative p-2 rounded-lg hover:bg-gray-100"
+          className="relative p-2.5 rounded-xl hover:bg-gray-100 transition-colors"
           data-testid="notification-bell"
           aria-label={`Notifications${unread > 0 ? ` (${unread} unread)` : ''}`}
           aria-expanded={showNotifs}
           aria-haspopup="true"
         >
-          🔔
+          <Icon name={unread > 0 ? 'bellAlert' : 'bell'} className="w-5 h-5 text-gray-500" />
           {unread > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
-              {unread}
-            </span>
+            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white" />
           )}
         </button>
 
         {/* Dropdown */}
         {showNotifs && (
-          <div className="absolute top-14 right-4 w-80 bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden z-50" role="menu" aria-label="Notifications">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-              <span className="font-semibold text-sm text-forest-500">Notifications</span>
+          <div className="absolute top-14 right-4 w-80 bg-white/95 backdrop-blur-xl rounded-2xl shadow-elevated border border-gray-200/60 overflow-hidden z-50 animate-[scaleIn_0.15s_ease-out]" role="menu" aria-label="Notifications">
+            <div className="flex items-center justify-between px-4 py-3.5 border-b border-gray-100/80">
+              <span className="font-semibold text-sm text-gray-800">Notifications</span>
               <button
                 onClick={async () => { await markAllRead(userId); refresh(); }}
-                className="text-xs text-[#166534] hover:text-[#14532d] font-medium"
+                className="text-xs text-forest-500 hover:text-forest-600 font-medium transition-colors"
               >
                 Mark all read
               </button>
             </div>
             <div className="max-h-80 overflow-y-auto divide-y divide-gray-50">
               {notifs.length === 0 ? (
-                <div className="px-4 py-6 text-center text-gray-400 text-sm">No notifications</div>
+                <div className="px-4 py-8 text-center">
+                  <Icon name="inbox" className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                  <p className="text-gray-400 text-sm">No notifications</p>
+                </div>
               ) : (
                 notifs.map(n => (
                   <div
@@ -86,14 +93,17 @@ export default function Topbar({ title, onMenuToggle, userId, user }) {
                     aria-label={`${!n.isRead ? 'Unread: ' : ''}${n.title || ''} ${n.message}`}
                     onClick={async () => { await markNotificationRead(n.id); refresh(); }}
                     onKeyDown={async (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); await markNotificationRead(n.id); refresh(); } }}
-                    className={`flex items-start gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors ${!n.isRead ? 'bg-gold-50/50' : ''}`}
+                    className={`flex items-start gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50/80 transition-colors ${!n.isRead ? 'bg-forest-50/30' : ''}`}
                   >
-                    <span className="text-lg shrink-0">{typeIcon(n.type)}</span>
-                    <div className="min-w-0">
-                      {n.title && <p className={`text-xs font-bold ${!n.isRead ? 'text-forest-600' : 'text-gray-500'}`}>{n.title}</p>}
-                      <p className={`text-sm ${!n.isRead ? 'font-semibold text-forest-500' : 'text-gray-600'}`}>{n.message}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{formatDate(n.createdAt)}</p>
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${!n.isRead ? 'bg-forest-100 text-forest-600' : 'bg-gray-100 text-gray-400'}`}>
+                      <Icon name={typeIcon(n.type)} className="w-4 h-4" />
                     </div>
+                    <div className="min-w-0 flex-1">
+                      {n.title && <p className={`text-xs font-semibold ${!n.isRead ? 'text-gray-800' : 'text-gray-500'}`}>{n.title}</p>}
+                      <p className={`text-sm leading-snug ${!n.isRead ? 'font-medium text-gray-700' : 'text-gray-500'}`}>{n.message}</p>
+                      <p className="text-[11px] text-gray-400 mt-1">{formatDate(n.createdAt)}</p>
+                    </div>
+                    {!n.isRead && <div className="w-2 h-2 rounded-full bg-forest-400 shrink-0 mt-1.5" />}
                   </div>
                 ))
               )}
@@ -101,9 +111,18 @@ export default function Topbar({ title, onMenuToggle, userId, user }) {
           </div>
         )}
 
-        {/* Avatar */}
-        <div className={`w-9 h-9 rounded-full ${avatarCls} flex items-center justify-center text-xs font-bold`}>
-          {initials}
+        {/* Divider */}
+        <div className="w-px h-8 bg-gray-200 mx-1 hidden sm:block" />
+
+        {/* Avatar + Name */}
+        <div className="flex items-center gap-2.5">
+          <div className={`w-9 h-9 rounded-xl ${avatarCls} flex items-center justify-center text-xs font-bold shadow-sm`}>
+            {initials}
+          </div>
+          <div className="hidden sm:block">
+            <p className="text-sm font-semibold text-gray-800 leading-tight">{fullName || 'User'}</p>
+            <p className="text-[11px] text-gray-400 leading-tight capitalize">{user?.role === 'applicant' ? 'Student' : user?.role || ''}</p>
+          </div>
         </div>
       </div>
     </header>

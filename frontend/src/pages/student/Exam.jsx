@@ -2,12 +2,13 @@ import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useAsync } from '../../hooks/useAsync.js';
-import { getExams, getExamSchedules, getMyRegistrations, registerForExam, getExamForStudent, startExam as apiStartExam } from '../../api/exams.js';
+import { getExams, getExamSchedules, getMyRegistrations, registerForExam, getExamForStudent, startExam as apiStartExam, getAvailableSchedules } from '../../api/exams.js';
 import { getMyResult, submitExamAnswers } from '../../api/results.js';
 import { showToast } from '../../components/Toast.jsx';
 import Modal from '../../components/Modal.jsx';
 import { useConfirm } from '../../components/ConfirmDialog.jsx';
 import { PageHeader, SkeletonPage, ErrorAlert } from '../../components/UI.jsx';
+import Icon from '../../components/Icons.jsx';
 import { formatTime } from '../../utils/helpers.js';
 
 export default function StudentExam() {
@@ -18,7 +19,7 @@ export default function StudentExam() {
   const { user } = useAuth();
   const { data: rawData, loading, error, refetch } = useAsync(async () => {
     const [myRegs, myResult] = await Promise.all([
-      getMyRegistrations(user.email), getMyResult(user.email)
+      getMyRegistrations(), getMyResult()
     ]);
     const myReg = myRegs?.[0] || null;
     return { myReg, myResult };
@@ -27,18 +28,40 @@ export default function StudentExam() {
   const myReg = rawData?.myReg || null;
   const myResult = rawData?.myResult || null;
 
+  const [startingExam, setStartingExam] = useState(false);
+
   const showLobby = (exam) => { setCurrentExam(exam); setView('lobby'); };
-  const handleStartExam = async () => { await apiStartExam(myReg.id); refetch(); setView('exam'); };
+  const handleStartExam = async () => {
+    if (startingExam) return;
+    setStartingExam(true);
+    try {
+      await apiStartExam(myReg.id);
+      refetch();
+      setView('exam');
+    } catch (err) {
+      showToast(err.message || 'Failed to start exam. Please try again.', 'error');
+    } finally {
+      setStartingExam(false);
+    }
+  };
 
   // Crash recovery: if registration is 'started' but not 'done', resume exam
   useEffect(() => {
     if (myReg?.status === 'started') {
+      let cancelled = false;
       (async () => {
-        const schedules = await getExamSchedules();
-        const schedule = schedules.find(s => s.id === myReg.scheduleId);
-        const exam = schedule ? await getExamForStudent(schedule.examId) : null;
-        if (exam) { setCurrentExam(exam); setView('exam'); }
+        try {
+          const schedules = await getExamSchedules();
+          if (cancelled) return;
+          const schedule = schedules.find(s => s.id === myReg.scheduleId);
+          const exam = schedule ? await getExamForStudent(schedule.examId) : null;
+          if (!cancelled && exam) { setCurrentExam(exam); setView('exam'); }
+        } catch (err) {
+          // Network error during recovery — stay on schedule view
+          console.error('Exam recovery failed:', err);
+        }
       })();
+      return () => { cancelled = true; };
     }
   }, [myReg]);
 
@@ -52,8 +75,8 @@ export default function StudentExam() {
   if (view === 'lobby' && currentExam) {
     return (
       <div className="max-w-2xl mx-auto">
-        <div className="lpu-card p-8 text-center">
-          <div className="text-6xl mb-4">📝</div>
+        <div className="gk-card p-8 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-forest-50 flex items-center justify-center mx-auto mb-4"><Icon name="documentText" className="w-8 h-8 text-forest-500" /></div>
           <h2 className="text-2xl font-bold text-forest-500 mb-2">Ready to Begin</h2>
           <p className="text-gray-500 mb-6 leading-relaxed">
             You are about to start the <strong>{currentExam.title}</strong>.<br />
@@ -62,7 +85,7 @@ export default function StudentExam() {
             Passing Score: <strong>{currentExam.passingScore}%</strong>
           </p>
           <div className="bg-gold-50 border border-gold-200 rounded-lg p-4 text-left mb-6">
-            <h4 className="font-bold text-forest-500 mb-2">⚠️ Important Rules</h4>
+            <h4 className="font-bold text-forest-500 mb-2 flex items-center gap-2"><Icon name="exclamation" className="w-5 h-5 text-gold-500" /> Important Rules</h4>
             <ul className="text-gray-600 text-sm space-y-1 list-disc pl-5">
               <li>Do not switch tabs or leave this window during the exam.</li>
               <li>Right-click and copy/paste are disabled.</li>
@@ -71,7 +94,9 @@ export default function StudentExam() {
               <li>Ensure a stable internet connection before starting.</li>
             </ul>
           </div>
-          <button onClick={handleStartExam} className="bg-gradient-to-r from-forest-500 to-forest-400 text-white px-8 py-3 rounded-lg font-semibold text-lg hover:from-gold-500 hover:to-gold-600 shadow-md">🚀 Start Exam</button>
+          <button onClick={handleStartExam} disabled={startingExam} className="bg-gradient-to-r from-forest-500 to-forest-400 text-white px-8 py-3 rounded-lg font-semibold text-lg hover:from-gold-500 hover:to-gold-600 shadow-md inline-flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed">
+            {startingExam ? <><span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Starting…</> : <><Icon name="exam" className="w-5 h-5" /> Start Exam</>}
+          </button>
         </div>
       </div>
     );
@@ -85,10 +110,11 @@ export default function StudentExam() {
 function ScheduleView({ myReg, myResult, onLobby, onRefresh, user }) {
   // All hooks must be called before any early returns (Rules of Hooks)
   const confirm = useConfirm();
+  const [bookingSlotId, setBookingSlotId] = useState(null);
 
   const { data: schedData } = useAsync(async () => {
-    const [schedules, exams] = await Promise.all([getExamSchedules(), getExams()]);
-    return { schedules, exams };
+    const [schedules, exams, availableSchedules] = await Promise.all([getExamSchedules(), getExams(), getAvailableSchedules()]);
+    return { schedules, exams, availableSchedules };
   });
 
   const schedules = schedData?.schedules || [];
@@ -98,11 +124,11 @@ function ScheduleView({ myReg, myResult, onLobby, onRefresh, user }) {
     return (
       <div>
         <PageHeader title="Entrance Examination" subtitle="Select an available exam slot and confirm your booking." />
-        <div className="lpu-card p-8 text-center">
-          <div className="text-4xl mb-3">✅</div>
+        <div className="gk-card p-8 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-forest-50 flex items-center justify-center mx-auto mb-3"><Icon name="checkCircle" className="w-7 h-7 text-forest-500" /></div>
           <h3 className="font-bold text-forest-500 mb-1">Exam Completed</h3>
           <p className="text-gray-500 text-sm mb-4">You have already taken the exam. View your results below.</p>
-          <Link to="/student/results" className="inline-block bg-[#166534] text-white px-5 py-2 rounded-lg font-semibold hover:bg-[#14532d]">View Results</Link>
+          <Link to="/student/results" className="inline-block bg-forest-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-forest-600">View Results</Link>
         </div>
       </div>
     );
@@ -112,15 +138,27 @@ function ScheduleView({ myReg, myResult, onLobby, onRefresh, user }) {
     const schedule = schedules.find(s => s.id === myReg.scheduleId);
     const exam = schedule ? exams.find(e => e.id === schedule.examId) : null;
     // Time gate: only allow starting exam when current time >= scheduled date+start time
-    const now = new Date();
+    const [now, setNow] = useState(() => new Date());
     const schedStart = schedule ? new Date(`${schedule.scheduledDate}T${schedule.startTime}:00`) : null;
     const canStart = schedStart ? now >= schedStart : false;
+    // Re-check canStart every 30 seconds so the button appears on time
+    useEffect(() => {
+      if (canStart) return; // already eligible, no need to poll
+      const interval = setInterval(() => setNow(new Date()), 30000);
+      return () => clearInterval(interval);
+    }, [canStart]);
     return (
       <div>
         <PageHeader title="Entrance Examination" subtitle="Select an available exam slot and confirm your booking." />
-        <div className="lpu-card p-8 text-center">
-          <div className="text-4xl mb-3">📅</div>
+        <div className="gk-card p-8 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-forest-50 flex items-center justify-center mx-auto mb-3"><Icon name="calendar" className="w-7 h-7 text-forest-500" /></div>
           <h3 className="font-bold text-forest-500 mb-2">Exam Scheduled</h3>
+          {myReg.trackingId && (
+            <div className="mb-4 bg-forest-50 border border-forest-200 rounded-lg px-4 py-2 inline-block">
+              <span className="text-xs text-gray-500">Tracking ID: </span>
+              <span className="font-mono font-bold text-forest-700">{myReg.trackingId}</span>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3 max-w-sm mx-auto text-left mb-6">
             <span className="text-xs text-gray-400">Exam</span><span className="text-sm font-medium">{exam?.title || 'N/A'}</span>
             <span className="text-xs text-gray-400">Date</span><span className="text-sm font-medium">{schedule?.scheduledDate || 'N/A'}</span>
@@ -130,15 +168,15 @@ function ScheduleView({ myReg, myResult, onLobby, onRefresh, user }) {
           {canStart ? (
             <button onClick={() => onLobby(exam)} className="bg-gradient-to-r from-forest-500 to-forest-400 text-white px-8 py-3 rounded-lg font-semibold hover:from-gold-500 hover:to-gold-600 shadow-md">Take Exam Now</button>
           ) : (
-            <p className="text-gray-400 text-sm">⏰ Exam will open on <strong>{schedule?.scheduledDate}</strong> at <strong>{formatTime(schedule?.startTime)}</strong></p>
+            <p className="text-gray-400 text-sm flex items-center justify-center gap-1.5"><Icon name="clock" className="w-4 h-4" /> Exam will open on <strong>{schedule?.scheduledDate}</strong> at <strong>{formatTime(schedule?.startTime)}</strong></p>
           )}
         </div>
       </div>
     );
   }
 
-  // Not registered - show available slots
-  const available = schedules.filter(s => s.slotsTaken < s.maxSlots);
+  // Not registered - show available slots (from server-side filtering)
+  const available = schedData?.availableSchedules || [];
 
   const bookSlot = async (scheduleId) => {
     const schedule = schedules.find(s => s.id === scheduleId);
@@ -150,25 +188,32 @@ function ScheduleView({ myReg, myResult, onLobby, onRefresh, user }) {
       variant: 'info',
     });
     if (!ok) return;
+    setBookingSlotId(scheduleId);
     try {
       const reg = await registerForExam(user.email, scheduleId);
-      if (reg) { showToast('Exam slot booked successfully!', 'success'); onRefresh(); }
+      if (reg) {
+        const trackMsg = reg.trackingId ? ` Your tracking ID: ${reg.trackingId}` : '';
+        showToast(`Exam slot booked successfully!${trackMsg}`, 'success');
+        onRefresh();
+      }
       else showToast('Slot is full or you are already registered. Please choose another.', 'error');
     } catch {
       showToast('Failed to book slot. Please try again.', 'error');
+    } finally {
+      setBookingSlotId(null);
     }
   };
 
   return (
     <div>
       <PageHeader title="Entrance Examination" subtitle="Select an available exam slot and confirm your booking." />
-      <div className="lpu-card p-4 mb-6">
+      <div className="gk-card p-4 mb-6">
         <div className="flex items-center gap-3 text-forest-600">
-          <span className="text-2xl">📋</span>
+          <Icon name="clipboard" className="w-6 h-6 text-forest-500" />
           <div><strong className="text-forest-500">Welcome to the Entrance Exam</strong><p className="text-gray-500 text-sm">Select an available exam slot below to book your entrance examination.</p></div>
         </div>
       </div>
-      <div className="lpu-card p-6">
+      <div className="gk-card p-6">
         <h3 className="text-lg font-bold text-forest-500 mb-4">Available Exam Slots</h3>
         {available.length > 0 ? (
           <div className="space-y-3">
@@ -186,7 +231,13 @@ function ScheduleView({ myReg, myResult, onLobby, onRefresh, user }) {
                     <h4 className="font-semibold text-forest-500">{exam?.title || 'Exam'}</h4>
                     <p className="text-gray-500 text-sm">{formatTime(s.startTime)} - {formatTime(s.endTime)} · {remaining} slots left</p>
                   </div>
-                  <button onClick={() => bookSlot(s.id)} className="bg-[#166534] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#14532d]">Book This Slot</button>
+                  <button
+                    onClick={() => bookSlot(s.id)}
+                    disabled={bookingSlotId === s.id}
+                    className="bg-forest-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-forest-600 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+                  >
+                    {bookingSlotId === s.id ? <><span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Booking…</> : 'Book This Slot'}
+                  </button>
                 </div>
               );
             })}
@@ -241,12 +292,17 @@ function LiveExam({ exam, registration }) {
     submittedRef.current = true;
     clearInterval(timerRef.current);
     try {
-      await submitExamAnswers(registration.id, answersRef.current, questions);
-    } catch {}
+      await submitExamAnswers(registration.id, answersRef.current);
+    } catch (err) {
+      // Allow retry on failure — answers are still in sessionStorage
+      submittedRef.current = false;
+      showToast(err.message || 'Failed to submit exam. Please try again.', 'error');
+      return;
+    }
     try { sessionStorage.removeItem(`gk_exam_answers_${registration.id}`); } catch {}
     if (title) setAutoModal({ title, msg });
     else { showToast('Exam submitted successfully!', 'success'); setTimeout(() => navigate('/student/results'), 1500); }
-  }, [questions, registration.id, navigate]);
+  }, [registration.id, navigate]);
 
   // Keep a stable ref to doSubmit for effects
   const doSubmitRef = useRef(doSubmit);
@@ -304,7 +360,7 @@ function LiveExam({ exam, registration }) {
         <div className="flex items-center justify-between mb-2">
           <h3 className="font-bold text-forest-500 text-lg">{exam.title}</h3>
           <div className={`flex items-center gap-2 font-mono text-lg font-bold ${timerColor}`} role="timer" aria-live="polite" aria-label={`Time remaining: ${mins} minutes ${secs} seconds`}>
-            ⏱ {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
+            <Icon name="clock" className="w-5 h-5" /> {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -315,14 +371,14 @@ function LiveExam({ exam, registration }) {
         </div>
         {cheatFlags > 0 && (
           <div className="mt-2 bg-red-50 border border-red-200 text-red-600 text-sm px-3 py-1.5 rounded-lg" role="alert">
-            ⚠️ Tab switch detected! ({cheatFlags}/3)
+            <Icon name="exclamation" className="w-4 h-4 inline" /> Tab switch detected! ({cheatFlags}/3)
           </div>
         )}
       </div>
 
       {/* Question */}
       <div id="exam-content" className="max-w-3xl mx-auto p-4">
-        <div className="lpu-card p-6 mb-4">
+        <div className="gk-card p-6 mb-4">
           <div className="flex items-center gap-3 mb-4">
             <span className="text-sm font-bold text-gray-400">Question {currentQ + 1} of {questions.length}</span>
             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${q.questionType === 'mc' ? 'bg-forest-100 text-forest-700' : 'bg-gold-100 text-gold-700'}`}>
@@ -335,7 +391,7 @@ function LiveExam({ exam, registration }) {
             <div className="space-y-2">
               {q.choices.map(c => (
                 <label key={c.id} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition ${answers[q.id] === c.id ? 'border-gold-400 bg-gold-50' : 'border-gray-200 hover:border-gray-300'}`}>
-                  <input type="radio" name={`q${q.id}`} checked={answers[q.id] === c.id} onChange={() => setAnswers(a => ({ ...a, [q.id]: c.id }))} className="accent-[#166534]" />
+                  <input type="radio" name={`q${q.id}`} checked={answers[q.id] === c.id} onChange={() => setAnswers(a => ({ ...a, [q.id]: c.id }))} className="accent-forest-500" />
                   <span className="text-gray-700">{c.choiceText}</span>
                 </label>
               ))}
@@ -343,7 +399,7 @@ function LiveExam({ exam, registration }) {
           ) : (
             <div>
               <textarea
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#166534]/20 outline-none min-h-[160px] resize-y"
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none min-h-[160px] resize-y"
                 placeholder="Type your answer here..."
                 value={answers[q.id] || ''}
                 onChange={e => setAnswers(a => ({ ...a, [q.id]: e.target.value }))}
@@ -360,7 +416,7 @@ function LiveExam({ exam, registration }) {
             return (
               <button key={i} onClick={() => setCurrentQ(i)}
                 aria-label={`Question ${i + 1}${isAnswered ? ', answered' : ', unanswered'}${i === currentQ ? ', current' : ''}`}
-                className={`w-8 h-8 rounded-full text-xs font-bold transition ${i === currentQ ? 'bg-[#166534] text-white' : isAnswered ? 'bg-forest-100 text-forest-700 border border-forest-300' : 'bg-gray-100 text-gray-400 border border-gray-200'}`}>
+                className={`w-8 h-8 rounded-full text-xs font-bold transition ${i === currentQ ? 'bg-forest-500 text-white' : isAnswered ? 'bg-forest-100 text-forest-700 border border-forest-300' : 'bg-gray-100 text-gray-400 border border-gray-200'}`}>
                 {i + 1}
               </button>
             );
@@ -369,16 +425,16 @@ function LiveExam({ exam, registration }) {
 
         {/* Navigation */}
         <div className="flex items-center justify-between">
-          <button onClick={() => setCurrentQ(c => Math.max(0, c - 1))} disabled={currentQ === 0} className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg disabled:opacity-40 hover:bg-gray-50">← Previous</button>
-          <button onClick={() => setShowSubmitModal(true)} className="bg-forest-500 text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-forest-600 shadow-md">✅ Submit Exam</button>
-          <button onClick={() => setCurrentQ(c => Math.min(questions.length - 1, c + 1))} disabled={currentQ === questions.length - 1} className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg disabled:opacity-40 hover:bg-gray-50">Next →</button>
+          <button onClick={() => setCurrentQ(c => Math.max(0, c - 1))} disabled={currentQ === 0} className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg disabled:opacity-40 hover:bg-gray-50 inline-flex items-center gap-1.5"><Icon name="chevronLeft" className="w-4 h-4" /> Previous</button>
+          <button onClick={() => setShowSubmitModal(true)} className="bg-forest-500 text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-forest-600 shadow-md inline-flex items-center gap-2"><Icon name="check" className="w-4 h-4" /> Submit Exam</button>
+          <button onClick={() => setCurrentQ(c => Math.min(questions.length - 1, c + 1))} disabled={currentQ === questions.length - 1} className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg disabled:opacity-40 hover:bg-gray-50 inline-flex items-center gap-1.5">Next <Icon name="chevronRight" className="w-4 h-4" /></button>
         </div>
       </div>
 
       {/* Submit Confirmation */}
       <Modal open={showSubmitModal} onClose={() => setShowSubmitModal(false)}>
         <div className="text-center">
-          <div className="text-4xl mb-3">📋</div>
+          <div className="w-14 h-14 rounded-2xl bg-forest-50 flex items-center justify-center mx-auto mb-3"><Icon name="clipboard" className="w-7 h-7 text-forest-500" /></div>
           <h3 className="text-xl font-bold text-forest-500">Submit Your Exam?</h3>
           <p className="text-gray-500 mt-2">You have answered {answered} out of {questions.length} questions.</p>
           <div className="flex gap-3 justify-center mt-4">
@@ -391,10 +447,10 @@ function LiveExam({ exam, registration }) {
       {/* Auto-submit Modal */}
       <Modal open={!!autoModal} onClose={() => navigate('/student/results')}>
         <div className="text-center">
-          <div className="text-4xl mb-3">⏰</div>
+          <div className="w-14 h-14 rounded-2xl bg-gold-50 flex items-center justify-center mx-auto mb-3"><Icon name="clock" className="w-7 h-7 text-gold-500" /></div>
           <h3 className="text-xl font-bold text-forest-500">{autoModal?.title}</h3>
           <p className="text-gray-500 mt-2">{autoModal?.msg}</p>
-          <button onClick={() => navigate('/student/results')} className="mt-4 bg-[#166534] text-white px-6 py-2 rounded-lg font-semibold hover:bg-[#14532d]">View Results</button>
+          <button onClick={() => navigate('/student/results')} className="mt-4 bg-forest-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-forest-600">View Results</button>
         </div>
       </Modal>
     </div>

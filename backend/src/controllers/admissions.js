@@ -1,0 +1,395 @@
+import prisma from '../config/db.js';
+import { paginate, paginatedResponse } from '../utils/pagination.js';
+import { VALID_TRANSITIONS } from '../utils/constants.js';
+import { generateTrackingId, generateStudentNumber } from '../utils/tracking.js';
+import { logAudit } from '../utils/auditLog.js';
+import { sendAdmissionSubmittedEmail, sendAdmissionStatusEmail } from '../utils/email.js';
+
+// Helper: shape admission for API response (include document names and file paths)
+function shapeAdmission(adm) {
+  if (!adm) return null;
+  const { documents: docs, academicYear, semester, ...rest } = adm;
+  return {
+    ...rest,
+    documents: docs ? docs.map(d => d.documentName) : [],
+    documentFiles: docs ? docs.map(d => ({ name: d.documentName, filePath: d.filePath })) : [],
+    academicYear: academicYear ? { id: academicYear.id, year: academicYear.year } : null,
+    semester: semester ? { id: semester.id, name: semester.name } : null,
+  };
+}
+
+// GET /api/admissions?status=&grade=&search=&sort=&page=&limit=&academicYearId=&semesterId=
+export async function getAdmissions(req, res, next) {
+  try {
+    const { status, grade, search, sort, page, limit, academicYearId, semesterId } = req.query;
+    const pg = paginate(page, limit);
+
+    const where = {};
+    if (status)        where.status = status;
+    if (grade)         where.gradeLevel = grade;
+    if (academicYearId) where.academicYearId = Number(academicYearId);
+    if (semesterId)    where.semesterId = Number(semesterId);
+    if (search) {
+      where.OR = [
+        { firstName: { contains: search, mode: 'insensitive' } },
+        { lastName:  { contains: search, mode: 'insensitive' } },
+        { email:     { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const orderBy = sort === 'oldest' ? { submittedAt: 'asc' } : { submittedAt: 'desc' };
+
+    const [admissions, total] = await Promise.all([
+      prisma.admission.findMany({
+        where, ...(pg && { skip: pg.skip, take: pg.take }), orderBy,
+        include: { documents: true, academicYear: true, semester: true },
+      }),
+      prisma.admission.count({ where }),
+    ]);
+
+    res.json(paginatedResponse(admissions.map(shapeAdmission), total, pg));
+  } catch (err) { next(err); }
+}
+
+// GET /api/admissions/mine
+export async function getMyAdmission(req, res, next) {
+  try {
+    const admission = await prisma.admission.findFirst({
+      where: { userId: req.user.id },
+      include: { documents: true, academicYear: true, semester: true },
+      orderBy: { submittedAt: 'desc' },
+    });
+    res.json(shapeAdmission(admission));
+  } catch (err) { next(err); }
+}
+
+// GET /api/admissions/:id
+export async function getAdmission(req, res, next) {
+  try {
+    const admission = await prisma.admission.findUnique({
+      where: { id: Number(req.params.id) },
+      include: { documents: true },
+    });
+    if (!admission) return res.status(404).json({ error: 'Admission not found', code: 'NOT_FOUND' });
+    // Ownership: applicants can only view their own admission
+    if (req.user.role === 'applicant' && admission.userId !== req.user.id) {
+      return res.status(403).json({ error: 'Access denied', code: 'FORBIDDEN' });
+    }
+    res.json(shapeAdmission(admission));
+  } catch (err) { next(err); }
+}
+
+// GET /api/admissions/stats?grade=&from=&to=&academicYearId=&semesterId=
+export async function getStats(req, res, next) {
+  try {
+    const { grade, from, to, academicYearId, semesterId } = req.query;
+    const where = {};
+    if (grade)         where.gradeLevel = grade;
+    if (academicYearId) where.academicYearId = Number(academicYearId);
+    if (semesterId)    where.semesterId = Number(semesterId);
+    if (from || to) {
+      where.submittedAt = {};
+      if (from) where.submittedAt.gte = new Date(from);
+      if (to)   where.submittedAt.lte = new Date(to);
+    }
+
+    const all = await prisma.admission.findMany({ where, select: { status: true } });
+    const counts = {
+      total:            all.length,
+      submitted:        all.filter(a => a.status === 'Submitted').length,
+      underScreening:   all.filter(a => a.status === 'Under Screening').length,
+      underEvaluation:  all.filter(a => a.status === 'Under Evaluation').length,
+      accepted:         all.filter(a => a.status === 'Accepted').length,
+      rejected:         all.filter(a => a.status === 'Rejected').length,
+    };
+
+    res.json(counts);
+  } catch (err) { next(err); }
+}
+
+// POST /api/admissions
+export async function createAdmission(req, res, next) {
+  try {
+    const {
+      firstName, lastName, email, phone, dob, gender, address,
+      gradeLevel, prevSchool, schoolYear, lrn, applicantType,
+      guardian, guardianRelation, guardianPhone, guardianEmail,
+      academicYearId, semesterId, studentNumber,
+      documents: docNames,
+    } = req.body;
+
+    // Validate required fields
+    if (!firstName || !lastName || !email || !dob || !gender || !address || !gradeLevel || !schoolYear || !guardian || !guardianRelation) {
+      return res.status(400).json({ error: 'Missing required fields', code: 'VALIDATION_ERROR' });
+    }
+
+    const trackingId = await generateTrackingId('ADM');
+
+    const admission = await prisma.admission.create({
+      data: {
+        trackingId,
+        userId: req.user.id,
+        firstName, lastName, email, phone, dob, gender, address,
+        gradeLevel, prevSchool: prevSchool || null, schoolYear,
+        lrn: lrn || null, applicantType: applicantType || 'New',
+        studentNumber: studentNumber || null,
+        guardian, guardianRelation,
+        guardianPhone: guardianPhone || null,
+        guardianEmail: guardianEmail || null,
+        ...(academicYearId && { academicYearId: Number(academicYearId) }),
+        ...(semesterId && { semesterId: Number(semesterId) }),
+        status: 'Submitted',
+        documents: docNames?.length ? {
+          create: docNames.map(name => ({ documentName: name })),
+        } : undefined,
+      },
+      include: { documents: true, academicYear: true, semester: true },
+    });
+
+    logAudit({ userId: req.user.id, action: 'admission.create', entity: 'admission', entityId: admission.id, details: { trackingId, gradeLevel, applicantType: applicantType || 'New' }, ipAddress: req.ip });
+
+    // Fire-and-forget confirmation email to the applicant
+    sendAdmissionSubmittedEmail({ to: email, firstName, trackingId, gradeLevel });
+
+    res.status(201).json(shapeAdmission(admission));
+  } catch (err) { next(err); }
+}
+
+// POST /api/admissions/:id/documents  (multipart/form-data)
+export async function uploadDocuments(req, res, next) {
+  try {
+    const admissionId = Number(req.params.id);
+    // Ownership check
+    const admission = await prisma.admission.findUnique({ where: { id: admissionId } });
+    if (!admission) return res.status(404).json({ error: 'Admission not found', code: 'NOT_FOUND' });
+    if (req.user.role === 'applicant' && admission.userId !== req.user.id) {
+      return res.status(403).json({ error: 'Access denied', code: 'FORBIDDEN' });
+    }
+    const files = req.files;
+    if (!files?.length) {
+      return res.status(400).json({ error: 'No files uploaded', code: 'VALIDATION_ERROR' });
+    }
+
+    const docs = await Promise.all(
+      files.map(f =>
+        prisma.admissionDocument.create({
+          data: {
+            admissionId,
+            documentName: f.originalname,
+            filePath: f.filename,
+          },
+        })
+      )
+    );
+
+    // Return public URLs
+    const baseUrl = `${req.protocol}://${req.get('host')}/uploads`;
+    const urls = docs.map(d => `${baseUrl}/${d.filePath}`);
+    res.json({ urls });
+  } catch (err) { next(err); }
+}
+
+// PATCH /api/admissions/:id/status
+export async function updateStatus(req, res, next) {
+  try {
+    const { status, notes } = req.body;
+    const id = Number(req.params.id);
+
+    const admission = await prisma.admission.findUnique({ where: { id }, include: { documents: true } });
+    if (!admission) return res.status(404).json({ error: 'Admission not found', code: 'NOT_FOUND' });
+
+    // Validate transition
+    const allowed = VALID_TRANSITIONS[admission.status] || [];
+    if (!allowed.includes(status)) {
+      return res.status(400).json({
+        error: `Cannot transition from "${admission.status}" to "${status}"`,
+        code: 'VALIDATION_ERROR',
+      });
+    }
+
+    const updated = await prisma.admission.update({
+      where: { id },
+      data: { status, notes: notes !== undefined ? notes : admission.notes },
+      include: { documents: true },
+    });
+
+    // When accepted, auto-assign a student number if the student doesn't have one yet
+    if (status === 'Accepted') {
+      try {
+        const profile = await prisma.applicantProfile.findUnique({ where: { userId: admission.userId }, select: { studentNumber: true } });
+        if (!profile?.studentNumber) {
+          const studentNumber = await generateStudentNumber();
+          await prisma.applicantProfile.upsert({
+            where: { userId: admission.userId },
+            update: { studentNumber },
+            create: { userId: admission.userId, studentNumber },
+          });
+        }
+      } catch (_) { /* student number failure should not block the response */ }
+    }
+
+    // Create notification for the applicant
+    try {
+      const statusMessages = {
+        'Under Screening': 'Your application is now under screening.',
+        'Under Evaluation': 'Your application is being evaluated.',
+        'Accepted': 'Congratulations! Your admission has been accepted.',
+        'Rejected': 'Your application has been reviewed. Please contact the registrar for details.',
+      };
+      await prisma.notification.create({
+        data: {
+          userId: admission.userId,
+          type: status === 'Rejected' ? 'warning' : status === 'Accepted' ? 'success' : 'info',
+          title: `Admission Status: ${status}`,
+          message: statusMessages[status] || `Your admission status has been updated to ${status}.`,
+        },
+      });
+    } catch (_) { /* notification failure should not block the response */ }
+
+    logAudit({ userId: req.user.id, action: 'admission.status_update', entity: 'admission', entityId: id, details: { from: admission.status, to: status, notes: notes || null }, ipAddress: req.ip });
+
+    // Fire-and-forget status update email to the applicant
+    sendAdmissionStatusEmail({
+      to: admission.email,
+      firstName: admission.firstName,
+      trackingId: admission.trackingId,
+      status,
+      notes: notes || null,
+    });
+
+    res.json(shapeAdmission(updated));
+  } catch (err) { next(err); }
+}
+
+// PATCH /api/admissions/bulk-status
+export async function bulkUpdateStatus(req, res, next) {
+  try {
+    const { ids, status } = req.body;
+    if (!ids?.length || !status) {
+      return res.status(400).json({ error: 'ids and status are required', code: 'VALIDATION_ERROR' });
+    }
+
+    // Validate each admission's transition
+    const admissions = await prisma.admission.findMany({ where: { id: { in: ids } } });
+    for (const adm of admissions) {
+      const allowed = VALID_TRANSITIONS[adm.status] || [];
+      if (!allowed.includes(status)) {
+        return res.status(400).json({
+          error: `Admission #${adm.id} cannot transition from "${adm.status}" to "${status}"`,
+          code: 'VALIDATION_ERROR',
+        });
+      }
+    }
+
+    const result = await prisma.admission.updateMany({
+      where: { id: { in: ids } },
+      data: { status },
+    });
+
+    // Create notifications for each affected applicant (best-effort)
+    const statusMessages = {
+      'Under Screening': 'Your application is now under screening.',
+      'Under Evaluation': 'Your application is being evaluated.',
+      'Accepted': 'Congratulations! Your admission has been accepted.',
+      'Rejected': 'Your application has been reviewed. Please contact the registrar for details.',
+    };
+    try {
+      await Promise.all(admissions.map(adm =>
+        prisma.notification.create({
+          data: {
+            userId: adm.userId,
+            type: status === 'Rejected' ? 'warning' : status === 'Accepted' ? 'success' : 'info',
+            title: `Admission Status: ${status}`,
+            message: statusMessages[status] || `Your admission status has been updated to ${status}.`,
+          },
+        })
+      ));
+    } catch (_) { /* notification failure should not block the response */ }
+
+    logAudit({ userId: req.user.id, action: 'admission.bulk_status_update', entity: 'admission', entityId: null, details: { ids, to: status, count: result.count }, ipAddress: req.ip });
+
+    res.json({ updated: result.count });
+  } catch (err) { next(err); }
+}
+
+// GET /api/admissions/track/:trackingId
+export async function trackApplication(req, res, next) {
+  try {
+    const { trackingId } = req.params;
+    if (!trackingId) {
+      return res.status(400).json({ error: 'Tracking ID is required', code: 'VALIDATION_ERROR' });
+    }
+
+    const upper = trackingId.toUpperCase();
+    const results = {};
+
+    // Check admission tracking
+    if (upper.includes('ADM')) {
+      const admission = await prisma.admission.findUnique({
+        where: { trackingId: upper },
+        include: { documents: true },
+      });
+      if (admission) {
+        // Ownership: applicants can only view their own tracking data
+        if (req.user.role === 'applicant' && admission.userId !== req.user.id) {
+          return res.status(403).json({ error: 'Access denied', code: 'FORBIDDEN' });
+        }
+        results.type = 'admission';
+        results.trackingId = admission.trackingId;
+        results.data = shapeAdmission(admission);
+      }
+    }
+
+    // Check exam registration tracking
+    if (upper.includes('EXM')) {
+      const registration = await prisma.examRegistration.findUnique({
+        where: { trackingId: upper },
+        include: {
+          schedule: { include: { exam: { select: { title: true, gradeLevel: true, passingScore: true } } } },
+          result: true,
+        },
+      });
+      if (registration) {
+        // Ownership: applicants can only view their own tracking data
+        if (req.user.role === 'applicant' && registration.userEmail !== req.user.email) {
+          return res.status(403).json({ error: 'Access denied', code: 'FORBIDDEN' });
+        }
+        results.type = 'exam';
+        results.trackingId = registration.trackingId;
+        results.data = registration;
+      }
+    }
+
+    // If neither prefix matched, try both
+    if (!results.type) {
+      const admission = await prisma.admission.findUnique({
+        where: { trackingId: upper },
+        include: { documents: true },
+      }).catch(() => null);
+      if (admission) {
+        results.type = 'admission';
+        results.trackingId = admission.trackingId;
+        results.data = shapeAdmission(admission);
+      } else {
+        const registration = await prisma.examRegistration.findUnique({
+          where: { trackingId: upper },
+          include: {
+            schedule: { include: { exam: { select: { title: true, gradeLevel: true, passingScore: true } } } },
+            result: true,
+          },
+        }).catch(() => null);
+        if (registration) {
+          results.type = 'exam';
+          results.trackingId = registration.trackingId;
+          results.data = registration;
+        }
+      }
+    }
+
+    if (!results.type) {
+      return res.status(404).json({ error: 'No application or exam found with this tracking ID', code: 'NOT_FOUND' });
+    }
+
+    res.json(results);
+  } catch (err) { next(err); }
+}

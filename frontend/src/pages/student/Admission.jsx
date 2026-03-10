@@ -9,9 +9,10 @@ import { showToast } from '../../components/Toast.jsx';
 import Modal from '../../components/Modal.jsx';
 import { useConfirm } from '../../components/ConfirmDialog.jsx';
 import { PageHeader, Badge, SkeletonPage, ErrorAlert } from '../../components/UI.jsx';
+import Icon from '../../components/Icons.jsx';
 import { formatDate, badgeClass } from '../../utils/helpers.js';
 import { useUnsavedChanges } from '../../hooks/useUnsavedChanges.js';
-import { GRADE_OPTIONS, DOC_REQUIREMENTS, DOC_SLOT_LABELS, ALLOWED_FILE_TYPES, MAX_FILE_SIZE } from '../../utils/constants.js';
+import { GRADE_OPTIONS, DOC_REQUIREMENTS, DOC_SLOT_LABELS, ALLOWED_FILE_TYPES, MAX_FILE_SIZE, getCurrentSchoolYear, GENDER_OPTIONS, GUARDIAN_RELATIONS, APPLICANT_TYPES, ADMISSION_PROGRESS_STEPS } from '../../utils/constants.js';
 
 function getRequiredDocs(gradeLevel) {
   const reqs = DOC_REQUIREMENTS[gradeLevel] || DOC_REQUIREMENTS['Grade 2']; // default fallback
@@ -48,13 +49,16 @@ export default function StudentAdmission() {
   const [step, setStep] = useState(1);
   const [showWizard, setShowWizard] = useState(true);
   const [successOpen, setSuccessOpen] = useState(false);
+  const [submittedTrackingId, setSubmittedTrackingId] = useState('');
   const [slotFiles, setSlotFiles] = useState({ birthCert: null, idPhoto: null, reportCard: null, goodMoral: null, baptismal: null, eccdChecklist: null, incomeTax: null, escCert: null });
   const [extraFiles, setExtraFiles] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [privacyConsent, setPrivacyConsent] = useState(false);
   const [form, setForm] = useState({
     firstName: '', lastName: '', email: '', phone: '', dob: '', gender: '', address: '',
     guardian: '', guardianRelation: '', guardianPhone: '', guardianEmail: '',
-    gradeLevel: '', prevSchool: '', schoolYear: '2026-2027', lrn: '', applicantType: 'New',
+    gradeLevel: '', prevSchool: '', schoolYear: getCurrentSchoolYear(), lrn: '', applicantType: 'New',
+    studentNumber: '',
   });
 
   const { user } = useAuth();
@@ -62,7 +66,7 @@ export default function StudentAdmission() {
 
   const { data: gateData, loading: gateLoading, error: gateError, refetch } = useAsync(async () => {
     const [existingApp, myRegs, myResult] = await Promise.all([
-      getMyAdmission(user.email), getMyRegistrations(user.email), getMyResult(user.email)
+      getMyAdmission(), getMyRegistrations(), getMyResult()
     ]);
     const examPassed = myResult?.passed === true;
     return { existingApp, examPassed };
@@ -82,6 +86,9 @@ export default function StudentAdmission() {
         firstName: f.firstName || user.firstName || '',
         lastName: f.lastName || user.lastName || '',
         email: f.email || user.email || '',
+        studentNumber: f.studentNumber || user.applicantProfile?.studentNumber || '',
+        // If the user already has a student number, they're a continuing student
+        ...(user.applicantProfile?.studentNumber && !f.applicantType ? { applicantType: 'Continuing' } : {}),
       }));
     }
     const saved = restore();
@@ -114,6 +121,11 @@ export default function StudentAdmission() {
 
       // Age validation (Step 2 when moving to Step 3)
       if (step === 2) {
+        // Continuing students must provide a student number
+        if (form.applicantType === 'Continuing' && !form.studentNumber?.trim()) {
+          showToast('Continuing students must provide their student number.', 'error');
+          return;
+        }
         const ageWarning = checkAgeRequirement(form.gradeLevel, form.dob, form.schoolYear);
         if (ageWarning) { showToast(ageWarning, 'error'); return; }
       }
@@ -135,6 +147,10 @@ export default function StudentAdmission() {
 
   const handleSubmit = async () => {
     if (saving) return;
+    if (!privacyConsent) {
+      showToast('Please agree to the Data Privacy consent before submitting.', 'error');
+      return;
+    }
     const ok = await confirmDialog({
       title: 'Submit Application',
       message: 'Are you sure you want to submit your admission application? This action cannot be undone.',
@@ -150,6 +166,21 @@ export default function StudentAdmission() {
     try {
       const result = await addAdmission({ ...form, documents: docs.length ? docs : ['(No documents uploaded)'] });
       if (result?.error) { showToast(result.error, 'error'); return; }
+
+      // Upload actual files if any were selected
+      const allFiles = [
+        ...Object.values(slotFiles).filter(Boolean),
+        ...extraFiles,
+      ];
+      if (allFiles.length > 0 && result?.id) {
+        try {
+          await uploadAdmissionDocuments(result.id, allFiles);
+        } catch (uploadErr) {
+          showToast('Application submitted but some documents failed to upload. Please contact the registrar.', 'warning');
+        }
+      }
+
+      if (result?.trackingId) setSubmittedTrackingId(result.trackingId);
       clear(); // Clear autosaved draft
       refetch();
       setSuccessOpen(true);
@@ -190,8 +221,8 @@ export default function StudentAdmission() {
     return (
       <div>
         <PageHeader title="Admission Application" subtitle="GOLDEN KEY Integrated School of St. Joseph — Admission Form" />
-        <div className="lpu-card p-8 text-center">
-          <div className="text-5xl mb-4">🔒</div>
+        <div className="gk-card p-8 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-forest-50 flex items-center justify-center mx-auto mb-4"><Icon name="lock" className="w-8 h-8 text-forest-500" /></div>
           <h3 className="text-xl font-bold text-forest-500 mb-2">Entrance Exam Required</h3>
           <p className="text-gray-500 mb-2">You must pass the entrance examination before you can submit an admission application.</p>
           <p className="text-gray-400 text-sm mb-6">Please take and pass the entrance exam first, then come back here to complete your admission.</p>
@@ -203,12 +234,12 @@ export default function StudentAdmission() {
 
   // Show existing application
   if (existingApp && showWizard) {
-    const statusSteps = ['Submitted','Under Screening','Under Evaluation','Accepted'];
+    const statusSteps = ADMISSION_PROGRESS_STEPS;
     const currentIdx = statusSteps.indexOf(existingApp.status);
     return (
       <div>
         <PageHeader title="Admission Application" subtitle="Track your admission progress below." />
-        <div className="lpu-card p-6">
+        <div className="gk-card p-6">
           <h3 className="text-lg font-bold text-forest-500 mb-4">Your Submitted Application</h3>
 
           {/* Admission Progress Tracker */}
@@ -226,6 +257,13 @@ export default function StudentAdmission() {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {existingApp.trackingId && (
+            <div className="mb-4 bg-forest-50 border border-forest-200 rounded-lg px-4 py-3 inline-block">
+              <span className="text-xs text-gray-500">Tracking ID: </span>
+              <span className="font-mono font-bold text-forest-700">{existingApp.trackingId}</span>
             </div>
           )}
 
@@ -257,7 +295,7 @@ export default function StudentAdmission() {
 
       {/* Admission Policy Summary */}
       <div className="bg-forest-50 border border-forest-200 rounded-xl p-4 mb-6">
-        <h4 className="font-semibold text-forest-700 text-sm mb-2">📋 Admission Policy & Procedure</h4>
+        <h4 className="font-semibold text-forest-700 text-sm mb-2 flex items-center gap-1.5"><Icon name="clipboard" className="w-4 h-4" /> Admission Policy & Procedure</h4>
         <div className="text-xs text-forest-600 space-y-1">
           <p>Admission is open to all students regardless of race, religion, gender, or socioeconomic status.</p>
           <p><strong>Procedure:</strong> ① Pass Entrance Exam → ② Submit Application & Documents → ③ Screening & Evaluation → ④ Admission Confirmation</p>
@@ -267,13 +305,13 @@ export default function StudentAdmission() {
         </div>
       </div>
 
-      <p className="text-sm text-gold-600 bg-gold-50 border border-gold-200 rounded-lg px-4 py-2 mb-6">💡 Parents or guardians may fill out this form on behalf of their child.</p>
+      <p className="text-sm text-gold-600 bg-gold-50 border border-gold-200 rounded-lg px-4 py-2 mb-6 flex items-center gap-2"><Icon name="info" className="w-4 h-4 shrink-0" /> Parents or guardians may fill out this form on behalf of their child.</p>
 
       {/* Step Indicator */}
       <div className="flex items-center justify-center gap-1 mb-8 flex-wrap">
         {steps.map((label, i) => (
           <div key={i} className="flex items-center gap-1">
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${i + 1 === step ? 'bg-[#166534] text-white' : i + 1 < step ? 'bg-forest-100 text-forest-700' : 'bg-gray-100 text-gray-400'}`}>
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${i + 1 === step ? 'bg-forest-500 text-white' : i + 1 < step ? 'bg-forest-100 text-forest-700' : 'bg-gray-100 text-gray-400'}`}>
               <span className="w-5 h-5 flex items-center justify-center rounded-full bg-white/30 text-xs font-bold">{i + 1 < step ? '✓' : i + 1}</span>
               <span className="hidden sm:inline">{label}</span>
             </div>
@@ -284,27 +322,27 @@ export default function StudentAdmission() {
 
       {/* Step 1: Personal Info */}
       {step === 1 && (
-        <div className="lpu-card p-6">
+        <div className="gk-card p-6">
           <h3 className="text-lg font-bold text-forest-500 mb-1">Step 1: Personal Information</h3>
           <p className="text-gray-500 text-sm mb-6">Provide basic personal details of the student.</p>
 
-          <h4 className="font-semibold text-forest-500 mb-3">👤 Student Details</h4>
+          <h4 className="font-semibold text-forest-500 mb-3 flex items-center gap-1.5"><Icon name="userCircle" className="w-4 h-4" /> Student Details</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <Input label="First Name" value={form.firstName} onChange={set('firstName')} required placeholder="Juan" />
             <Input label="Last Name" value={form.lastName} onChange={set('lastName')} required placeholder="Dela Cruz" />
             <Input label="Email Address" type="email" value={form.email} onChange={set('email')} required placeholder="example@email.com" />
             <Input label="Phone Number" type="tel" value={form.phone} onChange={(e) => { const v = e.target.value.replace(/[^0-9+\-\s()]/g, ''); setForm(f => ({ ...f, phone: v })); }} placeholder="+63 9XX XXX XXXX" />
             <Input label="Date of Birth" type="date" value={form.dob} onChange={set('dob')} required />
-            <Select label="Gender" value={form.gender} onChange={set('gender')} required options={[{v:'',l:'Select gender'},{v:'Male',l:'Male'},{v:'Female',l:'Female'},{v:'Other',l:'Other'}]} />
+            <Select label="Gender" value={form.gender} onChange={set('gender')} required options={GENDER_OPTIONS} />
             <div className="md:col-span-2">
               <Input label="Home Address" value={form.address} onChange={set('address')} required placeholder="Street, Barangay, Municipality, Province" />
             </div>
           </div>
 
-          <h4 className="font-semibold text-forest-500 mb-3">👨‍👩‍👧 Parent / Guardian Details</h4>
+          <h4 className="font-semibold text-forest-500 mb-3 flex items-center gap-1.5"><Icon name="users" className="w-4 h-4" /> Parent / Guardian Details</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <Input label="Parent / Guardian Full Name" value={form.guardian} onChange={set('guardian')} required placeholder="Full name" />
-            <Select label="Relationship to Student" value={form.guardianRelation} onChange={set('guardianRelation')} required options={[{v:'',l:'Select relationship'},{v:'Mother',l:'Mother'},{v:'Father',l:'Father'},{v:'Legal Guardian',l:'Legal Guardian'},{v:'Grandparent',l:'Grandparent'},{v:'Sibling',l:'Sibling'},{v:'Other',l:'Other'}]} />
+            <Select label="Relationship to Student" value={form.guardianRelation} onChange={set('guardianRelation')} required options={GUARDIAN_RELATIONS} />
             <Input label="Parent / Guardian Contact No." type="tel" value={form.guardianPhone} onChange={(e) => { const v = e.target.value.replace(/[^0-9+\-\s()]/g, ''); setForm(f => ({ ...f, guardianPhone: v })); }} required placeholder="+63 9XX XXX XXXX" />
             <Input label="Parent / Guardian Email" type="email" value={form.guardianEmail} onChange={set('guardianEmail')} placeholder="parent@email.com" />
           </div>
@@ -317,14 +355,24 @@ export default function StudentAdmission() {
 
       {/* Step 2: School Info */}
       {step === 2 && (
-        <div className="lpu-card p-6">
+        <div className="gk-card p-6">
           <h3 className="text-lg font-bold text-forest-500 mb-1">Step 2: School Information</h3>
           <p className="text-gray-500 text-sm mb-6">Tell us about the academic background.</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <Select label="Applicant Type" value={form.applicantType} onChange={set('applicantType')} required options={[{v:'New',l:'New Student'},{v:'Transferee',l:'Transferee'},{v:'Returning',l:'Returning Student'}]} />
+            <Select label="Applicant Type" value={form.applicantType} onChange={(e) => {
+              const type = e.target.value;
+              setForm(f => ({
+                ...f,
+                applicantType: type,
+                // Auto-fill prev school for continuing students
+                prevSchool: type === 'Continuing' ? 'GOLDEN KEY Integrated School of St. Joseph' : (f.prevSchool === 'GOLDEN KEY Integrated School of St. Joseph' ? '' : f.prevSchool),
+                // Auto-fill student number for continuing students if available from user profile
+                studentNumber: type === 'Continuing' && user?.applicantProfile?.studentNumber ? user.applicantProfile.studentNumber : (type !== 'Continuing' ? '' : f.studentNumber),
+              }));
+            }} required options={APPLICANT_TYPES} />
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Grade Level Applying For <span className="text-red-500">*</span></label>
-              <select value={form.gradeLevel} onChange={set('gradeLevel')} required className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#166534]/20 outline-none bg-white">
+              <select value={form.gradeLevel} onChange={set('gradeLevel')} required className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white">
                 <option value="">Select grade level</option>
                 {GRADE_OPTIONS.map(g => (
                   <optgroup key={g.group} label={g.group}>
@@ -333,9 +381,28 @@ export default function StudentAdmission() {
                 ))}
               </select>
             </div>
-            <Input label="Previous School" value={form.prevSchool} onChange={set('prevSchool')} placeholder="Name of previous school" />
+            <Input label="Previous School" value={form.prevSchool} onChange={set('prevSchool')} placeholder="Name of previous school" readOnly={form.applicantType === 'Continuing'} />
             <Input label="School Year" value={form.schoolYear} onChange={set('schoolYear')} placeholder="e.g. 2026-2027" />
             <Input label="Learner Reference Number (LRN)" value={form.lrn} onChange={(e) => { const v = e.target.value.replace(/\D/g, ''); setForm(f => ({ ...f, lrn: v })); }} placeholder="12-digit LRN" maxLength={12} pattern="[0-9]*" inputMode="numeric" />
+            {/* Student Number — auto-detected for continuing, read-only display for others with existing number */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Student Number
+                {form.applicantType === 'Continuing' && <span className="text-red-500"> *</span>}
+              </label>
+              {user?.applicantProfile?.studentNumber ? (
+                <div className="flex items-center gap-2">
+                  <input type="text" value={form.studentNumber || user.applicantProfile.studentNumber} readOnly className="gk-input bg-gray-50 font-mono" />
+                  <span className="text-xs text-forest-500 font-medium whitespace-nowrap">✓ Auto-detected</span>
+                </div>
+              ) : form.applicantType === 'Continuing' ? (
+                <input type="text" value={form.studentNumber} onChange={(e) => setForm(f => ({ ...f, studentNumber: e.target.value }))} placeholder="Enter your student number" className="gk-input font-mono" required />
+              ) : (
+                <div className="px-3 py-2.5 border border-gray-200 rounded-lg bg-gray-50 text-gray-400 text-sm">
+                  Will be assigned upon acceptance
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Age Requirement Warning */}
@@ -348,11 +415,11 @@ export default function StudentAdmission() {
           {/* Dynamic Document Requirements Preview */}
           {form.gradeLevel && (
             <div className="bg-gold-50 border border-gold-200 rounded-lg px-4 py-3 mb-4">
-              <h4 className="text-sm font-semibold text-gold-700 mb-2">📋 Required Documents for {form.gradeLevel}</h4>
+              <h4 className="text-sm font-semibold text-gold-700 mb-2 flex items-center gap-1.5"><Icon name="clipboard" className="w-4 h-4" /> Required Documents for {form.gradeLevel}</h4>
               <ul className="text-xs text-gold-600 space-y-1">
                 {requiredDocs.map(docKey => (
                   <li key={docKey} className="flex items-center gap-1.5">
-                    {slotFiles[docKey] ? <span className="text-forest-500">✅</span> : <span className="text-gray-400">◻️</span>}
+                    {slotFiles[docKey] ? <span className="text-forest-500"><Icon name="checkCircle" className="w-3.5 h-3.5 inline" /></span> : <span className="text-gray-400">○</span>}
                     {DOC_SLOT_LABELS[docKey]}
                   </li>
                 ))}
@@ -368,6 +435,13 @@ export default function StudentAdmission() {
             </div>
           )}
 
+          {/* Continuing student note */}
+          {form.applicantType === 'Continuing' && (
+            <div className="bg-forest-50 border border-forest-200 text-forest-700 rounded-lg px-4 py-3 mb-4 text-sm">
+              ℹ️ As a continuing student of Golden Key Integrated School of St. Joseph, your student number {user?.applicantProfile?.studentNumber ? 'has been auto-detected' : 'should be entered above'}. This application is for re-enrollment in the next school year.
+            </div>
+          )}
+
           <div className="flex justify-between">
             <button onClick={() => goTo(1)} className="border border-gray-300 text-gray-700 px-5 py-2.5 rounded-lg hover:bg-gray-50">← Back</button>
             <button onClick={() => goTo(3)} className="bg-gradient-to-r from-forest-500 to-forest-400 text-white px-6 py-2.5 rounded-lg font-semibold hover:from-gold-500 hover:to-gold-600">Next: Documents →</button>
@@ -377,13 +451,13 @@ export default function StudentAdmission() {
 
       {/* Step 3: Documents — Dynamic per grade level */}
       {step === 3 && (
-        <div className="lpu-card p-6">
+        <div className="gk-card p-6">
           <h3 className="text-lg font-bold text-forest-500 mb-1">Step 3: Required Documents</h3>
           <p className="text-gray-500 text-sm mb-2">Upload the documents required for <strong>{form.gradeLevel || 'your grade level'}</strong>.</p>
           <p className="text-xs text-gray-400 mb-6">Accepted formats: PDF, JPG, PNG, DOC, DOCX.</p>
 
           {/* Required Document Slots (dynamic based on grade) */}
-          <h4 className="font-semibold text-forest-500 mb-3">📎 Required Documents</h4>
+          <h4 className="font-semibold text-forest-500 mb-3 flex items-center gap-1.5"><Icon name="document" className="w-4 h-4" /> Required Documents</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             {requiredDocs.map(docKey => (
               <UploadSlot
@@ -399,16 +473,16 @@ export default function StudentAdmission() {
           </div>
 
           {/* Checklist Summary */}
-          <h4 className="font-semibold text-forest-500 mb-3">✅ Document Checklist</h4>
+          <h4 className="font-semibold text-forest-500 mb-3 flex items-center gap-1.5"><Icon name="checkCircle" className="w-4 h-4" /> Document Checklist</h4>
           <div className="space-y-2 mb-6">
             {requiredDocs.map(docKey => (
               <div key={docKey} className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg ${slotFiles[docKey] ? 'bg-forest-50 text-forest-700' : 'bg-red-50 text-red-500'}`}>
-                {slotFiles[docKey] ? '✅' : '⚠️'} {DOC_SLOT_LABELS[docKey]} — <span className="text-xs">{slotFiles[docKey] ? 'Uploaded' : 'Not yet uploaded'}</span>
+                {slotFiles[docKey] ? <Icon name="checkCircle" className="w-4 h-4" /> : <Icon name="exclamation" className="w-4 h-4" />} {DOC_SLOT_LABELS[docKey]} — <span className="text-xs">{slotFiles[docKey] ? 'Uploaded' : 'Not yet uploaded'}</span>
               </div>
             ))}
           </div>
 
-          <h4 className="font-semibold text-forest-500 mb-3">📁 Other Supporting Files (Optional)</h4>
+          <h4 className="font-semibold text-forest-500 mb-3 flex items-center gap-1.5"><Icon name="upload" className="w-4 h-4" /> Other Supporting Files (Optional)</h4>
           <div
             className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-gold-400 transition"
             onClick={() => document.getElementById('extraFileInput').click()}
@@ -416,8 +490,8 @@ export default function StudentAdmission() {
             onDragLeave={e => e.currentTarget.classList.remove('border-gold-400')}
             onDrop={e => { e.preventDefault(); e.currentTarget.classList.remove('border-gold-400'); handleExtraFiles(e.dataTransfer.files); }}
           >
-            <span className="text-3xl">📁</span>
-            <p className="text-gray-500 mt-2">Drag & drop files here or <span className="text-[#166534] font-medium">browse</span></p>
+            <Icon name="upload" className="w-8 h-8 text-gray-400" />
+            <p className="text-gray-500 mt-2">Drag & drop files here or <span className="text-forest-500 font-medium">browse</span></p>
             <p className="text-xs text-gray-400 mt-1">Medical records, recommendation letters, other certificates</p>
           </div>
           <input id="extraFileInput" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx" className="hidden" onChange={e => { handleExtraFiles(e.target.files); e.target.value = ''; }} />
@@ -441,11 +515,11 @@ export default function StudentAdmission() {
 
       {/* Step 4: Review & Submit */}
       {step === 4 && (
-        <div className="lpu-card p-6">
+        <div className="gk-card p-6">
           <h3 className="text-lg font-bold text-forest-500 mb-1">Step 4: Review & Submit</h3>
           <p className="text-gray-500 text-sm mb-6">Please review all information before submitting.</p>
 
-          <ReviewSection title="👤 Personal Information">
+          <ReviewSection title={<><Icon name="userCircle" className="w-4 h-4 inline" /> Personal Information</>}>
             <Detail label="First Name" value={form.firstName} />
             <Detail label="Last Name" value={form.lastName} />
             <Detail label="Email" value={form.email} />
@@ -455,14 +529,14 @@ export default function StudentAdmission() {
             <div className="md:col-span-2"><Detail label="Address" value={form.address} /></div>
           </ReviewSection>
 
-          <ReviewSection title="👨‍👩‍👧 Parent / Guardian">
+          <ReviewSection title={<><Icon name="users" className="w-4 h-4 inline" /> Parent / Guardian</>}>
             <Detail label="Full Name" value={form.guardian} />
             <Detail label="Relationship" value={form.guardianRelation} />
             <Detail label="Contact No." value={form.guardianPhone} />
             <Detail label="Email" value={form.guardianEmail || '—'} />
           </ReviewSection>
 
-          <ReviewSection title="🏫 School Information">
+          <ReviewSection title={<><Icon name="graduationCap" className="w-4 h-4 inline" /> School Information</>}>
             <Detail label="Applicant Type" value={form.applicantType} />
             <Detail label="Grade Level" value={form.gradeLevel} />
             <Detail label="Previous School" value={form.prevSchool || '—'} />
@@ -471,13 +545,13 @@ export default function StudentAdmission() {
           </ReviewSection>
 
           <div className="mb-6">
-            <h4 className="font-semibold text-forest-500 mb-3">📄 Uploaded Documents</h4>
+            <h4 className="font-semibold text-forest-500 mb-3 flex items-center gap-1.5"><Icon name="document" className="w-4 h-4" /> Uploaded Documents</h4>
             <div className="space-y-2">
               {Object.entries(slotFiles).filter(([,f]) => f).map(([k, f]) => (
-                <div key={k} className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-lg text-sm">📄 <strong>{DOC_SLOT_LABELS[k] || k}:</strong> {f.name} <span className="text-gray-400 text-xs">({(f.size/1024).toFixed(1)} KB)</span></div>
+                <div key={k} className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-lg text-sm"><Icon name="document" className="w-4 h-4 text-gray-400 shrink-0" /> <strong>{DOC_SLOT_LABELS[k] || k}:</strong> {f.name} <span className="text-gray-400 text-xs">({(f.size/1024).toFixed(1)} KB)</span></div>
               ))}
               {extraFiles.map((f, i) => (
-                <div key={`e${i}`} className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-lg text-sm">📄 <strong>Additional:</strong> {f.name} <span className="text-gray-400 text-xs">({(f.size/1024).toFixed(1)} KB)</span></div>
+                <div key={`e${i}`} className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-lg text-sm"><Icon name="document" className="w-4 h-4 text-gray-400 shrink-0" /> <strong>Additional:</strong> {f.name} <span className="text-gray-400 text-xs">({(f.size/1024).toFixed(1)} KB)</span></div>
               ))}
               {Object.values(slotFiles).every(f => !f) && extraFiles.length === 0 && <p className="text-gray-400 text-sm">No documents uploaded</p>}
             </div>
@@ -490,24 +564,32 @@ export default function StudentAdmission() {
           </div>
 
           {/* Data privacy consent */}
-          <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 mb-6 text-xs text-gray-500">
-            🔒 By submitting this application, you consent to the collection and processing of your personal information in accordance with the Data Privacy Act of 2012 (RA 10173) and GOLDEN KEY Integrated School of St. Joseph's privacy policies. Personal data shall not be disclosed without consent, except as required by law.
-          </div>
+          <label className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 mb-6 text-xs text-gray-500 flex items-start gap-3 cursor-pointer select-none">
+            <input type="checkbox" checked={privacyConsent} onChange={e => setPrivacyConsent(e.target.checked)} className="accent-forest-500 mt-0.5 shrink-0" />
+            <span><Icon name="lock" className="w-4 h-4 inline shrink-0 mr-1" /> By submitting this application, I consent to the collection and processing of my personal information in accordance with the Data Privacy Act of 2012 (RA 10173) and GOLDEN KEY Integrated School of St. Joseph's privacy policies. Personal data shall not be disclosed without consent, except as required by law.</span>
+          </label>
 
           <div className="flex justify-between">
             <button onClick={() => goTo(3)} className="border border-gray-300 text-gray-700 px-5 py-2.5 rounded-lg hover:bg-gray-50">← Back</button>
-            <button onClick={handleSubmit} disabled={saving} className="bg-forest-500 text-white px-8 py-2.5 rounded-lg font-semibold hover:bg-forest-600 shadow-md text-lg disabled:opacity-50 disabled:cursor-not-allowed">{saving ? '⏳ Submitting…' : '✅ Submit Application'}</button>
+            <button onClick={handleSubmit} disabled={saving} className="bg-forest-500 text-white px-8 py-2.5 rounded-lg font-semibold hover:bg-forest-600 shadow-md text-lg disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2">{saving ? <><Icon name="spinner" className="w-4 h-4 animate-spin" /> Submitting…</> : <><Icon name="check" className="w-5 h-5" /> Submit Application</>}</button>
           </div>
         </div>
       )}
 
       <Modal open={successOpen} onClose={() => setSuccessOpen(false)}>
         <div className="text-center">
-          <div className="text-5xl mb-4">🎉</div>
+          <div className="w-16 h-16 rounded-2xl bg-forest-50 flex items-center justify-center mx-auto mb-4"><Icon name="trophy" className="w-8 h-8 text-gold-500" /></div>
           <h3 className="text-xl font-bold text-forest-500">Application Submitted!</h3>
+          {submittedTrackingId && (
+            <div className="mt-3 bg-forest-50 border border-forest-200 rounded-lg px-4 py-3">
+              <p className="text-xs text-gray-500 mb-1">Your Tracking ID</p>
+              <p className="text-lg font-mono font-bold text-forest-700">{submittedTrackingId}</p>
+              <p className="text-xs text-gray-400 mt-1">Save this ID to track your application status anytime.</p>
+            </div>
+          )}
           <p className="text-gray-500 mt-2">Your admission application has been received by <strong>GOLDEN KEY Integrated School of St. Joseph</strong>.</p>
           <p className="text-xs text-gray-400 mt-2">Next step: The school will screen your application and notify you of your admission status.</p>
-          <Link to="/student/dashboard" className="mt-4 inline-block bg-[#166534] text-white px-6 py-2 rounded-lg font-semibold hover:bg-[#14532d]">Go to Dashboard</Link>
+          <Link to="/student/dashboard" className="mt-4 inline-block bg-forest-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-forest-600">Go to Dashboard</Link>
         </div>
       </Modal>
     </div>
@@ -521,7 +603,7 @@ function Input({ label, type = 'text', required, ...props }) {
   return (
     <div>
       <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">{label} {required && <span className="text-red-500">*</span>}</label>
-      <input id={id} type={type} {...props} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#166534]/20 outline-none" />
+      <input id={id} type={type} {...props} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none" />
     </div>
   );
 }
@@ -531,7 +613,7 @@ function Select({ label, required, options, ...props }) {
   return (
     <div>
       <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">{label} {required && <span className="text-red-500">*</span>}</label>
-      <select id={id} {...props} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#166534]/20 outline-none bg-white">
+      <select id={id} {...props} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white">
         {options.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
       </select>
     </div>

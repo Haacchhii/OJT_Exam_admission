@@ -1,7 +1,8 @@
-﻿import { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
+import * as XLSX from 'xlsx';
 import { useAsync } from '../../hooks/useAsync.js';
-import { getExams, getExam, addExam, updateExam, deleteExam, getExamSchedules, addExamSchedule, updateExamSchedule, deleteExamSchedule, getExamRegistrations } from '../../api/exams.js';
-import { getAdmissions } from '../../api/admissions.js';
+import { getExams, addExam, updateExam, deleteExam, getExamSchedules, addExamSchedule, updateExamSchedule, deleteExamSchedule, getExamRegistrations } from '../../api/exams.js';
+import { getAcademicYears, getSemesters } from '../../api/academicYears.js';
 import { getExamResults } from '../../api/results.js';
 import { getUsers } from '../../api/users.js';
 import { showToast } from '../../components/Toast.jsx';
@@ -10,6 +11,7 @@ import { useConfirm } from '../../components/ConfirmDialog.jsx';
 import { useUnsavedChanges } from '../../hooks/useUnsavedChanges.js';
 import { EXAM_GRADE_LEVELS } from '../../utils/constants.js';
 import { PageHeader, StatCard, Badge, EmptyState, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert } from '../../components/UI.jsx';
+import Icon from '../../components/Icons.jsx';
 import { formatTime, badgeClass, uid } from '../../utils/helpers.js';
 
 const EXAMS_PER_PAGE = 10;
@@ -23,9 +25,11 @@ export default function EmployeeExams() {
   return (
     <div>
       <div className="flex gap-2 mb-6 flex-wrap" role="tablist">
-        {[['exams','ðŸ" Exams'],['builder','âž• Create Exam'],['schedules','ðŸ"… Schedules']].map(([k,l]) => (
-          <button key={k} role="tab" aria-selected={tab === k} onClick={() => { if (k !== 'builder') setEditExamData(null); setTab(k); }} className={`px-4 py-2 rounded-lg text-sm font-medium transition ${tab === k ? 'bg-[#166534] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{l}</button>
-        ))}
+        {[['exams','Exams'],['builder','Create Exam'],['schedules','Schedules']].map(([k,l]) => {
+          const tabIcon = k === 'exams' ? 'documentText' : k === 'builder' ? 'plus' : 'calendar';
+          return (
+          <button key={k} role="tab" aria-selected={tab === k} onClick={() => { if (k !== 'builder') setEditExamData(null); setTab(k); }} className={`px-4 py-2 rounded-lg text-sm font-medium transition inline-flex items-center gap-1.5 ${tab === k ? 'bg-forest-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}><Icon name={tabIcon} className="w-4 h-4" />{l}</button>
+        )})}
       </div>
       {tab === 'exams' && <ExamsList onEdit={(exam) => { setEditExamData(exam); setTab('builder'); }} />}
       {tab === 'builder' && <ExamBuilder editExam={editExamData} onDone={() => { setEditExamData(null); setTab('exams'); }} />}
@@ -41,6 +45,8 @@ function ExamsList({ onEdit }) {
   const [searchExam, setSearchExam] = useState('');
   const [gradeFilterExam, setGradeFilterExam] = useState('all');
   const [statusFilterExam, setStatusFilterExam] = useState('all');
+  const [yearFilterExam, setYearFilterExam] = useState('all');
+  const [semesterFilterExam, setSemesterFilterExam] = useState('all');
   const [examPage, setExamPage] = useState(1);
   const [readSearch, setReadSearch] = useState('');
   const [readStatusFilter, setReadStatusFilter] = useState('all');
@@ -48,10 +54,21 @@ function ExamsList({ onEdit }) {
 
   const { data, loading, error, refetch } = useAsync(async () => {
     const [exams, schedules, regs, allUsers, allResults] = await Promise.all([
-      getExams(), getExamSchedules(), getExamRegistrations(), getUsers(), getExamResults()
+      getExams(), getExamSchedules(), getExamRegistrations(),
+      getUsers(),
+      getExamResults(),
     ]);
     return { exams, schedules, regs, allUsers, allResults };
   });
+
+  const { data: academicYears } = useAsync(() => getAcademicYears());
+  const { data: allSemesters } = useAsync(() => getSemesters());
+
+  const semesterOptionsExam = useMemo(() => {
+    const list = allSemesters || [];
+    if (yearFilterExam === 'all') return list;
+    return list.filter(s => s.academicYearId === Number(yearFilterExam));
+  }, [allSemesters, yearFilterExam]);
 
   const exams = data?.exams || [];
   const schedules = data?.schedules || [];
@@ -68,15 +85,17 @@ function ExamsList({ onEdit }) {
     }
     if (gradeFilterExam !== 'all') list = list.filter(e => e.gradeLevel === gradeFilterExam);
     if (statusFilterExam !== 'all') list = list.filter(e => (statusFilterExam === 'active') === e.isActive);
+    if (yearFilterExam !== 'all') list = list.filter(e => e.academicYear?.id === Number(yearFilterExam));
+    if (semesterFilterExam !== 'all') list = list.filter(e => e.semester?.id === Number(semesterFilterExam));
     return list;
-  }, [exams, searchExam, gradeFilterExam, statusFilterExam]);
+  }, [exams, searchExam, gradeFilterExam, statusFilterExam, yearFilterExam, semesterFilterExam]);
 
   const examGrades = useMemo(() => [...new Set(exams.map(e => e.gradeLevel).filter(Boolean))].sort(), [exams]);
 
   const { paginated: paginatedExams, totalPages: examTotalPages, safePage: examSafePage, totalItems: examTotal } = usePaginationSlice(filteredExams, examPage, EXAMS_PER_PAGE);
   const resetExamPage = () => setExamPage(1);
 
-  // Filtered readiness â€” show exam registrations & results
+  // Filtered readiness — show exam registrations & results
   const readinessRows = useMemo(() => {
     return regs.map(r => {
       const user = allUsers.find(u => u.email === r.userEmail);
@@ -117,16 +136,16 @@ function ExamsList({ onEdit }) {
 
     return (
       <div>
-        <button onClick={() => setDetailId(null)} className="mb-4 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 text-sm">â† Back to Exam List</button>
-        <div className="lpu-card p-6 mb-4">
+        <button onClick={() => setDetailId(null)} className="mb-4 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 text-sm">← Back to Exam List</button>
+        <div className="gk-card p-6 mb-4">
           <div className="flex justify-between items-start mb-4">
             <div>
               <h2 className="text-xl font-bold text-forest-500">{exam.title}</h2>
               <Badge className={exam.isActive ? 'bg-forest-100 text-forest-700' : 'bg-gray-100 text-gray-500'}>{exam.isActive ? 'Active' : 'Inactive'}</Badge>
             </div>
             <div className="flex gap-2">
-              <button onClick={() => onEdit(exam)} className="bg-[#166534] text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-[#14532d]">âœï¸ Edit</button>
-              <button onClick={async () => { try { await updateExam(exam.id, { isActive: !exam.isActive }); refetch(); } catch (err) { showToast('Failed to update exam.', 'error'); } }} className="border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-sm hover:bg-gray-50">{exam.isActive ? 'Deactivate' : 'Activate'}</button>
+              <button onClick={() => onEdit(exam)} className="bg-forest-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-forest-600 inline-flex items-center gap-1"><Icon name="edit" className="w-3.5 h-3.5" /> Edit</button>
+              <button onClick={async () => { const action = exam.isActive ? 'Deactivate' : 'Activate'; const ok = await confirm({ title: `${action} Exam`, message: `Are you sure you want to ${action.toLowerCase()} "${exam.title}"?`, confirmLabel: action, variant: exam.isActive ? 'danger' : 'info' }); if (!ok) return; try { await updateExam(exam.id, { isActive: !exam.isActive }); showToast(`Exam ${action.toLowerCase()}d!`, 'success'); refetch(); } catch (err) { showToast('Failed to update exam.', 'error'); } }} className="border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-sm hover:bg-gray-50">{exam.isActive ? 'Deactivate' : 'Activate'}</button>
             </div>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -135,7 +154,7 @@ function ExamsList({ onEdit }) {
             <DetailField label="Schedules" v={eSched.length} /><DetailField label="Registrations" v={`${eRegs.length} (${completed} completed)`} />
           </div>
         </div>
-        <div className="lpu-card p-6">
+        <div className="gk-card p-6">
           <h3 className="text-lg font-bold text-forest-500 mb-4">Questions ({exam.questions.length})</h3>
           <div className="space-y-3">
             {exam.questions.map((q, i) => (
@@ -146,7 +165,7 @@ function ExamsList({ onEdit }) {
         </div>
 
         {/* Registered Students */}
-        <div className="lpu-card p-6 mt-4">
+        <div className="gk-card p-6 mt-4">
           <h3 className="text-lg font-bold text-forest-500 mb-4">Registered Students ({eRegs.length})</h3>
           {eRegs.length > 0 ? (
             <div className="table-scroll">
@@ -182,27 +201,35 @@ function ExamsList({ onEdit }) {
     <div>
       <PageHeader title="All Exams" subtitle="View and manage created exams." />
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard icon="ðŸ“" value={exams.length} label="Total Exams" color="blue" />
-        <StatCard icon="ðŸ“…" value={schedules.length} label="Schedules" color="emerald" />
-        <StatCard icon="ðŸ‘¥" value={regs.length} label="Registrations" color="amber" />
-        <StatCard icon="âœ…" value={regs.filter(r => r.status === 'done').length} label="Completed" color="amber" />
+        <StatCard icon="exam" value={exams.length} label="Total Exams" color="blue" />
+        <StatCard icon="calendar" value={schedules.length} label="Schedules" color="emerald" />
+        <StatCard icon="users" value={regs.length} label="Registrations" color="amber" />
+        <StatCard icon="checkCircle" value={regs.filter(r => r.status === 'done').length} label="Completed" color="amber" />
       </div>
 
       {/* Exams filter bar */}
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
-        <input value={searchExam} onChange={e => { setSearchExam(e.target.value); resetExamPage(); }} placeholder="Search examsâ€¦" className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#166534]/20 outline-none text-sm" />
-        <select value={gradeFilterExam} onChange={e => { setGradeFilterExam(e.target.value); resetExamPage(); }} className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#166534]/20 outline-none bg-white text-sm">
+        <input value={searchExam} onChange={e => { setSearchExam(e.target.value); resetExamPage(); }} placeholder="Search exams…" className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm" />
+        <select value={gradeFilterExam} onChange={e => { setGradeFilterExam(e.target.value); resetExamPage(); }} className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
           <option value="all">All Grades</option>
           {examGrades.map(g => <option key={g} value={g}>{g}</option>)}
         </select>
-        <select value={statusFilterExam} onChange={e => { setStatusFilterExam(e.target.value); resetExamPage(); }} className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#166534]/20 outline-none bg-white text-sm">
+        <select value={statusFilterExam} onChange={e => { setStatusFilterExam(e.target.value); resetExamPage(); }} className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
           <option value="all">All Status</option>
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
         </select>
+        <select value={yearFilterExam} onChange={e => { setYearFilterExam(e.target.value); setSemesterFilterExam('all'); resetExamPage(); }} className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
+          <option value="all">All Years</option>
+          {(academicYears || []).map(y => <option key={y.id} value={y.id}>{y.year}</option>)}
+        </select>
+        <select value={semesterFilterExam} onChange={e => { setSemesterFilterExam(e.target.value); resetExamPage(); }} className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
+          <option value="all">All Semesters</option>
+          {semesterOptionsExam.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </select>
       </div>
 
-      <div className="lpu-card p-4 mb-6">
+      <div className="gk-card p-4 mb-6">
         {paginatedExams.length > 0 ? (
           <>
             <div className="table-scroll">
@@ -224,8 +251,8 @@ function ExamsList({ onEdit }) {
                       <td className="py-3 px-2"><Badge className={e.isActive ? 'bg-forest-100 text-forest-700' : 'bg-gray-100 text-gray-500'}>{e.isActive ? 'Active' : 'Inactive'}</Badge></td>
                       <td className="py-3 px-2">
                         <div className="flex gap-1">
-                          <button onClick={() => setDetailId(e.id)} className="text-[#166534] hover:underline text-xs">View</button>
-                          <button onClick={async () => { try { await updateExam(e.id, { isActive: !e.isActive }); refetch(); } catch (err) { showToast('Failed to update exam.', 'error'); } }} className="text-gray-500 hover:underline text-xs">{e.isActive ? 'Deactivate' : 'Activate'}</button>
+                          <button onClick={() => setDetailId(e.id)} className="text-forest-500 hover:underline text-xs">View</button>
+                          <button onClick={async () => { const action = e.isActive ? 'Deactivate' : 'Activate'; const ok = await confirm({ title: `${action} Exam`, message: `Are you sure you want to ${action.toLowerCase()} "${e.title}"?`, confirmLabel: action, variant: e.isActive ? 'danger' : 'info' }); if (!ok) return; try { await updateExam(e.id, { isActive: !e.isActive }); showToast(`Exam ${action.toLowerCase()}d!`, 'success'); refetch(); } catch (err) { showToast('Failed to update exam.', 'error'); } }} className="text-gray-500 hover:underline text-xs">{e.isActive ? 'Deactivate' : 'Activate'}</button>
                           <button onClick={async () => { if (await confirm({ title: 'Delete Exam', message: 'Are you sure you want to delete this exam? This cannot be undone.', confirmLabel: 'Delete', variant: 'danger' })) { try { await deleteExam(e.id); refetch(); } catch (err) { showToast('Failed to delete exam.', 'error'); } } }} className="text-red-500 hover:underline text-xs">Delete</button>
                         </div>
                       </td>
@@ -237,16 +264,16 @@ function ExamsList({ onEdit }) {
             <Pagination currentPage={examSafePage} totalPages={examTotalPages} onPageChange={setExamPage} totalItems={examTotal} itemsPerPage={EXAMS_PER_PAGE} />
           </>
         ) : (
-          <EmptyState icon="ðŸ“" title="No exams found" text="No exams match your filters." />
+          <EmptyState icon="documentText" title="No exams found" text="No exams match your filters." />
         )}
       </div>
 
       {/* Readiness */}
-      <div className="lpu-card p-6">
+      <div className="gk-card p-6">
         <h3 className="text-lg font-bold text-forest-500 mb-4">Exam Registrations & Results</h3>
         <div className="flex flex-col sm:flex-row gap-3 mb-4">
-          <input value={readSearch} onChange={e => { setReadSearch(e.target.value); resetReadPage(); }} placeholder="Search studentâ€¦" className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#166534]/20 outline-none text-sm" />
-          <select value={readStatusFilter} onChange={e => { setReadStatusFilter(e.target.value); resetReadPage(); }} className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#166534]/20 outline-none bg-white text-sm">
+          <input value={readSearch} onChange={e => { setReadSearch(e.target.value); resetReadPage(); }} placeholder="Search student…" className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm" />
+          <select value={readStatusFilter} onChange={e => { setReadStatusFilter(e.target.value); resetReadPage(); }} className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
             <option value="all">All</option>
             <option value="pending">Scheduled / In Progress</option>
             <option value="done">Completed</option>
@@ -267,7 +294,7 @@ function ExamsList({ onEdit }) {
                       <td className="py-3 px-2 font-medium">{r.user ? `${r.user.firstName} ${r.user.lastName}` : r.userEmail}</td>
                       <td className="py-3 px-2">{r.exam?.title || 'N/A'}</td>
                       <td className="py-3 px-2"><Badge className={badgeClass(r.status)}>{r.status}</Badge></td>
-                      <td className="py-3 px-2">{r.result ? `${r.result.totalScore}/${r.result.maxPossible} (${r.result.percentage.toFixed(1)}%)` : 'â€”'}</td>
+                      <td className="py-3 px-2">{r.result ? `${r.result.totalScore}/${r.result.maxPossible} (${r.result.percentage.toFixed(1)}%)` : '—'}</td>
                       <td className="py-3 px-2">{r.result ? <Badge className={r.result.passed ? 'bg-forest-100 text-forest-700' : 'bg-red-100 text-red-700'}>{r.result.passed ? 'Passed' : (r.result.essayReviewed ? 'Failed' : 'Pending Review')}</Badge> : <Badge className="bg-gray-100 text-gray-500">Awaiting</Badge>}</td>
                     </tr>
                   ))}
@@ -277,7 +304,7 @@ function ExamsList({ onEdit }) {
             <Pagination currentPage={readSafePage} totalPages={readTotalPages} onPageChange={setReadPage} totalItems={readTotal} itemsPerPage={READINESS_PER_PAGE} />
           </>
         ) : (
-          <EmptyState icon="ðŸ“‹" title="No registrations found" text="No exam registrations match your filters." />
+          <EmptyState icon="clipboard" title="No registrations found" text="No exam registrations match your filters." />
         )}
       </div>
     </div>
@@ -356,26 +383,101 @@ function parseJSONQuestions(text) {
   return { parsed, errs };
 }
 
-function downloadTemplate(format) {
-  let content, mime, filename;
-  if (format === 'csv') {
-    content = 'type,question,points,choiceA,choiceB,choiceC,choiceD,correct\nmc,What is 2 + 2?,2,3,4,5,6,B\nmc,"Which planet is closest to the Sun?",3,Venus,Mercury,Earth,Mars,B\nessay,Explain the importance of education in society.,5,,,,,\n';
-    mime = 'text/csv';
-    filename = 'exam_template.csv';
-  } else {
-    content = JSON.stringify([
-      { type: 'mc', question: 'What is 2 + 2?', points: 2, choices: ['3', '4', '5', '6'], correct: 1 },
-      { type: 'mc', question: 'Which planet is closest to the Sun?', points: 3, choices: [{ text: 'Venus', isCorrect: false }, { text: 'Mercury', isCorrect: true }, { text: 'Earth', isCorrect: false }, { text: 'Mars', isCorrect: false }] },
-      { type: 'essay', question: 'Explain the importance of education in society.', points: 5 },
-    ], null, 2);
-    mime = 'application/json';
-    filename = 'exam_template.json';
+function parseExcelQuestions(arrayBuffer) {
+  const wb = XLSX.read(arrayBuffer, { type: 'array' });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+  // Skip header row (first row)
+  const dataRows = rows.slice(1).filter(r => r.some(c => String(c).trim()));
+  const parsed = [];
+  let errs = 0;
+  for (const cols of dataRows) {
+    const type = String(cols[0] || '').trim().toLowerCase();
+    const qText = String(cols[1] || '').trim();
+    const pts   = parseInt(cols[2]) || 1;
+    if (!qText) { errs++; continue; }
+    if (type === 'essay') {
+      parsed.push({ id: uid(), questionText: qText, questionType: 'essay', points: pts, orderNum: parsed.length + 1, choices: [] });
+    } else if (type === 'mc' || type === 'multiple choice' || type === 'multiple_choice') {
+      const choiceTexts = [cols[3], cols[4], cols[5], cols[6]].map(c => String(c || '').trim()).filter(Boolean);
+      const correctRaw = String(cols[7] || '').trim().toUpperCase();
+      const correctIdx = correctRaw === 'A' ? 0 : correctRaw === 'B' ? 1 : correctRaw === 'C' ? 2 : correctRaw === 'D' ? 3 :
+                         correctRaw === '1' ? 0 : correctRaw === '2' ? 1 : correctRaw === '3' ? 2 : correctRaw === '4' ? 3 : 0;
+      if (choiceTexts.length < 2) { errs++; continue; }
+      parsed.push({
+        id: uid(),
+        questionText: qText,
+        questionType: 'mc',
+        points: pts,
+        orderNum: parsed.length + 1,
+        choices: choiceTexts.map((t, i) => ({ id: uid(), choiceText: t, isCorrect: i === correctIdx })),
+      });
+    } else { errs++; }
   }
-  const blob = new Blob([content], { type: mime });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = filename; a.click();
-  URL.revokeObjectURL(url);
+  return { parsed, errs };
+}
+
+function downloadTemplate(format) {
+  if (format === 'csv') {
+    const content = [
+      'type,question,points,choiceA,choiceB,choiceC,choiceD,correct',
+      'mc,What is the capital of the Philippines?,2,Cebu,Manila,Davao,Quezon City,B',
+      'mc,"Which planet is known as the Red Planet?",3,Venus,Jupiter,Mars,Saturn,C',
+      'mc,What is 15 × 8?,2,110,120,132,140,C',
+      'essay,Explain why education is important in society.,5,,,,, ',
+      'essay,"Describe the three branches of government and their roles.",10,,,,,',
+    ].join('\n');
+    const blob = new Blob([content], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'exam_template.csv'; a.click();
+    URL.revokeObjectURL(url);
+  } else if (format === 'json') {
+    const content = JSON.stringify([
+      { type: 'mc', question: 'What is the capital of the Philippines?', points: 2, choices: ['Cebu', 'Manila', 'Davao', 'Quezon City'], correct: 1 },
+      { type: 'mc', question: 'Which planet is known as the Red Planet?', points: 3, choices: [{ text: 'Venus', isCorrect: false }, { text: 'Jupiter', isCorrect: false }, { text: 'Mars', isCorrect: true }, { text: 'Saturn', isCorrect: false }] },
+      { type: 'mc', question: 'What is 15 × 8?', points: 2, choices: ['110', '120', '132', '140'], correct: 2 },
+      { type: 'essay', question: 'Explain why education is important in society.', points: 5 },
+      { type: 'essay', question: 'Describe the three branches of government and their roles.', points: 10 },
+    ], null, 2);
+    const blob = new Blob([content], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'exam_template.json'; a.click();
+    URL.revokeObjectURL(url);
+  } else if (format === 'excel') {
+    const rows = [
+      ['type', 'question', 'points', 'choiceA', 'choiceB', 'choiceC', 'choiceD', 'correct'],
+      ['mc', 'What is the capital of the Philippines?', 2, 'Cebu', 'Manila', 'Davao', 'Quezon City', 'B'],
+      ['mc', 'Which planet is known as the Red Planet?', 3, 'Venus', 'Jupiter', 'Mars', 'Saturn', 'C'],
+      ['mc', 'What is 15 × 8?', 2, '110', '120', '132', '140', 'C'],
+      ['essay', 'Explain why education is important in society.', 5, '', '', '', '', ''],
+      ['essay', 'Describe the three branches of government and their roles.', 10, '', '', '', '', ''],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    // Column widths
+    ws['!cols'] = [{ wch: 12 }, { wch: 55 }, { wch: 8 }, { wch: 22 }, { wch: 22 }, { wch: 22 }, { wch: 22 }, { wch: 10 }];
+    // Style header row bold (xlsx-style not available; we add a note sheet instead)
+    const noteRows = [
+      ['INSTRUCTIONS'],
+      ['Column', 'Description'],
+      ['type', 'mc = Multiple Choice  |  essay = Essay'],
+      ['question', 'The full question text'],
+      ['points', 'Point value (number)'],
+      ['choiceA–D', 'Answer options (MC only; leave blank for essay)'],
+      ['correct', 'Correct answer: A, B, C, or D (MC only; leave blank for essay)'],
+      [''],
+      ['NOTES'],
+      ['- You may add or remove rows freely.'],
+      ['- Do NOT change column headers in row 1 of the Questions sheet.'],
+      ['- For essay questions, leave choiceA–D and correct columns blank.'],
+      ['- The "correct" column accepts A/B/C/D or 1/2/3/4 (1-indexed).'],
+    ];
+    const wsNotes = XLSX.utils.aoa_to_sheet(noteRows);
+    wsNotes['!cols'] = [{ wch: 18 }, { wch: 60 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Questions');
+    XLSX.utils.book_append_sheet(wb, wsNotes, 'Instructions');
+    XLSX.writeFile(wb, 'exam_template.xlsx');
+  }
 }
 
 /* ===== EXAM BUILDER ===== */
@@ -384,6 +486,8 @@ function ExamBuilder({ editExam, onDone }) {
   const [grade, setGrade] = useState(editExam?.gradeLevel || '');
   const [duration, setDuration] = useState(editExam?.durationMinutes || '');
   const [passing, setPassing] = useState(editExam?.passingScore || '');
+  const [yearId, setYearId] = useState(editExam?.academicYear?.id || '');
+  const [semId, setSemId] = useState(editExam?.semester?.id || '');
   const [questions, setQuestions] = useState(editExam ? JSON.parse(JSON.stringify(editExam.questions)) : []);
   const [qModal, setQModal] = useState(null); // null | 'mc' | 'essay'
   const [qText, setQText] = useState('');
@@ -392,6 +496,11 @@ function ExamBuilder({ editExam, onDone }) {
   const [uploadPreview, setUploadPreview] = useState(null); // { parsed, errs, fileName }
   const [dragOver, setDragOver] = useState(false);
   const [dragIdx, setDragIdx] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const { data: years } = useAsync(() => getAcademicYears());
+  const { data: allSems } = useAsync(() => getSemesters());
+  const semesterOptions = (allSems || []).filter(s => !yearId || s.academicYearId === Number(yearId));
 
   const isDirty = !!(title || questions.length > 0);
   const { clear } = useUnsavedChanges(isDirty);
@@ -434,8 +543,22 @@ function ExamBuilder({ editExam, onDone }) {
   const handleUploadFile = (file) => {
     if (!file) return;
     const ext = file.name.split('.').pop().toLowerCase();
-    if (!['json', 'csv'].includes(ext)) {
-      showToast('Unsupported file type. Please upload a .csv or .json file.', 'error');
+    if (!['json', 'csv', 'xlsx', 'xls'].includes(ext)) {
+      showToast('Unsupported file type. Please upload a .csv, .xlsx, or .json file.', 'error');
+      return;
+    }
+    if (ext === 'xlsx' || ext === 'xls') {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const { parsed, errs } = parseExcelQuestions(e.target.result);
+          if (parsed.length === 0) { showToast('No valid questions found in file. Check the format.', 'error'); return; }
+          setUploadPreview({ parsed, errs, fileName: file.name });
+        } catch (err) {
+          showToast(`Failed to parse Excel file: ${err.message}`, 'error');
+        }
+      };
+      reader.readAsArrayBuffer(file);
       return;
     }
     const reader = new FileReader();
@@ -470,19 +593,36 @@ function ExamBuilder({ editExam, onDone }) {
   };
 
   const saveExam = async () => {
-    if (!title || !grade || !duration || !passing) { showToast('Fill in all exam details.', 'error'); return; }
-    if (questions.length === 0) { showToast('Add at least one question.', 'error'); return; }
+    if (!title.trim() || !grade || !duration || !passing) { showToast('Fill in all required exam details (title, grade, duration, passing score).', 'error'); return; }
+    const dur = parseInt(duration);
+    const pass = parseFloat(passing);
+    if (isNaN(dur) || dur <= 0) { showToast('Duration must be a positive number of minutes.', 'error'); return; }
+    if (isNaN(pass) || pass < 0 || pass > 100) { showToast('Passing score must be between 0 and 100.', 'error'); return; }
+    if (questions.length === 0) { showToast('Add at least one question before saving.', 'error'); return; }
+    setIsSaving(true);
     try {
+      const payload = {
+        title: title.trim(),
+        gradeLevel: grade,
+        durationMinutes: dur,
+        passingScore: pass,
+        ...(yearId && { academicYearId: Number(yearId) }),
+        ...(semId  && { semesterId:     Number(semId) }),
+        questions,
+      };
       if (editExam) {
-        await updateExam(editExam.id, { title, gradeLevel: grade, durationMinutes: parseInt(duration), passingScore: parseInt(passing), questions });
-        showToast('Exam updated!', 'success');
+        await updateExam(editExam.id, payload);
+        showToast('Exam updated successfully!', 'success');
       } else {
-        await addExam({ title, gradeLevel: grade, durationMinutes: parseInt(duration), passingScore: parseInt(passing), questions });
-        showToast('Exam created!', 'success');
+        await addExam(payload);
+        showToast('Exam created successfully!', 'success');
       }
+      clear();
       onDone();
     } catch (err) {
-      showToast('Failed to save exam.', 'error');
+      showToast('Failed to save exam: ' + (err.message || 'Unknown error'), 'error');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -493,32 +633,47 @@ function ExamBuilder({ editExam, onDone }) {
   return (
     <div>
       <PageHeader title={editExam ? 'Edit Exam' : 'Create New Exam'} subtitle="Set up exam details and add questions manually or upload a file." />
-      <div className="lpu-card p-6 mb-4">
+      <div className="gk-card p-6 mb-4">
         <h3 className="text-lg font-bold text-forest-500 mb-4">Exam Details</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormInput label="Exam Title" value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Entrance Exam - Grade 7" />
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Grade Level</label>
-            <select value={grade} onChange={e => setGrade(e.target.value)} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#166534]/20 outline-none bg-white">
+            <select value={grade} onChange={e => setGrade(e.target.value)} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white">
               <option value="">Select grade level</option>
               {EXAM_GRADE_LEVELS.map(g => <option key={g}>{g}</option>)}
             </select>
           </div>
           <FormInput label="Duration (minutes)" type="number" value={duration} onChange={e => setDuration(e.target.value)} placeholder="60" />
           <FormInput label="Passing Score (%)" type="number" value={passing} onChange={e => setPassing(e.target.value)} placeholder="60" />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Academic Year <span className="text-gray-400 font-normal">(optional)</span></label>
+            <select value={yearId} onChange={e => { setYearId(e.target.value); setSemId(''); }} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white">
+              <option value="">Select academic year</option>
+              {(years || []).map(y => <option key={y.id} value={y.id}>{y.year}{y.isActive ? ' (Active)' : ''}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Semester / Period <span className="text-gray-400 font-normal">(optional)</span></label>
+            <select value={semId} onChange={e => setSemId(e.target.value)} disabled={!yearId} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white disabled:bg-gray-50 disabled:text-gray-400">
+              <option value="">{yearId ? 'Select semester' : 'Select a year first'}</option>
+              {semesterOptions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
         </div>
       </div>
 
       {/* Upload Questionnaire Section */}
-      <div className="lpu-card p-6 mb-4">
+      <div className="gk-card p-6 mb-4">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <h3 className="text-lg font-bold text-forest-500">ðŸ“¤ Upload Questionnaire</h3>
-            <p className="text-gray-500 text-sm mt-0.5">Import questions from a CSV or JSON file to quickly build your exam.</p>
+            <h3 className="text-lg font-bold text-forest-500 flex items-center gap-1.5"><Icon name="upload" className="w-5 h-5" /> Upload Questionnaire</h3>
+            <p className="text-gray-500 text-sm mt-0.5">Import questions from a CSV, Excel, or JSON file to quickly build your exam.</p>
           </div>
           <div className="flex gap-2">
-            <button onClick={() => downloadTemplate('csv')} className="text-xs border border-gray-300 text-gray-600 px-2.5 py-1.5 rounded-lg hover:bg-gray-50 flex items-center gap-1">ðŸ“„ CSV Template</button>
-            <button onClick={() => downloadTemplate('json')} className="text-xs border border-gray-300 text-gray-600 px-2.5 py-1.5 rounded-lg hover:bg-gray-50 flex items-center gap-1">ðŸ“„ JSON Template</button>
+            <button onClick={() => downloadTemplate('csv')} className="text-xs border border-gray-300 text-gray-600 px-2.5 py-1.5 rounded-lg hover:bg-gray-50 flex items-center gap-1"><Icon name="document" className="w-3.5 h-3.5" /> CSV</button>
+            <button onClick={() => downloadTemplate('excel')} className="text-xs border border-forest-300 text-forest-700 bg-forest-50 px-2.5 py-1.5 rounded-lg hover:bg-forest-100 flex items-center gap-1"><Icon name="document" className="w-3.5 h-3.5" /> Excel</button>
+            <button onClick={() => downloadTemplate('json')} className="text-xs border border-gray-300 text-gray-600 px-2.5 py-1.5 rounded-lg hover:bg-gray-50 flex items-center gap-1"><Icon name="document" className="w-3.5 h-3.5" /> JSON</button>
           </div>
         </div>
 
@@ -530,37 +685,79 @@ function ExamBuilder({ editExam, onDone }) {
           onDragLeave={() => setDragOver(false)}
           onDrop={e => { e.preventDefault(); setDragOver(false); if (e.dataTransfer.files[0]) handleUploadFile(e.dataTransfer.files[0]); }}
         >
-          <div className="text-3xl mb-2">ðŸ“</div>
+          <div className="text-3xl mb-2"><Icon name="upload" className="w-8 h-8 text-gray-400 mx-auto" /></div>
           <p className="text-gray-600 font-medium">Drag & drop your questionnaire file here</p>
-          <p className="text-gray-400 text-sm mt-1">or <span className="text-[#166534] font-medium underline">click to browse</span></p>
-          <p className="text-xs text-gray-400 mt-2">Supported formats: .csv, .json</p>
+          <p className="text-gray-400 text-sm mt-1">or <span className="text-forest-500 font-medium underline">click to browse</span></p>
+          <p className="text-xs text-gray-400 mt-2">Supported: .xlsx (Excel) · .csv · .json</p>
         </div>
-        <input id="questionnaire-upload" type="file" accept=".csv,.json" className="hidden" onChange={e => { if (e.target.files[0]) handleUploadFile(e.target.files[0]); e.target.value = ''; }} />
+        <input id="questionnaire-upload" type="file" accept=".csv,.json,.xlsx,.xls" className="hidden" onChange={e => { if (e.target.files[0]) handleUploadFile(e.target.files[0]); e.target.value = ''; }} />
 
         {/* Format Guide */}
         <details className="mt-4 group">
-          <summary className="text-sm text-forest-500 font-medium cursor-pointer hover:underline select-none">â„¹ï¸ How to format your file</summary>
-          <div className="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <summary className="text-sm text-forest-500 font-medium cursor-pointer hover:underline select-none flex items-center gap-1"><Icon name="info" className="w-4 h-4" /> How to format your file</summary>
+          <div className="mt-3 grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="bg-gray-50 rounded-lg p-4">
-              <h4 className="font-bold text-forest-500 text-sm mb-2">CSV Format</h4>
-              <p className="text-xs text-gray-500 mb-2">Columns: type, question, points, choiceA, choiceB, choiceC, choiceD, correct</p>
-              <pre className="text-xs bg-white rounded p-2 border border-gray-200 overflow-x-auto whitespace-pre-wrap text-gray-600">
-{`mc,What is 2+2?,2,3,4,5,6,B
-essay,Explain photosynthesis.,5`}
-              </pre>
+              <h4 className="font-bold text-forest-500 text-sm mb-1 flex items-center gap-1"><Icon name="document" className="w-4 h-4" /> CSV / Excel Format</h4>
+              <p className="text-xs text-gray-500 mb-2">8 columns — same structure for both .csv and .xlsx</p>
+              <div className="text-xs font-mono bg-white rounded p-2 border border-gray-200 overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead><tr className="bg-forest-50">
+                    <th className="border border-gray-200 px-1.5 py-1">type</th>
+                    <th className="border border-gray-200 px-1.5 py-1">question</th>
+                    <th className="border border-gray-200 px-1.5 py-1">points</th>
+                    <th className="border border-gray-200 px-1.5 py-1">choiceA</th>
+                    <th className="border border-gray-200 px-1.5 py-1">choiceB</th>
+                    <th className="border border-gray-200 px-1.5 py-1">choiceC</th>
+                    <th className="border border-gray-200 px-1.5 py-1">choiceD</th>
+                    <th className="border border-gray-200 px-1.5 py-1">correct</th>
+                  </tr></thead>
+                  <tbody>
+                    <tr><td className="border border-gray-200 px-1.5 py-1 text-blue-600">mc</td><td className="border border-gray-200 px-1.5 py-1">What is 2+2?</td><td className="border border-gray-200 px-1.5 py-1">2</td><td className="border border-gray-200 px-1.5 py-1">3</td><td className="border border-gray-200 px-1.5 py-1">4</td><td className="border border-gray-200 px-1.5 py-1">5</td><td className="border border-gray-200 px-1.5 py-1">6</td><td className="border border-gray-200 px-1.5 py-1 text-green-600">B</td></tr>
+                    <tr><td className="border border-gray-200 px-1.5 py-1 text-purple-600">essay</td><td className="border border-gray-200 px-1.5 py-1">Explain photosynthesis.</td><td className="border border-gray-200 px-1.5 py-1">5</td><td className="border border-gray-200 px-1.5 py-1 text-gray-300">—</td><td className="border border-gray-200 px-1.5 py-1 text-gray-300">—</td><td className="border border-gray-200 px-1.5 py-1 text-gray-300">—</td><td className="border border-gray-200 px-1.5 py-1 text-gray-300">—</td><td className="border border-gray-200 px-1.5 py-1 text-gray-300">—</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-xs text-gray-400 mt-2">• <strong>type:</strong> <code>mc</code> or <code>essay</code></p>
+              <p className="text-xs text-gray-400">• <strong>correct:</strong> A / B / C / D (or 1 / 2 / 3 / 4)</p>
+              <p className="text-xs text-gray-400">• Leave choiceA–D & correct blank for essay rows</p>
             </div>
             <div className="bg-gray-50 rounded-lg p-4">
-              <h4 className="font-bold text-forest-500 text-sm mb-2">JSON Format</h4>
-              <p className="text-xs text-gray-500 mb-2">Array of question objects with type, question, points, choices, correct</p>
-              <pre className="text-xs bg-white rounded p-2 border border-gray-200 overflow-x-auto whitespace-pre-wrap text-gray-600">
-{`[
-  { "type": "mc", "question": "...",
-    "points": 2, "choices": ["A","B","C","D"],
-    "correct": 1 },
-  { "type": "essay", "question": "...",
-    "points": 5 }
-]`}
-              </pre>
+              <h4 className="font-bold text-forest-500 text-sm mb-1 flex items-center gap-1"><Icon name="document" className="w-4 h-4" /> JSON Format</h4>
+              <p className="text-xs text-gray-500 mb-2">Array of question objects</p>
+              <pre className="text-xs bg-white rounded p-2 border border-gray-200 overflow-x-auto whitespace-pre-wrap text-gray-600">{`[
+  {
+    "type": "mc",
+    "question": "What is 2+2?",
+    "points": 2,
+    "choices": ["3","4","5","6"],
+    "correct": 1
+  },
+  {
+    "type": "essay",
+    "question": "Explain...",
+    "points": 5
+  }
+]`}</pre>
+              <p className="text-xs text-gray-400 mt-2">• <strong>correct:</strong> 0-based index <em>or</em> letter A–D</p>
+              <p className="text-xs text-gray-400">• choices can be strings or <code>{'{text, isCorrect}'}</code> objects</p>
+            </div>
+            <div className="bg-gold-50 rounded-lg p-4 border border-gold-200">
+              <h4 className="font-bold text-gold-700 text-sm mb-1">Download Templates</h4>
+              <p className="text-xs text-gray-500 mb-3">Pre-filled sample files ready to edit</p>
+              <div className="space-y-2">
+                <button onClick={() => downloadTemplate('excel')} className="w-full flex items-center gap-2 text-sm text-forest-700 bg-white border border-forest-200 rounded-lg px-3 py-2 hover:bg-forest-50 transition-colors">
+                  <Icon name="document" className="w-4 h-4 text-green-600" />
+                  <span>Excel Template <span className="text-xs text-gray-400 font-normal">(.xlsx)</span></span>
+                </button>
+                <button onClick={() => downloadTemplate('csv')} className="w-full flex items-center gap-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors">
+                  <Icon name="document" className="w-4 h-4 text-blue-500" />
+                  <span>CSV Template <span className="text-xs text-gray-400 font-normal">(.csv)</span></span>
+                </button>
+                <button onClick={() => downloadTemplate('json')} className="w-full flex items-center gap-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors">
+                  <Icon name="document" className="w-4 h-4 text-yellow-500" />
+                  <span>JSON Template <span className="text-xs text-gray-400 font-normal">(.json)</span></span>
+                </button>
+              </div>
             </div>
           </div>
         </details>
@@ -570,7 +767,7 @@ essay,Explain photosynthesis.,5`}
       <Modal open={!!uploadPreview} onClose={() => setUploadPreview(null)}>
         {uploadPreview && (
           <div>
-            <h3 className="text-lg font-bold text-forest-500 mb-2">ðŸ“‹ Import Preview</h3>
+            <h3 className="text-lg font-bold text-forest-500 mb-2 flex items-center gap-1.5"><Icon name="clipboard" className="w-5 h-5" /> Import Preview</h3>
             <p className="text-gray-500 text-sm mb-4">File: <span className="font-medium text-forest-500">{uploadPreview.fileName}</span></p>
 
             {/* Summary */}
@@ -590,7 +787,7 @@ essay,Explain photosynthesis.,5`}
             </div>
             <div className="text-sm text-gray-500 mb-2">Total points: <strong>{uploadPreview.parsed.reduce((s, q) => s + q.points, 0)}</strong></div>
             {uploadPreview.errs > 0 && (
-              <p className="text-sm text-red-500 mb-3">âš ï¸ {uploadPreview.errs} row(s) were skipped due to formatting errors.</p>
+              <p className="text-sm text-red-500 mb-3">⚠️ {uploadPreview.errs} row(s) were skipped due to formatting errors.</p>
             )}
 
             {/* Preview list */}
@@ -623,14 +820,14 @@ essay,Explain photosynthesis.,5`}
               <div>
                 <p className="text-sm text-gray-500 mb-3">You already have <strong>{questions.length}</strong> question(s). How would you like to import?</p>
                 <div className="flex gap-2 flex-wrap">
-                  <button onClick={() => confirmUpload('append')} className="bg-[#166534] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#14532d]">âž• Add to Existing</button>
-                  <button onClick={() => confirmUpload('replace')} className="bg-forest-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-forest-600">ðŸ”„ Replace All</button>
+                  <button onClick={() => confirmUpload('append')} className="bg-forest-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-forest-600 inline-flex items-center gap-1"><Icon name="plus" className="w-4 h-4" /> Add to Existing</button>
+                  <button onClick={() => confirmUpload('replace')} className="bg-forest-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-forest-600 inline-flex items-center gap-1"><Icon name="refresh" className="w-4 h-4" /> Replace All</button>
                   <button onClick={() => setUploadPreview(null)} className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-50">Cancel</button>
                 </div>
               </div>
             ) : (
               <div className="flex gap-2">
-                <button onClick={() => confirmUpload('replace')} className="bg-forest-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-forest-600">âœ… Import Questions</button>
+                <button onClick={() => confirmUpload('replace')} className="bg-forest-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-forest-600 inline-flex items-center gap-1.5"><Icon name="check" className="w-4 h-4" /> Import Questions</button>
                 <button onClick={() => setUploadPreview(null)} className="border border-gray-300 text-gray-700 px-5 py-2 rounded-lg hover:bg-gray-50">Cancel</button>
               </div>
             )}
@@ -639,16 +836,16 @@ essay,Explain photosynthesis.,5`}
       </Modal>
 
       {/* Questions Section */}
-      <div className="lpu-card p-6 mb-4">
+      <div className="gk-card p-6 mb-4">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-lg font-bold text-forest-500">Questions ({questions.length})</h3>
             {questions.length > 0 && (
-              <p className="text-xs text-gray-400 mt-0.5">{mcCount} MC Â· {essayCount} Essay Â· {totalPoints} total pts</p>
+              <p className="text-xs text-gray-400 mt-0.5">{mcCount} MC · {essayCount} Essay · {totalPoints} total pts</p>
             )}
           </div>
           <div className="flex gap-2">
-            <button onClick={() => openQ('mc')} className="bg-[#166534] text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-[#14532d]">+ Multiple Choice</button>
+            <button onClick={() => openQ('mc')} className="bg-forest-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-forest-600">+ Multiple Choice</button>
             <button onClick={() => openQ('essay')} className="border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-sm hover:bg-gray-50">+ Essay</button>
           </div>
         </div>
@@ -665,9 +862,9 @@ essay,Explain photosynthesis.,5`}
                 onDrop={(e) => { e.preventDefault(); if (dragIdx !== null && dragIdx !== i) moveQuestion(dragIdx, i); setDragIdx(null); }}
               >
                 <div className="flex flex-col items-center gap-0.5 pt-3">
-                  <button onClick={() => { if (i > 0) moveQuestion(i, i - 1); }} disabled={i === 0} className="text-gray-400 hover:text-forest-500 disabled:opacity-30 text-xs px-1" aria-label={`Move question ${i + 1} up`}>â–²</button>
-                  <div className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-forest-500 px-1 select-none text-lg" title="Drag to reorder">â —</div>
-                  <button onClick={() => { if (i < questions.length - 1) moveQuestion(i, i + 1); }} disabled={i === questions.length - 1} className="text-gray-400 hover:text-forest-500 disabled:opacity-30 text-xs px-1" aria-label={`Move question ${i + 1} down`}>â–¼</button>
+                  <button onClick={() => { if (i > 0) moveQuestion(i, i - 1); }} disabled={i === 0} className="text-gray-400 hover:text-forest-500 disabled:opacity-30 text-xs px-1" aria-label={`Move question ${i + 1} up`}>▲</button>
+                  <div className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-forest-500 px-1 select-none text-lg" title="Drag to reorder">⠗</div>
+                  <button onClick={() => { if (i < questions.length - 1) moveQuestion(i, i + 1); }} disabled={i === questions.length - 1} className="text-gray-400 hover:text-forest-500 disabled:opacity-30 text-xs px-1" aria-label={`Move question ${i + 1} down`}>▼</button>
                 </div>
                 <div className="flex-1">
                   <QuestionCard q={q} i={i} />
@@ -677,13 +874,15 @@ essay,Explain photosynthesis.,5`}
             ))}
           </div>
         ) : (
-          <EmptyState icon="ðŸ“" title="No Questions Added" text="Upload a questionnaire file above, or click the buttons to add questions manually." />
+          <EmptyState icon="documentText" title="No Questions Added" text="Upload a questionnaire file above, or click the buttons to add questions manually." />
         )}
       </div>
 
       <div className="flex gap-3">
-        <button onClick={saveExam} className="bg-forest-500 text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-forest-600 shadow-md">ðŸ’¾ Save Exam</button>
-        <button onClick={onDone} className="border border-gray-300 text-gray-700 px-5 py-2.5 rounded-lg hover:bg-gray-50">Cancel</button>
+        <button onClick={saveExam} disabled={isSaving} className="bg-forest-500 text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-forest-600 shadow-md inline-flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed">
+          {isSaving ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Saving…</> : <><Icon name="check" className="w-4 h-4" /> Save Exam</>}
+        </button>
+        <button onClick={onDone} disabled={isSaving} className="border border-gray-300 text-gray-700 px-5 py-2.5 rounded-lg hover:bg-gray-50 disabled:opacity-50">Cancel</button>
       </div>
 
       {/* Question Modal */}
@@ -692,11 +891,11 @@ essay,Explain photosynthesis.,5`}
         <div className="space-y-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Question Text</label>
-            <textarea value={qText} onChange={e => setQText(e.target.value)} placeholder="Enter your question..." className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#166534]/20 outline-none min-h-[80px]" />
+            <textarea value={qText} onChange={e => setQText(e.target.value)} placeholder="Enter your question..." className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none min-h-[80px]" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Points</label>
-            <input type="number" value={qPts} onChange={e => setQPts(e.target.value)} placeholder="5" className="w-24 px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#166534]/20 outline-none" />
+            <input type="number" value={qPts} onChange={e => setQPts(e.target.value)} placeholder="5" className="w-24 px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none" />
           </div>
           {qModal === 'mc' && (
             <div>
@@ -704,9 +903,9 @@ essay,Explain photosynthesis.,5`}
               <div className="space-y-2">
                 {choices.map((c, i) => (
                   <div key={i} className="flex items-center gap-2">
-                    <input type="radio" name="correctChoice" checked={!!c.correct} onChange={() => setChoices(cs => cs.map((cc, j) => ({ ...cc, correct: j === i })))} className="accent-[#166534]" />
-                    <input type="text" value={c.text} onChange={e => setChoices(cs => cs.map((cc, j) => j === i ? { ...cc, text: e.target.value } : cc))} placeholder={`Choice ${i + 1}`} className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#166534]/20 outline-none text-sm" />
-                    {choices.length > 2 && <button onClick={() => setChoices(cs => cs.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600">âœ•</button>}
+                    <input type="radio" name="correctChoice" checked={!!c.correct} onChange={() => setChoices(cs => cs.map((cc, j) => ({ ...cc, correct: j === i })))} className="accent-forest-500" />
+                    <input type="text" value={c.text} onChange={e => setChoices(cs => cs.map((cc, j) => j === i ? { ...cc, text: e.target.value } : cc))} placeholder={`Choice ${i + 1}`} className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm" />
+                    {choices.length > 2 && <button onClick={() => setChoices(cs => cs.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600">✕</button>}
                   </div>
                 ))}
               </div>
@@ -714,7 +913,7 @@ essay,Explain photosynthesis.,5`}
             </div>
           )}
           <div className="flex gap-3 pt-2">
-            <button onClick={addQuestion} className="bg-[#166534] text-white px-5 py-2 rounded-lg font-semibold hover:bg-[#14532d]">Add Question</button>
+            <button onClick={addQuestion} className="bg-forest-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-forest-600">Add Question</button>
             <button onClick={() => setQModal(null)} className="border border-gray-300 text-gray-700 px-5 py-2 rounded-lg hover:bg-gray-50">Cancel</button>
           </div>
         </div>
@@ -731,6 +930,7 @@ function ScheduleManager() {
   const [schedSearch, setSchedSearch] = useState('');
   const [schedExamFilter, setSchedExamFilter] = useState('all');
   const [schedPage, setSchedPage] = useState(1);
+  const [isSavingSched, setIsSavingSched] = useState(false);
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
 
   const { data: schedData, loading: schedLoading, error: schedError, refetch: schedRefetch } = useAsync(async () => {
@@ -772,8 +972,8 @@ function ScheduleManager() {
       showToast('End time must be after start time.', 'error');
       return;
     }
-    // Validate date is not in the past (for new schedules)
-    if (!editId && form.date) {
+    // Validate date is not in the past
+    if (form.date) {
       const today = new Date().toISOString().split('T')[0];
       if (form.date < today) {
         showToast('Schedule date cannot be in the past.', 'error');
@@ -781,11 +981,14 @@ function ScheduleManager() {
       }
     }
     const data = { examId: parseInt(form.examId), scheduledDate: form.date, startTime: form.start, endTime: form.end, maxSlots: parseInt(form.slots) };
+    setIsSavingSched(true);
     try {
       if (editId) { await updateExamSchedule(editId, data); showToast('Schedule updated!', 'success'); setEditId(null); }
       else { await addExamSchedule(data); showToast('Schedule added!', 'success'); }
     } catch (err) {
-      showToast('Failed to save schedule.', 'error');
+      showToast('Failed to save schedule: ' + (err.message || 'Unknown error'), 'error');
+    } finally {
+      setIsSavingSched(false);
     }
     setForm({ examId: '', date: '', start: '', end: '', slots: '' });
     schedRefetch();
@@ -794,17 +997,17 @@ function ScheduleManager() {
   const editSched = (s) => { setEditId(s.id); setForm({ examId: String(s.examId), date: s.scheduledDate, start: s.startTime, end: s.endTime, slots: String(s.maxSlots) }); };
 
   if (schedLoading) return <SkeletonPage />;
-  if (schedError) return <div className="lpu-card p-8 text-center"><p className="text-red-600 font-medium">Failed to load schedules.</p><button onClick={schedRefetch} className="mt-2 text-[#166534] underline text-sm">Retry</button></div>;
+  if (schedError) return <div className="gk-card p-8 text-center"><p className="text-red-600 font-medium">Failed to load schedules.</p><button onClick={schedRefetch} className="mt-2 text-forest-500 underline text-sm">Retry</button></div>;
 
   return (
     <div>
       <PageHeader title="Exam Schedules" subtitle="Create and manage exam date/time slots." />
-      <div className="lpu-card p-6 mb-6">
+      <div className="gk-card p-6 mb-6">
         <h3 className="text-lg font-bold text-forest-500 mb-4">{editId ? 'Edit Schedule' : 'Add New Schedule'}</h3>
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Exam</label>
-            <select value={form.examId} onChange={set('examId')} required className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#166534]/20 outline-none bg-white">
+            <select value={form.examId} onChange={set('examId')} required className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white">
               <option value="">Select exam</option>
               {exams.map(e => <option key={e.id} value={e.id}>{e.title}</option>)}
             </select>
@@ -814,16 +1017,18 @@ function ScheduleManager() {
           <FormInput label="End Time" type="time" value={form.end} onChange={set('end')} required />
           <FormInput label="Max Applicants" type="number" value={form.slots} onChange={set('slots')} placeholder="30" required />
           <div className="flex items-end">
-            <button type="submit" className="bg-[#166534] text-white px-5 py-2.5 rounded-lg font-semibold hover:bg-[#14532d]">{editId ? 'Update Schedule' : 'Add Schedule'}</button>
+            <button type="submit" disabled={isSavingSched} className="bg-forest-500 text-white px-5 py-2.5 rounded-lg font-semibold hover:bg-forest-600 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-2">
+              {isSavingSched ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Saving…</> : (editId ? 'Update Schedule' : 'Add Schedule')}
+            </button>
           </div>
         </form>
       </div>
 
-      <div className="lpu-card p-6">
+      <div className="gk-card p-6">
         <h3 className="text-lg font-bold text-forest-500 mb-4">Current Schedules</h3>
         <div className="flex flex-col sm:flex-row gap-3 mb-4">
-          <input value={schedSearch} onChange={e => { setSchedSearch(e.target.value); resetSchedPage(); }} placeholder="Search by exam or dateâ€¦" className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#166534]/20 outline-none text-sm" />
-          <select value={schedExamFilter} onChange={e => { setSchedExamFilter(e.target.value); resetSchedPage(); }} className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#166534]/20 outline-none bg-white text-sm">
+          <input value={schedSearch} onChange={e => { setSchedSearch(e.target.value); resetSchedPage(); }} placeholder="Search by exam or date…" className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm" />
+          <select value={schedExamFilter} onChange={e => { setSchedExamFilter(e.target.value); resetSchedPage(); }} className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
             <option value="all">All Exams</option>
             {exams.map(e => <option key={e.id} value={String(e.id)}>{e.title}</option>)}
           </select>
@@ -848,13 +1053,13 @@ function ScheduleManager() {
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => editSched(s)} className="text-[#166534] hover:underline text-xs">âœï¸ Edit</button>
-                  <button onClick={async () => { if (await confirm({ title: 'Delete Schedule', message: 'Are you sure you want to delete this schedule?', confirmLabel: 'Delete', variant: 'danger' })) { try { await deleteExamSchedule(s.id); schedRefetch(); } catch (err) { showToast('Failed to delete schedule.', 'error'); } } }} className="text-red-500 hover:underline text-xs">ðŸ—‘ Delete</button>
+                  <button onClick={() => editSched(s)} className="text-forest-500 hover:underline text-xs inline-flex items-center gap-0.5"><Icon name="edit" className="w-3 h-3" /> Edit</button>
+                  <button onClick={async () => { if (await confirm({ title: 'Delete Schedule', message: 'Are you sure you want to delete this schedule?', confirmLabel: 'Delete', variant: 'danger' })) { try { await deleteExamSchedule(s.id); schedRefetch(); } catch (err) { showToast('Failed to delete schedule.', 'error'); } } }} className="text-red-500 hover:underline text-xs inline-flex items-center gap-0.5"><Icon name="trash" className="w-3 h-3" /> Delete</button>
                 </div>
               </div>
             );
           })}
-          {paginatedScheds.length === 0 && <EmptyState icon="ðŸ“…" title="No schedules" text="No schedules match your filters." />}
+          {paginatedScheds.length === 0 && <EmptyState icon="calendar" title="No schedules" text="No schedules match your filters." />}
         </div>
         <Pagination currentPage={schedSafePage} totalPages={schedTotalPages} onPageChange={setSchedPage} totalItems={schedTotal} itemsPerPage={SCHED_PER_PAGE} />
       </div>
@@ -864,7 +1069,7 @@ function ScheduleManager() {
 
 /* ===== Shared sub-components ===== */
 function DetailField({ label, v }) { return <div><span className="block text-xs text-gray-400 uppercase tracking-wide">{label}</span><span className="text-sm text-forest-500 font-medium">{String(v)}</span></div>; }
-function FormInput({ label, required, ...props }) { return <div><label className="block text-sm font-medium text-gray-700 mb-1">{label}</label><input {...props} required={required} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#166534]/20 outline-none" /></div>; }
+function FormInput({ label, required, ...props }) { return <div><label className="block text-sm font-medium text-gray-700 mb-1">{label}</label><input {...props} required={required} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none" /></div>; }
 
 function QuestionCard({ q, i }) {
   return (
@@ -879,12 +1084,12 @@ function QuestionCard({ q, i }) {
         <div className="space-y-1">
           {q.choices.map(c => (
             <div key={c.id} className={`text-sm px-2 py-1 rounded ${c.isCorrect ? 'bg-forest-50 text-forest-700 font-medium' : 'text-gray-500'}`}>
-              {c.isCorrect ? 'âœ“' : 'â—‹'} {c.choiceText}
+              {c.isCorrect ? '✓' : '○'} {c.choiceText}
             </div>
           ))}
         </div>
       ) : (
-        <p className="text-gray-400 text-sm italic">ðŸ“ Essay response required</p>
+        <p className="text-gray-400 text-sm italic">📝 Essay response required</p>
       )}
     </div>
   );

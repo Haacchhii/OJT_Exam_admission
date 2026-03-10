@@ -14,25 +14,9 @@ export function load() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const data = JSON.parse(raw);
-      // backward compat
-      if (!data.exams) data.exams = JSON.parse(JSON.stringify(defaultData.exams));
-      if (!data.examSchedules) data.examSchedules = JSON.parse(JSON.stringify(defaultData.examSchedules));
-      if (!data.examRegistrations) data.examRegistrations = JSON.parse(JSON.stringify(defaultData.examRegistrations));
-      if (!data.examResults) data.examResults = JSON.parse(JSON.stringify(defaultData.examResults));
-      if (!data.essayAnswers) data.essayAnswers = JSON.parse(JSON.stringify(defaultData.essayAnswers));
-      if (!data.notifications) data.notifications = JSON.parse(JSON.stringify(defaultData.notifications));
-      if (!data.users) data.users = JSON.parse(JSON.stringify(defaultData.users));
-      if (!data.submittedAnswers) data.submittedAnswers = JSON.parse(JSON.stringify(defaultData.submittedAnswers));
-      // Migrate old admission statuses to current admission workflow
-      if (data.admissions) {
-        const statusMap = { 'Pending': 'Submitted', 'Approved': 'Accepted', 'Enrolled': 'Accepted', 'Pending Payment': 'Under Screening' };
-        let migrated = false;
-        data.admissions.forEach(a => {
-          if (statusMap[a.status]) { a.status = statusMap[a.status]; migrated = true; }
-          if (!a.applicantType) { a.applicantType = a.enrollmentType || 'New'; delete a.enrollmentType; migrated = true; }
-          if (a.enrollmentType) { a.applicantType = a.enrollmentType; delete a.enrollmentType; migrated = true; }
-        });
-        if (migrated) save(data);
+      // Ensure all keys exist (empty arrays for any missing)
+      for (const key of Object.keys(defaultData)) {
+        if (data[key] === undefined) data[key] = JSON.parse(JSON.stringify(defaultData[key]));
       }
       _cache = data;
       return data;

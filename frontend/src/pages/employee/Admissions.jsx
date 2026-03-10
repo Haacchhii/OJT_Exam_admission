@@ -1,11 +1,15 @@
 import { useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAsync } from '../../hooks/useAsync.js';
-import { getAdmissions, getStats, updateAdmissionStatus, VALID_TRANSITIONS } from '../../api/admissions.js';
+import { getAdmissions, getStats, updateAdmissionStatus, bulkUpdateStatus, VALID_TRANSITIONS } from '../../api/admissions.js';
+import { getAcademicYears, getSemesters } from '../../api/academicYears.js';
 import { showToast } from '../../components/Toast.jsx';
 import { useConfirm } from '../../components/ConfirmDialog.jsx';
 import { PageHeader, Badge, EmptyState, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert } from '../../components/UI.jsx';
+import Icon from '../../components/Icons.jsx';
 import { formatDate, badgeClass } from '../../utils/helpers.js';
+import { ADMISSION_STATUSES } from '../../utils/constants.js';
+import ApplicationTracker from './ApplicationTracker.jsx';
 
 const PER_PAGE = 10;
 
@@ -19,12 +23,15 @@ export default function EmployeeAdmissions() {
   const [filter, setFilter] = useState(directStatus || 'all');
   const [gradeFilter, setGradeFilter] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
+  const [yearFilter, setYearFilter] = useState('all');
+  const [semesterFilter, setSemesterFilter] = useState('all');
   const [statusVal, setStatusVal] = useState('');
   const [notes, setNotes] = useState('');
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState(new Set());
   const [bulkStatus, setBulkStatus] = useState('Submitted');
   const [saving, setSaving] = useState(false);
+  const [viewMode, setViewMode] = useState('applications');
 
   const { data: rawData, loading, error, refetch } = useAsync(async () => {
     const [stats, admissions] = await Promise.all([getStats(), getAdmissions()]);
@@ -32,12 +39,21 @@ export default function EmployeeAdmissions() {
     return { stats, admissions, grades };
   });
 
-  const ADMISSION_STATUSES = ['Submitted', 'Under Screening', 'Under Evaluation', 'Accepted', 'Rejected'];
+  const { data: academicYears } = useAsync(() => getAcademicYears());
+  const { data: allSemesters } = useAsync(() => getSemesters());
+
+  const semesterOptions = useMemo(() => {
+    const list = allSemesters || [];
+    if (yearFilter === 'all') return list;
+    return list.filter(s => s.academicYearId === Number(yearFilter));
+  }, [allSemesters, yearFilter]);
 
   const admissions = useMemo(() => {
     let list = rawData?.admissions || [];
     if (filter !== 'all') list = list.filter(a => a.status === filter);
     if (gradeFilter !== 'all') list = list.filter(a => a.gradeLevel === gradeFilter);
+    if (yearFilter !== 'all') list = list.filter(a => a.academicYear?.id === Number(yearFilter));
+    if (semesterFilter !== 'all') list = list.filter(a => a.semester?.id === Number(semesterFilter));
     if (search) list = list.filter(a => `${a.firstName} ${a.lastName} ${a.email}`.toLowerCase().includes(search.toLowerCase()));
     // Sort
     if (sortBy === 'newest') list = [...list].sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
@@ -45,7 +61,7 @@ export default function EmployeeAdmissions() {
     else if (sortBy === 'name') list = [...list].sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`));
     else if (sortBy === 'status') list = [...list].sort((a, b) => a.status.localeCompare(b.status));
     return list;
-  }, [rawData, search, filter, gradeFilter, sortBy]);
+  }, [rawData, search, filter, gradeFilter, yearFilter, semesterFilter, sortBy]);
 
   const { paginated, totalPages, safePage, totalItems } = usePaginationSlice(admissions, page, PER_PAGE);
 
@@ -88,7 +104,7 @@ export default function EmployeeAdmissions() {
     if (!ok) return;
     setSaving(true);
     try {
-      await Promise.all(validIds.map(id => updateAdmissionStatus(id, bulkStatus, '')));
+      await bulkUpdateStatus(validIds, bulkStatus);
       showToast(`${validIds.length} application(s) updated to ${bulkStatus}.${skippedIds.length ? ` ${skippedIds.length} skipped.` : ''}`, 'success');
       setSelected(new Set());
       refetch();
@@ -119,6 +135,15 @@ export default function EmployeeAdmissions() {
       showToast(`Cannot transition from "${adm.status}" to "${statusVal}".`, 'error');
       return;
     }
+    if (statusVal !== adm.status) {
+      const ok = await confirm({
+        title: `Update Status to "${statusVal}"`,
+        message: `Are you sure you want to change ${adm.firstName} ${adm.lastName}'s application from "${adm.status}" to "${statusVal}"?`,
+        confirmLabel: statusVal,
+        variant: statusVal === 'Rejected' ? 'danger' : 'info',
+      });
+      if (!ok) return;
+    }
     setSaving(true);
     try {
       await updateAdmissionStatus(detailId, statusVal, notes);
@@ -130,6 +155,19 @@ export default function EmployeeAdmissions() {
       setSaving(false);
     }
   };
+
+  // Top-level view mode: Applications vs Track
+  if (viewMode === 'track') {
+    return (
+      <div>
+        <div className="flex gap-2 mb-6">
+          <button onClick={() => setViewMode('applications')} className="px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition inline-flex items-center gap-1.5"><Icon name="clipboard" className="w-4 h-4" /> Applications</button>
+          <button className="px-4 py-2 rounded-lg text-sm font-medium bg-forest-500 text-white inline-flex items-center gap-1.5"><Icon name="search" className="w-4 h-4" /> Track Application</button>
+        </div>
+        <ApplicationTracker />
+      </div>
+    );
+  }
 
   // Loading guard
   if (loading && !rawData) return <SkeletonPage />;
@@ -167,7 +205,7 @@ export default function EmployeeAdmissions() {
           @media print { body { padding: 20px; } }
         </style>
       </head><body>
-        <div class="logo"><span>🔑</span><h1>GOLDEN KEY Integrated School of St. Joseph</h1><p class="subtitle">Lapolapo 1st, San Jose, Batangas, Philippines &bull; Tel: (043)-702-2153<br/>Admission Application Form</p></div>
+        <div class="logo"><span>🔑</span><h1><span style="color:#fbbf24">GOLDEN KEY</span><br/><span style="color:#166534">Integrated School of St. Joseph</span></h1><p class="subtitle">Lapolapo 1st, San Jose, Batangas, Philippines &bull; Tel: (043)-702-2153<br/>Admission Application Form</p></div>
         <h2>Student Information</h2>
         <div class="grid">
           <div class="field"><label>Full Name</label><span>${esc(adm.firstName)} ${esc(adm.lastName)}</span></div>
@@ -187,7 +225,7 @@ export default function EmployeeAdmissions() {
         <h2>Application Status</h2>
         <p><span class="status ${esc(adm.status).replace(/\s+/g, '-')}">${esc(adm.status)}</span></p>
         ${adm.notes ? `<p style="margin-top:8px;font-size:13px;color:#666"><strong>Notes:</strong> ${esc(adm.notes)}</p>` : ''}
-        <p style="margin-top:30px;font-size:11px;color:#aaa;text-align:center">Printed on ${new Date().toLocaleDateString()} — GOLDEN KEY Integrated School of St. Joseph &copy; 2026</p>
+        <p style="margin-top:30px;font-size:11px;color:#aaa;text-align:center">Printed on ${new Date().toLocaleDateString()} — GOLDEN KEY Integrated School of St. Joseph &copy; ${new Date().getFullYear()}</p>
       </body></html>`);
       printWin.document.close();
       printWin.focus();
@@ -198,11 +236,11 @@ export default function EmployeeAdmissions() {
       <div>
         <div className="flex items-center gap-2 mb-4">
           <button onClick={backToList} className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 text-sm">← Back to List</button>
-          <button onClick={handlePrint} className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 text-sm ml-auto">🖨️ Print / Export PDF</button>
+          <button onClick={() => handlePrint()} className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 text-sm ml-auto inline-flex items-center gap-1.5"><Icon name="document" className="w-4 h-4" /> Print / Export PDF</button>
         </div>
         <PageHeader title="Application Details" />
 
-        <div className="lpu-card p-6 mb-4">
+        <div className="gk-card p-6 mb-4">
           <h3 className="text-lg font-bold text-forest-500 mb-4">Student Information</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <D label="Full Name" value={`${adm.firstName} ${adm.lastName}`} />
@@ -212,6 +250,7 @@ export default function EmployeeAdmissions() {
             <D label="Gender" value={adm.gender} />
             <D label="Grade Level" value={adm.gradeLevel} />
             <D label="Applicant Type" value={adm.applicantType || 'New'} />
+            <D label="Student Number" value={adm.studentNumber || (adm.applicantType === 'New' || adm.applicantType === 'Transferee' ? 'Will be assigned on acceptance' : 'N/A')} />
             <div className="md:col-span-2"><D label="Address" value={adm.address} /></div>
             <D label="Previous School" value={adm.prevSchool || 'N/A'} />
             <D label="Parent / Guardian" value={adm.guardian} />
@@ -219,35 +258,40 @@ export default function EmployeeAdmissions() {
           </div>
         </div>
 
-        <div className="lpu-card p-6 mb-4">
+        <div className="gk-card p-6 mb-4">
           <h3 className="text-lg font-bold text-forest-500 mb-4">Submitted Documents</h3>
           <div className="space-y-2">
-            {adm.documents.map((doc, i) => (
+            {(adm.documentFiles || adm.documents.map(d => ({ name: d, filePath: null }))).map((doc, i) => (
               <div key={i} className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded-lg text-sm">
-                <span>📄 {doc}</span>
-                <span className="bg-forest-100 text-forest-700 px-2 py-0.5 rounded-full text-xs">Submitted</span>
+                <span><Icon name="document" className="w-4 h-4 inline text-gray-400" /> {doc.name}</span>
+                <div className="flex items-center gap-2">
+                  {doc.filePath && (
+                    <a href={`${import.meta.env.VITE_API_URL?.replace(/\/api\/?$/, '')}/uploads/${doc.filePath}`} target="_blank" rel="noopener noreferrer" className="text-forest-500 hover:underline text-xs font-medium">View / Download</a>
+                  )}
+                  <span className="bg-forest-100 text-forest-700 px-2 py-0.5 rounded-full text-xs">Submitted</span>
+                </div>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="lpu-card p-6">
+        <div className="gk-card p-6">
           <h3 className="text-lg font-bold text-forest-500 mb-4">Application Status</h3>
           <div className="mb-4">Current Status: <Badge className={badgeClass(adm.status)}>{adm.status}</Badge></div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-xl mb-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Update Status</label>
-              <select value={statusVal} onChange={e => setStatusVal(e.target.value)} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#166534]/20 outline-none bg-white">
+              <select value={statusVal} onChange={e => setStatusVal(e.target.value)} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white">
                 {ADMISSION_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">Notes / Remarks</label>
-              <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Add notes about this application..." className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#166534]/20 outline-none min-h-[80px]" />
+              <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Add notes about this application..." className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none min-h-[80px]" />
             </div>
           </div>
           <div className="flex gap-3">
-            <button onClick={saveStatus} disabled={saving} className="bg-forest-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-forest-600 disabled:opacity-50 disabled:cursor-not-allowed">{saving ? '⏳ Saving…' : '💾 Save Changes'}</button>
+            <button onClick={saveStatus} disabled={saving} className="bg-forest-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-forest-600 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5">{saving ? <><Icon name="spinner" className="w-4 h-4 animate-spin" /> Saving…</> : <><Icon name="check" className="w-4 h-4" /> Save Changes</>}</button>
             <button onClick={backToList} className="border border-gray-300 text-gray-700 px-5 py-2 rounded-lg hover:bg-gray-50">Cancel</button>
           </div>
         </div>
@@ -267,20 +311,32 @@ export default function EmployeeAdmissions() {
 
   return (
     <div>
+      <div className="flex gap-2 mb-6">
+        <button className="px-4 py-2 rounded-lg text-sm font-medium bg-forest-500 text-white inline-flex items-center gap-1.5"><Icon name="clipboard" className="w-4 h-4" /> Applications</button>
+        <button onClick={() => setViewMode('track')} className="px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition inline-flex items-center gap-1.5"><Icon name="search" className="w-4 h-4" /> Track Application</button>
+      </div>
       <PageHeader title="All Admission Applications" />
 
       {/* Filter bar */}
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
-        <input type="text" value={search} onChange={e => { setSearch(e.target.value); resetPage(); }} placeholder="Search by name or email..." aria-label="Search applications" className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#166534]/20 outline-none" />
-        <select value={filter} onChange={e => { setFilter(e.target.value); resetPage(); }} aria-label="Filter by status" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#166534]/20 outline-none bg-white">
+        <input type="text" value={search} onChange={e => { setSearch(e.target.value); resetPage(); }} placeholder="Search by name or email..." aria-label="Search applications" className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none" />
+        <select value={filter} onChange={e => { setFilter(e.target.value); resetPage(); }} aria-label="Filter by status" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white">
           <option value="all">All Status</option>
           {ADMISSION_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
-        <select value={gradeFilter} onChange={e => { setGradeFilter(e.target.value); resetPage(); }} aria-label="Filter by grade" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#166534]/20 outline-none bg-white">
+        <select value={gradeFilter} onChange={e => { setGradeFilter(e.target.value); resetPage(); }} aria-label="Filter by grade" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white">
           <option value="all">All Grades</option>
           {(rawData?.grades || []).map(g => <option key={g} value={g}>{g}</option>)}
         </select>
-        <select value={sortBy} onChange={e => { setSortBy(e.target.value); resetPage(); }} aria-label="Sort by" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#166534]/20 outline-none bg-white">
+        <select value={yearFilter} onChange={e => { setYearFilter(e.target.value); setSemesterFilter('all'); resetPage(); }} aria-label="Filter by school year" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white">
+          <option value="all">All Years</option>
+          {(academicYears || []).map(y => <option key={y.id} value={y.id}>{y.year}</option>)}
+        </select>
+        <select value={semesterFilter} onChange={e => { setSemesterFilter(e.target.value); resetPage(); }} aria-label="Filter by semester" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white">
+          <option value="all">All Semesters</option>
+          {semesterOptions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </select>
+        <select value={sortBy} onChange={e => { setSortBy(e.target.value); resetPage(); }} aria-label="Sort by" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white">
           <option value="newest">Newest First</option>
           <option value="oldest">Oldest First</option>
           <option value="name">Name A–Z</option>
@@ -290,7 +346,7 @@ export default function EmployeeAdmissions() {
 
       <div className="flex gap-2 mb-4 flex-wrap" role="tablist">
         {tabs.map(t => (
-          <button key={t.key} role="tab" aria-selected={filter === t.key} onClick={() => { setFilter(t.key); resetPage(); }} className={`px-4 py-2 rounded-lg text-sm font-medium transition ${filter === t.key ? 'bg-[#166534] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+          <button key={t.key} role="tab" aria-selected={filter === t.key} onClick={() => { setFilter(t.key); resetPage(); }} className={`px-4 py-2 rounded-lg text-sm font-medium transition ${filter === t.key ? 'bg-forest-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
             {t.label} ({t.count})
           </button>
         ))}
@@ -300,22 +356,22 @@ export default function EmployeeAdmissions() {
       {selected.size > 0 && (
         <div className="flex items-center gap-3 mb-4 bg-forest-50 border border-forest-200 rounded-lg px-4 py-3 animate-[fadeInUp_0.2s_ease-out]">
           <span className="text-sm font-semibold text-forest-700">{selected.size} selected</span>
-          <select value={bulkStatus} onChange={e => setBulkStatus(e.target.value)} className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-[#166534]/20 outline-none">
+          <select value={bulkStatus} onChange={e => setBulkStatus(e.target.value)} className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-forest-500/20 outline-none">
             {ADMISSION_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
-          <button onClick={handleBulkAction} disabled={saving} className="bg-forest-500 text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-forest-600 transition disabled:opacity-50 disabled:cursor-not-allowed">{saving ? '⏳ Applying…' : 'Apply'}</button>
+          <button onClick={handleBulkAction} disabled={saving} className="bg-forest-500 text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-forest-600 transition disabled:opacity-50 disabled:cursor-not-allowed">{saving ? 'Applying…' : 'Apply'}</button>
           <button onClick={() => setSelected(new Set())} className="text-gray-500 text-sm hover:underline ml-auto">Clear selection</button>
         </div>
       )}
 
-      <div className="lpu-card p-4">
+      <div className="gk-card p-4">
         {paginated.length > 0 ? (
           <>
             <div className="table-scroll">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-200 text-left text-gray-400 uppercase text-xs">
-                    <th scope="col" className="py-3 px-2 w-8"><input type="checkbox" checked={paginated.length > 0 && paginated.every(a => selected.has(a.id))} onChange={toggleAll} className="accent-[#166534] rounded" /></th>
+                    <th scope="col" className="py-3 px-2 w-8"><input type="checkbox" checked={paginated.length > 0 && paginated.every(a => selected.has(a.id))} onChange={toggleAll} className="accent-forest-500 rounded" /></th>
                     <th scope="col" className="py-3 px-2">ID</th><th scope="col" className="py-3 px-2">Student Name</th><th scope="col" className="py-3 px-2">Email</th>
                     <th scope="col" className="py-3 px-2">Grade Level</th><th scope="col" className="py-3 px-2">Type</th><th scope="col" className="py-3 px-2">Documents</th><th scope="col" className="py-3 px-2">Status</th>
                     <th scope="col" className="py-3 px-2">Submitted</th><th scope="col" className="py-3 px-2">Actions</th>
@@ -324,7 +380,7 @@ export default function EmployeeAdmissions() {
                 <tbody>
                   {paginated.map(a => (
                     <tr key={a.id} onClick={() => showDetail(a.id)} className={`border-b border-gray-50 hover:bg-gray-50 cursor-pointer ${selected.has(a.id) ? 'bg-gold-50/50' : ''}`}>
-                      <td className="py-3 px-2" onClick={e => e.stopPropagation()}><input type="checkbox" checked={selected.has(a.id)} onChange={() => toggleSelect(a.id)} className="accent-[#166534] rounded" /></td>
+                      <td className="py-3 px-2" onClick={e => e.stopPropagation()}><input type="checkbox" checked={selected.has(a.id)} onChange={() => toggleSelect(a.id)} className="accent-forest-500 rounded" /></td>
                       <td className="py-3 px-2 text-gray-400">{a.id}</td>
                       <td className="py-3 px-2 font-medium text-forest-500">{a.firstName} {a.lastName}</td>
                       <td className="py-3 px-2 text-gray-500">{a.email}</td>
@@ -333,7 +389,7 @@ export default function EmployeeAdmissions() {
                       <td className="py-3 px-2">{a.documents.length} file(s)</td>
                       <td className="py-3 px-2"><Badge className={badgeClass(a.status)}>{a.status}</Badge></td>
                       <td className="py-3 px-2 text-gray-500">{formatDate(a.submittedAt)}</td>
-                      <td className="py-3 px-2"><button onClick={(e) => { e.stopPropagation(); showDetail(a.id); }} className="text-[#166534] hover:underline text-xs font-medium">View</button></td>
+                      <td className="py-3 px-2"><button onClick={(e) => { e.stopPropagation(); showDetail(a.id); }} className="text-forest-500 hover:underline text-xs font-medium">View</button></td>
                     </tr>
                   ))}
                 </tbody>
@@ -342,7 +398,7 @@ export default function EmployeeAdmissions() {
             <Pagination currentPage={safePage} totalPages={totalPages} onPageChange={setPage} totalItems={totalItems} itemsPerPage={PER_PAGE} />
           </>
         ) : (
-          <EmptyState icon="📭" title="No applications found" text="No admission applications match your current filters." />
+          <EmptyState icon="inbox" title="No applications found" text="No admission applications match your current filters." />
         )}
       </div>
     </div>

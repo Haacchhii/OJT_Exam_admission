@@ -1,0 +1,427 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── Users ────────────────────────────────────────────
+model User {
+  id            Int      @id @default(autoincrement())
+  firstName     String   @map("first_name")
+  lastName      String   @map("last_name")
+  email         String   @unique
+  passwordHash  String   @map("password_hash")
+  role          String   @default("applicant") // administrator | registrar | teacher | applicant
+  status        String   @default("Active")    // Active | Inactive
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  admissions      Admission[]
+  examsCreated    Exam[]             @relation("ExamCreator")
+  reviewedResults ExamResult[]       @relation("ResultReviewer")
+  scoredEssays    EssayAnswer[]      @relation("EssayScorer")
+  notifications   Notification[]
+  auditLogs       AuditLog[]
+  enrollments     Enrollment[]
+  payments        PaymentRecord[]
+  announcements   Announcement[]     @relation("AnnouncementAuthor")
+
+  applicantProfile  ApplicantProfile?
+  staffProfile      StaffProfile?
+
+  @@map("users")
+}
+
+// ─── Admissions ───────────────────────────────────────
+model Admission {
+  id              Int      @id @default(autoincrement())
+  trackingId      String   @unique @map("tracking_id") // e.g. GK-ADM-2026-00001
+  userId          Int      @map("user_id")
+  firstName       String   @map("first_name")
+  lastName        String   @map("last_name")
+  email           String
+  phone           String?
+  dob             String   // stored as ISO date string
+  gender          String   // Male | Female
+  address         String
+  gradeLevel      String   @map("grade_level")
+  prevSchool      String?  @map("prev_school")
+  schoolYear      String   @map("school_year")
+  lrn             String?
+  applicantType   String   @default("New") @map("applicant_type") // New | Transferee | Returning | Continuing
+  studentNumber   String?  @map("student_number") // pre-filled for continuing students, assigned for new on acceptance
+  guardian        String
+  guardianRelation String  @map("guardian_relation")
+  guardianPhone   String?  @map("guardian_phone")
+  guardianEmail   String?  @map("guardian_email")
+  status          String   @default("Submitted") // Submitted | Under Screening | Under Evaluation | Accepted | Rejected
+  notes           String?
+  academicYearId  Int?     @map("academic_year_id")
+  semesterId      Int?     @map("semester_id")
+  submittedAt     DateTime @default(now()) @map("submitted_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documents     AdmissionDocument[]
+  academicYear  AcademicYear?       @relation(fields: [academicYearId], references: [id])
+  semester      Semester?           @relation(fields: [semesterId], references: [id])
+  enrollment    Enrollment?
+  payments      PaymentRecord[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([gradeLevel])
+  @@index([academicYearId])
+  @@index([semesterId])
+  @@map("admissions")
+}
+
+model AdmissionDocument {
+  id           Int      @id @default(autoincrement())
+  admissionId  Int      @map("admission_id")
+  documentName String   @map("document_name")
+  filePath     String?  @map("file_path")
+  uploadedAt   DateTime @default(now()) @map("uploaded_at")
+
+  admission Admission @relation(fields: [admissionId], references: [id], onDelete: Cascade)
+
+  @@index([admissionId])
+  @@map("admission_documents")
+}
+
+// ─── Exams ────────────────────────────────────────────
+model Exam {
+  id              Int      @id @default(autoincrement())
+  title           String
+  gradeLevel      String   @map("grade_level")
+  durationMinutes Int      @map("duration_minutes")
+  passingScore    Float    @map("passing_score") // percentage 0-100
+  isActive        Boolean  @default(true) @map("is_active")
+  academicYearId  Int?     @map("academic_year_id")
+  semesterId      Int?     @map("semester_id")
+  createdById     Int?     @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  createdBy    User?          @relation("ExamCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  questions    ExamQuestion[]
+  schedules    ExamSchedule[]
+  academicYear AcademicYear?  @relation(fields: [academicYearId], references: [id])
+  semester     Semester?      @relation(fields: [semesterId], references: [id])
+
+  @@index([gradeLevel])
+  @@index([isActive])
+  @@index([academicYearId])
+  @@map("exams")
+}
+
+model ExamQuestion {
+  id           Int    @id @default(autoincrement())
+  examId       Int    @map("exam_id")
+  questionText String @map("question_text")
+  questionType String @map("question_type") // mc | essay
+  points       Int
+  orderNum     Int    @map("order_num")
+
+  exam             Exam              @relation(fields: [examId], references: [id], onDelete: Cascade)
+  choices          QuestionChoice[]
+  submittedAnswers SubmittedAnswer[]
+  essayAnswers     EssayAnswer[]
+
+  @@unique([examId, orderNum])
+  @@map("exam_questions")
+}
+
+model QuestionChoice {
+  id         Int     @id @default(autoincrement())
+  questionId Int     @map("question_id")
+  choiceText String  @map("choice_text")
+  isCorrect  Boolean @default(false) @map("is_correct")
+  orderNum   Int     @map("order_num")
+
+  question   ExamQuestion      @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  selectedIn SubmittedAnswer[]
+
+  @@index([questionId])
+  @@map("question_choices")
+}
+
+// ─── Schedules & Registrations ────────────────────────
+model ExamSchedule {
+  id            Int      @id @default(autoincrement())
+  examId        Int      @map("exam_id")
+  scheduledDate String   @map("scheduled_date") // YYYY-MM-DD
+  startTime     String   @map("start_time")     // HH:mm
+  endTime       String   @map("end_time")       // HH:mm
+  maxSlots      Int      @map("max_slots")
+  slotsTaken    Int      @default(0) @map("slots_taken")
+  venue         String?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  exam          Exam               @relation(fields: [examId], references: [id], onDelete: Cascade)
+  registrations ExamRegistration[]
+
+  @@index([examId])
+  @@index([scheduledDate])
+  @@map("exam_schedules")
+}
+
+model ExamRegistration {
+  id          Int       @id @default(autoincrement())
+  trackingId  String    @unique @map("tracking_id") // e.g. GK-EXM-2026-00001
+  userEmail   String    @map("user_email")
+  scheduleId  Int       @map("schedule_id")
+  status      String    @default("scheduled") // scheduled | started | done
+  startedAt   DateTime? @map("started_at")
+  submittedAt DateTime? @map("submitted_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  schedule         ExamSchedule      @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  result           ExamResult?
+  submittedAnswers SubmittedAnswer[]
+  essayAnswers     EssayAnswer[]
+
+  @@index([userEmail])
+  @@index([scheduleId])
+  @@index([status])
+  @@map("exam_registrations")
+}
+
+// ─── Results ──────────────────────────────────────────
+model ExamResult {
+  id             Int      @id @default(autoincrement())
+  registrationId Int      @unique @map("registration_id")
+  totalScore     Int      @default(0) @map("total_score")
+  maxPossible    Int      @map("max_possible")
+  percentage     Float
+  passed         Boolean  @default(false)
+  essayReviewed  Boolean  @default(false) @map("essay_reviewed")
+  reviewedById   Int?     @map("reviewed_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  registration ExamRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  reviewedBy   User?            @relation("ResultReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@map("exam_results")
+}
+
+model SubmittedAnswer {
+  id               Int      @id @default(autoincrement())
+  registrationId   Int      @map("registration_id")
+  questionId       Int      @map("question_id")
+  selectedChoiceId Int?     @map("selected_choice_id")
+  essayText        String?  @map("essay_text")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  registration   ExamRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  question       ExamQuestion     @relation(fields: [questionId], references: [id])
+  selectedChoice QuestionChoice?  @relation(fields: [selectedChoiceId], references: [id])
+
+  @@unique([registrationId, questionId])
+  @@map("submitted_answers")
+}
+
+model EssayAnswer {
+  id             Int       @id @default(autoincrement())
+  registrationId Int       @map("registration_id")
+  questionId     Int       @map("question_id")
+  essayResponse  String    @map("essay_response")
+  pointsAwarded  Int?      @map("points_awarded")
+  maxPoints      Int       @map("max_points")
+  scored         Boolean   @default(false)
+  scoredById     Int?      @map("scored_by")
+  scoredAt       DateTime? @map("scored_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  registration ExamRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  question     ExamQuestion     @relation(fields: [questionId], references: [id])
+  scoredBy     User?            @relation("EssayScorer", fields: [scoredById], references: [id], onDelete: SetNull)
+
+  @@index([scored])
+  @@unique([registrationId, questionId])
+  @@map("essay_answers")
+}
+
+// ─── Notifications ────────────────────────────────────
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  type      String   // info | success | warning | exam | admission | status | scoring
+  title     String
+  message   String
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+// ─── Audit Trail ──────────────────────────────────────
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int?     @map("user_id")
+  action    String   // e.g. "admission.status_update", "user.create", "exam.delete"
+  entity    String   // e.g. "admission", "user", "exam", "result"
+  entityId  Int?     @map("entity_id")
+  details   String?  // JSON string with extra context
+  ipAddress String?  @map("ip_address")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([action])
+  @@index([entity])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ─── Academic Year ──────────────────────────────────
+model AcademicYear {
+  id        Int        @id @default(autoincrement())
+  year      String     @unique                    // e.g. "2026-2027"
+  isActive  Boolean    @default(false) @map("is_active")
+  startDate DateTime?  @map("start_date")
+  endDate   DateTime?  @map("end_date")
+  createdAt DateTime   @default(now()) @map("created_at")
+
+  semesters   Semester[]
+  admissions  Admission[]
+  exams       Exam[]
+  enrollments Enrollment[]
+
+  @@map("academic_years")
+}
+
+// ─── Semester / Period ──────────────────────────────
+model Semester {
+  id             Int          @id @default(autoincrement())
+  name           String       // "First Semester" | "Second Semester" | "Summer"
+  academicYearId Int          @map("academic_year_id")
+  isActive       Boolean      @default(false) @map("is_active")
+  startDate      DateTime?    @map("start_date")
+  endDate        DateTime?    @map("end_date")
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  admissions   Admission[]
+  exams        Exam[]
+  enrollments  Enrollment[]
+
+  @@unique([academicYearId, name])
+  @@map("semesters")
+}
+
+// ─── Role Profiles ───────────────────────────────────
+model ApplicantProfile {
+  id            Int      @id @default(autoincrement())
+  userId        Int      @unique @map("user_id")
+  studentNumber String?  @unique @map("student_number") // e.g. GKISSJ-2026-00001 (assigned on acceptance)
+  lrn           String?
+  gradeLevel    String?  @map("grade_level")
+  guardian      String?
+  guardianPhone String?  @map("guardian_phone")
+  guardianEmail String?  @map("guardian_email")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("applicant_profiles")
+}
+
+model StaffProfile {
+  id         Int      @id @default(autoincrement())
+  userId     Int      @unique @map("user_id")
+  employeeId String?  @unique @map("employee_id")
+  department String?
+  position   String?
+  hireDate   DateTime? @map("hire_date")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("staff_profiles")
+}
+
+// ─── Enrollment ───────────────────────────────────────
+// Tracks the formal enrollment of an accepted applicant into a school year.
+model Enrollment {
+  id             Int      @id @default(autoincrement())
+  userId         Int      @map("user_id")
+  admissionId    Int      @unique @map("admission_id")  // one admission → one enrollment
+  academicYearId Int      @map("academic_year_id")
+  semesterId     Int?     @map("semester_id")
+  gradeLevel     String   @map("grade_level")
+  section        String?  // e.g. "St. Joseph"
+  status         String   @default("Enrolled") // Enrolled | Dropped | Transferred | Graduated
+  enrolledAt     DateTime @default(now()) @map("enrolled_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  admission    Admission    @relation(fields: [admissionId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+  semester     Semester?    @relation(fields: [semesterId], references: [id])
+
+  @@index([userId])
+  @@index([academicYearId])
+  @@index([gradeLevel])
+  @@map("enrollments")
+}
+
+// ─── Payment / Fees ────────────────────────────────────
+model PaymentRecord {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
+  admissionId Int?     @map("admission_id")
+  type        String   // "admission_fee" | "exam_fee" | "enrollment_fee" | "tuition" | "other"
+  amount      Float
+  currency    String   @default("PHP")
+  status      String   @default("Pending") // Pending | Paid | Cancelled | Refunded
+  reference   String?  // reference number / OR number
+  notes       String?
+  paidAt      DateTime? @map("paid_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  admission Admission? @relation(fields: [admissionId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([admissionId])
+  @@index([status])
+  @@index([type])
+  @@map("payment_records")
+}
+
+// ─── Announcements ─────────────────────────────────────
+model Announcement {
+  id          Int      @id @default(autoincrement())
+  title       String
+  content     String
+  audience    String   @default("all") // all | applicant | staff
+  isPinned    Boolean  @default(false) @map("is_pinned")
+  isPublished Boolean  @default(true)  @map("is_published")
+  publishedAt DateTime @default(now()) @map("published_at")
+  expiresAt   DateTime? @map("expires_at")
+  createdById Int?     @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  createdBy User? @relation("AnnouncementAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([audience])
+  @@index([isPinned])
+  @@index([publishedAt])
+  @@map("announcements")
+}

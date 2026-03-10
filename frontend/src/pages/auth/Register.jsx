@@ -1,17 +1,16 @@
 import { useState } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
-import { addUser, getUserByEmail } from '../../api/users.js';
 import { showToast } from '../../components/Toast.jsx';
-import Modal from '../../components/Modal.jsx';
 import { getPasswordStrength } from '../../utils/passwordStrength.js';
+import Icon from '../../components/Icons.jsx';
 
 export default function Register() {
-  const { user } = useAuth();
+  const { user, login } = useAuth();
+  const navigate = useNavigate();
   const [form, setForm] = useState({ firstName: '', lastName: '', email: '', password: '', confirmPassword: '' });
   const [showPw, setShowPw] = useState(false);
   const [showConfirmPw, setShowConfirmPw] = useState(false);
-  const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
   if (user) return <Navigate to={user.role === 'applicant' ? '/student' : '/employee'} replace />;
@@ -26,12 +25,17 @@ export default function Register() {
     if (strength.score < 3) { showToast('Password is too weak. Include uppercase, numbers, or symbols.', 'error'); return; }
     if (form.password !== form.confirmPassword) { showToast('Passwords do not match', 'error'); return; }
     if (!/\S+@\S+\.\S+/.test(form.email)) { showToast('Please enter a valid email address.', 'error'); return; }
-    if (await getUserByEmail(form.email)) { showToast('Email already registered.', 'error'); return; }
     setLoading(true);
     try {
-      const result = await addUser({ firstName: form.firstName, lastName: form.lastName, email: form.email, role: 'applicant', password: form.password });
-      if (result?.error) { showToast(result.error, 'error'); return; }
-      setSuccess(true);
+      const result = await login(form.email, form.password, {
+        registerPayload: { firstName: form.firstName, lastName: form.lastName, email: form.email, password: form.password },
+      });
+      if (!result.ok) {
+        showToast(result.msg || 'Registration failed. Please try again.', 'error');
+        return;
+      }
+      showToast('Account created! Welcome aboard.', 'success');
+      navigate('/student');
     } catch (err) {
       showToast(err.message || 'Registration failed. Please try again.', 'error');
     } finally {
@@ -40,63 +44,136 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-forest-500 via-forest-600 to-forest-700 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
-        <div className="text-center mb-6">
-          <span className="text-4xl">🔑</span>
-          <h1 className="text-xl font-bold text-forest-500 mt-2">GOLDEN KEY Integrated School of St. Joseph</h1>
-        </div>
-        <h2 className="text-2xl font-bold text-forest-500 mb-1">Create Account</h2>
-        <p className="text-gray-500 text-sm mb-6">Register as a new applicant to get started</p>
+    <div className="min-h-screen flex gk-auth-bg">
+      {/* Left: Hero Panel */}
+      <div className="hidden lg:flex lg:w-[45%] relative flex-col justify-between p-12 text-white overflow-hidden">
+        <div className="absolute top-20 -left-16 w-64 h-64 bg-gold-400/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-32 right-0 w-48 h-48 bg-white/5 rounded-full blur-2xl" />
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
-              <input type="text" value={form.firstName} onChange={set('firstName')} required className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#166534]/20 outline-none" placeholder="Juan" />
+        <div className="relative z-10">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gold-400 to-gold-500 flex items-center justify-center shadow-lg">
+              <Icon name="key" className="w-5 h-5 text-forest-800" />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
-              <input type="text" value={form.lastName} onChange={set('lastName')} required className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#166534]/20 outline-none" placeholder="Dela Cruz" />
-            </div>
+            <span className="text-lg font-bold tracking-tight text-gold-400">GOLDEN KEY</span>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-            <input type="email" value={form.email} onChange={set('email')} required className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#166534]/20 outline-none" placeholder="your@email.com" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-            <input type={showPw ? 'text' : 'password'} value={form.password} onChange={set('password')} required minLength={8} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#166534]/20 outline-none" placeholder="Create a password" />
-            {form.password && (
-              <div className="mt-2 flex items-center gap-2">
-                <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden"><div className={`h-full ${strength.color} transition-all`} style={{ width: strength.width }} /></div>
-                <span className="text-xs text-gray-500">{strength.text}</span>
+          <p className="text-forest-300 text-sm font-semibold">Integrated School of St. Joseph</p>
+        </div>
+
+        <div className="relative z-10 space-y-6">
+          <h2 className="text-4xl font-bold leading-tight">
+            Start Your<br />
+            <span className="text-gold-400">Journey Today</span>
+          </h2>
+          <p className="text-white/60 text-sm leading-relaxed max-w-sm">
+            Join our community of learners. Register to apply for admission and take entrance exams online.
+          </p>
+
+          {/* How it works */}
+          <div className="space-y-4 pt-2">
+            <p className="text-white/50 text-xs font-semibold uppercase tracking-widest">How it works</p>
+            {[
+              { step: '1', label: 'Create your account', desc: 'Register with your name and email — takes less than a minute.' },
+              { step: '2', label: 'Book & take the entrance exam', desc: 'Choose a schedule and complete the online entrance exam.' },
+              { step: '3', label: 'Submit your admission application', desc: 'Once you pass, fill out the admission form and upload your documents.' },
+            ].map(({ step, label, desc }) => (
+              <div key={step} className="flex items-start gap-3">
+                <div className="w-7 h-7 rounded-full bg-gold-400/20 border border-gold-400/40 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <span className="text-gold-400 text-xs font-bold">{step}</span>
+                </div>
+                <div>
+                  <p className="text-white/80 text-sm font-semibold">{label}</p>
+                  <p className="text-white/40 text-xs mt-0.5">{desc}</p>
+                </div>
               </div>
-            )}
+            ))}
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
-            <div className="relative">
-              <input type={showConfirmPw ? 'text' : 'password'} value={form.confirmPassword} onChange={set('confirmPassword')} required className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#166534]/20 outline-none pr-12" placeholder="Re-enter your password" />
-              <button type="button" onClick={() => setShowConfirmPw(!showConfirmPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                {showConfirmPw ? '🙈' : '👁'}
-              </button>
-            </div>
-            {form.confirmPassword && form.confirmPassword !== form.password && <p className="text-red-500 text-xs mt-1">Passwords do not match</p>}
-          </div>
-          <button type="submit" disabled={loading} data-testid="register-submit" className="w-full bg-gradient-to-r from-forest-500 to-forest-400 text-white font-semibold py-2.5 rounded-lg hover:from-gold-500 hover:to-gold-600 shadow-md btn-shimmer disabled:opacity-60 disabled:cursor-not-allowed">{loading ? 'Creating Account…' : 'Create Account'}</button>
-        </form>
-        <p className="text-sm text-gray-500 text-center mt-6">Already have an account? <Link to="/login" className="text-[#166534] font-medium">Sign in</Link></p>
+        </div>
+
+        <p className="relative z-10 text-xs text-white/30">&copy; {new Date().getFullYear()} GOLDEN KEY Integrated School of St. Joseph. All rights reserved.</p>
       </div>
 
-      <Modal open={success} onClose={() => setSuccess(false)}>
-        <div className="text-center">
-          <span className="text-4xl">✅</span>
-          <h3 className="text-xl font-bold text-forest-500 mt-4">Account Created!</h3>
-          <p className="text-gray-500 mt-2">Your account has been registered. You can now log in.</p>
-          <Link to="/login" className="mt-4 inline-block bg-[#166534] text-white px-6 py-2 rounded-lg font-semibold hover:bg-[#14532d]">Go to Login</Link>
+      {/* Right: Register Form */}
+      <div className="flex-1 flex items-center justify-center p-6 lg:p-12">
+        <div className="w-full max-w-md animate-[fadeIn_0.4s_ease-out]">
+          {/* Mobile brand */}
+          <div className="lg:hidden text-center mb-8">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-gold-400 to-gold-500 flex items-center justify-center mx-auto mb-3 shadow-lg">
+              <Icon name="key" className="w-6 h-6 text-forest-800" />
+            </div>
+            <h1 className="text-lg font-bold text-gold-400">GOLDEN KEY</h1>
+            <p className="text-sm text-forest-300 font-semibold">Integrated School of St. Joseph</p>
+          </div>
+
+          <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-elevated p-8 sm:p-10 border border-white/60">
+            <div className="mb-8">
+              <h2 className="text-2xl font-bold text-gray-800">Create Account</h2>
+              <p className="text-gray-500 text-sm mt-1">Register as a new applicant to get started</p>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">First Name</label>
+                  <input type="text" value={form.firstName} onChange={set('firstName')} required className="gk-input" placeholder="Juan" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Last Name</label>
+                  <input type="text" value={form.lastName} onChange={set('lastName')} required className="gk-input" placeholder="Dela Cruz" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
+                <div className="relative">
+                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400">
+                    <Icon name="mail" className="w-4.5 h-4.5" />
+                  </div>
+                  <input type="email" value={form.email} onChange={set('email')} required className="gk-input pl-11" placeholder="your@email.com" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
+                <div className="relative">
+                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400">
+                    <Icon name="lock" className="w-4.5 h-4.5" />
+                  </div>
+                  <input type={showPw ? 'text' : 'password'} value={form.password} onChange={set('password')} required minLength={8} className="gk-input pl-11 pr-12" placeholder="Create a password" />
+                  <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors" aria-label={showPw ? 'Hide password' : 'Show password'}>
+                    <Icon name={showPw ? 'eyeOff' : 'eye'} className="w-4.5 h-4.5" />
+                  </button>
+                </div>
+                {form.password && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className={`h-full ${strength.color} transition-all rounded-full`} style={{ width: strength.width }} /></div>
+                    <span className="text-xs text-gray-500 font-medium">{strength.text}</span>
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Confirm Password</label>
+                <div className="relative">
+                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400">
+                    <Icon name="lock" className="w-4.5 h-4.5" />
+                  </div>
+                  <input type={showConfirmPw ? 'text' : 'password'} value={form.confirmPassword} onChange={set('confirmPassword')} required className="gk-input pl-11 pr-12" placeholder="Re-enter your password" />
+                  <button type="button" onClick={() => setShowConfirmPw(!showConfirmPw)} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors" aria-label={showConfirmPw ? 'Hide password' : 'Show password'}>
+                    <Icon name={showConfirmPw ? 'eyeOff' : 'eye'} className="w-4.5 h-4.5" />
+                  </button>
+                </div>
+                {form.confirmPassword && form.confirmPassword !== form.password && (
+                  <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1"><Icon name="exclamation" className="w-3.5 h-3.5" />Passwords do not match</p>
+                )}
+              </div>
+              <button type="submit" disabled={loading} data-testid="register-submit" className="gk-btn-primary w-full py-3 text-sm flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
+                {loading ? (
+                  <><Icon name="spinner" className="w-4 h-4 animate-spin" />Creating Account…</>
+                ) : 'Create Account'}
+              </button>
+            </form>
+            <p className="text-sm text-gray-500 text-center mt-6">Already have an account? <Link to="/login" className="text-forest-500 hover:text-forest-600 font-semibold transition-colors">Sign in</Link></p>
+          </div>
         </div>
-      </Modal>
+      </div>
     </div>
   );
 }

@@ -4,8 +4,11 @@ import { getAdmissions } from '../../api/admissions.js';
 import { getExams, getExamSchedules, getExamRegistrations } from '../../api/exams.js';
 import { getExamResults, getEssayAnswers } from '../../api/results.js';
 import { getUsers } from '../../api/users.js';
+import { getAcademicYears, getSemesters } from '../../api/academicYears.js';
 import { showToast } from '../../components/Toast.jsx';
 import { PageHeader, SkeletonPage, ErrorAlert } from '../../components/UI.jsx';
+import Icon from '../../components/Icons.jsx';
+import { ADMISSION_STATUSES } from '../../utils/constants.js';
 
 function downloadCSV(filename, rows) {
   const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
@@ -19,15 +22,43 @@ function downloadCSV(filename, rows) {
 export default function EmployeeReports() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [gradeFilter, setGradeFilter] = useState('all');
+  const [yearFilter, setYearFilter] = useState('all');
+  const [semesterFilter, setSemesterFilter] = useState('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
   const { data: rawData, loading, error, refetch } = useAsync(async () => {
-    const [admissions, results, exams, schedules, regs, essays, users] = await Promise.all([
-      getAdmissions(), getExamResults(), getExams(), getExamSchedules(), getExamRegistrations(), getEssayAnswers(), getUsers()
+    const settled = await Promise.allSettled([
+      getAdmissions(),
+      getExamResults(),
+      getExams(),
+      getExamSchedules(),
+      getExamRegistrations(),
+      getEssayAnswers(),
+      getUsers(),
     ]);
-    return { admissions, results, exams, schedules, regs, essays, users };
+    const extract = (r) => r.status === 'fulfilled' ? r.value : [];
+    const failures = settled.filter(r => r.status === 'rejected');
+    if (failures.length > 0) {
+      showToast(`${failures.length} data source(s) failed to load. Some report data may be incomplete.`, 'error');
+    }
+    return {
+      admissions: extract(settled[0]),
+      results: extract(settled[1]),
+      exams: extract(settled[2]),
+      schedules: extract(settled[3]),
+      regs: extract(settled[4]),
+      essays: extract(settled[5]),
+      users: extract(settled[6]),
+    };
   });
+
+  const { data: academicYears } = useAsync(() => getAcademicYears());
+  const { data: allSemesters } = useAsync(() => getSemesters());
+
+  const semesterOptions = (allSemesters || []).filter(s =>
+    yearFilter === 'all' || s.academicYearId === Number(yearFilter)
+  );
 
   const grades = useMemo(() => [...new Set((rawData?.admissions || []).map(a => a.gradeLevel).filter(Boolean))].sort(), [rawData?.admissions]);
 
@@ -36,6 +67,8 @@ export default function EmployeeReports() {
     let adm = rawData?.admissions || [];
     if (statusFilter !== 'all') adm = adm.filter(a => a.status === statusFilter);
     if (gradeFilter !== 'all') adm = adm.filter(a => a.gradeLevel === gradeFilter);
+    if (yearFilter !== 'all') adm = adm.filter(a => a.academicYear?.id === Number(yearFilter));
+    if (semesterFilter !== 'all') adm = adm.filter(a => a.semester?.id === Number(semesterFilter));
     if (dateFrom) adm = adm.filter(a => new Date(a.submittedAt) >= new Date(dateFrom));
     if (dateTo) adm = adm.filter(a => new Date(a.submittedAt) <= new Date(dateTo + 'T23:59:59'));
 
@@ -50,7 +83,7 @@ export default function EmployeeReports() {
       schedules: rawData?.schedules || [], regs: filteredRegs, essays: rawData?.essays || [],
       users: rawData?.users || [],
     };
-  }, [rawData, statusFilter, gradeFilter, dateFrom, dateTo]);
+  }, [rawData, statusFilter, gradeFilter, yearFilter, semesterFilter, dateFrom, dateTo]);
 
   if (loading && !rawData) return <SkeletonPage />;
   if (error) return <ErrorAlert error={error} onRetry={refetch} />;
@@ -128,35 +161,39 @@ export default function EmployeeReports() {
 
       {/* Refresh button */}
       <div className="flex justify-end mb-4">
-        <button onClick={refetch} className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 flex items-center gap-2">🔄 Refresh Data</button>
+        <button onClick={refetch} className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 flex items-center gap-2"><Icon name="refresh" className="w-4 h-4" /> Refresh Data</button>
       </div>
 
       {/* Filters */}
-      <div className="lpu-card p-4 mb-6">
+      <div className="gk-card p-4 mb-6">
         <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Filter Report Data</h4>
         <div className="flex flex-col sm:flex-row gap-3">
-          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} aria-label="Filter by status" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#166534]/20 outline-none bg-white text-sm">
+          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} aria-label="Filter by status" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
             <option value="all">All Status</option>
-            <option value="Submitted">Submitted</option>
-            <option value="Under Screening">Under Screening</option>
-            <option value="Under Evaluation">Under Evaluation</option>
-            <option value="Accepted">Accepted</option>
-            <option value="Rejected">Rejected</option>
+            {ADMISSION_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
-          <select value={gradeFilter} onChange={e => setGradeFilter(e.target.value)} className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#166534]/20 outline-none bg-white text-sm">
+          <select value={gradeFilter} onChange={e => setGradeFilter(e.target.value)} className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
             <option value="all">All Grades</option>
             {grades.map(g => <option key={g} value={g}>{g}</option>)}
           </select>
+          <select value={yearFilter} onChange={e => { setYearFilter(e.target.value); setSemesterFilter('all'); }} aria-label="Filter by school year" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
+            <option value="all">All Years</option>
+            {(academicYears || []).map(y => <option key={y.id} value={y.id}>{y.year}</option>)}
+          </select>
+          <select value={semesterFilter} onChange={e => setSemesterFilter(e.target.value)} aria-label="Filter by semester" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
+            <option value="all">All Semesters</option>
+            {semesterOptions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
           <div className="flex items-center gap-2">
             <label className="text-sm text-gray-500 whitespace-nowrap">From</label>
-            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#166534]/20 outline-none text-sm" />
+            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm" />
           </div>
           <div className="flex items-center gap-2">
             <label className="text-sm text-gray-500 whitespace-nowrap">To</label>
-            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#166534]/20 outline-none text-sm" />
+            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm" />
           </div>
-          {(statusFilter !== 'all' || gradeFilter !== 'all' || dateFrom || dateTo) && (
-            <button onClick={() => { setStatusFilter('all'); setGradeFilter('all'); setDateFrom(''); setDateTo(''); }} className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+          {(statusFilter !== 'all' || gradeFilter !== 'all' || yearFilter !== 'all' || semesterFilter !== 'all' || dateFrom || dateTo) && (
+            <button onClick={() => { setStatusFilter('all'); setGradeFilter('all'); setYearFilter('all'); setSemesterFilter('all'); setDateFrom(''); setDateTo(''); }} className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
               ✕ Clear
             </button>
           )}
@@ -166,15 +203,15 @@ export default function EmployeeReports() {
       {/* Export Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         {[
-          { icon: '📋', title: 'Applicant List', desc: 'Download a full list of all applicants with their admission status.', onClick: exportApplicants },
-          { icon: '🧮', title: 'Exam Results', desc: 'Download exam scores and pass/fail data for all applicants.', onClick: exportResults },
-          { icon: '📅', title: 'Exam Schedules', desc: 'Download all exam schedule data and slot availability.', onClick: exportSchedules },
+          { icon: 'clipboard', title: 'Applicant List', desc: 'Download a full list of all applicants with their admission status.', onClick: exportApplicants },
+          { icon: 'chartBar', title: 'Exam Results', desc: 'Download exam scores and pass/fail data for all applicants.', onClick: exportResults },
+          { icon: 'calendar', title: 'Exam Schedules', desc: 'Download all exam schedule data and slot availability.', onClick: exportSchedules },
         ].map((c, i) => (
-          <div key={i} className="lpu-card p-6 text-center">
-            <div className="text-4xl mb-3">{c.icon}</div>
+          <div key={i} className="gk-card p-6 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-forest-50 flex items-center justify-center mx-auto mb-3"><Icon name={c.icon} className="w-7 h-7 text-forest-500" /></div>
             <h3 className="font-bold text-forest-500 mb-1">{c.title}</h3>
             <p className="text-gray-500 text-sm mb-4">{c.desc}</p>
-            <button onClick={c.onClick} className="bg-[#166534] text-white px-5 py-2 rounded-lg font-semibold hover:bg-[#14532d]">📥 Download CSV</button>
+            <button onClick={c.onClick} className="bg-forest-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-forest-600 inline-flex items-center gap-1.5"><Icon name="document" className="w-4 h-4" /> Download CSV</button>
           </div>
         ))}
       </div>
@@ -182,8 +219,8 @@ export default function EmployeeReports() {
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {/* Pass Rate */}
-        <div className="lpu-card p-6">
-          <h3 className="text-lg font-bold text-forest-500 mb-4">📊 Pass Rate by Exam</h3>
+        <div className="gk-card p-6">
+          <h3 className="text-lg font-bold text-forest-500 mb-4 flex items-center gap-1.5"><Icon name="chartBar" className="w-5 h-5" /> Pass Rate by Exam</h3>
           {examStats.length > 0 && examStats.some(e => e.total > 0) ? (
             <div className="space-y-3">
               {examStats.map((e, i) => (
@@ -206,8 +243,8 @@ export default function EmployeeReports() {
         </div>
 
         {/* Volume Chart */}
-        <div className="lpu-card p-6">
-          <h3 className="text-lg font-bold text-forest-500 mb-4">📈 Applicant Volume (Monthly)</h3>
+        <div className="gk-card p-6">
+          <h3 className="text-lg font-bold text-forest-500 mb-4 flex items-center gap-1.5"><Icon name="arrowTrendUp" className="w-5 h-5" /> Applicant Volume (Monthly)</h3>
           <div className="flex items-end gap-3 h-48">
             {monthData.map((m, i) => (
               <div key={i} className="flex-1 flex flex-col items-center justify-end h-full">
@@ -221,8 +258,8 @@ export default function EmployeeReports() {
       </div>
 
       {/* Summary Table */}
-      <div className="lpu-card p-6">
-        <h3 className="text-lg font-bold text-forest-500 mb-4">📋 Summary Statistics</h3>
+      <div className="gk-card p-6">
+          <h3 className="text-lg font-bold text-forest-500 mb-4 flex items-center gap-1.5"><Icon name="clipboard" className="w-5 h-5" /> Summary Statistics</h3>
         <div className="table-scroll">
           <table className="w-full text-sm">
             <thead><tr className="border-b border-gray-200 text-left text-gray-400 uppercase text-xs">

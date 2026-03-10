@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom';
-import { getMyRegistrations, getExamSchedules, getExam } from '../../api/exams.js';
-import { getMyResult, getEssayAnswers, getSubmittedAnswers } from '../../api/results.js';
+import { getMyRegistrations, getExamSchedules, getExamForReview } from '../../api/exams.js';
+import { getMyResult, getSubmittedAnswers } from '../../api/results.js';
 import { PageHeader, SkeletonPage, ErrorAlert } from '../../components/UI.jsx';
+import Icon from '../../components/Icons.jsx';
 import { formatDate } from '../../utils/helpers.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { showToast } from '../../components/Toast.jsx';
@@ -11,14 +12,38 @@ export default function StudentResults() {
   const { user } = useAuth();
 
   const { data: rawData, loading, error, refetch } = useAsync(async () => {
-    const [myRegs, myResult, schedules, essayAnswersAll] = await Promise.all([
-      getMyRegistrations(user.email), getMyResult(user.email), getExamSchedules(), getEssayAnswers()
+    const [myRegs, myResult, schedules] = await Promise.all([
+      getMyRegistrations(), getMyResult(), getExamSchedules()
     ]);
     const myReg = myRegs?.[0] || null;
     const schedule = myReg ? schedules.find(s => s.id === myReg.scheduleId) : null;
-    const exam = schedule ? await getExam(schedule.examId) : null;
-    const essayAnswers = myReg ? essayAnswersAll.filter(a => a.registrationId === myReg.id) : [];
-    const storedAnswers = myReg ? await getSubmittedAnswers(myReg.id) : [];
+    let exam = null;
+    let storedAnswers = [];
+    if (schedule) {
+      try {
+        exam = await getExamForReview(schedule.examId);
+      } catch (err) {
+        showToast('Could not load exam review. Question breakdown may be incomplete.', 'error');
+        console.error('getExamForReview failed:', err);
+      }
+    }
+    if (myReg) {
+      try {
+        storedAnswers = await getSubmittedAnswers(myReg.id);
+      } catch (err) {
+        showToast('Could not load your submitted answers.', 'error');
+        console.error('getSubmittedAnswers failed:', err);
+      }
+    }
+    // Derive essay answers from submitted answers (student cannot call getEssayAnswers)
+    const essayAnswers = storedAnswers.filter(a => a.question?.questionType === 'essay').map(a => ({
+      registrationId: a.registrationId,
+      questionId: a.questionId,
+      essayResponse: a.essayText || '',
+      maxPoints: a.question?.points || 0,
+      scored: a.pointsAwarded != null, // true if teacher has scored this essay
+      pointsAwarded: a.pointsAwarded ?? null,
+    }));
     return { myResult, myReg, exam, essayAnswers, storedAnswers };
   }, [user]);
 
@@ -35,8 +60,8 @@ export default function StudentResults() {
     return (
       <div>
         <PageHeader title="Exam Results" subtitle="View your entrance examination score and results." />
-        <div className="lpu-card p-8 text-center">
-          <div className="text-4xl mb-3">📊</div>
+        <div className="gk-card p-8 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-forest-50 flex items-center justify-center mx-auto mb-3"><Icon name="chartBar" className="w-7 h-7 text-forest-500" /></div>
           <h3 className="font-bold text-forest-500 mb-1">No Results Yet</h3>
           <p className="text-gray-500 text-sm mb-4">{!myReg ? "You haven't registered for an exam yet." : 'Your exam results are not yet available.'}</p>
           <Link to="/student/exam" className="border border-gray-300 text-gray-700 px-5 py-2 rounded-lg inline-block hover:bg-gray-50">Go to Exam Page</Link>
@@ -75,7 +100,7 @@ export default function StudentResults() {
         @media print { body { padding: 20px; } }
       </style>
     </head><body>
-      <div class="logo"><span>🔑</span><h1>GOLDEN KEY Integrated School of St. Joseph</h1><p class="subtitle">Lapolapo 1st, San Jose, Batangas, Philippines &bull; Tel: (043)-702-2153<br/>Entrance Examination Result</p></div>
+      <div class="logo"><span>🔑</span><h1><span style="color:#fbbf24">GOLDEN KEY</span><br/><span style="color:#166534">Integrated School of St. Joseph</span></h1><p class="subtitle">Lapolapo 1st, San Jose, Batangas, Philippines &bull; Tel: (043)-702-2153<br/>Entrance Examination Result</p></div>
       <h2>Student: ${studentName}</h2>
       <h2>Exam Results</h2>
       <div class="score-circle"><div class="pct ${passed ? 'passed' : 'failed'}">${myResult.percentage.toFixed(1)}%</div><p style="color:#888;font-size:13px">Overall Score</p></div>
@@ -87,7 +112,7 @@ export default function StudentResults() {
         <div class="field"><label>Essay Review</label><span>${myResult.essayReviewed ? 'Reviewed' : 'Pending'}</span></div>
         <div class="field"><label>Date Taken</label><span>${myResult.createdAt ? new Date(myResult.createdAt).toLocaleDateString() : 'N/A'}</span></div>
       </div>
-      <p style="margin-top:40px;font-size:11px;color:#aaa;text-align:center">Printed on ${new Date().toLocaleDateString()} — GOLDEN KEY Integrated School of St. Joseph &copy; 2026</p>
+      <p style="margin-top:40px;font-size:11px;color:#aaa;text-align:center">Printed on ${new Date().toLocaleDateString()} — GOLDEN KEY Integrated School of St. Joseph &copy; ${new Date().getFullYear()}</p>
     </body></html>`);
     printWin.document.close();
     printWin.focus();
@@ -97,13 +122,13 @@ export default function StudentResults() {
   return (
     <div>
       <PageHeader title="Exam Results" subtitle="View your entrance examination score and results.">
-        <button onClick={handlePrint} className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 text-sm" aria-label="Print exam result">🖨️ Print / Export PDF</button>
+        <button onClick={handlePrint} className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 text-sm inline-flex items-center gap-1.5" aria-label="Print exam result"><Icon name="document" className="w-4 h-4" /> Print / Export PDF</button>
       </PageHeader>
 
       {/* Score Summary */}
       <div className={`rounded-xl border-2 p-6 mb-6 ${passed ? 'bg-forest-50 border-forest-200' : 'bg-red-50 border-red-200'}`}>
         <div className="flex items-center gap-4 mb-4">
-          <span className="text-5xl">{passed ? '🎉' : '😔'}</span>
+          <span className="text-5xl">{passed ? <Icon name="trophy" className="w-12 h-12 text-gold-500" /> : <Icon name="xCircle" className="w-12 h-12 text-red-400" />}</span>
           <div>
             <h3 className={`text-2xl font-bold ${passed ? 'text-forest-700' : 'text-red-700'}`}>{passed ? 'PASSED' : 'FAILED'}</h3>
             <p className="text-gray-500">{exam?.title || 'Entrance Exam'}</p>
@@ -129,7 +154,7 @@ export default function StudentResults() {
 
       {/* Question Breakdown */}
       {exam && (
-        <div className="lpu-card p-6">
+        <div className="gk-card p-6">
           <h3 className="text-lg font-bold text-forest-500 mb-4">Question Breakdown</h3>
           <div className="space-y-4">
             {exam.questions.map((q, i) => {
@@ -145,7 +170,7 @@ export default function StudentResults() {
                     <div className="flex items-center justify-between mb-2">
                       <span className="font-bold text-sm text-gray-400">Q{i + 1}</span>
                       <div className="flex items-center gap-3 text-sm">
-                        <span>{isCorrect ? '✅ Correct' : '❌ Incorrect'}</span>
+                        <span>{isCorrect ? <><Icon name="checkCircle" className="w-4 h-4 inline text-forest-500" /> Correct</> : <><Icon name="xCircle" className="w-4 h-4 inline text-red-500" /> Incorrect</>}</span>
                         <span className="text-gray-400">{isCorrect ? q.points : 0} / {q.points} pts</span>
                       </div>
                     </div>
@@ -170,7 +195,7 @@ export default function StudentResults() {
                     <div className="flex items-center justify-between mb-2">
                       <span className="font-bold text-sm text-gray-400">Q{i + 1}</span>
                       <div className="flex items-center gap-3 text-sm">
-                        <span>{essay?.scored ? '📝 Scored' : '⏳ Pending Review'}</span>
+                        <span>{essay?.scored ? <><Icon name="documentText" className="w-4 h-4 inline" /> Scored</> : <><Icon name="clock" className="w-4 h-4 inline" /> Pending Review</>}</span>
                         <span className="text-gray-400">{essay?.scored ? essay.pointsAwarded : '—'} / {q.points} pts</span>
                       </div>
                     </div>

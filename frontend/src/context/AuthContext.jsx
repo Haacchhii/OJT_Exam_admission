@@ -1,14 +1,13 @@
 import { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
-import { getUserByEmail } from '../api/users.js';
-import { USE_API, client, setToken, setAuthErrorHandler } from '../api/client.js';
+import { client, setToken, setAuthErrorHandler } from '../api/client.js';
 
 const AuthContext = createContext(null);
 
 /* ===== Role-Based Access Control ===== */
 const ROLE_PERMISSIONS = {
-  administrator: ['dashboard', 'admissions', 'exams', 'results', 'reports', 'users'],
+  administrator: ['dashboard', 'admissions', 'exams', 'results', 'reports', 'users', 'audit', 'settings'],
   registrar:     ['dashboard', 'admissions', 'results', 'reports'],
-  teacher:       ['dashboard', 'exams', 'results', 'reports'],
+  teacher:       ['dashboard', 'admissions', 'exams', 'results', 'reports'],
 };
 
 const ROLE_LABELS = {
@@ -50,7 +49,7 @@ export function AuthProvider({ children }) {
   const logout = useCallback(() => {
     localStorage.removeItem('gk_current_user');
     localStorage.removeItem('gk_user_hash');
-    if (USE_API) setToken(null);
+    setToken(null);
     setUser(null);
   }, []);
 
@@ -59,44 +58,34 @@ export function AuthProvider({ children }) {
     setAuthErrorHandler(() => logout());
   }, [logout]);
 
-  const login = useCallback(async (email, password) => {
-    if (USE_API) {
-      try {
-        const res = await client.post('/auth/login', { email, password });
-        // Backend returns { user, token }
-        setToken(res.token);
-        localStorage.setItem('gk_current_user', JSON.stringify(res.user));
-        localStorage.setItem('gk_user_hash', computeHash(res.user));
-        setUser(res.user);
-        return { ok: true, user: res.user };
-      } catch (err) {
-        return { ok: false, msg: err.message || 'Login failed.' };
-      }
+  const login = useCallback(async (email, password, opts = {}) => {
+    try {
+      // If registerPayload is provided, call /auth/register instead of /auth/login
+      const res = opts.registerPayload
+        ? await client.post('/auth/register', opts.registerPayload)
+        : await client.post('/auth/login', { email, password });
+      // Backend returns { user, token }
+      setToken(res.token);
+      localStorage.setItem('gk_current_user', JSON.stringify(res.user));
+      localStorage.setItem('gk_user_hash', computeHash(res.user));
+      setUser(res.user);
+      return { ok: true, user: res.user };
+    } catch (err) {
+      return { ok: false, msg: err.message || 'Login failed.' };
     }
-    // localStorage mode
-    const u = await getUserByEmail(email);
-    if (!u) return { ok: false, msg: 'No account found with that email.' };
-    if (u.password !== password) return { ok: false, msg: 'Invalid email or password.' };
-    if (u.status === 'Inactive') return { ok: false, msg: 'Your account has been deactivated. Please contact an administrator.' };
-    const { password: _, ...safeUser } = u;
-    localStorage.setItem('gk_current_user', JSON.stringify(safeUser));
-    localStorage.setItem('gk_user_hash', computeHash(safeUser));
-    setUser(safeUser);
-    return { ok: true, user: safeUser };
   }, []);
 
   const refreshUser = useCallback(async () => {
     if (!user) return;
     try {
-      const u = await getUserByEmail(user.email);
-      if (!u || u.status === 'Inactive') {
+      const res = await client.get('/auth/me');
+      if (!res || res.status === 'Inactive') {
         logout();
         return;
       }
-      const { password: _, ...safeUser } = u;
-      localStorage.setItem('gk_current_user', JSON.stringify(safeUser));
-      localStorage.setItem('gk_user_hash', computeHash(safeUser));
-      setUser(safeUser);
+      localStorage.setItem('gk_current_user', JSON.stringify(res));
+      localStorage.setItem('gk_user_hash', computeHash(res));
+      setUser(res);
     } catch {
       // Network error during refresh — keep current session
     }

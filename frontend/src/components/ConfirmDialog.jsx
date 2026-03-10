@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef, createContext, useContext } from 'react';
+import Icon from './Icons.jsx';
 
 /* ===== Styled Confirmation Dialog ===== */
 export function ConfirmDialog({ open, title, message, confirmLabel = 'Confirm', cancelLabel = 'Cancel', variant = 'danger', onConfirm, onCancel }) {
@@ -40,36 +41,36 @@ export function ConfirmDialog({ open, title, message, confirmLabel = 'Confirm', 
   if (!open) return null;
 
   const variants = {
-    danger: { icon: '⚠️', btn: 'bg-red-500 hover:bg-red-600 text-white', ring: 'bg-red-100' },
-    warning: { icon: '⚡', btn: 'bg-gold-500 hover:bg-gold-600 text-white', ring: 'bg-gold-100' },
-    info: { icon: 'ℹ️', btn: 'bg-forest-500 hover:bg-forest-600 text-white', ring: 'bg-forest-100' },
+    danger: { icon: 'exclamation', iconCls: 'text-red-500', btn: 'bg-red-500 hover:bg-red-600 text-white shadow-sm', ring: 'bg-red-50 ring-1 ring-red-100' },
+    warning: { icon: 'exclamation', iconCls: 'text-gold-500', btn: 'bg-gold-500 hover:bg-gold-600 text-white shadow-sm', ring: 'bg-gold-50 ring-1 ring-gold-100' },
+    info: { icon: 'info', iconCls: 'text-forest-500', btn: 'bg-forest-500 hover:bg-forest-600 text-white shadow-sm', ring: 'bg-forest-50 ring-1 ring-forest-100' },
   };
   const v = variants[variant] || variants.danger;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" role="alertdialog" aria-modal="true" aria-label={title || 'Confirmation'} onClick={onCancel}>
-      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" />
+      <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" />
       <div
         ref={dialogRef}
-        className="relative bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 animate-[fadeInUp_0.2s_ease-out]"
+        className="relative bg-white/95 backdrop-blur-xl rounded-3xl shadow-elevated max-w-sm w-full p-8 animate-[scaleIn_0.2s_ease-out] border border-white/60"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex flex-col items-center text-center">
-          <div className={`w-14 h-14 rounded-full ${v.ring} flex items-center justify-center text-2xl mb-4`}>
-            {v.icon}
+          <div className={`w-14 h-14 rounded-2xl ${v.ring} flex items-center justify-center mb-5`}>
+            <Icon name={v.icon} className={`w-7 h-7 ${v.iconCls}`} />
           </div>
-          <h3 className="text-lg font-bold text-forest-500 mb-2">{title}</h3>
-          <p className="text-gray-500 text-sm mb-6">{message}</p>
+          <h3 className="text-lg font-bold text-gray-800 mb-2">{title}</h3>
+          <p className="text-gray-500 text-sm mb-8 leading-relaxed">{message}</p>
           <div className="flex gap-3 w-full">
             <button
               onClick={onCancel}
-              className="flex-1 py-2.5 rounded-lg border border-gray-300 text-gray-700 font-medium text-sm hover:bg-gray-50 transition"
+              className="gk-btn-secondary flex-1 py-2.5 text-sm"
             >
               {cancelLabel}
             </button>
             <button
               onClick={onConfirm}
-              className={`flex-1 py-2.5 rounded-lg font-semibold text-sm transition ${v.btn}`}
+              className={`flex-1 py-2.5 rounded-xl font-semibold text-sm transition-all ${v.btn}`}
             >
               {confirmLabel}
             </button>

@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
+import Icon from './Icons.jsx';
 
 const labelMap = {
   student: 'Student Portal',
@@ -29,7 +30,7 @@ export default function Breadcrumbs() {
   return (
     <nav className="flex items-center gap-1.5 text-sm text-gray-400 mb-4 -mt-1" aria-label="Breadcrumb">
       <Link to={`/${segments[0]}`} className="hover:text-forest-500 transition-colors">
-        🏠
+        <Icon name="home" className="w-4 h-4" />
       </Link>
       {crumbs.slice(1).map((c) => (
         <span key={c.path} className="flex items-center gap-1.5">

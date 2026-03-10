@@ -17,7 +17,7 @@ const SHORTCUTS = [
 
 export function KeyboardShortcutsProvider({ children, navigate, role }) {
   const [helpOpen, setHelpOpen] = useState(false);
-  const perms = ROLE_PERMISSIONS[role] || [];
+  const perms = ROLE_PERMISSIONS[role] || (role === 'applicant' ? ['admissions', 'exams', 'results'] : []);
 
   useEffect(() => {
     const handler = (e) => {

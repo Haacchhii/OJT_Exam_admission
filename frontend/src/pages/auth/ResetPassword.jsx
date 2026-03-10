@@ -1,29 +1,31 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
-import { getUserByEmail, updateUser } from '../../api/users.js';
+import { client } from '../../api/client.js';
 import { showToast } from '../../components/Toast.jsx';
 import { getPasswordStrength } from '../../utils/passwordStrength.js';
+import Icon from '../../components/Icons.jsx';
 
 export default function ResetPassword() {
   const { user: authUser } = useAuth();
   const [pw, setPw] = useState('');
   const [confirm, setConfirm] = useState('');
-  const [email, setEmail] = useState('');
+  const [resetToken, setResetToken] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     try {
-      const raw = localStorage.getItem('gk_reset_token');
+      const raw = sessionStorage.getItem('gk_reset_token');
       if (!raw) { navigate('/forgot-password'); return; }
       const token = JSON.parse(raw);
       if (!token.email || !token.expires || Date.now() > token.expires) {
-        localStorage.removeItem('gk_reset_token');
+        sessionStorage.removeItem('gk_reset_token');
         showToast('Reset link has expired. Please try again.', 'error');
         navigate('/forgot-password');
         return;
       }
-      setEmail(token.email);
+      if (token.resetToken) setResetToken(token.resetToken);
     } catch {
       navigate('/forgot-password');
     }
@@ -38,43 +40,56 @@ export default function ResetPassword() {
     if (pw.length < 8) { showToast('Password must be at least 8 characters', 'error'); return; }
     if (strength.score < 3) { showToast('Password is too weak. Include uppercase, numbers, or symbols.', 'error'); return; }
     if (pw !== confirm) { showToast('Passwords do not match', 'error'); return; }
-    const u = await getUserByEmail(email);
-    if (!u) { showToast('User not found', 'error'); return; }
-    await updateUser(u.id, { password: pw });
-    localStorage.removeItem('gk_reset_token');
-    showToast('Password updated successfully!', 'success');
-    navigate('/login');
+    setLoading(true);
+    try {
+      await client.post('/auth/reset-password', { resetToken, password: pw });
+      sessionStorage.removeItem('gk_reset_token');
+      showToast('Password updated successfully!', 'success');
+      navigate('/login');
+    } catch (err) {
+      showToast(err.message || 'Failed to reset password.', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-forest-500 via-forest-600 to-forest-700 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
-        <div className="text-center mb-6">
-          <span className="text-4xl">🔄</span>
-          <h2 className="text-2xl font-bold text-forest-500 mt-3">Reset Password</h2>
+    <div className="min-h-screen flex items-center justify-center gk-auth-bg p-4">
+      <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-elevated w-full max-w-md p-8 sm:p-10 border border-white/60 animate-[fadeIn_0.4s_ease-out]">
+        <div className="text-center mb-8">
+          <div className="w-14 h-14 rounded-2xl bg-forest-50 flex items-center justify-center mx-auto mb-4">
+            <Icon name="refresh" className="w-7 h-7 text-forest-500" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-800">Reset Password</h2>
           <p className="text-gray-500 text-sm mt-1">Enter and confirm your new password</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
-            <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} required minLength={8} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#166534]/20 outline-none" placeholder="Minimum 8 characters" />
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">New Password</label>
+            <div className="relative">
+              <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"><Icon name="lock" className="w-4.5 h-4.5" /></div>
+              <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} required minLength={8} className="gk-input pl-11" placeholder="Minimum 8 characters" />
+            </div>
             {pw && (
               <div className="mt-2 flex items-center gap-2">
-                <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden"><div className={`h-full ${strength.color} transition-all`} style={{ width: strength.width }} /></div>
-                <span className="text-xs text-gray-500">{strength.text}</span>
+                <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className={`h-full ${strength.color} transition-all rounded-full`} style={{ width: strength.width }} /></div>
+                <span className="text-xs text-gray-500 font-medium">{strength.text}</span>
               </div>
             )}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
-            <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#166534]/20 outline-none" placeholder="Re-enter your password" />
-            {confirm && confirm !== pw && <p className="text-red-500 text-xs mt-1">Passwords do not match</p>}
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Confirm New Password</label>
+            <div className="relative">
+              <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"><Icon name="lock" className="w-4.5 h-4.5" /></div>
+              <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required className="gk-input pl-11" placeholder="Re-enter your password" />
+            </div>
+            {confirm && confirm !== pw && <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1"><Icon name="exclamation" className="w-3.5 h-3.5" />Passwords do not match</p>}
           </div>
-          <button type="submit" className="w-full bg-gradient-to-r from-forest-500 to-forest-400 text-white font-semibold py-2.5 rounded-lg hover:from-gold-500 hover:to-gold-600 shadow-md btn-shimmer">Set New Password</button>
+          <button type="submit" disabled={loading} className="gk-btn-primary w-full py-3 text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">{loading ? <><Icon name="spinner" className="w-4 h-4 animate-spin" />Resetting…</> : 'Set New Password'}</button>
         </form>
 
-        <p className="text-sm text-gray-500 text-center mt-6">Back to <Link to="/login" className="text-[#166534] font-medium">Sign in</Link></p>
+        <p className="text-sm text-gray-500 text-center mt-6">Back to <Link to="/login" className="text-forest-500 hover:text-forest-600 font-semibold transition-colors">Sign in</Link></p>
       </div>
     </div>
   );
