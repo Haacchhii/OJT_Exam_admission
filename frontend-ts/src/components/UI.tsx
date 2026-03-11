@@ -40,24 +40,12 @@ export function StatCard({ icon, value, label, color = 'blue', trend, trendLabel
     red: 'bg-red-50 text-red-500',
     gold: 'bg-gold-50 text-gold-600',
   };
-  // Decorative shape varies by color
-  const decoShapes: Record<string, string> = {
-    blue: 'rounded-2xl rotate-12 bg-forest-500/[0.04]',
-    green: 'rounded-full bg-forest-500/[0.05]',
-    emerald: 'rounded-3xl -rotate-6 bg-emerald-500/[0.04]',
-    orange: 'rounded-2xl rotate-45 bg-orange-400/[0.05]',
-    amber: 'rounded-full bg-gold-400/[0.06]',
-    red: 'rounded-2xl -rotate-12 bg-red-400/[0.05]',
-    gold: 'rounded-3xl rotate-6 bg-gold-400/[0.06]',
-  };
   const trendUp = (trend ?? 0) > 0;
   const trendDown = (trend ?? 0) < 0;
   return (
-    <div className="gk-card relative overflow-hidden p-5 group">
-      {/* Decorative background shape */}
-      <div className={`absolute -top-4 -right-4 w-28 h-28 ${decoShapes[color] || decoShapes.blue} group-hover:scale-110 transition-transform duration-500 pointer-events-none`} />
+    <div className="gk-card p-5">
       <div className="flex items-start gap-4">
-        <div className={`w-11 h-11 rounded-xl ${iconColors[color] || iconColors.blue} flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-105`} aria-hidden="true">
+        <div className={`w-10 h-10 rounded-lg ${iconColors[color] || iconColors.blue} flex items-center justify-center shrink-0`} aria-hidden="true">
           {typeof icon === 'string' && !/[\u{1F000}-\u{1FFFF}]/u.test(icon) ? <Icon name={icon} className="w-5 h-5" /> : <span className="text-lg">{icon}</span>}
         </div>
         {trend !== undefined && trend !== null && (
@@ -69,8 +57,8 @@ export function StatCard({ icon, value, label, color = 'blue', trend, trendLabel
         )}
       </div>
       <div className="mt-3">
-        <div className="text-3xl stat-value" style={{ fontFamily: 'var(--font-display)', letterSpacing: '-0.03em' }}>{value}</div>
-        <div className="text-[11px] text-gray-500 uppercase tracking-widest mt-1" style={{ fontFamily: 'var(--font-body)', fontWeight: 500 }}>{label}</div>
+        <div className="text-2xl stat-value">{value}</div>
+        <div className="text-xs text-gray-500 mt-1 font-medium">{label}</div>
       </div>
     </div>
   );
@@ -139,8 +127,7 @@ export function PageHeader({ title, subtitle, children }: PageHeaderProps) {
     <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
       <div>
         <h2 className="text-2xl text-gray-800 gk-heading">{title}</h2>
-        {subtitle && <p className="text-gray-500 text-sm mt-1.5" style={{ fontFamily: 'var(--font-body)' }}>{subtitle}</p>}
-        <div className="mt-3 h-[3px] w-12 rounded-full bg-gradient-to-r from-gold-400 via-gold-300 to-transparent" />
+        {subtitle && <p className="text-gray-500 text-sm mt-1.5">{subtitle}</p>}
       </div>
       {children && <div className="flex items-center gap-2">{children}</div>}
     </div>

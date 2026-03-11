@@ -56,25 +56,22 @@ export default function Sidebar({ open, onClose, role, collapsed, onToggleCollap
       {open && <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 lg:hidden transition-opacity" onClick={onClose} />}
 
       <aside className={`fixed top-0 left-0 z-50 h-screen flex flex-col transition-all duration-300 lg:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'} ${collapsed ? 'lg:w-[72px]' : 'lg:w-[270px]'} w-[270px]`} role="navigation" aria-label="Main navigation">
-        <div className="flex flex-col h-full bg-gradient-to-b from-[#0a2e1a] via-[#0f3d22] to-forest-700 border-r border-gold-400/10">
+        <div className="flex flex-col h-full bg-forest-800 border-r border-forest-700/50">
 
           {/* Brand */}
-          <div className={`flex items-center gap-3.5 border-b border-gold-400/10 ${collapsed ? 'lg:justify-center lg:px-3 lg:py-5' : 'px-5 py-5'}`}>
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gold-300 via-gold-400 to-gold-500 flex items-center justify-center shrink-0 shadow-gold ring-2 ring-gold-400/20">
-              <Icon name="key" className="w-5 h-5 text-forest-900" />
+          <div className={`flex items-center gap-3 border-b border-forest-700/40 ${collapsed ? 'lg:justify-center lg:px-3 lg:py-5' : 'px-5 py-5'}`}>
+            <div className="w-9 h-9 rounded-lg bg-forest-600 flex items-center justify-center shrink-0">
+              <Icon name="key" className="w-4.5 h-4.5 text-gold-400" />
             </div>
             <div className={`transition-opacity duration-200 ${collapsed ? 'lg:hidden' : ''}`}>
-              <h2 className="text-sm tracking-wider leading-tight" style={{ fontFamily: 'var(--font-display)' }}>
-                <span className="text-gold-400">GOLDEN KEY</span>
-              </h2>
-              <p className="text-xs text-forest-300/80 font-light tracking-wide" style={{ fontFamily: 'var(--font-body)' }}>Integrated School of St. Joseph</p>
+              <h2 className="text-sm font-bold tracking-wide text-white leading-tight">GOLDEN KEY</h2>
+              <p className="text-[11px] text-forest-300/70 font-normal mt-0.5">Integrated School of St. Joseph</p>
             </div>
           </div>
 
           {/* Role Badge */}
           <div className={`px-4 py-3 ${collapsed ? 'lg:flex lg:justify-center lg:px-2' : ''}`}>
-            <span className={`inline-flex items-center text-xs font-semibold uppercase tracking-widest px-3 py-1.5 rounded-full border ${collapsed ? 'lg:px-1.5' : ''}`}
-              style={{ fontFamily: 'var(--font-body)', background: 'linear-gradient(135deg, rgba(255,215,0,0.1), rgba(255,215,0,0.05))', color: '#fcd34d', borderColor: 'rgba(255,215,0,0.15)' }}>
+            <span className={`inline-flex items-center text-[11px] font-medium uppercase tracking-wider px-2.5 py-1 rounded-md bg-forest-700/60 text-forest-200 ${collapsed ? 'lg:px-1.5' : ''}`}>
               {collapsed ? roleBadgeShort : roleBadgeText}
             </span>
           </div>
@@ -82,12 +79,12 @@ export default function Sidebar({ open, onClose, role, collapsed, onToggleCollap
           {/* Section label */}
           {!collapsed && (
             <div className="px-6 pt-1 pb-2">
-              <span className="text-[11px] uppercase tracking-[0.2em] text-forest-400/60 font-semibold" style={{ fontFamily: 'var(--font-body)' }}>Navigation</span>
+              <span className="text-[11px] uppercase tracking-[0.15em] text-forest-500 font-medium">Navigation</span>
             </div>
           )}
 
           {/* Nav Links */}
-          <nav className="flex-1 px-3 space-y-1 overflow-y-auto animate-nav-items">
+          <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto">
             {links.map(l => (
               <NavLink
                 key={l.to}
@@ -97,26 +94,22 @@ export default function Sidebar({ open, onClose, role, collapsed, onToggleCollap
                 title={collapsed ? l.label : undefined}
                 aria-label={l.label}
                 className={({ isActive }) =>
-                  `group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-200 ${collapsed ? 'lg:justify-center lg:px-0' : ''} ${
+                  `group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors duration-150 ${collapsed ? 'lg:justify-center lg:px-0' : ''} ${
                     isActive
-                      ? 'bg-gradient-to-r from-gold-400/15 to-transparent text-white border-l-[3px] border-gold-400 ml-0 pl-2.5'
-                      : 'text-gray-400 hover:bg-white/5 hover:text-gray-200 border-l-[3px] border-transparent'
+                      ? 'bg-forest-600/50 text-white'
+                      : 'text-forest-300 hover:bg-forest-700/50 hover:text-white'
                   }`
                 }
               >
                 {({ isActive }) => (
                   <>
-                    <div className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 shrink-0 ${
-                      isActive ? 'bg-gold-400/20 text-gold-300 shadow-sm shadow-gold-400/10' : 'text-gray-500 group-hover:text-gray-300'
+                    <div className={`flex items-center justify-center w-8 h-8 rounded-lg shrink-0 ${
+                      isActive ? 'text-white' : 'text-forest-400 group-hover:text-forest-200'
                     }`}>
                       <Icon name={l.icon} className="w-[18px] h-[18px]" />
                     </div>
-                    <span className={`${collapsed ? 'lg:hidden' : ''} ${isActive ? 'font-semibold' : 'font-normal'}`}
-                      style={{ fontFamily: 'var(--font-body)' }}>{l.label}</span>
+                    <span className={`${collapsed ? 'lg:hidden' : ''} ${isActive ? 'font-semibold' : 'font-normal'}`}>{l.label}</span>
                     {isActive && <span className="sr-only">(current page)</span>}
-                    {isActive && !collapsed && (
-                      <div className="ml-auto w-1.5 h-1.5 rounded-full bg-gold-400 lg:block hidden shadow-sm shadow-gold-400/50" />
-                    )}
                   </>
                 )}
               </NavLink>
@@ -124,28 +117,27 @@ export default function Sidebar({ open, onClose, role, collapsed, onToggleCollap
           </nav>
 
           {/* Collapse toggle */}
-          <div className="hidden lg:flex justify-center py-2 border-t border-gold-400/8">
-            <button onClick={onToggleCollapse} className="p-2 rounded-lg text-gray-500 hover:text-gold-300 hover:bg-white/5 transition-all duration-200" title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+          <div className="hidden lg:flex justify-center py-2 border-t border-forest-700/40">
+            <button onClick={onToggleCollapse} className="p-2 rounded-lg text-forest-400 hover:text-forest-200 hover:bg-forest-700/50 transition-colors duration-150" title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
               <Icon name={collapsed ? 'chevronRight' : 'chevronLeft'} className="w-4 h-4" />
             </button>
           </div>
 
           {/* Footer */}
-          <div className={`border-t border-gold-400/8 ${collapsed ? 'lg:flex lg:flex-col lg:items-center lg:p-3' : 'p-4'}`}>
+          <div className={`border-t border-forest-700/40 ${collapsed ? 'lg:flex lg:flex-col lg:items-center lg:p-3' : 'p-4'}`}>
             <button
               onClick={async () => {
                 const ok = await confirm({ title: 'Log Out', message: 'Are you sure you want to log out?', confirmLabel: 'Log Out', variant: 'warning' });
                 if (ok) { logout(); navigate('/login'); }
               }}
-              className={`group flex items-center gap-2.5 text-sm w-full px-3 py-2 rounded-xl text-red-400/70 hover:text-red-300 hover:bg-red-500/10 transition-all duration-200 ${collapsed ? 'lg:justify-center lg:px-0' : ''}`}
+              className={`group flex items-center gap-2.5 text-sm w-full px-3 py-2 rounded-lg text-red-400/70 hover:text-red-300 hover:bg-red-500/10 transition-colors duration-150 ${collapsed ? 'lg:justify-center lg:px-0' : ''}`}
               title={collapsed ? 'Logout' : undefined}
               aria-label="Log out"
-              style={{ fontFamily: 'var(--font-body)' }}
             >
               <Icon name="logout" className="w-[18px] h-[18px] shrink-0" />
               <span className={`font-medium ${collapsed ? 'lg:hidden' : ''}`}>Log out</span>
             </button>
-            <p className={`text-xs text-forest-700 mt-3 px-3 ${collapsed ? 'lg:hidden' : ''}`} style={{ fontFamily: 'var(--font-body)' }}>&copy; 2026 GKISSJ</p>
+            <p className={`text-[11px] text-forest-600 mt-3 px-3 ${collapsed ? 'lg:hidden' : ''}`}>&copy; 2026 GKISSJ</p>
           </div>
         </div>
       </aside>

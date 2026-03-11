@@ -53,14 +53,13 @@ export default function Topbar({ title, onMenuToggle, userId, user }: TopbarProp
   };
 
   return (
-    <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-xl border-b border-gray-200/50 px-4 lg:px-8 h-[68px] flex items-center justify-between" role="banner"
-      style={{ boxShadow: '0 1px 8px 0 rgba(0,0,0,0.04)' }}>
+    <header className="sticky top-0 z-30 bg-white border-b border-gray-200 px-4 lg:px-8 h-[60px] flex items-center justify-between" role="banner">
       <div className="flex items-center gap-3">
         <button onClick={onMenuToggle} className="lg:hidden p-2 rounded-xl hover:bg-forest-50 transition-colors" aria-label="Toggle navigation menu">
           <Icon name="menu" className="w-5 h-5 text-forest-600" />
         </button>
         <div>
-          <h1 className="text-lg font-semibold text-gray-800" style={{ fontFamily: 'var(--font-heading)', letterSpacing: '-0.01em' }}>{title}</h1>
+          <h1 className="text-lg font-semibold text-gray-800 tracking-tight">{title}</h1>
         </div>
       </div>
       <div className="flex items-center gap-3" ref={ref}>
@@ -79,7 +78,7 @@ export default function Topbar({ title, onMenuToggle, userId, user }: TopbarProp
         </button>
 
         {showNotifs && (
-          <div className="absolute top-14 right-4 w-80 bg-white/95 backdrop-blur-xl rounded-2xl shadow-elevated border border-gray-200/60 overflow-hidden z-50 animate-[scaleIn_0.15s_ease-out]" role="region" aria-label="Notifications">
+          <div className="absolute top-14 right-4 w-80 bg-white rounded-xl shadow-elevated border border-gray-200 overflow-hidden z-50 animate-[scaleIn_0.15s_ease-out]" role="region" aria-label="Notifications">
             <div className="flex items-center justify-between px-4 py-3.5 border-b border-gray-100/80">
               <span className="font-semibold text-sm text-gray-800">Notifications</span>
               <button
@@ -122,16 +121,15 @@ export default function Topbar({ title, onMenuToggle, userId, user }: TopbarProp
           </div>
         )}
 
-        <div className="w-px h-9 bg-gradient-to-b from-transparent via-gray-200 to-transparent mx-1 hidden sm:block" />
+        <div className="w-px h-7 bg-gray-200 mx-1 hidden sm:block" />
 
         <div className="flex items-center gap-3 cursor-pointer hover:opacity-85 transition-all duration-200 group pl-1" onClick={() => navigate(isEmployee ? '/employee/profile' : '/student/profile')} title="View Profile">
-          <div className={`w-10 h-10 rounded-xl ${avatarCls} flex items-center justify-center text-xs font-bold ring-2 ring-white/80 transition-shadow group-hover:ring-forest-200`}
-            style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+          <div className={`w-9 h-9 rounded-lg ${avatarCls} flex items-center justify-center text-xs font-bold`}>
             {initials}
           </div>
           <div className="hidden sm:block">
-            <p className="text-sm font-semibold text-gray-800 leading-tight" style={{ fontFamily: 'var(--font-body)' }}>{fullName || 'User'}</p>
-            <p className="text-[11px] text-forest-500 leading-tight capitalize font-medium" style={{ fontFamily: 'var(--font-body)' }}>{user.role === 'applicant' ? 'Student' : user.role || ''}</p>
+            <p className="text-sm font-semibold text-gray-800 leading-tight">{fullName || 'User'}</p>
+            <p className="text-[11px] text-forest-500 leading-tight capitalize font-medium">{user.role === 'applicant' ? 'Student' : user.role || ''}</p>
           </div>
           <Icon name="chevronDown" className="w-3.5 h-3.5 text-gray-400 hidden sm:block" />
         </div>
