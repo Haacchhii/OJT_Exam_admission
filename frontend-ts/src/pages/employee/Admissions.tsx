@@ -304,7 +304,7 @@ export default function EmployeeAdmissions() {
                   {doc.filePath && doc.id > 0 && (
                     <a href={getDocumentDownloadUrl(adm.id, doc.id)} target="_blank" rel="noopener noreferrer" className="text-forest-500 hover:underline text-xs font-medium">View / Download</a>
                   )}
-                  <span className="bg-forest-100 text-forest-700 px-2 py-0.5 rounded-full text-xs">Submitted</span>
+                  <span className="gk-badge gk-badge-submitted">Submitted</span>
                 </div>
               </div>
             ))}

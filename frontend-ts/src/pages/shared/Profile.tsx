@@ -79,7 +79,7 @@ export default function Profile() {
             <div>
               <h2 className="text-lg font-bold text-gray-800">{user.firstName} {user.lastName}</h2>
               <p className="text-sm text-gray-500">{user.email}</p>
-              <span className="inline-block mt-1 px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize bg-forest-100 text-forest-700">
+              <span className="gk-badge gk-badge-active mt-1 capitalize">
                 {user.role === 'applicant' ? 'Student' : user.role}
               </span>
             </div>

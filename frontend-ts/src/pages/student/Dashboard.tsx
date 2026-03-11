@@ -83,16 +83,16 @@ export default function StudentDashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 animate-stagger">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8 animate-stagger">
         <StatCard icon={examStatus.icon} value={examStatus.text} label="Exam Status" color={examStatus.color} />
         <StatCard icon={admissionUnlocked ? 'lockOpen' : 'lock'} value={admissionUnlocked ? 'Unlocked' : 'Locked'} label="Admission Access" color={admissionUnlocked ? 'emerald' : 'blue'} />
         <StatCard icon={statusText === 'Accepted' ? 'checkCircle' : statusText === 'Rejected' ? 'xCircle' : 'clock'} value={statusText} label="Admission Status" color={statusColor} />
         <StatCard icon="document" value={myApp?.documents?.length || 0} label="Documents Uploaded" color="amber" />
       </div>
 
-      <div className="gk-card p-6 mb-6">
-        <h3 className="text-lg font-bold text-gray-800 mb-5 flex items-center gap-2">
-          <Icon name="admissions" className="w-5 h-5 text-forest-500" />
+      <div className="gk-card p-6 mb-8">
+        <h3 className="gk-heading-sm text-gray-800 mb-5 flex items-center gap-2">
+          <span className="p-1.5 bg-forest-50 rounded-lg"><Icon name="admissions" className="w-5 h-5 text-forest-500" /></span>
           Admission Progress
         </h3>
         {myApp ? (
@@ -147,8 +147,8 @@ export default function StudentDashboard() {
       </div>
 
       <div className="gk-card p-6">
-        <h3 className="text-lg font-bold text-gray-800 mb-5 flex items-center gap-2">
-          <Icon name="arrowRight" className="w-5 h-5 text-forest-500" />
+        <h3 className="gk-heading-sm text-gray-800 mb-5 flex items-center gap-2">
+          <span className="p-1.5 bg-forest-50 rounded-lg"><Icon name="arrowRight" className="w-5 h-5 text-forest-500" /></span>
           Quick Actions
         </h3>
         <div className="flex flex-wrap gap-3">

@@ -32,16 +32,18 @@ export function formatTime(timeStr: string | null | undefined): string {
 
 export function badgeClass(status: string): string {
   const map: Record<string, string> = {
-    Submitted: 'bg-gold-100 text-gold-700',
-    'Under Screening': 'bg-blue-100 text-blue-700',
-    'Under Evaluation': 'bg-purple-100 text-purple-700',
-    Accepted: 'bg-emerald-100 text-emerald-700',
-    Rejected: 'bg-red-100 text-red-700',
-    Passed: 'bg-emerald-100 text-emerald-700',
-    Failed: 'bg-red-100 text-red-700',
-    scheduled: 'bg-blue-100 text-blue-700',
-    started: 'bg-gold-100 text-gold-700',
-    done: 'bg-emerald-100 text-emerald-700',
+    Submitted: 'gk-badge gk-badge-submitted',
+    'Under Screening': 'gk-badge gk-badge-screening',
+    'Under Evaluation': 'gk-badge gk-badge-evaluation',
+    Accepted: 'gk-badge gk-badge-accepted',
+    Rejected: 'gk-badge gk-badge-rejected',
+    Passed: 'gk-badge gk-badge-passed',
+    Failed: 'gk-badge gk-badge-failed',
+    scheduled: 'gk-badge gk-badge-scheduled',
+    started: 'gk-badge gk-badge-started',
+    done: 'gk-badge gk-badge-done',
+    Active: 'gk-badge gk-badge-active',
+    Inactive: 'gk-badge gk-badge-inactive',
   };
-  return map[status] || 'bg-gray-100 text-gray-600';
+  return map[status] || 'gk-badge gk-badge-inactive';
 }

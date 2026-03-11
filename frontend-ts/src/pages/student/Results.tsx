@@ -166,8 +166,8 @@ export default function StudentResults() {
             <span className="text-gray-500">Date Taken</span><span className="font-semibold">{formatDate(myResult.createdAt)}</span>
             <span className="text-gray-500">Essay Review</span>
             <span>{myResult.essayReviewed
-              ? <span className="bg-forest-100 text-forest-700 px-2 py-0.5 rounded-full text-xs font-medium">Reviewed</span>
-              : <span className="bg-gold-100 text-gold-700 px-2 py-0.5 rounded-full text-xs font-medium">Pending</span>}
+              ? <span className="gk-badge gk-badge-reviewed">Reviewed</span>
+              : <span className="gk-badge gk-badge-pending">Pending</span>}
             </span>
           </div>
         </div>

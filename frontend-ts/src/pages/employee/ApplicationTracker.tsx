@@ -187,12 +187,12 @@ function ExamResult({ data, trackingId }: { data: Record<string, any>; trackingI
               <div className="text-xs text-gray-400">Points</div>
             </div>
             <div className="text-center">
-              <Badge className={result.passed ? 'bg-forest-100 text-forest-700 text-lg' : 'bg-red-100 text-red-700 text-lg'}>
+              <Badge className={result.passed ? 'gk-badge gk-badge-passed text-lg' : 'gk-badge gk-badge-failed text-lg'}>
                 {result.passed ? <><Icon name="checkCircle" className="w-5 h-5 inline" /> PASSED</> : <><Icon name="xCircle" className="w-5 h-5 inline" /> FAILED</>}
               </Badge>
             </div>
             <div className="text-center">
-              <Badge className={result.essayReviewed ? 'bg-forest-100 text-forest-700' : 'bg-gold-100 text-gold-700'}>
+              <Badge className={result.essayReviewed ? 'gk-badge gk-badge-reviewed' : 'gk-badge gk-badge-pending'}>
                 {result.essayReviewed ? 'Essays Reviewed' : 'Essay Pending'}
               </Badge>
             </div>

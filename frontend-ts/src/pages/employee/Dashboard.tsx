@@ -104,9 +104,9 @@ export default function EmployeeDashboard() {
         'Monitor admission applications and exam activity.'
       } />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 animate-stagger">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8 animate-stagger">
         {canAccess('admissions') && <>
-          <Link to="/employee/admissions"><StatCard icon="graduationCap" value={rawData?.stats?.total || 0} label="Total Applicants" color="blue" trend={rawData?.trends?.total} trendLabel="vs last week" /></Link>
+          <Link to="/employee/admissions" className="sm:col-span-2 lg:col-span-1"><StatCard icon="graduationCap" value={rawData?.stats?.total || 0} label="Total Applicants" color="blue" trend={rawData?.trends?.total} trendLabel="vs last week" /></Link>
           <Link to="/employee/admissions?status=Accepted"><StatCard icon="checkCircle" value={rawData?.stats?.accepted || 0} label="Accepted" color="emerald" trend={rawData?.trends?.accepted} trendLabel="vs last week" /></Link>
           <Link to="/employee/admissions"><StatCard icon="clock" value={(rawData?.stats?.submitted || 0) + (rawData?.stats?.underScreening || 0) + (rawData?.stats?.underEvaluation || 0)} label="In Progress" color="amber" trend={rawData?.trends?.inProgress} trendLabel="vs last week" /></Link>
           <Link to="/employee/admissions?status=Rejected"><StatCard icon="xCircle" value={rawData?.stats?.rejected || 0} label="Rejected" color="red" trend={rawData?.trends?.rejected} trendLabel="vs last week" /></Link>
@@ -122,9 +122,11 @@ export default function EmployeeDashboard() {
       </div>
 
       {canAccess('admissions') && (
-      <div className="gk-card p-6 mb-6">
-        <h3 className="text-lg font-bold text-gray-800 mb-5 flex items-center gap-2">
-          <Icon name="admissions" className="w-5 h-5 text-forest-500" />
+      <div className="gk-card p-6 mb-8">
+        <h3 className="gk-heading-sm mb-5 flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-forest-50 flex items-center justify-center">
+            <Icon name="admissions" className="w-4 h-4 text-forest-500" />
+          </div>
           Recent Admission Submissions
         </h3>
 
@@ -186,8 +188,10 @@ export default function EmployeeDashboard() {
 
       {canAccess('exams') && (
       <div className="gk-card p-6">
-        <h3 className="text-lg font-bold text-gray-800 mb-5 flex items-center gap-2">
-          <Icon name="exam" className="w-5 h-5 text-forest-500" />
+        <h3 className="gk-heading-sm mb-5 flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-forest-50 flex items-center justify-center">
+            <Icon name="exam" className="w-4 h-4 text-forest-500" />
+          </div>
           Exam Activity Overview
         </h3>
         <div className="table-scroll">
@@ -212,7 +216,7 @@ export default function EmployeeDashboard() {
                     <td>{exam.gradeLevel}</td>
                     <td>{exam.questions.length}</td>
                     <td>{regCount}</td>
-                    <td><Badge className={exam.isActive ? 'bg-forest-50 text-forest-700 ring-1 ring-forest-200/60' : 'bg-gray-50 text-gray-500 ring-1 ring-gray-200/60'}>{exam.isActive ? 'Active' : 'Inactive'}</Badge></td>
+                    <td><Badge className={exam.isActive ? 'gk-badge gk-badge-active' : 'gk-badge gk-badge-inactive'}>{exam.isActive ? 'Active' : 'Inactive'}</Badge></td>
                     <td><Link to="/employee/exams" className="text-forest-500 hover:text-forest-600 text-xs font-semibold transition-colors">Manage</Link></td>
                   </tr>
                 );

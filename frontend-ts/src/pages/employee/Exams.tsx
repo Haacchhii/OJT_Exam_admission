@@ -188,7 +188,7 @@ function ExamsList({ onEdit }: { onEdit: (exam: Exam) => void }) {
           <div className="flex justify-between items-start mb-4">
             <div>
               <h2 className="text-xl font-bold text-forest-500">{exam.title}</h2>
-              <Badge className={exam.isActive ? 'bg-forest-100 text-forest-700' : 'bg-gray-100 text-gray-500'}>{exam.isActive ? 'Active' : 'Inactive'}</Badge>
+              <Badge className={exam.isActive ? 'gk-badge gk-badge-active' : 'gk-badge gk-badge-inactive'}>{exam.isActive ? 'Active' : 'Inactive'}</Badge>
             </div>
             <div className="flex gap-2">
               <button onClick={() => setPreviewExam(exam)} className="border border-forest-300 text-forest-600 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-forest-50 inline-flex items-center gap-1"><Icon name="eye" className="w-3.5 h-3.5" /> Preview</button>
@@ -299,7 +299,7 @@ function ExamsList({ onEdit }: { onEdit: (exam: Exam) => void }) {
                       <td className="py-3 px-2">{e.durationMinutes} min</td>
                       <td className="py-3 px-2">{e.questions.length}</td>
                       <td className="py-3 px-2">{e.passingScore}%</td>
-                      <td className="py-3 px-2"><Badge className={e.isActive ? 'bg-forest-100 text-forest-700' : 'bg-gray-100 text-gray-500'}>{e.isActive ? 'Active' : 'Inactive'}</Badge></td>
+                      <td className="py-3 px-2"><Badge className={e.isActive ? 'gk-badge gk-badge-active' : 'gk-badge gk-badge-inactive'}>{e.isActive ? 'Active' : 'Inactive'}</Badge></td>
                       <td className="py-3 px-2">
                         <div className="flex gap-1">
                           <button onClick={() => setDetailId(e.id)} className="text-forest-500 hover:underline text-xs">View</button>
@@ -345,7 +345,7 @@ function ExamsList({ onEdit }: { onEdit: (exam: Exam) => void }) {
                       <td className="py-3 px-2">{r.exam?.title || 'N/A'}</td>
                       <td className="py-3 px-2"><Badge className={badgeClass(r.status)}>{r.status}</Badge></td>
                       <td className="py-3 px-2">{r.result ? `${r.result.totalScore}/${r.result.maxPossible} (${r.result.percentage.toFixed(1)}%)` : '—'}</td>
-                      <td className="py-3 px-2">{r.result ? <Badge className={r.result.passed ? 'bg-forest-100 text-forest-700' : 'bg-red-100 text-red-700'}>{r.result.passed ? 'Passed' : (r.result.essayReviewed ? 'Failed' : 'Pending Review')}</Badge> : <Badge className="bg-gray-100 text-gray-500">Awaiting</Badge>}</td>
+                      <td className="py-3 px-2">{r.result ? <Badge className={r.result.passed ? 'gk-badge gk-badge-passed' : 'gk-badge gk-badge-failed'}>{r.result.passed ? 'Passed' : (r.result.essayReviewed ? 'Failed' : 'Pending Review')}</Badge> : <Badge className="gk-badge gk-badge-neutral">Awaiting</Badge>}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -372,7 +372,7 @@ function ExamPreviewModal({ exam, onClose }: { exam: Exam | null; onClose: () =>
               <h3 className="text-lg font-bold text-forest-500">{exam.title}</h3>
               <p className="text-sm text-gray-500">Grade {exam.gradeLevel} • {exam.durationMinutes} minutes • {exam.questions.length} questions</p>
             </div>
-            <Badge className="bg-gold-100 text-gold-700">Preview Mode</Badge>
+            <Badge className="gk-badge gk-badge-preview">Preview Mode</Badge>
           </div>
           <div className="space-y-4">
             {exam.questions
@@ -887,14 +887,14 @@ function ExamBuilder({ editExam, onDone }: { editExam: Exam | null; onDone: () =
                   <span className="bg-forest-500 text-white text-xs px-1.5 py-0.5 rounded-full font-bold shrink-0 mt-0.5">Q{i + 1}</span>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <Badge className={q.questionType === 'mc' ? 'bg-forest-100 text-forest-700' : 'bg-gold-100 text-gold-700'}>{q.questionType === 'mc' ? 'MC' : 'Essay'}</Badge>
+                      <Badge className={q.questionType === 'mc' ? 'gk-badge gk-badge-mc' : 'gk-badge gk-badge-essay'}>{q.questionType === 'mc' ? 'MC' : 'Essay'}</Badge>
                       <span className="text-gray-400 text-xs">{q.points} pts</span>
                     </div>
                     <p className="text-gray-700 truncate">{q.questionText}</p>
                     {q.questionType === 'mc' && (
                       <div className="flex flex-wrap gap-1 mt-1">
                         {q.choices.map((c, j) => (
-                          <span key={j} className={`text-xs px-1.5 py-0.5 rounded ${c.isCorrect ? 'bg-forest-100 text-forest-700 font-medium' : 'bg-gray-100 text-gray-500'}`}>
+                          <span key={j} className={`text-xs px-1.5 py-0.5 rounded ${c.isCorrect ? 'bg-forest-50 text-forest-700 font-medium' : 'bg-gray-100 text-gray-500'}`}>
                             {String.fromCharCode(65 + j)}. {c.choiceText}
                           </span>
                         ))}
@@ -1134,8 +1134,8 @@ function ScheduleManager() {
                   <h4 className="font-semibold text-forest-500">{exam?.title || 'Unknown Exam'}</h4>
                   <p className="text-gray-500 text-sm">{formatTime(s.startTime)} - {formatTime(s.endTime)}</p>
                   <div className="flex gap-2 mt-1">
-                    <Badge className="bg-forest-100 text-forest-700">{s.slotsTaken} / {s.maxSlots} booked</Badge>
-                    <Badge className={remaining > 0 ? 'bg-forest-100 text-forest-700' : 'bg-red-100 text-red-700'}>{remaining > 0 ? `${remaining} slots left` : 'Full'}</Badge>
+                    <Badge className="gk-badge gk-badge-info">{s.slotsTaken} / {s.maxSlots} booked</Badge>
+                    <Badge className={remaining > 0 ? 'gk-badge gk-badge-active' : 'gk-badge gk-badge-danger'}>{remaining > 0 ? `${remaining} slots left` : 'Full'}</Badge>
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -1163,7 +1163,7 @@ function QuestionCard({ q, i }: { q: ParsedQuestion | ExamQuestion; i: number })
     <div className="border border-gray-200 rounded-lg p-4">
       <div className="flex items-center gap-3 mb-2">
         <span className="bg-forest-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">Q{i + 1}</span>
-        <Badge className={q.questionType === 'mc' ? 'bg-forest-100 text-forest-700' : 'bg-gold-100 text-gold-700'}>{q.questionType === 'mc' ? 'Multiple Choice' : 'Essay'}</Badge>
+        <Badge className={q.questionType === 'mc' ? 'gk-badge gk-badge-mc' : 'gk-badge gk-badge-essay'}>{q.questionType === 'mc' ? 'Multiple Choice' : 'Essay'}</Badge>
         <span className="text-xs text-gray-400 ml-auto">{q.points} pts</span>
       </div>
       <p className="text-forest-500 font-medium text-sm mb-2">{q.questionText}</p>

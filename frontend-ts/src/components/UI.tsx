@@ -40,25 +40,38 @@ export function StatCard({ icon, value, label, color = 'blue', trend, trendLabel
     red: 'bg-red-50 text-red-500',
     gold: 'bg-gold-50 text-gold-600',
   };
+  // Decorative shape varies by color
+  const decoShapes: Record<string, string> = {
+    blue: 'rounded-2xl rotate-12 bg-forest-500/[0.04]',
+    green: 'rounded-full bg-forest-500/[0.05]',
+    emerald: 'rounded-3xl -rotate-6 bg-emerald-500/[0.04]',
+    orange: 'rounded-2xl rotate-45 bg-orange-400/[0.05]',
+    amber: 'rounded-full bg-gold-400/[0.06]',
+    red: 'rounded-2xl -rotate-12 bg-red-400/[0.05]',
+    gold: 'rounded-3xl rotate-6 bg-gold-400/[0.06]',
+  };
   const trendUp = (trend ?? 0) > 0;
   const trendDown = (trend ?? 0) < 0;
   return (
-    <div className="gk-card relative overflow-hidden p-5 flex items-center gap-4 group">
-      <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full bg-forest-500/5 group-hover:bg-forest-500/8 transition-colors pointer-events-none" />
-      <div className={`w-12 h-12 rounded-xl ${iconColors[color] || iconColors.blue} flex items-center justify-center shrink-0`} aria-hidden="true">
-        {typeof icon === 'string' && !/[\u{1F000}-\u{1FFFF}]/u.test(icon) ? <Icon name={icon} className="w-6 h-6" /> : <span className="text-xl">{icon}</span>}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="text-2xl font-bold stat-value">{value}</div>
-        <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">{label}</div>
-      </div>
-      {trend !== undefined && trend !== null && (
-        <div className={`flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg ${trendUp ? 'bg-emerald-50 text-emerald-600' : trendDown ? 'bg-red-50 text-red-500' : 'bg-gray-50 text-gray-400'}`}
-          aria-label={`${trendUp ? 'Up' : trendDown ? 'Down' : 'No change'} ${Math.abs(trend)}%${trendLabel ? `, ${trendLabel}` : ''}`}>
-          {trendUp ? <Icon name="arrowTrendUp" className="w-3.5 h-3.5" /> : trendDown ? <Icon name="arrowTrendDown" className="w-3.5 h-3.5" /> : <span>—</span>}
-          <span>{Math.abs(trend)}%</span>
+    <div className="gk-card relative overflow-hidden p-5 group">
+      {/* Decorative background shape */}
+      <div className={`absolute -top-4 -right-4 w-28 h-28 ${decoShapes[color] || decoShapes.blue} group-hover:scale-110 transition-transform duration-500 pointer-events-none`} />
+      <div className="flex items-start gap-4">
+        <div className={`w-11 h-11 rounded-xl ${iconColors[color] || iconColors.blue} flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-105`} aria-hidden="true">
+          {typeof icon === 'string' && !/[\u{1F000}-\u{1FFFF}]/u.test(icon) ? <Icon name={icon} className="w-5 h-5" /> : <span className="text-lg">{icon}</span>}
         </div>
-      )}
+        {trend !== undefined && trend !== null && (
+          <div className={`ml-auto flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ${trendUp ? 'bg-emerald-50 text-emerald-600' : trendDown ? 'bg-red-50 text-red-500' : 'bg-gray-50 text-gray-400'}`}
+            aria-label={`${trendUp ? 'Up' : trendDown ? 'Down' : 'No change'} ${Math.abs(trend)}%${trendLabel ? `, ${trendLabel}` : ''}`}>
+            {trendUp ? <Icon name="arrowTrendUp" className="w-3 h-3" /> : trendDown ? <Icon name="arrowTrendDown" className="w-3 h-3" /> : <span>—</span>}
+            <span>{Math.abs(trend)}%</span>
+          </div>
+        )}
+      </div>
+      <div className="mt-3">
+        <div className="text-3xl stat-value" style={{ fontFamily: 'var(--font-display)', letterSpacing: '-0.03em' }}>{value}</div>
+        <div className="text-[11px] text-gray-500 uppercase tracking-widest mt-1" style={{ fontFamily: 'var(--font-body)', fontWeight: 500 }}>{label}</div>
+      </div>
     </div>
   );
 }
@@ -72,13 +85,13 @@ interface BadgeProps {
 
 export function Badge({ children, variant, className: cls }: BadgeProps) {
   const variants: Record<string, string> = {
-    info: 'bg-forest-50 text-forest-700 ring-1 ring-forest-200/60',
-    success: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/60',
-    warning: 'bg-gold-50 text-gold-700 ring-1 ring-gold-200/60',
-    danger: 'bg-red-50 text-red-700 ring-1 ring-red-200/60',
+    info: 'gk-badge gk-badge-active',
+    success: 'gk-badge gk-badge-accepted',
+    warning: 'gk-badge gk-badge-submitted',
+    danger: 'gk-badge gk-badge-rejected',
   };
-  const resolved = cls || variants[variant || ''] || 'bg-gray-50 text-gray-600 ring-1 ring-gray-200/60';
-  return <span className={`inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-semibold ${resolved}`}>{children}</span>;
+  const resolved = cls || variants[variant || ''] || 'gk-badge gk-badge-inactive';
+  return <span className={resolved}>{children}</span>;
 }
 
 /* ===== EmptyState ===== */
@@ -125,9 +138,9 @@ export function PageHeader({ title, subtitle, children }: PageHeaderProps) {
   return (
     <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
       <div>
-        <h2 className="text-2xl font-bold text-gray-800 tracking-tight">{title}</h2>
-        {subtitle && <p className="text-gray-500 text-sm mt-1">{subtitle}</p>}
-        <div className="mt-2.5 h-1 w-10 rounded-full bg-gradient-to-r from-gold-400 to-gold-300" />
+        <h2 className="text-2xl text-gray-800 gk-heading">{title}</h2>
+        {subtitle && <p className="text-gray-500 text-sm mt-1.5" style={{ fontFamily: 'var(--font-body)' }}>{subtitle}</p>}
+        <div className="mt-3 h-[3px] w-12 rounded-full bg-gradient-to-r from-gold-400 via-gold-300 to-transparent" />
       </div>
       {children && <div className="flex items-center gap-2">{children}</div>}
     </div>

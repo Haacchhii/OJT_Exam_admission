@@ -250,8 +250,8 @@ export default function EmployeeResults() {
                           <td className="py-3 px-2">{(r.exam as any)?.title || 'N/A'}</td>
                           <td className="py-3 px-2">{r.totalScore} / {r.maxPossible}</td>
                           <td className="py-3 px-2">{r.percentage.toFixed(1)}%</td>
-                          <td className="py-3 px-2"><Badge className={r.passed ? 'bg-forest-100 text-forest-700' : 'bg-red-100 text-red-700'}>{r.passed ? 'Passed' : 'Failed'}</Badge></td>
-                          <td className="py-3 px-2"><Badge className={r.essayReviewed ? 'bg-forest-100 text-forest-700' : 'bg-gold-100 text-gold-700'}>{r.essayReviewed ? 'Reviewed' : 'Pending'}</Badge></td>
+                          <td className="py-3 px-2"><Badge className={r.passed ? 'gk-badge gk-badge-passed' : 'gk-badge gk-badge-failed'}>{r.passed ? 'Passed' : 'Failed'}</Badge></td>
+                          <td className="py-3 px-2"><Badge className={r.essayReviewed ? 'gk-badge gk-badge-reviewed' : 'gk-badge gk-badge-pending'}>{r.essayReviewed ? 'Reviewed' : 'Pending'}</Badge></td>
                           <td className="py-3 px-2 text-gray-500">{formatDate(r.createdAt)}</td>
                           <td className="py-3 px-2 text-right"><button onClick={() => handlePrintResult(r)} className="text-forest-500 hover:bg-forest-50 px-2 py-1 rounded text-xs font-medium inline-flex items-center gap-1" aria-label="Print result"><Icon name="document" className="w-3.5 h-3.5" /> Print</button></td>
                         </tr>
@@ -324,7 +324,7 @@ function EssayCard({ essay, student, question, status, onScore }: EssayCardProps
       <div className="flex justify-between items-start mb-3">
         <div>
           <strong className="text-forest-500">{student}</strong>
-          <Badge className={status === 'pending' ? 'bg-gold-100 text-gold-700 ml-2' : 'bg-forest-100 text-forest-700 ml-2'}>{status === 'pending' ? 'Pending' : `${essay.pointsAwarded} / ${essay.maxPoints} pts`}</Badge>
+          <Badge className={status === 'pending' ? 'gk-badge gk-badge-pending ml-2' : 'gk-badge gk-badge-reviewed ml-2'}>{status === 'pending' ? 'Pending' : `${essay.pointsAwarded} / ${essay.maxPoints} pts`}</Badge>
         </div>
         {status === 'pending' && <span className="text-gray-400 text-xs">Max: {essay.maxPoints} pts</span>}
       </div>

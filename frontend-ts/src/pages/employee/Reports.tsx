@@ -226,7 +226,7 @@ export default function EmployeeReports() {
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <div className="gk-card p-6">
-          <h3 className="text-lg font-bold text-forest-500 mb-4 flex items-center gap-1.5"><Icon name="chartBar" className="w-5 h-5" /> Pass Rate by Exam</h3>
+          <h3 className="gk-heading-sm text-forest-500 mb-4 flex items-center gap-1.5"><span className="p-1.5 bg-forest-50 rounded-lg"><Icon name="chartBar" className="w-5 h-5" /></span> Pass Rate by Exam</h3>
           {examStats.length > 0 && examStats.some(e => e.total > 0) ? (
             <div className="space-y-3">
               {examStats.map((e, i) => (
@@ -249,7 +249,7 @@ export default function EmployeeReports() {
         </div>
 
         <div className="gk-card p-6">
-          <h3 className="text-lg font-bold text-forest-500 mb-4 flex items-center gap-1.5"><Icon name="arrowTrendUp" className="w-5 h-5" /> Applicant Volume (Monthly)</h3>
+          <h3 className="gk-heading-sm text-forest-500 mb-4 flex items-center gap-1.5"><span className="p-1.5 bg-forest-50 rounded-lg"><Icon name="arrowTrendUp" className="w-5 h-5" /></span> Applicant Volume (Monthly)</h3>
           <div className="flex items-end gap-3 h-48">
             {monthData.map((m, i) => (
               <div key={i} className="flex-1 flex flex-col items-center justify-end h-full">
@@ -264,11 +264,11 @@ export default function EmployeeReports() {
 
       {/* Summary Table */}
       <div className="gk-card p-6">
-        <h3 className="text-lg font-bold text-forest-500 mb-4 flex items-center gap-1.5"><Icon name="clipboard" className="w-5 h-5" /> Summary Statistics</h3>
+        <h3 className="gk-heading-sm text-forest-500 mb-4 flex items-center gap-1.5"><span className="p-1.5 bg-forest-50 rounded-lg"><Icon name="clipboard" className="w-5 h-5" /></span> Summary Statistics</h3>
         <div className="table-scroll">
-          <table className="w-full text-sm">
-            <thead><tr className="border-b border-gray-200 text-left text-gray-400 uppercase text-xs">
-              <th scope="col" className="py-3 px-2">Metric</th><th scope="col" className="py-3 px-2">Value</th><th scope="col" className="py-3 px-2">Change</th>
+          <table className="gk-table">
+            <thead><tr>
+              <th>Metric</th><th>Value</th><th>Change</th>
             </tr></thead>
             <tbody>
               {metrics.map((m, i) => (

@@ -10,21 +10,21 @@ import type { PaginatedAuditResponse } from '../../api/auditLog';
 const ENTITY_OPTIONS = ['', 'admission', 'user', 'exam', 'result'];
 const ENTITY_LABELS: Record<string, string> = { admission: 'Admission', user: 'User', exam: 'Exam', result: 'Result' };
 
-const ACTION_COLORS: Record<string, string> = {
-  create: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  delete: 'bg-red-100 text-red-700 border-red-200',
-  score:  'bg-blue-100 text-blue-700 border-blue-200',
-  submit: 'bg-purple-100 text-purple-700 border-purple-200',
-  status: 'bg-amber-100 text-amber-700 border-amber-200',
-  update: 'bg-sky-100 text-sky-700 border-sky-200',
-  bulk:   'bg-amber-100 text-amber-700 border-amber-200',
+const ACTION_BADGE: Record<string, string> = {
+  create: 'gk-badge gk-badge-create',
+  delete: 'gk-badge gk-badge-delete',
+  score:  'gk-badge gk-badge-score',
+  submit: 'gk-badge gk-badge-submit',
+  status: 'gk-badge gk-badge-status',
+  update: 'gk-badge gk-badge-update',
+  bulk:   'gk-badge gk-badge-status',
 };
 
-function getActionColor(action: string): string {
-  for (const [key, cls] of Object.entries(ACTION_COLORS)) {
+function getActionBadge(action: string): string {
+  for (const [key, cls] of Object.entries(ACTION_BADGE)) {
     if (action.toLowerCase().includes(key)) return cls;
   }
-  return 'bg-gray-100 text-gray-600 border-gray-200';
+  return 'gk-badge gk-badge-neutral';
 }
 
 function formatDateLocal(date: string): string {
@@ -117,16 +117,16 @@ export default function AuditLog() {
       {/* Logs Table */}
       <div className="gk-card overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="gk-table">
             <thead>
-              <tr className="border-b border-gray-200">
-                <th className="text-left px-4 py-3 text-gray-400 font-medium text-xs uppercase tracking-wider">Timestamp</th>
-                <th className="text-left px-4 py-3 text-gray-400 font-medium text-xs uppercase tracking-wider">User</th>
-                <th className="text-left px-4 py-3 text-gray-400 font-medium text-xs uppercase tracking-wider">Action</th>
-                <th className="text-left px-4 py-3 text-gray-400 font-medium text-xs uppercase tracking-wider">Entity</th>
-                <th className="text-left px-4 py-3 text-gray-400 font-medium text-xs uppercase tracking-wider">ID</th>
-                <th className="text-left px-4 py-3 text-gray-400 font-medium text-xs uppercase tracking-wider">Details</th>
-                <th className="text-left px-4 py-3 text-gray-400 font-medium text-xs uppercase tracking-wider">IP</th>
+              <tr>
+                <th>Timestamp</th>
+                <th>User</th>
+                <th>Action</th>
+                <th>Entity</th>
+                <th>ID</th>
+                <th>Details</th>
+                <th>IP</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -154,7 +154,7 @@ export default function AuditLog() {
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`inline-flex items-center text-[10px] font-bold uppercase px-2 py-0.5 rounded-md border ${getActionColor(log.action)}`}>
+                    <span className={`${getActionBadge(log.action)} !text-[10px] uppercase`}>
                       {log.action}
                     </span>
                   </td>
