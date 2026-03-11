@@ -1,17 +1,32 @@
 import { z } from 'zod';
 
-// ─── Auth Schemas ─────────────────────────────────────
-export const loginSchema = z.object({
-  email: z.string().email('Invalid email format'),
-  password: z.string().min(1, 'Password is required'),
-});
-
+// ─── Shared helpers ─────────────────────────────────
 const passwordSchema = z.string()
   .min(8, 'Password must be at least 8 characters')
   .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
   .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
   .regex(/[0-9]/, 'Password must contain at least one number')
   .regex(/[^A-Za-z0-9]/, 'Password must contain at least one special character');
+
+export { passwordSchema };
+
+const coercePositiveInt = z.coerce.number().int().positive();
+const coerceOptionalInt = z.coerce.number().int().positive().optional();
+const optionalString = z.string().max(200).optional();
+const isoDateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2})?/, 'Must be ISO date format');
+
+// Common query param schema for paginated list endpoints
+const paginationQuery = {
+  page:   z.coerce.number().int().positive().optional(),
+  limit:  z.coerce.number().int().min(1).max(100).optional(),
+  search: z.string().max(200).optional(),
+};
+
+// ─── Auth Schemas ─────────────────────────────────────
+export const loginSchema = z.object({
+  email: z.string().email('Invalid email format'),
+  password: z.string().min(1, 'Password is required'),
+});
 
 export const registerSchema = z.object({
   firstName: z.string().min(1, 'First name is required').max(100),
@@ -117,4 +132,100 @@ export const updateUserSchema = z.object({
   email: z.string().email().optional(),
   role: z.enum(['administrator', 'registrar', 'teacher', 'applicant']).optional(),
   status: z.enum(['Active', 'Inactive']).optional(),
+});
+
+// ─── Query Parameter Schemas ──────────────────────────
+export const admissionsQuerySchema = z.object({
+  ...paginationQuery,
+  status: z.enum(['Submitted', 'Under Screening', 'Under Evaluation', 'Accepted', 'Rejected']).optional(),
+  grade:  optionalString,
+  sort:   z.enum(['newest', 'oldest']).optional(),
+  academicYearId: coerceOptionalInt,
+  semesterId:     coerceOptionalInt,
+});
+
+export const admissionsStatsQuerySchema = z.object({
+  grade:          optionalString,
+  from:           isoDateStr.optional(),
+  to:             isoDateStr.optional(),
+  academicYearId: coerceOptionalInt,
+  semesterId:     coerceOptionalInt,
+});
+
+export const examsQuerySchema = z.object({
+  ...paginationQuery,
+  grade:          optionalString,
+  status:         z.enum(['active', 'inactive']).optional(),
+  academicYearId: coerceOptionalInt,
+  semesterId:     coerceOptionalInt,
+});
+
+export const schedulesQuerySchema = z.object({
+  ...paginationQuery,
+  examId: coerceOptionalInt,
+});
+
+export const registrationsQuerySchema = z.object({
+  ...paginationQuery,
+  status: z.enum(['scheduled', 'started', 'done']).optional(),
+});
+
+export const resultsQuerySchema = z.object({
+  ...paginationQuery,
+  passed: z.enum(['true', 'false']).optional(),
+  examId: coerceOptionalInt,
+});
+
+export const essaysQuerySchema = z.object({
+  ...paginationQuery,
+  status: z.enum(['pending', 'scored', 'all']).optional(),
+});
+
+export const usersQuerySchema = z.object({
+  ...paginationQuery,
+  role:   z.enum(['administrator', 'registrar', 'teacher', 'applicant']).optional(),
+  status: z.enum(['Active', 'Inactive']).optional(),
+});
+
+export const auditLogQuerySchema = z.object({
+  ...paginationQuery,
+  action: optionalString,
+  entity: optionalString,
+  userId: coerceOptionalInt,
+  from:   isoDateStr.optional(),
+  to:     isoDateStr.optional(),
+});
+
+export const notificationsQuerySchema = z.object({
+  ...paginationQuery,
+});
+
+// ─── Missing update / create schemas ──────────────────
+export const updateExamSchema = z.object({
+  title:           z.string().min(1).max(200).optional(),
+  gradeLevel:      z.string().min(1).optional(),
+  durationMinutes: z.number().int().positive().optional(),
+  passingScore:    z.number().min(0).max(100).optional(),
+  isActive:        z.boolean().optional(),
+  questions:       z.array(questionSchema).optional(),
+});
+
+export const updateScheduleSchema = z.object({
+  scheduledDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD format').optional(),
+  startTime:     z.string().regex(/^\d{2}:\d{2}$/, 'Must be HH:mm format').optional(),
+  endTime:       z.string().regex(/^\d{2}:\d{2}$/, 'Must be HH:mm format').optional(),
+  maxSlots:      z.number().int().positive().optional(),
+  venue:         z.string().max(200).optional().nullable(),
+});
+
+export const createNotificationSchema = z.object({
+  userId:  z.number().int().positive(),
+  title:   z.string().min(1).max(200),
+  message: z.string().min(1).max(1000),
+  type:    z.enum(['info', 'success', 'warning', 'error', 'admission', 'exam']).default('info'),
+});
+
+export const scoreEssaySchema = z.object({
+  points:  z.number().min(0),
+  comment: z.string().max(2000).optional().nullable(),
 });

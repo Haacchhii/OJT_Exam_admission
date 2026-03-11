@@ -77,6 +77,12 @@ export async function updateUser(req, res, next) {
   try {
     const { firstName, lastName, email, role, status, password } = req.body;
     const id = Number(req.params.id);
+
+    // Only administrators can assign the administrator role
+    if (role === 'administrator' && req.user.role !== 'administrator') {
+      return res.status(403).json({ error: 'Only administrators can assign the administrator role', code: 'FORBIDDEN' });
+    }
+
     const data = {};
     if (firstName !== undefined) data.firstName = firstName;
     if (lastName  !== undefined) data.lastName  = lastName;

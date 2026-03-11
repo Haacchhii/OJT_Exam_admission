@@ -91,8 +91,8 @@ export async function getStats(req, res, next) {
     if (semesterId)    where.semesterId = Number(semesterId);
     if (from || to) {
       where.submittedAt = {};
-      if (from) where.submittedAt.gte = new Date(from);
-      if (to)   where.submittedAt.lte = new Date(to);
+      if (from) { const d = new Date(from); if (!isNaN(d.getTime())) where.submittedAt.gte = d; }
+      if (to)   { const d = new Date(to);   if (!isNaN(d.getTime())) where.submittedAt.lte = d; }
     }
 
     const all = await prisma.admission.findMany({ where, select: { status: true } });

@@ -21,3 +21,26 @@ export function validate(schema) {
     }
   };
 }
+
+/**
+ * Express middleware factory: validates req.query against a Zod schema.
+ * Invalid/unknown params are stripped; valid ones are coerced to proper types.
+ * Usage: router.get('/', validateQuery(myQuerySchema), controller)
+ */
+export function validateQuery(schema) {
+  return (req, _res, next) => {
+    try {
+      req.query = schema.parse(req.query);
+      next();
+    } catch (err) {
+      if (err instanceof ZodError) {
+        const message = err.issues.map(e => `${e.path.join('.')}: ${e.message}`).join('; ');
+        const error = new Error(message);
+        error.status = 400;
+        error.code = 'VALIDATION_ERROR';
+        return next(error);
+      }
+      next(err);
+    }
+  };
+}
