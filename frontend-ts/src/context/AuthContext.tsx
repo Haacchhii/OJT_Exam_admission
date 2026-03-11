@@ -102,6 +102,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = opts.registerPayload
         ? await client.post<AuthResponse>('/auth/register', opts.registerPayload)
         : await client.post<AuthResponse>('/auth/login', { email, password });
+      if (!res?.user || !res?.token) {
+        throw new Error(`API misconfiguration: expected {user,token} but got ${typeof res === 'string' ? 'HTML page' : JSON.stringify(res)?.slice(0, 80)}. Check VITE_API_URL.`);
+      }
       setToken(res.token);
       localStorage.setItem('gk_current_user', JSON.stringify(res.user));
       localStorage.setItem('gk_user_hash', computeHash(res.user));
