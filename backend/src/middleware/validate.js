@@ -25,12 +25,15 @@ export function validate(schema) {
 /**
  * Express middleware factory: validates req.query against a Zod schema.
  * Invalid/unknown params are stripped; valid ones are coerced to proper types.
+ * In Express 5 req.query is a read-only getter on the prototype, so we shadow
+ * it on the instance with Object.defineProperty.
  * Usage: router.get('/', validateQuery(myQuerySchema), controller)
  */
 export function validateQuery(schema) {
   return (req, _res, next) => {
     try {
-      req.query = schema.parse(req.query);
+      const parsed = schema.parse(req.query);
+      Object.defineProperty(req, 'query', { value: parsed, writable: true, configurable: true });
       next();
     } catch (err) {
       if (err instanceof ZodError) {
