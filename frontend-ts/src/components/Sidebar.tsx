@@ -56,7 +56,7 @@ export default function Sidebar({ open, onClose, role, collapsed, onToggleCollap
       {open && <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 lg:hidden transition-opacity" onClick={onClose} />}
 
       <aside className={`fixed top-0 left-0 z-50 h-screen flex flex-col transition-all duration-300 lg:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'} ${collapsed ? 'lg:w-[72px]' : 'lg:w-[270px]'} w-[270px]`} role="navigation" aria-label="Main navigation">
-        <div className="sidebar-pattern flex flex-col h-full bg-gradient-to-b from-[#0a2e1a] via-[#0f3d22] to-forest-700 border-r border-gold-400/10">
+        <div className="flex flex-col h-full bg-gradient-to-b from-[#0a2e1a] via-[#0f3d22] to-forest-700 border-r border-gold-400/10">
 
           {/* Brand */}
           <div className={`flex items-center gap-3.5 border-b border-gold-400/10 ${collapsed ? 'lg:justify-center lg:px-3 lg:py-5' : 'px-5 py-5'}`}>
@@ -67,13 +67,13 @@ export default function Sidebar({ open, onClose, role, collapsed, onToggleCollap
               <h2 className="text-sm tracking-wider leading-tight" style={{ fontFamily: 'var(--font-display)' }}>
                 <span className="text-gold-400">GOLDEN KEY</span>
               </h2>
-              <p className="text-[10px] text-forest-300/80 font-light tracking-wide" style={{ fontFamily: 'var(--font-body)' }}>Integrated School of St. Joseph</p>
+              <p className="text-xs text-forest-300/80 font-light tracking-wide" style={{ fontFamily: 'var(--font-body)' }}>Integrated School of St. Joseph</p>
             </div>
           </div>
 
           {/* Role Badge */}
           <div className={`px-4 py-3 ${collapsed ? 'lg:flex lg:justify-center lg:px-2' : ''}`}>
-            <span className={`inline-flex items-center text-[10px] font-semibold uppercase tracking-widest px-3 py-1.5 rounded-full border ${collapsed ? 'lg:px-1.5' : ''}`}
+            <span className={`inline-flex items-center text-xs font-semibold uppercase tracking-widest px-3 py-1.5 rounded-full border ${collapsed ? 'lg:px-1.5' : ''}`}
               style={{ fontFamily: 'var(--font-body)', background: 'linear-gradient(135deg, rgba(255,215,0,0.1), rgba(255,215,0,0.05))', color: '#fcd34d', borderColor: 'rgba(255,215,0,0.15)' }}>
               {collapsed ? roleBadgeShort : roleBadgeText}
             </span>
@@ -82,7 +82,7 @@ export default function Sidebar({ open, onClose, role, collapsed, onToggleCollap
           {/* Section label */}
           {!collapsed && (
             <div className="px-6 pt-1 pb-2">
-              <span className="text-[9px] uppercase tracking-[0.2em] text-forest-400/60 font-semibold" style={{ fontFamily: 'var(--font-body)' }}>Navigation</span>
+              <span className="text-[11px] uppercase tracking-[0.2em] text-forest-400/60 font-semibold" style={{ fontFamily: 'var(--font-body)' }}>Navigation</span>
             </div>
           )}
 
@@ -97,7 +97,7 @@ export default function Sidebar({ open, onClose, role, collapsed, onToggleCollap
                 title={collapsed ? l.label : undefined}
                 aria-label={l.label}
                 className={({ isActive }) =>
-                  `group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${collapsed ? 'lg:justify-center lg:px-0' : ''} ${
+                  `group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-200 ${collapsed ? 'lg:justify-center lg:px-0' : ''} ${
                     isActive
                       ? 'bg-gradient-to-r from-gold-400/15 to-transparent text-white border-l-[3px] border-gold-400 ml-0 pl-2.5'
                       : 'text-gray-400 hover:bg-white/5 hover:text-gray-200 border-l-[3px] border-transparent'
@@ -145,7 +145,7 @@ export default function Sidebar({ open, onClose, role, collapsed, onToggleCollap
               <Icon name="logout" className="w-[18px] h-[18px] shrink-0" />
               <span className={`font-medium ${collapsed ? 'lg:hidden' : ''}`}>Log out</span>
             </button>
-            <p className={`text-[10px] text-forest-700 mt-3 px-3 ${collapsed ? 'lg:hidden' : ''}`} style={{ fontFamily: 'var(--font-body)' }}>&copy; 2026 GKISSJ</p>
+            <p className={`text-xs text-forest-700 mt-3 px-3 ${collapsed ? 'lg:hidden' : ''}`} style={{ fontFamily: 'var(--font-body)' }}>&copy; 2026 GKISSJ</p>
           </div>
         </div>
       </aside>

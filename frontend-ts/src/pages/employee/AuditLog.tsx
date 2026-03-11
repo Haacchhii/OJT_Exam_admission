@@ -147,14 +147,14 @@ export default function AuditLog() {
                     {log.user ? (
                       <div>
                         <p className="text-gray-700 text-xs font-medium">{log.user.firstName} {log.user.lastName}</p>
-                        <p className="text-gray-500 text-[10px]">{log.user.email}</p>
+                        <p className="text-gray-500 text-xs">{log.user.email}</p>
                       </div>
                     ) : (
                       <span className="text-gray-500 text-xs">System</span>
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`${getActionBadge(log.action)} !text-[10px] uppercase`}>
+                    <span className={`${getActionBadge(log.action)} !text-xs uppercase`}>
                       {log.action}
                     </span>
                   </td>
