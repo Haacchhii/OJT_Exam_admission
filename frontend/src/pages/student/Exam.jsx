@@ -9,7 +9,7 @@ import Modal from '../../components/Modal.jsx';
 import { useConfirm } from '../../components/ConfirmDialog.jsx';
 import { PageHeader, SkeletonPage, ErrorAlert } from '../../components/UI.jsx';
 import Icon from '../../components/Icons.jsx';
-import { formatTime } from '../../utils/helpers.js';
+import { formatTime, asArray } from '../../utils/helpers.js';
 
 export default function StudentExam() {
   const [view, setView] = useState('schedule'); // schedule | lobby | exam
@@ -51,9 +51,9 @@ export default function StudentExam() {
       let cancelled = false;
       (async () => {
         try {
-          const schedules = await getExamSchedules();
+          const rawSched = await getExamSchedules();
           if (cancelled) return;
-          const schedule = schedules.find(s => s.id === myReg.scheduleId);
+          const schedule = asArray(rawSched).find(s => s.id === myReg.scheduleId);
           const exam = schedule ? await getExamForStudent(schedule.examId) : null;
           if (!cancelled && exam) { setCurrentExam(exam); setView('exam'); }
         } catch (err) {
@@ -113,8 +113,8 @@ function ScheduleView({ myReg, myResult, onLobby, onRefresh, user }) {
   const [bookingSlotId, setBookingSlotId] = useState(null);
 
   const { data: schedData } = useAsync(async () => {
-    const [schedules, exams, availableSchedules] = await Promise.all([getExamSchedules(), getExams(), getAvailableSchedules()]);
-    return { schedules, exams, availableSchedules };
+    const [rawSched, rawExams, availableSchedules] = await Promise.all([getExamSchedules(), getExams(), getAvailableSchedules()]);
+    return { schedules: asArray(rawSched), exams: asArray(rawExams), availableSchedules };
   });
 
   const schedules = schedData?.schedules || [];

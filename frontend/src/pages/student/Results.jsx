@@ -3,7 +3,7 @@ import { getMyRegistrations, getExamSchedules, getExamForReview } from '../../ap
 import { getMyResult, getSubmittedAnswers } from '../../api/results.js';
 import { PageHeader, SkeletonPage, ErrorAlert } from '../../components/UI.jsx';
 import Icon from '../../components/Icons.jsx';
-import { formatDate } from '../../utils/helpers.js';
+import { formatDate, asArray } from '../../utils/helpers.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { showToast } from '../../components/Toast.jsx';
 import { useAsync } from '../../hooks/useAsync.js';
@@ -12,10 +12,11 @@ export default function StudentResults() {
   const { user } = useAuth();
 
   const { data: rawData, loading, error, refetch } = useAsync(async () => {
-    const [myRegs, myResult, schedules] = await Promise.all([
+    const [myRegs, myResult, rawSchedules] = await Promise.all([
       getMyRegistrations(), getMyResult(), getExamSchedules()
     ]);
     const myReg = myRegs?.[0] || null;
+    const schedules = asArray(rawSchedules);
     const schedule = myReg ? schedules.find(s => s.id === myReg.scheduleId) : null;
     let exam = null;
     let storedAnswers = [];

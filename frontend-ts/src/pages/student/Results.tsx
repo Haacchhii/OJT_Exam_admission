@@ -31,11 +31,12 @@ export default function StudentResults() {
   const { user } = useAuth();
 
   const { data: rawData, loading, error, refetch } = useAsync<ResultsData>(async () => {
-    const [myRegs, myResult, schedules] = await Promise.all([
+    const [myRegs, myResult, rawSchedules] = await Promise.all([
       getMyRegistrations(), getMyResult(), getExamSchedules()
     ]);
     const myReg = myRegs?.[0] || null;
-    const schedule = myReg ? schedules.find((s: { id: number }) => s.id === myReg.scheduleId) : null;
+    const schedules = asArray<{ id: number; examId: number }>(rawSchedules);
+    const schedule = myReg ? schedules.find(s => s.id === myReg.scheduleId) : null;
     let exam: Exam | null = null;
     let storedAnswers: SubmittedAnswer[] = [];
     if (schedule) {

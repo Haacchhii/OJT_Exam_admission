@@ -64,9 +64,9 @@ export default function StudentExam() {
       let cancelled = false;
       (async () => {
         try {
-          const schedules = await getExamSchedules();
+          const rawSchedules = await getExamSchedules();
           if (cancelled) return;
-          const schedule = schedules.find((s: ExamSchedule) => s.id === myReg.scheduleId);
+          const schedule = asArray<ExamSchedule>(rawSchedules).find((s: ExamSchedule) => s.id === myReg.scheduleId);
           const exam = schedule ? await getExamForStudent(schedule.examId) : null;
           if (!cancelled && exam) { setCurrentExam(exam); setView('exam'); }
         } catch (err) {

@@ -1,3 +1,10 @@
+/** Safely normalise an API result that may be a raw array OR a paginated wrapper { data: T[] }. */
+export function asArray(val) {
+  if (Array.isArray(val)) return val;
+  if (val && typeof val === 'object' && 'data' in val && Array.isArray(val.data)) return val.data;
+  return [];
+}
+
 /** Generate a unique ID string, safe for high-frequency calls (CSV import). */
 let _uidCounter = 0;
 export function uid() {
