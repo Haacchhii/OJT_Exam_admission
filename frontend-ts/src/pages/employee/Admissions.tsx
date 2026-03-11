@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAsync } from '../../hooks/useAsync';
-import { getAdmissions, getStats, updateAdmissionStatus, bulkUpdateStatus, bulkDeleteAdmissions, VALID_TRANSITIONS } from '../../api/admissions';
+import { getAdmissions, getStats, updateAdmissionStatus, bulkUpdateStatus, bulkDeleteAdmissions, getDocumentDownloadUrl, VALID_TRANSITIONS } from '../../api/admissions';
 import { getAcademicYears, getSemesters } from '../../api/academicYears';
 import { showToast } from '../../components/Toast';
 import { useConfirm } from '../../components/ConfirmDialog';
@@ -297,12 +297,12 @@ export default function EmployeeAdmissions() {
         <div className="gk-card p-6 mb-4">
           <h3 className="text-lg font-bold text-forest-500 mb-4">Submitted Documents</h3>
           <div className="space-y-2">
-            {((adm as any).documentFiles || adm.documents.map((d: string) => ({ name: d, filePath: null as string | null }))).map((doc: { name: string; filePath: string | null }, i: number) => (
+            {((adm as any).documentFiles || adm.documents.map((d: string) => ({ id: 0, name: d, filePath: null as string | null }))).map((doc: { id: number; name: string; filePath: string | null }, i: number) => (
               <div key={i} className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded-lg text-sm">
                 <span><Icon name="document" className="w-4 h-4 inline text-gray-400" /> {doc.name}</span>
                 <div className="flex items-center gap-2">
-                  {doc.filePath && (
-                    <a href={`${import.meta.env.VITE_API_URL?.replace(/\/api\/?$/, '')}/uploads/${doc.filePath}`} target="_blank" rel="noopener noreferrer" className="text-forest-500 hover:underline text-xs font-medium">View / Download</a>
+                  {doc.filePath && doc.id > 0 && (
+                    <a href={getDocumentDownloadUrl(adm.id, doc.id)} target="_blank" rel="noopener noreferrer" className="text-forest-500 hover:underline text-xs font-medium">View / Download</a>
                   )}
                   <span className="bg-forest-100 text-forest-700 px-2 py-0.5 rounded-full text-xs">Submitted</span>
                 </div>

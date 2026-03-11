@@ -26,9 +26,6 @@ model User {
   scoredEssays    EssayAnswer[]      @relation("EssayScorer")
   notifications   Notification[]
   auditLogs       AuditLog[]
-  enrollments     Enrollment[]
-  payments        PaymentRecord[]
-  announcements   Announcement[]     @relation("AnnouncementAuthor")
   examRegistrations ExamRegistration[] @relation("ExamRegistrationUser")
 
   applicantProfile  ApplicantProfile?
@@ -70,9 +67,6 @@ model Admission {
   documents     AdmissionDocument[]
   academicYear  AcademicYear?       @relation(fields: [academicYearId], references: [id])
   semester      Semester?           @relation(fields: [semesterId], references: [id])
-  enrollment    Enrollment?
-  payments      PaymentRecord[]
-
   @@index([userId])
   @@index([status])
   @@index([gradeLevel])
@@ -239,6 +233,7 @@ model EssayAnswer {
   essayResponse  String    @map("essay_response")
   pointsAwarded  Int?      @map("points_awarded")
   maxPoints      Int       @map("max_points")
+  comment        String?   // teacher feedback on essay
   scored         Boolean   @default(false)
   scoredById     Int?      @map("scored_by")
   scoredAt       DateTime? @map("scored_at")
@@ -303,7 +298,6 @@ model AcademicYear {
   semesters   Semester[]
   admissions  Admission[]
   exams       Exam[]
-  enrollments Enrollment[]
 
   @@map("academic_years")
 }
@@ -321,7 +315,6 @@ model Semester {
   academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
   admissions   Admission[]
   exams        Exam[]
-  enrollments  Enrollment[]
 
   @@unique([academicYearId, name])
   @@map("semesters")
@@ -360,74 +353,4 @@ model StaffProfile {
   @@map("staff_profiles")
 }
 
-// ─── Enrollment ───────────────────────────────────────
-// Tracks the formal enrollment of an accepted applicant into a school year.
-model Enrollment {
-  id             Int      @id @default(autoincrement())
-  userId         Int      @map("user_id")
-  admissionId    Int      @unique @map("admission_id")  // one admission → one enrollment
-  academicYearId Int      @map("academic_year_id")
-  semesterId     Int?     @map("semester_id")
-  gradeLevel     String   @map("grade_level")
-  section        String?  // e.g. "St. Joseph"
-  status         String   @default("Enrolled") // Enrolled | Dropped | Transferred | Graduated
-  enrolledAt     DateTime @default(now()) @map("enrolled_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
 
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  admission    Admission    @relation(fields: [admissionId], references: [id], onDelete: Cascade)
-  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
-  semester     Semester?    @relation(fields: [semesterId], references: [id])
-
-  @@index([userId])
-  @@index([academicYearId])
-  @@index([gradeLevel])
-  @@map("enrollments")
-}
-
-// ─── Payment / Fees ────────────────────────────────────
-model PaymentRecord {
-  id          Int      @id @default(autoincrement())
-  userId      Int      @map("user_id")
-  admissionId Int?     @map("admission_id")
-  type        String   // "admission_fee" | "exam_fee" | "enrollment_fee" | "tuition" | "other"
-  amount      Float
-  currency    String   @default("PHP")
-  status      String   @default("Pending") // Pending | Paid | Cancelled | Refunded
-  reference   String?  // reference number / OR number
-  notes       String?
-  paidAt      DateTime? @map("paid_at")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  admission Admission? @relation(fields: [admissionId], references: [id], onDelete: SetNull)
-
-  @@index([userId])
-  @@index([admissionId])
-  @@index([status])
-  @@index([type])
-  @@map("payment_records")
-}
-
-// ─── Announcements ─────────────────────────────────────
-model Announcement {
-  id          Int      @id @default(autoincrement())
-  title       String
-  content     String
-  audience    String   @default("all") // all | applicant | staff
-  isPinned    Boolean  @default(false) @map("is_pinned")
-  isPublished Boolean  @default(true)  @map("is_published")
-  publishedAt DateTime @default(now()) @map("published_at")
-  expiresAt   DateTime? @map("expires_at")
-  createdById Int?     @map("created_by")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  createdBy User? @relation("AnnouncementAuthor", fields: [createdById], references: [id], onDelete: SetNull)
-
-  @@index([audience])
-  @@index([isPinned])
-  @@index([publishedAt])
-  @@map("announcements")
-}

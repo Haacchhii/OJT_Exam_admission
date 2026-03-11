@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getNotifications, markNotificationRead, markAllRead } from '../api/notifications';
 import { formatDate } from '../utils/helpers';
 import Icon from './Icons';
@@ -15,6 +16,7 @@ export default function Topbar({ title, onMenuToggle, userId, user }: TopbarProp
   const [showNotifs, setShowNotifs] = useState(false);
   const [notifs, setNotifs] = useState<Notification[]>([]);
   const ref = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
 
   const refresh = useCallback(async () => {
     try {
@@ -121,7 +123,7 @@ export default function Topbar({ title, onMenuToggle, userId, user }: TopbarProp
 
         <div className="w-px h-8 bg-gray-200 mx-1 hidden sm:block" />
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 cursor-pointer hover:opacity-80 transition" onClick={() => navigate(isEmployee ? '/employee/profile' : '/student/profile')} title="View Profile">
           <div className={`w-9 h-9 rounded-xl ${avatarCls} flex items-center justify-center text-xs font-bold shadow-sm`}>
             {initials}
           </div>

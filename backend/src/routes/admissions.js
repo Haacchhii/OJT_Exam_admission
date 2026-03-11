@@ -25,6 +25,9 @@ router.post('/',     authorize('applicant'), validate(createAdmissionSchema), ct
 // Documents upload — ownership checked in controller
 router.post('/:id/documents', authorize('administrator', 'registrar', 'applicant'), upload.array('documents', 10), verifyMime, ctrl.uploadDocuments);
 
+// Document download — ownership checked in controller
+router.get('/:id/documents/:docId/download', ctrl.downloadDocument);
+
 // Bulk operations (MUST come before /:id to avoid param capture)
 router.patch('/bulk-status',  authorize('administrator', 'registrar'), validate(bulkUpdateStatusSchema), ctrl.bulkUpdateStatus);
 router.post('/bulk-delete',   authorize('administrator', 'registrar'), validate(bulkDeleteSchema), ctrl.bulkDeleteAdmissions);

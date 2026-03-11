@@ -25,6 +25,7 @@ export default function EmployeeResults() {
   const [essayStatusFilter, setEssayStatusFilter] = useState('all');
   const [scoreModal, setScoreModal] = useState(null);
   const [scoreVal, setScoreVal] = useState('');
+  const [commentVal, setCommentVal] = useState('');
   const [saving, setSaving] = useState(false);
   const [resultsPage, setResultsPage] = useState(1);
 
@@ -104,7 +105,7 @@ export default function EmployeeResults() {
     if (s > scoreModal.maxPoints) { showToast(`Score cannot exceed ${scoreModal.maxPoints} points.`, 'error'); return; }
     setSaving(true);
     try {
-      await scoreEssay(scoreModal.id, s);
+      await scoreEssay(scoreModal.id, s, commentVal.trim() || undefined);
       showToast('Essay scored!', 'success');
       setScoreModal(null);
       refetch();
@@ -257,7 +258,7 @@ export default function EmployeeResults() {
             <div className="space-y-4">
               {pending.length > 0 && <h3 className="font-bold text-forest-500 text-lg flex items-center gap-1.5"><Icon name="clock" className="w-5 h-5" /> Pending Review ({pending.length})</h3>}
               {pending.map(e => (
-                <EssayCard key={e.id} essay={e} student={getStudentName(e.registrationId)} question={getQuestionText(e.questionId)} status="pending" onScore={() => { setScoreModal(e); setScoreVal(''); }} />
+                <EssayCard key={e.id} essay={e} student={getStudentName(e.registrationId)} question={getQuestionText(e.questionId)} status="pending" onScore={() => { setScoreModal(e); setScoreVal(''); setCommentVal(''); }} />
               ))}
               {scored.length > 0 && <h3 className="font-bold text-forest-500 text-lg mt-6 flex items-center gap-1.5"><Icon name="checkCircle" className="w-5 h-5" /> Scored ({scored.length})</h3>}
               {scored.map(e => (
@@ -278,6 +279,10 @@ export default function EmployeeResults() {
               <label className="text-sm font-medium text-gray-700">Points Awarded</label>
               <input type="number" value={scoreVal} onChange={e => setScoreVal(e.target.value)} min={0} max={scoreModal.maxPoints} className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none" />
               <span className="text-gray-500 text-sm">/ {scoreModal.maxPoints} pts</span>
+            </div>
+            <div className="mb-4">
+              <label className="text-sm font-medium text-gray-700 block mb-1">Feedback / Comment <span className="text-gray-400 font-normal">(optional)</span></label>
+              <textarea value={commentVal} onChange={e => setCommentVal(e.target.value)} rows={3} placeholder="Add feedback for the student…" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm resize-none" />
             </div>
             <div className="flex gap-3">
               <button onClick={handleScore} disabled={saving} className="bg-forest-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-forest-600 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5">{saving ? <><Icon name="spinner" className="w-4 h-4 animate-spin" /> Saving…</> : 'Save Score'}</button>
@@ -310,6 +315,12 @@ function EssayCard({ essay, student, question, status, onScore }) {
       </div>
       {status === 'pending' && onScore && (
         <button onClick={onScore} className="bg-forest-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-forest-600">Score This Answer</button>
+      )}
+      {status === 'scored' && essay.comment && (
+        <div className="mt-2">
+          <span className="text-xs text-gray-400 uppercase font-semibold">Feedback</span>
+          <div className="bg-gold-50 border border-gold-200 rounded-lg p-3 text-sm text-gray-700 leading-relaxed mt-1">{essay.comment}</div>
+        </div>
       )}
     </div>
   );

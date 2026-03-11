@@ -77,7 +77,7 @@ export interface Admission {
   submittedAt: string;
   updatedAt: string;
   documents: string[];
-  documentFiles: { name: string; filePath: string | null }[];
+  documentFiles: { id: number; name: string; filePath: string | null }[];
   academicYear: { id: number; year: string } | null;
   semester: { id: number; name: string } | null;
 }
@@ -172,6 +172,7 @@ export interface EssayAnswer {
   essayResponse: string;
   pointsAwarded: number | null;
   maxPoints: number;
+  comment?: string | null;
   scored: boolean;
   scoredById: number | null;
   scoredAt: string | null;

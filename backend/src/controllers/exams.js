@@ -449,6 +449,22 @@ export async function createRegistration(req, res, next) {
 
     res.status(201).json(registration);
 
+    // Fire-and-forget in-app notification for exam booking
+    prisma.examSchedule.findUnique({
+      where: { id: scheduleId },
+      include: { exam: { select: { title: true } } },
+    }).then(sched => {
+      if (!sched) return;
+      prisma.notification.create({
+        data: {
+          userId: req.user.id,
+          type: 'exam',
+          title: 'Exam Registration Confirmed',
+          message: `You have been registered for "${sched.exam?.title || 'Entrance Exam'}" (Tracking ID: ${registration.trackingId}).`,
+        },
+      }).catch(() => {});
+    }).catch(() => {});
+
     // Fire-and-forget booking confirmation email
     prisma.user.findUnique({ where: { id: req.user.id }, select: { firstName: true, email: true } })
       .then(async (student) => {

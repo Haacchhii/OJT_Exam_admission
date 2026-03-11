@@ -1,9 +1,11 @@
 import prisma from '../config/db.js';
+import path from 'path';
 import { paginate, paginatedResponse } from '../utils/pagination.js';
 import { VALID_TRANSITIONS } from '../utils/constants.js';
 import { generateTrackingId, generateStudentNumber } from '../utils/tracking.js';
 import { logAudit } from '../utils/auditLog.js';
 import { sendAdmissionSubmittedEmail, sendAdmissionStatusEmail } from '../utils/email.js';
+import env from '../config/env.js';
 
 // Helper: shape admission for API response (include document names and file paths)
 function shapeAdmission(adm) {
@@ -12,7 +14,7 @@ function shapeAdmission(adm) {
   return {
     ...rest,
     documents: docs ? docs.map(d => d.documentName) : [],
-    documentFiles: docs ? docs.map(d => ({ name: d.documentName, filePath: d.filePath })) : [],
+    documentFiles: docs ? docs.map(d => ({ id: d.id, name: d.documentName, filePath: d.filePath })) : [],
     academicYear: academicYear ? { id: academicYear.id, year: academicYear.year } : null,
     semester: semester ? { id: semester.id, name: semester.name } : null,
   };
@@ -139,14 +141,34 @@ export async function createAdmission(req, res, next) {
         ...(academicYearId && { academicYearId: Number(academicYearId) }),
         ...(semesterId && { semesterId: Number(semesterId) }),
         status: 'Submitted',
-        documents: docNames?.length ? {
-          create: docNames.map(name => ({ documentName: name })),
-        } : undefined,
       },
       include: { documents: true, academicYear: true, semester: true },
     });
 
     logAudit({ userId: req.user.id, action: 'admission.create', entity: 'admission', entityId: admission.id, details: { trackingId, gradeLevel, applicantType: applicantType || 'New' }, ipAddress: req.ip });
+
+    // Notify the applicant about their submission
+    prisma.notification.create({
+      data: {
+        userId: req.user.id,
+        type: 'admission',
+        title: 'Application Submitted',
+        message: `Your admission application (${trackingId}) for ${gradeLevel} has been submitted successfully and is now under review.`,
+      },
+    }).catch(() => {});
+
+    // Notify employees about new application
+    prisma.user.findMany({ where: { role: { in: ['administrator', 'registrar'] } }, select: { id: true } })
+      .then(staff => {
+        if (staff.length) {
+          return prisma.notification.createMany({
+            data: staff.map(s => ({
+              userId: s.id, type: 'admission', title: 'New Admission Application',
+              message: `${firstName} ${lastName} submitted an admission application for ${gradeLevel}. Tracking ID: ${trackingId}`,
+            })),
+          });
+        }
+      }).catch(() => {});
 
     // Fire-and-forget confirmation email to the applicant
     sendAdmissionSubmittedEmail({ to: email, firstName, trackingId, gradeLevel });
@@ -410,5 +432,33 @@ export async function bulkDeleteAdmissions(req, res, next) {
     logAudit({ userId: req.user.id, action: 'admission.bulkDelete', entity: 'admission', details: { count: ids.length, ids }, ipAddress: req.ip });
 
     res.json({ deleted: ids.length });
+  } catch (err) { next(err); }
+}
+
+// GET /api/admissions/:id/documents/:docId/download
+export async function downloadDocument(req, res, next) {
+  try {
+    const admissionId = Number(req.params.id);
+    const docId = Number(req.params.docId);
+
+    const doc = await prisma.admissionDocument.findUnique({ where: { id: docId } });
+    if (!doc || doc.admissionId !== admissionId) {
+      return res.status(404).json({ error: 'Document not found', code: 'NOT_FOUND' });
+    }
+
+    // Ownership check
+    if (req.user.role === 'applicant') {
+      const admission = await prisma.admission.findUnique({ where: { id: admissionId } });
+      if (!admission || admission.userId !== req.user.id) {
+        return res.status(403).json({ error: 'Access denied', code: 'FORBIDDEN' });
+      }
+    }
+
+    if (!doc.filePath) {
+      return res.status(404).json({ error: 'File not available', code: 'NOT_FOUND' });
+    }
+
+    const filePath = path.resolve(env.UPLOAD_DIR, doc.filePath);
+    res.download(filePath, doc.documentName);
   } catch (err) { next(err); }
 }

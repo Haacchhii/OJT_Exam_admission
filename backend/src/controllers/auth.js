@@ -178,3 +178,46 @@ export async function resetPassword(req, res, next) {
     res.json({ ok: true, message: 'Password updated successfully.' });
   } catch (err) { next(err); }
 }
+
+// PATCH /api/auth/profile — update authenticated user's profile
+export async function updateProfile(req, res, next) {
+  try {
+    const { firstName, lastName, currentPassword, newPassword } = req.body;
+    const userId = req.user.id;
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return res.status(404).json({ error: 'User not found', code: 'NOT_FOUND' });
+
+    const data = {};
+    if (firstName !== undefined) data.firstName = firstName.trim();
+    if (lastName !== undefined) data.lastName = lastName.trim();
+
+    // Password change requires current password verification
+    if (newPassword) {
+      if (!currentPassword) {
+        return res.status(400).json({ error: 'Current password is required to set a new password', code: 'VALIDATION_ERROR' });
+      }
+      const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+      if (!valid) {
+        return res.status(400).json({ error: 'Current password is incorrect', code: 'VALIDATION_ERROR' });
+      }
+      const pwErr = validatePassword(newPassword);
+      if (pwErr) {
+        return res.status(400).json({ error: pwErr, code: 'VALIDATION_ERROR' });
+      }
+      data.passwordHash = await bcrypt.hash(newPassword, 12);
+    }
+
+    if (Object.keys(data).length === 0) {
+      return res.status(400).json({ error: 'No fields to update', code: 'VALIDATION_ERROR' });
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data,
+      include: { applicantProfile: true, staffProfile: true },
+    });
+
+    res.json(safeUser(updated));
+  } catch (err) { next(err); }
+}

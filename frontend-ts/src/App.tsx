@@ -32,6 +32,7 @@ const EmployeeReports = lazy(() => import('./pages/employee/Reports'));
 const EmployeeUsers = lazy(() => import('./pages/employee/Users'));
 const EmployeeAuditLog = lazy(() => import('./pages/employee/AuditLog'));
 const EmployeeSettings = lazy(() => import('./pages/employee/Settings'));
+const Profile = lazy(() => import('./pages/shared/Profile'));
 
 /* Route guard: redirects to /employee if user doesn't have permission for the page */
 function RoleGuard({ page, children }: { page: Permission; children: ReactNode }) {
@@ -73,6 +74,7 @@ export default function App() {
             <Route path="admission" element={<PageErrorBoundary pageName="Admission"><StudentAdmission /></PageErrorBoundary>} />
             <Route path="exam" element={<PageErrorBoundary pageName="Exam"><StudentExam /></PageErrorBoundary>} />
             <Route path="results" element={<PageErrorBoundary pageName="Results"><StudentResults /></PageErrorBoundary>} />
+            <Route path="profile" element={<PageErrorBoundary pageName="Profile"><Profile /></PageErrorBoundary>} />
           </Route>
 
           {/* Employee routes */}
@@ -86,6 +88,7 @@ export default function App() {
             <Route path="users" element={<RoleGuard page="users"><PageErrorBoundary pageName="Users"><EmployeeUsers /></PageErrorBoundary></RoleGuard>} />
             <Route path="audit" element={<RoleGuard page="audit"><PageErrorBoundary pageName="Audit Log"><EmployeeAuditLog /></PageErrorBoundary></RoleGuard>} />
             <Route path="settings" element={<RoleGuard page="settings"><PageErrorBoundary pageName="Settings"><EmployeeSettings /></PageErrorBoundary></RoleGuard>} />
+            <Route path="profile" element={<PageErrorBoundary pageName="Profile"><Profile /></PageErrorBoundary>} />
           </Route>
 
           {/* Root redirect */}

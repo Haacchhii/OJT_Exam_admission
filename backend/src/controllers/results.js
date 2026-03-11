@@ -114,7 +114,19 @@ export async function getSubmittedAnswers(req, res, next) {
         selectedChoice: true,
       },
     });
-    res.json(answers);
+    // Attach essay scoring data (comment, pointsAwarded) from EssayAnswer records
+    const essayRecords = await prisma.essayAnswer.findMany({
+      where: { registrationId: regId },
+    });
+    const essayMap = new Map(essayRecords.map(e => [e.questionId, e]));
+    const enriched = answers.map(a => {
+      const essay = essayMap.get(a.questionId);
+      if (essay) {
+        return { ...a, pointsAwarded: essay.pointsAwarded, essayComment: essay.comment };
+      }
+      return a;
+    });
+    res.json(enriched);
   } catch (err) { next(err); }
 }
 
@@ -306,7 +318,7 @@ export async function getEssayAnswers(req, res, next) {
 export async function scoreEssay(req, res, next) {
   try {
     const id = Number(req.params.id);
-    const { points } = req.body;
+    const { points, comment } = req.body;
     if (points == null) {
       return res.status(400).json({ error: 'points is required', code: 'VALIDATION_ERROR' });
     }
@@ -321,6 +333,7 @@ export async function scoreEssay(req, res, next) {
       where: { id },
       data: {
         pointsAwarded: clampedPoints,
+        comment: comment ?? null,
         scored: true,
         scoredById: req.user.id,
         scoredAt: new Date(),
@@ -410,6 +423,6 @@ export async function scoreEssay(req, res, next) {
 
     res.json(updated);
 
-    logAudit({ userId: req.user.id, action: 'essay.score', entity: 'result', entityId: id, details: { points: clampedPoints, maxPoints: essay.maxPoints, allScored }, ipAddress: req.ip });
+    logAudit({ userId: req.user.id, action: 'essay.score', entity: 'result', entityId: id, details: { points: clampedPoints, maxPoints: essay.maxPoints, comment: comment || null, allScored }, ipAddress: req.ip });
   } catch (err) { next(err); }
 }

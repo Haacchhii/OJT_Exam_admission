@@ -11,5 +11,6 @@ router.post('/register',        validate(registerSchema), ctrl.register);
 router.post('/forgot-password',  validate(forgotPasswordSchema), ctrl.forgotPassword);
 router.post('/reset-password',   validate(resetPasswordSchema), ctrl.resetPassword);
 router.get('/me',               authenticate, ctrl.getMe);
+router.patch('/profile',        authenticate, ctrl.updateProfile);
 
 export default router;

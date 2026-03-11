@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect, type ReactNode, type ChangeE
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useAsync } from '../../hooks/useAsync';
-import { getMyAdmission, addAdmission, uploadAdmissionDocuments } from '../../api/admissions';
+import { getMyAdmission, addAdmission, uploadAdmissionDocuments, getDocumentDownloadUrl } from '../../api/admissions';
 import { getMyRegistrations } from '../../api/exams';
 import { getMyResult } from '../../api/results';
 import { showToast } from '../../components/Toast';
@@ -261,7 +261,29 @@ export default function StudentAdmission() {
             <Detail label="Applicant Type" value={(existingApp as any).applicantType || 'New'} />
             <Detail label="Status"><Badge className={badgeClass(existingApp.status)}>{existingApp.status}</Badge></Detail>
             <Detail label="Submitted" value={formatDate(existingApp.submittedAt)} />
-            <Detail label="Documents" value={existingApp.documents.join(', ') || 'None'} />
+            <Detail label="Documents">
+              {existingApp.documentFiles?.length > 0 ? (
+                <ul className="space-y-1">
+                  {existingApp.documentFiles.map((df) => (
+                    <li key={df.id} className="flex items-center gap-2">
+                      <Icon name="documentText" className="w-4 h-4 text-forest-500 flex-shrink-0" />
+                      {df.filePath ? (
+                        <a
+                          href={getDocumentDownloadUrl(existingApp.id, df.id)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-forest-600 hover:text-forest-800 underline"
+                        >{df.name}</a>
+                      ) : (
+                        <span className="text-sm text-gray-600">{df.name}</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <span className="text-sm text-gray-500">{existingApp.documents.join(', ') || 'None'}</span>
+              )}
+            </Detail>
             {(existingApp as any).notes && <div className="md:col-span-2"><Detail label="Notes from Registrar" value={(existingApp as any).notes} /></div>}
           </div>
           {existingApp.status === 'Rejected' ? (

@@ -65,6 +65,7 @@ export default function EmployeeExams() {
 function ExamsList({ onEdit }: { onEdit: (exam: Exam) => void }) {
   const confirm = useConfirm();
   const [detailId, setDetailId] = useState<number | null>(null);
+  const [previewExam, setPreviewExam] = useState<Exam | null>(null);
   const [searchExam, setSearchExam] = useState('');
   const [gradeFilterExam, setGradeFilterExam] = useState('all');
   const [statusFilterExam, setStatusFilterExam] = useState('all');
@@ -190,6 +191,7 @@ function ExamsList({ onEdit }: { onEdit: (exam: Exam) => void }) {
               <Badge className={exam.isActive ? 'bg-forest-100 text-forest-700' : 'bg-gray-100 text-gray-500'}>{exam.isActive ? 'Active' : 'Inactive'}</Badge>
             </div>
             <div className="flex gap-2">
+              <button onClick={() => setPreviewExam(exam)} className="border border-forest-300 text-forest-600 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-forest-50 inline-flex items-center gap-1"><Icon name="eye" className="w-3.5 h-3.5" /> Preview</button>
               <button onClick={() => onEdit(exam)} className="bg-forest-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-forest-600 inline-flex items-center gap-1"><Icon name="edit" className="w-3.5 h-3.5" /> Edit</button>
               <button onClick={async () => { const action = exam.isActive ? 'Deactivate' : 'Activate'; const ok = await confirm({ title: `${action} Exam`, message: `Are you sure you want to ${action.toLowerCase()} "${exam.title}"?`, confirmLabel: action, variant: exam.isActive ? 'danger' : 'info' }); if (!ok) return; try { await updateExam(exam.id, { isActive: !exam.isActive }); showToast(`Exam ${action.toLowerCase()}d!`, 'success'); refetch(); } catch { showToast('Failed to update exam.', 'error'); } }} className="border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-sm hover:bg-gray-50">{exam.isActive ? 'Deactivate' : 'Activate'}</button>
             </div>
@@ -238,6 +240,7 @@ function ExamsList({ onEdit }: { onEdit: (exam: Exam) => void }) {
             <p className="text-gray-400 text-center py-6">No students registered for this exam yet.</p>
           )}
         </div>
+        <ExamPreviewModal exam={previewExam} onClose={() => setPreviewExam(null)} />
       </div>
     );
   }
@@ -355,6 +358,57 @@ function ExamsList({ onEdit }: { onEdit: (exam: Exam) => void }) {
         )}
       </div>
     </div>
+  );
+}
+
+/* ===== Exam Preview Modal ===== */
+function ExamPreviewModal({ exam, onClose }: { exam: Exam | null; onClose: () => void }) {
+  return (
+    <Modal open={!!exam} onClose={onClose}>
+      {exam && (
+        <div className="max-h-[70vh] overflow-y-auto">
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <h3 className="text-lg font-bold text-forest-500">{exam.title}</h3>
+              <p className="text-sm text-gray-500">Grade {exam.gradeLevel} • {exam.durationMinutes} minutes • {exam.questions.length} questions</p>
+            </div>
+            <Badge className="bg-gold-100 text-gold-700">Preview Mode</Badge>
+          </div>
+          <div className="space-y-4">
+            {exam.questions
+              .slice()
+              .sort((a: ExamQuestion, b: ExamQuestion) => a.orderNum - b.orderNum)
+              .map((q: ExamQuestion, i: number) => (
+              <div key={q.id} className={`rounded-lg p-4 border ${q.questionType === 'essay' ? 'border-gold-200 bg-gold-50/30' : 'border-gray-200 bg-gray-50/30'}`}>
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-xs font-bold text-gray-400">Question {i + 1}</span>
+                  <span className="text-xs text-gray-400">{q.points} pts • {q.questionType === 'mc' ? 'Multiple Choice' : 'Essay'}</span>
+                </div>
+                <p className="text-sm font-medium text-gray-800 mb-3">{q.questionText}</p>
+                {q.questionType === 'mc' && q.choices && (
+                  <div className="space-y-2">
+                    {q.choices
+                      .slice()
+                      .sort((a: QuestionChoice, b: QuestionChoice) => a.orderNum - b.orderNum)
+                      .map((c: QuestionChoice, ci: number) => (
+                      <div key={c.id} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm">
+                        <span className="w-5 h-5 rounded-full border-2 border-gray-300 flex-shrink-0" />
+                        <span>{String.fromCharCode(65 + ci)}. {c.choiceText}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {q.questionType === 'essay' && (
+                  <div className="border border-dashed border-gray-300 rounded-lg p-3 text-sm text-gray-400 italic bg-white">
+                    Student will type their answer here…
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </Modal>
   );
 }
 

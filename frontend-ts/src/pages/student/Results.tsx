@@ -16,6 +16,7 @@ interface EssayAnswer {
   maxPoints: number;
   scored: boolean;
   pointsAwarded: number | null;
+  comment?: string | null;
 }
 
 interface ResultsData {
@@ -55,13 +56,14 @@ export default function StudentResults() {
     }
     const essayAnswers: EssayAnswer[] = storedAnswers
       .filter((a: SubmittedAnswer) => a.question?.questionType === 'essay')
-      .map((a: SubmittedAnswer) => ({
+      .map((a: SubmittedAnswer & { essayComment?: string | null }) => ({
         registrationId: a.registrationId,
         questionId: a.questionId,
         essayResponse: a.essayText || '',
         maxPoints: a.question?.points || 0,
         scored: a.pointsAwarded != null,
         pointsAwarded: a.pointsAwarded ?? null,
+        comment: a.essayComment ?? null,
       }));
     return { myResult, myReg, exam, essayAnswers, storedAnswers };
   }, [user]);
@@ -221,6 +223,12 @@ export default function StudentResults() {
                       <p className="text-xs text-gray-400 mb-1 font-medium">Your Answer:</p>
                       <p className="text-gray-700 text-sm whitespace-pre-wrap">{essay?.essayResponse || 'No response submitted.'}</p>
                     </div>
+                    {essay?.scored && essay.comment && (
+                      <div className="bg-gold-50 border border-gold-200 rounded-lg p-3 mt-2">
+                        <p className="text-xs text-gray-400 mb-1 font-medium">Teacher Feedback:</p>
+                        <p className="text-gray-700 text-sm whitespace-pre-wrap">{essay.comment}</p>
+                      </div>
+                    )}
                   </div>
                 );
               }

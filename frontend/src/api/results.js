@@ -21,8 +21,8 @@ export async function getEssayAnswers(params) {
   return client.get(`/results/essays${qs(params)}`);
 }
 
-export async function scoreEssay(answerId, points) {
-  return client.patch(`/results/essays/${answerId}/score`, { points });
+export async function scoreEssay(answerId, points, comment) {
+  return client.patch(`/results/essays/${answerId}/score`, { points, comment });
 }
 
 export async function getSubmittedAnswers(registrationId) {

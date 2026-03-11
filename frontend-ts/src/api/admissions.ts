@@ -57,3 +57,8 @@ export async function getStats(params?: Record<string, unknown>) {
 export async function trackApplication(trackingId: string) {
   return client.get<{ type: string; trackingId: string; data: Record<string, any> }>(`/admissions/track/${encodeURIComponent(trackingId)}`);
 }
+
+export function getDocumentDownloadUrl(admissionId: number, docId: number): string {
+  const base = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
+  return `${base}/admissions/${admissionId}/documents/${docId}/download`;
+}
