@@ -52,6 +52,17 @@ export default function Topbar({ title, onMenuToggle, userId, user }: TopbarProp
     return map[type || ''] || 'bell';
   };
 
+  const notifLink = (type?: string): string | null => {
+    const base = isEmployee ? '/employee' : '/student';
+    const map: Record<string, string> = {
+      admission: `${base}/${isEmployee ? 'admissions' : 'admission'}`,
+      exam: `${base}/exam${isEmployee ? 's' : ''}`,
+      scoring: `${base}/results`,
+      status: `${base}/${isEmployee ? 'admissions' : 'admission'}`,
+    };
+    return map[type || ''] || null;
+  };
+
   return (
     <header className="sticky top-0 z-30 bg-white border-b border-gray-200 px-4 lg:px-8 h-[60px] flex items-center justify-between" role="banner">
       <div className="flex items-center gap-3">
@@ -101,8 +112,8 @@ export default function Topbar({ title, onMenuToggle, userId, user }: TopbarProp
                     role="button"
                     tabIndex={0}
                     aria-label={`${!n.isRead ? 'Unread: ' : ''}${n.title || ''} ${n.message}`}
-                    onClick={async () => { await markNotificationRead(n.id); refresh(); }}
-                    onKeyDown={async (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); await markNotificationRead(n.id); refresh(); } }}
+                    onClick={async () => { await markNotificationRead(n.id); refresh(); const link = notifLink(n.type); if (link) { setShowNotifs(false); navigate(link); } }}
+                    onKeyDown={async (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); await markNotificationRead(n.id); refresh(); const link = notifLink(n.type); if (link) { setShowNotifs(false); navigate(link); } } }}
                     className={`flex items-start gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50/80 transition-colors ${!n.isRead ? 'bg-forest-50/30' : ''}`}
                   >
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${!n.isRead ? 'bg-forest-100 text-forest-600' : 'bg-gray-100 text-gray-400'}`}>

@@ -315,7 +315,7 @@ function ExamsList({ onEdit }: { onEdit: (exam: Exam) => void }) {
             <Pagination currentPage={examSafePage} totalPages={examTotalPages} onPageChange={setExamPage} totalItems={examTotal} itemsPerPage={EXAMS_PER_PAGE} />
           </>
         ) : (
-          <EmptyState icon="documentText" title="No exams found" text="No exams match your filters." />
+          <EmptyState icon="documentText" title="No exams found" text={searchExam ? `No exams match "${searchExam}"${gradeFilterExam !== 'all' || statusFilterExam !== 'all' ? ' with the selected filters' : ''}.` : 'No exams match your current filters.'} />
         )}
       </div>
 
@@ -354,7 +354,7 @@ function ExamsList({ onEdit }: { onEdit: (exam: Exam) => void }) {
             <Pagination currentPage={readSafePage} totalPages={readTotalPages} onPageChange={setReadPage} totalItems={readTotal} itemsPerPage={READINESS_PER_PAGE} />
           </>
         ) : (
-          <EmptyState icon="clipboard" title="No registrations found" text="No exam registrations match your filters." />
+          <EmptyState icon="clipboard" title="No registrations found" text={readSearch ? `No registrations match "${readSearch}"${readStatusFilter !== 'all' ? ` with status "${readStatusFilter}"` : ''}.` : readStatusFilter !== 'all' ? `No registrations with status "${readStatusFilter}".` : 'No exam registrations match your current filters.'} />
         )}
       </div>
     </div>
@@ -1145,7 +1145,7 @@ function ScheduleManager() {
               </div>
             );
           })}
-          {paginatedScheds.length === 0 && <EmptyState icon="calendar" title="No schedules" text="No schedules match your filters." />}
+          {paginatedScheds.length === 0 && <EmptyState icon="calendar" title="No schedules" text={schedSearch ? `No schedules match "${schedSearch}"${schedExamFilter !== 'all' ? ' for the selected exam' : ''}.` : schedExamFilter !== 'all' ? 'No schedules for the selected exam.' : 'No schedules match your current filters.'} />}
         </div>
         <Pagination currentPage={schedSafePage} totalPages={schedTotalPages} onPageChange={setSchedPage} totalItems={schedTotal} itemsPerPage={SCHED_PER_PAGE} />
       </div>

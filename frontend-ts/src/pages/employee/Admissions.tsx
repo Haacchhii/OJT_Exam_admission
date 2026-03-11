@@ -318,8 +318,12 @@ export default function EmployeeAdmissions() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Update Status</label>
               <select value={statusVal} onChange={e => setStatusVal(e.target.value)} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white">
-                {ADMISSION_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                <option value={adm.status}>{adm.status} (current)</option>
+                {(VALID_TRANSITIONS[adm.status] || []).map(s => <option key={s} value={s}>{s}</option>)}
               </select>
+              {(VALID_TRANSITIONS[adm.status] || []).length === 0 && (
+                <p className="text-xs text-gray-400 mt-1">No further transitions available for this status.</p>
+              )}
             </div>
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">Notes / Remarks</label>
@@ -389,7 +393,7 @@ export default function EmployeeAdmissions() {
       </div>
 
       {/* Bulk action bar */}
-      {selected.size > 0 && (
+      {selected.size > 0 ? (
         <div className="flex items-center gap-3 mb-4 bg-forest-50 border border-forest-200 rounded-lg px-4 py-3 animate-[fadeInUp_0.2s_ease-out]">
           <span className="text-sm font-semibold text-forest-700">{selected.size} selected</span>
           <select value={bulkStatus} onChange={e => setBulkStatus(e.target.value)} className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-forest-500/20 outline-none">
@@ -398,6 +402,11 @@ export default function EmployeeAdmissions() {
           <button onClick={handleBulkAction} disabled={saving} className="bg-forest-500 text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-forest-600 transition disabled:opacity-50 disabled:cursor-not-allowed">{saving ? 'Applying…' : 'Apply Status'}</button>
           <button onClick={handleBulkDelete} disabled={bulkDeleting} className="bg-red-600 text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"><Icon name="trash" className="w-3.5 h-3.5" />{bulkDeleting ? 'Deleting…' : 'Delete Selected'}</button>
           <button onClick={() => setSelected(new Set())} className="text-gray-500 text-sm hover:underline ml-auto">Clear selection</button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 mb-4 text-xs text-gray-400">
+          <Icon name="info" className="w-3.5 h-3.5" />
+          <span>Use checkboxes to select multiple applications for bulk status changes or deletion.</span>
         </div>
       )}
 
@@ -435,7 +444,7 @@ export default function EmployeeAdmissions() {
             <Pagination currentPage={safePage} totalPages={totalPages} onPageChange={setPage} totalItems={totalItems} itemsPerPage={PER_PAGE} />
           </>
         ) : (
-          <EmptyState icon="inbox" title="No applications found" text="No admission applications match your current filters." />
+          <EmptyState icon="inbox" title="No applications found" text={search ? `No applications match "${search}"${filter !== 'all' ? ` with status "${filter}"` : ''}.` : filter !== 'all' ? `No applications with status "${filter}".` : 'No admission applications match your current filters.'} />
         )}
       </div>
     </div>

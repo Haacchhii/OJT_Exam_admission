@@ -96,14 +96,20 @@ export default function StudentExam() {
             Total Questions: <strong>{currentExam.questions.length}</strong><br />
             Passing Score: <strong>{currentExam.passingScore}%</strong>
           </p>
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-left mb-4">
+            <h4 className="font-bold text-red-600 mb-2 flex items-center gap-2"><Icon name="exclamation" className="w-5 h-5" /> Critical Rules — Read Before Starting</h4>
+            <ul className="text-red-700 text-sm space-y-1.5 list-disc pl-5">
+              <li><strong>After 3 tab switches, the exam will be automatically submitted.</strong> Do not switch tabs or apps.</li>
+              <li><strong>The exam will auto-submit when the timer reaches zero.</strong> Monitor your time.</li>
+              <li>Right-click and copy/paste are disabled during the exam.</li>
+            </ul>
+          </div>
           <div className="bg-gold-50 border border-gold-200 rounded-lg p-4 text-left mb-6">
-            <h4 className="font-bold text-forest-500 mb-2 flex items-center gap-2"><Icon name="exclamation" className="w-5 h-5 text-gold-500" /> Important Rules</h4>
+            <h4 className="font-bold text-forest-500 mb-2 flex items-center gap-2"><Icon name="info" className="w-5 h-5 text-gold-500" /> Reminders</h4>
             <ul className="text-gray-600 text-sm space-y-1 list-disc pl-5">
-              <li>Do not switch tabs or leave this window during the exam.</li>
-              <li>Right-click and copy/paste are disabled.</li>
-              <li>The exam will auto-submit when the timer reaches zero.</li>
-              <li>After 3 tab switches, the exam will be automatically submitted.</li>
               <li>Ensure a stable internet connection before starting.</li>
+              <li>You cannot pause or restart the exam once it begins.</li>
+              <li>Your answers are saved automatically as you go.</li>
             </ul>
           </div>
           <button onClick={handleStartExam} disabled={startingExam} className="bg-gradient-to-r from-forest-500 to-forest-400 text-white px-8 py-3 rounded-lg font-semibold text-lg hover:from-gold-500 hover:to-gold-600 shadow-md inline-flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed">

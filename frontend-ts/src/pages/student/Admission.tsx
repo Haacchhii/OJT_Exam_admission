@@ -56,7 +56,9 @@ interface GateData {
 }
 
 export default function StudentAdmission() {
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(() => {
+    try { const s = localStorage.getItem('gk_admission_step'); return s ? Math.min(Math.max(parseInt(s), 1), 4) : 1; } catch { return 1; }
+  });
   const [showWizard, setShowWizard] = useState(true);
   const [successOpen, setSuccessOpen] = useState(false);
   const [submittedTrackingId, setSubmittedTrackingId] = useState('');
@@ -146,6 +148,7 @@ export default function StudentAdmission() {
       }
     }
     setStep(n);
+    try { localStorage.setItem('gk_admission_step', String(n)); } catch { /* ignore */ }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -174,6 +177,7 @@ export default function StudentAdmission() {
       }
       if (result?.trackingId) setSubmittedTrackingId(result.trackingId);
       clear();
+      try { localStorage.removeItem('gk_admission_step'); } catch { /* ignore */ }
       refetch();
       setSuccessOpen(true);
     } catch (err: unknown) {
@@ -314,6 +318,25 @@ export default function StudentAdmission() {
       </div>
 
       <p className="text-sm text-gold-600 bg-gold-50 border border-gold-200 rounded-lg px-4 py-2 mb-6 flex items-center gap-2"><Icon name="info" className="w-4 h-4 shrink-0" /> Parents or guardians may fill out this form on behalf of their child.</p>
+
+      {/* Auto-save indicator */}
+      {isDirty && (
+        <div className="flex items-center gap-2 text-xs text-gray-400 mb-4">
+          <Icon name="checkCircle" className="w-3.5 h-3.5 text-forest-400" />
+          <span>Your progress is automatically saved. You can safely close and return later.</span>
+        </div>
+      )}
+
+      {/* Progress bar */}
+      <div className="mb-2">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-sm font-medium text-gray-700">Step {step} of {steps.length}</span>
+          <span className="text-sm font-medium text-forest-600">{Math.round(((step - 1) / (steps.length - 1)) * 100)}% complete</span>
+        </div>
+        <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+          <div className="h-full bg-forest-500 rounded-full transition-all duration-300" style={{ width: `${((step - 1) / (steps.length - 1)) * 100}%` }} />
+        </div>
+      </div>
 
       <div className="flex items-center justify-center gap-1 mb-8 flex-wrap">
         {steps.map((label, i) => (

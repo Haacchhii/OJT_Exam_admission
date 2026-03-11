@@ -23,20 +23,26 @@ export function useUnsavedChanges(
     return () => window.removeEventListener('beforeunload', handler);
   }, []);
 
+  // Save to localStorage (persists across browser close, reload, connection loss)
   useEffect(() => {
     if (!storageKey || !formState) return;
     const timer = setTimeout(() => {
       if (dirtyRef.current) {
-        sessionStorage.setItem(storageKey, JSON.stringify(formState));
+        try { localStorage.setItem(storageKey, JSON.stringify(formState)); } catch { /* quota exceeded */ }
       }
-    }, 1000);
+    }, 800);
     return () => clearTimeout(timer);
   }, [storageKey, formState]);
 
   const restore = useCallback((): Record<string, unknown> | null => {
     if (!storageKey) return null;
     try {
-      const raw = sessionStorage.getItem(storageKey);
+      // Try localStorage first (persistent), fall back to sessionStorage (legacy)
+      const raw = localStorage.getItem(storageKey) || sessionStorage.getItem(storageKey);
+      if (raw) {
+        // Migrate from sessionStorage to localStorage
+        sessionStorage.removeItem(storageKey);
+      }
       return raw ? (JSON.parse(raw) as Record<string, unknown>) : null;
     } catch {
       return null;
@@ -44,7 +50,10 @@ export function useUnsavedChanges(
   }, [storageKey]);
 
   const clear = useCallback(() => {
-    if (storageKey) sessionStorage.removeItem(storageKey);
+    if (storageKey) {
+      localStorage.removeItem(storageKey);
+      sessionStorage.removeItem(storageKey);
+    }
   }, [storageKey]);
 
   return { restore, clear };
