@@ -7,8 +7,13 @@ import { validate, validateQuery } from '../middleware/validate.js';
 import { createAdmissionSchema, updateStatusSchema, bulkUpdateStatusSchema, bulkDeleteSchema, admissionsQuerySchema, admissionsStatsQuerySchema } from '../utils/schemas.js';
 import { writeLimiter } from '../middleware/rateLimits.js';
 import * as ctrl from '../controllers/admissions.js';
+import { previewDocument, extractDocument } from '../controllers/documentPreview.js';
 
 const router = Router();
+
+// Document preview handles its own auth (supports ?token= for iframe/img src)
+router.get('/:id/documents/:docId/preview', previewDocument);
+
 router.use(authenticate);
 
 // Student scoped
@@ -28,6 +33,9 @@ router.post('/:id/documents', authorize('administrator', 'registrar', 'applicant
 
 // Document download — ownership checked in controller
 router.get('/:id/documents/:docId/download', ctrl.downloadDocument);
+
+// Document OCR / text extraction — ownership checked in controller
+router.post('/:id/documents/:docId/extract', authorize('administrator', 'registrar'), extractDocument);
 
 // Bulk operations (MUST come before /:id to avoid param capture)
 router.patch('/bulk-status',  authorize('administrator', 'registrar'), validate(bulkUpdateStatusSchema), ctrl.bulkUpdateStatus);

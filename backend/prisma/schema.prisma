@@ -76,11 +76,14 @@ model Admission {
 }
 
 model AdmissionDocument {
-  id           Int      @id @default(autoincrement())
-  admissionId  Int      @map("admission_id")
-  documentName String   @map("document_name")
-  filePath     String?  @map("file_path")
-  uploadedAt   DateTime @default(now()) @map("uploaded_at")
+  id            Int       @id @default(autoincrement())
+  admissionId   Int       @map("admission_id")
+  documentName  String    @map("document_name")
+  filePath      String?   @map("file_path")
+  uploadedAt    DateTime  @default(now()) @map("uploaded_at")
+  extractedText String?   @map("extracted_text")
+  extractedData String?   @map("extracted_data") // JSON string of parsed key-value fields
+  extractedAt   DateTime? @map("extracted_at")
 
   admission Admission @relation(fields: [admissionId], references: [id], onDelete: Cascade)
 

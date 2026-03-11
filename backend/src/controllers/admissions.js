@@ -14,7 +14,7 @@ function shapeAdmission(adm) {
   return {
     ...rest,
     documents: docs ? docs.map(d => d.documentName) : [],
-    documentFiles: docs ? docs.map(d => ({ id: d.id, name: d.documentName, filePath: d.filePath })) : [],
+    documentFiles: docs ? docs.map(d => ({ id: d.id, name: d.documentName, filePath: d.filePath, hasExtraction: !!(d.extractedText && d.extractedData) })) : [],
     academicYear: academicYear ? { id: academicYear.id, year: academicYear.year } : null,
     semester: semester ? { id: semester.id, name: semester.name } : null,
   };
