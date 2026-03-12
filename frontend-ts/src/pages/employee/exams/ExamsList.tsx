@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useAsync } from '../../../hooks/useAsync';
-import { getExams, updateExam, deleteExam, bulkDeleteExams, getExamSchedules, getExamRegistrations } from '../../../api/exams';
+import { getExams, getExam, updateExam, deleteExam, bulkDeleteExams, cloneExam, getExamSchedules, getExamRegistrations } from '../../../api/exams';
 import { getAcademicYears, getSemesters } from '../../../api/academicYears';
 import { getExamResults } from '../../../api/results';
 import { getUsers } from '../../../api/users';
@@ -18,7 +18,8 @@ import type { Exam, ExamSchedule, ExamRegistration, ExamResult, User, AcademicYe
 const EXAMS_PER_PAGE = 10;
 const READINESS_PER_PAGE = 10;
 
-export default function ExamsList({ onEdit }: { onEdit: (exam: Exam) => void }) {
+export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void }) {
+  const canManageExams = !!onEdit;
   const confirm = useConfirm();
   const [detailId, setDetailId] = useState<number | null>(null);
   const [previewExam, setPreviewExam] = useState<Exam | null>(null);
@@ -43,6 +44,12 @@ export default function ExamsList({ onEdit }: { onEdit: (exam: Exam) => void }) 
     return { exams: asArray<Exam>(rawExm), schedules: asArray<ExamSchedule>(rawSched), regs: asArray<ExamRegistration>(rawRegs), allUsers: asArray<User>(rawUsers), allResults: asArray<ExamResult>(rawRes) };
   });
 
+  // Fetch full exam (with questions) when viewing detail
+  const { data: fullExam, loading: examDetailLoading } = useAsync<Exam | null>(
+    () => detailId ? getExam(detailId) : Promise.resolve(null),
+    [detailId]
+  );
+
   const { data: academicYears } = useAsync<AcademicYear[]>(() => getAcademicYears());
   const { data: allSemesters } = useAsync<Semester[]>(() => getSemesters());
 
@@ -66,8 +73,8 @@ export default function ExamsList({ onEdit }: { onEdit: (exam: Exam) => void }) 
     }
     if (gradeFilterExam !== 'all') list = list.filter(e => e.gradeLevel === gradeFilterExam);
     if (statusFilterExam !== 'all') list = list.filter(e => (statusFilterExam === 'active') === e.isActive);
-    if (yearFilterExam !== 'all') list = list.filter(e => (e as any).academicYear?.id === Number(yearFilterExam));
-    if (semesterFilterExam !== 'all') list = list.filter(e => (e as any).semester?.id === Number(semesterFilterExam));
+    if (yearFilterExam !== 'all') list = list.filter(e => e.academicYear?.id === Number(yearFilterExam));
+    if (semesterFilterExam !== 'all') list = list.filter(e => e.semester?.id === Number(semesterFilterExam));
     return list;
   }, [exams, searchExam, gradeFilterExam, statusFilterExam, yearFilterExam, semesterFilterExam]);
 
@@ -136,6 +143,7 @@ export default function ExamsList({ onEdit }: { onEdit: (exam: Exam) => void }) 
     const eSched = schedules.filter(s => s.examId === exam.id);
     const eRegs = regs.filter(r => eSched.some(s => s.id === r.scheduleId));
     const completed = eRegs.filter(r => r.status === 'done').length;
+    const detailQuestions = fullExam?.questions || exam.questions;
 
     return (
       <div>
@@ -147,25 +155,31 @@ export default function ExamsList({ onEdit }: { onEdit: (exam: Exam) => void }) 
               <Badge className={exam.isActive ? 'gk-badge gk-badge-active' : 'gk-badge gk-badge-inactive'}>{exam.isActive ? 'Active' : 'Inactive'}</Badge>
             </div>
             <div className="flex gap-2">
-              <button onClick={() => setPreviewExam(exam)} className="border border-forest-300 text-forest-600 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-forest-50 inline-flex items-center gap-1"><Icon name="eye" className="w-3.5 h-3.5" /> Preview</button>
-              <button onClick={() => onEdit(exam)} className="bg-forest-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-forest-600 inline-flex items-center gap-1"><Icon name="edit" className="w-3.5 h-3.5" /> Edit</button>
-              <button onClick={async () => { const action = exam.isActive ? 'Deactivate' : 'Activate'; const ok = await confirm({ title: `${action} Exam`, message: `Are you sure you want to ${action.toLowerCase()} "${exam.title}"?`, confirmLabel: action, variant: exam.isActive ? 'danger' : 'info' }); if (!ok) return; try { await updateExam(exam.id, { isActive: !exam.isActive }); showToast(`Exam ${action.toLowerCase()}d!`, 'success'); refetch(); } catch { showToast('Failed to update exam.', 'error'); } }} className="border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-sm hover:bg-gray-50">{exam.isActive ? 'Deactivate' : 'Activate'}</button>
+              <button onClick={() => setPreviewExam(fullExam || exam)} className="border border-forest-300 text-forest-600 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-forest-50 inline-flex items-center gap-1"><Icon name="eye" className="w-3.5 h-3.5" /> Preview</button>
+              {canManageExams && <>
+                <button onClick={() => onEdit!(fullExam || exam)} className="bg-forest-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-forest-600 inline-flex items-center gap-1"><Icon name="edit" className="w-3.5 h-3.5" /> Edit</button>
+                <button onClick={async () => { const action = exam.isActive ? 'Deactivate' : 'Activate'; const ok = await confirm({ title: `${action} Exam`, message: `Are you sure you want to ${action.toLowerCase()} "${exam.title}"?`, confirmLabel: action, variant: exam.isActive ? 'danger' : 'info' }); if (!ok) return; try { await updateExam(exam.id, { isActive: !exam.isActive }); showToast(`Exam ${action.toLowerCase()}d!`, 'success'); refetch(); } catch { showToast('Failed to update exam.', 'error'); } }} className="border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-sm hover:bg-gray-50">{exam.isActive ? 'Deactivate' : 'Activate'}</button>
+              </>}
             </div>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <DetailField label="Grade Level" v={exam.gradeLevel} /><DetailField label="Duration" v={`${exam.durationMinutes} minutes`} />
-            <DetailField label="Passing Score" v={`${exam.passingScore}%`} /><DetailField label="Questions" v={exam.questions.length} />
+            <DetailField label="Passing Score" v={`${exam.passingScore}%`} /><DetailField label="Questions" v={detailQuestions.length} />
             <DetailField label="Schedules" v={eSched.length} /><DetailField label="Registrations" v={`${eRegs.length} (${completed} completed)`} />
           </div>
         </div>
         <div className="gk-card p-6">
-          <h3 className="text-lg font-bold text-forest-500 mb-4">Questions ({exam.questions.length})</h3>
+          <h3 className="text-lg font-bold text-forest-500 mb-4">Questions ({detailQuestions.length})</h3>
+          {examDetailLoading && !fullExam ? (
+            <p className="text-gray-400 text-center py-6">Loading questions…</p>
+          ) : (
           <div className="space-y-3">
-            {exam.questions.map((q, i) => (
+            {detailQuestions.map((q, i) => (
               <QuestionCard key={q.id} q={q} i={i} />
             ))}
-            {exam.questions.length === 0 && <p className="text-gray-400 text-center py-6">No questions in this exam.</p>}
+            {detailQuestions.length === 0 && <p className="text-gray-400 text-center py-6">No questions in this exam.</p>}
           </div>
+          )}
         </div>
 
         <div className="gk-card p-6 mt-4">
@@ -232,7 +246,7 @@ export default function ExamsList({ onEdit }: { onEdit: (exam: Exam) => void }) 
         </select>
       </div>
 
-      <BulkActionBar count={selectedCount} onDelete={handleBulkDelete} onClear={clearSelection} deleting={bulkDeleting} />
+      {canManageExams && <BulkActionBar count={selectedCount} onDelete={handleBulkDelete} onClear={clearSelection} deleting={bulkDeleting} />}
 
       <div className="gk-card p-4 mb-6">
         {paginatedExams.length > 0 ? (
@@ -240,7 +254,7 @@ export default function ExamsList({ onEdit }: { onEdit: (exam: Exam) => void }) 
             <div className="table-scroll">
               <table className="w-full text-sm">
                 <thead><tr className="border-b border-gray-200 text-left text-gray-400 uppercase text-xs">
-                  <th scope="col" className="py-3 px-2 w-8"><input type="checkbox" checked={isAllSelected(paginatedExams)} onChange={() => togglePage(paginatedExams)} className="accent-forest-500 rounded" aria-label="Select all exams" /></th>
+                  {canManageExams && <th scope="col" className="py-3 px-2 w-8"><input type="checkbox" checked={isAllSelected(paginatedExams)} onChange={() => togglePage(paginatedExams)} className="accent-forest-500 rounded" aria-label="Select all exams" /></th>}
                   <th scope="col" className="py-3 px-2">ID</th><th scope="col" className="py-3 px-2">Title</th><th scope="col" className="py-3 px-2">Grade</th>
                   <th scope="col" className="py-3 px-2">Duration</th><th scope="col" className="py-3 px-2">Questions</th><th scope="col" className="py-3 px-2">Passing</th>
                   <th scope="col" className="py-3 px-2">Status</th><th scope="col" className="py-3 px-2">Actions</th>
@@ -248,7 +262,7 @@ export default function ExamsList({ onEdit }: { onEdit: (exam: Exam) => void }) 
                 <tbody>
                   {paginatedExams.map(e => (
                     <tr key={e.id} className={`border-b border-gray-50 hover:bg-gray-50 ${selected.has(e.id) ? 'bg-gold-50/50' : ''}`}>
-                      <td className="py-3 px-2"><input type="checkbox" checked={selected.has(e.id)} onChange={() => toggle(e.id)} className="accent-forest-500 rounded" aria-label={`Select ${e.title}`} /></td>
+                      {canManageExams && <td className="py-3 px-2"><input type="checkbox" checked={selected.has(e.id)} onChange={() => toggle(e.id)} className="accent-forest-500 rounded" aria-label={`Select ${e.title}`} /></td>}
                       <td className="py-3 px-2 text-gray-400">{e.id}</td>
                       <td className="py-3 px-2 font-medium text-forest-500">{e.title}</td>
                       <td className="py-3 px-2">{e.gradeLevel}</td>
@@ -259,8 +273,11 @@ export default function ExamsList({ onEdit }: { onEdit: (exam: Exam) => void }) 
                       <td className="py-3 px-2">
                         <div className="flex gap-1">
                           <button onClick={() => setDetailId(e.id)} className="text-forest-500 hover:underline text-xs">View</button>
-                          <button onClick={async () => { const action = e.isActive ? 'Deactivate' : 'Activate'; const ok = await confirm({ title: `${action} Exam`, message: `Are you sure you want to ${action.toLowerCase()} "${e.title}"?`, confirmLabel: action, variant: e.isActive ? 'danger' : 'info' }); if (!ok) return; try { await updateExam(e.id, { isActive: !e.isActive }); showToast(`Exam ${action.toLowerCase()}d!`, 'success'); refetch(); } catch { showToast('Failed to update exam.', 'error'); } }} className="text-gray-500 hover:underline text-xs">{e.isActive ? 'Deactivate' : 'Activate'}</button>
-                          <button onClick={async () => { if (await confirm({ title: 'Delete Exam', message: 'Are you sure you want to delete this exam? This cannot be undone.', confirmLabel: 'Delete', variant: 'danger' })) { try { await deleteExam(e.id); refetch(); } catch { showToast('Failed to delete exam.', 'error'); } } }} className="text-red-500 hover:underline text-xs">Delete</button>
+                          {canManageExams && <>
+                            <button onClick={async () => { try { await cloneExam(e.id); showToast('Exam cloned successfully!', 'success'); refetch(); } catch { showToast('Failed to clone exam.', 'error'); } }} className="text-gold-600 hover:underline text-xs">Clone</button>
+                            <button onClick={async () => { const action = e.isActive ? 'Deactivate' : 'Activate'; const ok = await confirm({ title: `${action} Exam`, message: `Are you sure you want to ${action.toLowerCase()} "${e.title}"?`, confirmLabel: action, variant: e.isActive ? 'danger' : 'info' }); if (!ok) return; try { await updateExam(e.id, { isActive: !e.isActive }); showToast(`Exam ${action.toLowerCase()}d!`, 'success'); refetch(); } catch { showToast('Failed to update exam.', 'error'); } }} className="text-gray-500 hover:underline text-xs">{e.isActive ? 'Deactivate' : 'Activate'}</button>
+                            <button onClick={async () => { if (await confirm({ title: 'Delete Exam', message: 'Are you sure you want to delete this exam? This cannot be undone.', confirmLabel: 'Delete', variant: 'danger' })) { try { await deleteExam(e.id); refetch(); } catch { showToast('Failed to delete exam.', 'error'); } } }} className="text-red-500 hover:underline text-xs">Delete</button>
+                          </>}
                         </div>
                       </td>
                     </tr>

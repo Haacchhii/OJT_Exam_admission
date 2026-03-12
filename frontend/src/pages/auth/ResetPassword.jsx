@@ -5,6 +5,7 @@ import { client } from '../../api/client.js';
 import { showToast } from '../../components/Toast.jsx';
 import { getPasswordStrength } from '../../utils/passwordStrength.js';
 import Icon from '../../components/Icons.jsx';
+import { ROLES } from '../../utils/constants.js';
 
 export default function ResetPassword() {
   const { user: authUser } = useAuth();
@@ -31,7 +32,7 @@ export default function ResetPassword() {
     }
   }, [navigate]);
 
-  if (authUser) return <Navigate to={authUser.role === 'applicant' ? '/student' : '/employee'} replace />;
+  if (authUser) return <Navigate to={authUser.role === ROLES.APPLICANT ? '/student' : '/employee'} replace />;
 
   const strength = getPasswordStrength(pw);
 

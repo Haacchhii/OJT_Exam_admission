@@ -5,7 +5,7 @@ import { logAudit } from '../utils/auditLog.js';
 
 // Re-export schedule and registration controllers so routes/exams.js keeps working
 export { getSchedules, getAvailableSchedules, createSchedule, updateSchedule, deleteSchedule } from './examSchedules.js';
-export { getRegistrations, getMyRegistrations, createRegistration, startExam } from './examRegistrations.js';
+export { getRegistrations, getMyRegistrations, createRegistration, startExam, saveDraftAnswers } from './examRegistrations.js';
 
 // ═══════════════════════════════════════════════════════
 // EXAMS CRUD
@@ -71,7 +71,7 @@ export async function getExams(req, res, next) {
     const { search, grade, status, academicYearId, semesterId, page, limit } = req.query;
     const pg = paginate(page, limit);
 
-    const where = {};
+    const where = { deletedAt: null };
     if (grade)          where.gradeLevel = grade;
     if (academicYearId) where.academicYearId = Number(academicYearId);
     if (semesterId)     where.semesterId = Number(semesterId);
@@ -100,7 +100,7 @@ export async function getExams(req, res, next) {
 export async function getExam(req, res, next) {
   try {
     const exam = await prisma.exam.findUnique({ where: { id: Number(req.params.id) }, include: examDetailInclude });
-    if (!exam) return res.status(404).json({ error: 'Exam not found', code: 'NOT_FOUND' });
+    if (!exam || exam.deletedAt) return res.status(404).json({ error: 'Exam not found', code: 'NOT_FOUND' });
     res.json(shapeExam(exam));
   } catch (err) { next(err); }
 }
@@ -109,7 +109,7 @@ export async function getExam(req, res, next) {
 export async function getExamForStudent(req, res, next) {
   try {
     const exam = await prisma.exam.findUnique({ where: { id: Number(req.params.id) }, include: examDetailInclude });
-    if (!exam) return res.status(404).json({ error: 'Exam not found', code: 'NOT_FOUND' });
+    if (!exam || exam.deletedAt) return res.status(404).json({ error: 'Exam not found', code: 'NOT_FOUND' });
     res.json(stripAnswers(shapeExam(exam)));
   } catch (err) { next(err); }
 }
@@ -236,7 +236,7 @@ export async function updateExam(req, res, next) {
 export async function deleteExam(req, res, next) {
   try {
     const id = Number(req.params.id);
-    await prisma.exam.delete({ where: { id } });
+    await prisma.exam.update({ where: { id }, data: { deletedAt: new Date() } });
 
     logAudit({ userId: req.user.id, action: 'exam.delete', entity: 'exam', entityId: id, ipAddress: req.ip });
 
@@ -249,11 +249,53 @@ export async function bulkDeleteExams(req, res, next) {
   try {
     const { ids } = req.body;
 
-    await prisma.exam.deleteMany({ where: { id: { in: ids } } });
+    await prisma.exam.updateMany({ where: { id: { in: ids } }, data: { deletedAt: new Date() } });
 
     logAudit({ userId: req.user.id, action: 'exam.bulkDelete', entity: 'exam', details: { count: ids.length, ids }, ipAddress: req.ip });
 
     res.json({ deleted: ids.length });
+  } catch (err) { next(err); }
+}
+
+// POST /api/exams/:id/clone  — deep-copy exam + questions + choices
+export async function cloneExam(req, res, next) {
+  try {
+    const sourceId = Number(req.params.id);
+    const source = await prisma.exam.findUnique({ where: { id: sourceId }, include: examDetailInclude });
+    if (!source || source.deletedAt) return res.status(404).json({ error: 'Exam not found', code: 'NOT_FOUND' });
+
+    const clone = await prisma.exam.create({
+      data: {
+        title: `${source.title} (Copy)`,
+        gradeLevel: source.gradeLevel,
+        durationMinutes: source.durationMinutes,
+        passingScore: source.passingScore,
+        isActive: false,
+        academicYearId: source.academicYearId,
+        semesterId: source.semesterId,
+        createdById: req.user.id,
+        questions: {
+          create: source.questions.map((q, qi) => ({
+            questionText: q.questionText,
+            questionType: q.questionType,
+            points: q.points,
+            orderNum: q.orderNum ?? qi + 1,
+            choices: q.choices?.length ? {
+              create: q.choices.map((c, ci) => ({
+                choiceText: c.choiceText,
+                isCorrect: c.isCorrect || false,
+                orderNum: c.orderNum ?? ci + 1,
+              })),
+            } : undefined,
+          })),
+        },
+      },
+      include: examDetailInclude,
+    });
+
+    logAudit({ userId: req.user.id, action: 'exam.clone', entity: 'exam', entityId: clone.id, details: { sourceId, title: clone.title }, ipAddress: req.ip });
+
+    res.status(201).json(shapeExam(clone));
   } catch (err) { next(err); }
 }
 

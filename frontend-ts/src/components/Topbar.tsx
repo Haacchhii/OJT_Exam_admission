@@ -1,7 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getNotifications, markNotificationRead, markAllRead } from '../api/notifications';
+import { getNotifications, markNotificationRead, markAllRead, createNotification } from '../api/notifications';
+import { getUsers } from '../api/users';
 import { formatDate } from '../utils/helpers';
+import { showToast } from './Toast';
+import Modal from './Modal';
 import Icon from './Icons';
 import type { User, Notification } from '../types';
 
@@ -15,8 +18,36 @@ interface TopbarProps {
 export default function Topbar({ title, onMenuToggle, userId, user }: TopbarProps) {
   const [showNotifs, setShowNotifs] = useState(false);
   const [notifs, setNotifs] = useState<Notification[]>([]);
+  const [showCompose, setShowCompose] = useState(false);
+  const [composeUsers, setComposeUsers] = useState<User[]>([]);
+  const [composeTo, setComposeTo] = useState('');
+  const [composeTitle, setComposeTitle] = useState('');
+  const [composeMsg, setComposeMsg] = useState('');
+  const [composeSending, setComposeSending] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const isStaff = user.role !== 'applicant';
+
+  const openCompose = useCallback(async () => {
+    setShowCompose(true);
+    try {
+      const result = await getUsers();
+      const arr = Array.isArray(result) ? result : (result as any)?.data ?? [];
+      setComposeUsers(arr);
+    } catch { /* ignore */ }
+  }, []);
+
+  const handleSend = useCallback(async () => {
+    if (!composeTo || !composeTitle.trim() || !composeMsg.trim()) return;
+    setComposeSending(true);
+    try {
+      await createNotification({ userId: Number(composeTo), title: composeTitle.trim(), message: composeMsg.trim(), type: 'info' });
+      showToast('Notification sent', 'success');
+      setShowCompose(false);
+      setComposeTo(''); setComposeTitle(''); setComposeMsg('');
+    } catch { showToast('Failed to send', 'error'); }
+    finally { setComposeSending(false); }
+  }, [composeTo, composeTitle, composeMsg]);
 
   const refresh = useCallback(async () => {
     try {
@@ -74,6 +105,16 @@ export default function Topbar({ title, onMenuToggle, userId, user }: TopbarProp
         </div>
       </div>
       <div className="flex items-center gap-3" ref={ref}>
+        {isStaff && (
+          <button
+            onClick={openCompose}
+            className="p-2.5 rounded-xl hover:bg-forest-50 transition-all duration-200 group"
+            aria-label="Send notification"
+            title="Send Notification"
+          >
+            <Icon name="mail" className="w-5 h-5 text-gray-500 group-hover:text-forest-600 transition-colors" />
+          </button>
+        )}
         <button
           onClick={() => { setShowNotifs(!showNotifs); refresh(); }}
           className="relative p-2.5 rounded-xl hover:bg-forest-50 transition-all duration-200 group"
@@ -145,6 +186,33 @@ export default function Topbar({ title, onMenuToggle, userId, user }: TopbarProp
           <Icon name="chevronDown" className="w-3.5 h-3.5 text-gray-400 hidden sm:block" />
         </div>
       </div>
+
+      {/* Send Notification Modal */}
+      <Modal open={showCompose} onClose={() => setShowCompose(false)} title="Send Notification">
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium text-gray-700 block mb-1">Recipient</label>
+            <select value={composeTo} onChange={e => setComposeTo(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
+              <option value="">— Select user —</option>
+              {composeUsers.map(u => <option key={u.id} value={u.id}>{u.firstName} {u.lastName} ({u.email})</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 block mb-1">Title</label>
+            <input value={composeTitle} onChange={e => setComposeTitle(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm" placeholder="Notification title" />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 block mb-1">Message</label>
+            <textarea value={composeMsg} onChange={e => setComposeMsg(e.target.value)} rows={3} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm resize-none" placeholder="Type your message…" />
+          </div>
+          <div className="flex gap-3">
+            <button onClick={handleSend} disabled={composeSending || !composeTo || !composeTitle.trim() || !composeMsg.trim()} className="bg-forest-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-forest-600 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5">
+              {composeSending ? 'Sending…' : 'Send'}
+            </button>
+            <button onClick={() => setShowCompose(false)} className="border border-gray-300 text-gray-700 px-5 py-2 rounded-lg hover:bg-gray-50">Cancel</button>
+          </div>
+        </div>
+      </Modal>
     </header>
   );
 }

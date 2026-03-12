@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { TOAST_DURATION_LONG, TOAST_DURATION_SHORT } from '../utils/constants.js';
 
 let toastId = 0;
 
@@ -17,7 +18,7 @@ export function showToast(message, type = 'success') {
   }
   toastStore.listeners.forEach(fn => fn([...toastStore.toasts]));
   // Errors/warnings stay longer so users can read them
-  const duration = (type === 'error' || type === 'warning') ? 5000 : 3000;
+  const duration = (type === 'error' || type === 'warning') ? TOAST_DURATION_LONG : TOAST_DURATION_SHORT;
   setTimeout(() => {
     toastStore.toasts = toastStore.toasts.filter(t => t.id !== id);
     toastStore.listeners.forEach(fn => fn([...toastStore.toasts]));

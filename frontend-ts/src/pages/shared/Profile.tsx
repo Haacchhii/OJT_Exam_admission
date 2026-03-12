@@ -10,6 +10,8 @@ export default function Profile() {
 
   const [firstName, setFirstName] = useState(user?.firstName || '');
   const [lastName, setLastName] = useState(user?.lastName || '');
+  const [phone, setPhone] = useState(user?.phone || '');
+  const [address, setAddress] = useState(user?.address || '');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -28,7 +30,7 @@ export default function Profile() {
     }
     setSaving(true);
     try {
-      await client.patch('/auth/profile', { firstName: firstName.trim(), lastName: lastName.trim() });
+      await client.patch('/auth/profile', { firstName: firstName.trim(), lastName: lastName.trim(), phone: phone.trim(), address: address.trim() });
       await refreshUser();
       showToast('Profile updated successfully!', 'success');
     } catch (err) {
@@ -109,11 +111,11 @@ export default function Profile() {
           </div>
         </div>
 
-        {/* Edit Name */}
+        {/* Edit Profile */}
         <div className="gk-card p-6">
           <h3 className="text-md font-bold text-forest-500 mb-4 flex items-center gap-2">
             <Icon name="userCircle" className="w-5 h-5" />
-            Edit Name
+            Edit Profile
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
             <div>
@@ -123,6 +125,19 @@ export default function Profile() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
               <input type="text" value={lastName} onChange={e => setLastName(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+              <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="e.g. 09171234567" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm" />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+              <input type="text" value={address} onChange={e => setAddress(e.target.value)} placeholder="Street, City, Province" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <input type="email" value={user.email} disabled className="w-full px-3 py-2 border border-gray-200 bg-gray-50 rounded-lg text-sm text-gray-500 cursor-not-allowed" />
+              <p className="text-xs text-gray-400 mt-0.5">Email cannot be changed.</p>
             </div>
           </div>
           <button onClick={handleSaveProfile} disabled={saving} className="bg-forest-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-forest-600 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5 text-sm">

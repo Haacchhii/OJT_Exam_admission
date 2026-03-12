@@ -10,6 +10,7 @@ import env from './config/env.js';
 import prisma from './config/db.js';
 import { errorHandler } from './middleware/errors.js';
 import { authenticate } from './middleware/auth.js';
+import { RATE_LIMITS, BODY_SIZE_LIMIT } from './utils/constants.js';
 
 // Route imports
 import authRoutes          from './routes/auth.js';
@@ -45,13 +46,13 @@ app.use(cors({
   credentials: true,
 }));
 
-app.use(express.json({ limit: '1mb' }));
-app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+app.use(express.json({ limit: BODY_SIZE_LIMIT }));
+app.use(express.urlencoded({ extended: true, limit: BODY_SIZE_LIMIT }));
 
 // ─── Global rate limit (all routes) ──────────────────
 const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 300,  // 300 requests per 15 min per IP
+  windowMs: RATE_LIMITS.GLOBAL.windowMs,
+  max: RATE_LIMITS.GLOBAL.max,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests, please try again later.', code: 'RATE_LIMIT' },
@@ -60,8 +61,8 @@ app.use(globalLimiter);
 
 // ─── Stricter rate limiting on auth routes ────────────
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20,                   // 20 requests per window
+  windowMs: RATE_LIMITS.AUTH.windowMs,
+  max: RATE_LIMITS.AUTH.max,
   message: { error: 'Too many requests, please try again later.', code: 'RATE_LIMIT' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -69,24 +70,24 @@ const authLimiter = rateLimit({
 
 // ─── Rate limiters for sensitive operations ───────────
 const uploadLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 30,                   // 30 uploads per hour
+  windowMs: RATE_LIMITS.UPLOAD.windowMs,
+  max: RATE_LIMITS.UPLOAD.max,
   message: { error: 'Too many uploads, please try again later.', code: 'RATE_LIMIT' },
   standardHeaders: true,
   legacyHeaders: false,
 });
 
 const examSubmitLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 10,                   // 10 exam submissions per hour
+  windowMs: RATE_LIMITS.EXAM_SUBMIT.windowMs,
+  max: RATE_LIMITS.EXAM_SUBMIT.max,
   message: { error: 'Too many exam submissions, please try again later.', code: 'RATE_LIMIT' },
   standardHeaders: true,
   legacyHeaders: false,
 });
 
 const bulkOpLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10,                   // 10 bulk operations per 15 min
+  windowMs: RATE_LIMITS.BULK.windowMs,
+  max: RATE_LIMITS.BULK.max,
   message: { error: 'Too many bulk operations, please try again later.', code: 'RATE_LIMIT' },
   standardHeaders: true,
   legacyHeaders: false,

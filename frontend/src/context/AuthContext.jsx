@@ -1,20 +1,21 @@
 import { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 import { client, setToken, setAuthErrorHandler } from '../api/client.js';
+import { ROLES } from '../utils/constants.js';
 
 const AuthContext = createContext(null);
 
 /* ===== Role-Based Access Control ===== */
 const ROLE_PERMISSIONS = {
-  administrator: ['dashboard', 'admissions', 'exams', 'results', 'reports', 'users', 'audit', 'settings'],
-  registrar:     ['dashboard', 'admissions', 'results', 'reports'],
-  teacher:       ['dashboard', 'admissions', 'exams', 'results', 'reports'],
+  [ROLES.ADMIN]: ['dashboard', 'admissions', 'exams', 'results', 'reports', 'users', 'audit', 'settings'],
+  [ROLES.REGISTRAR]:     ['dashboard', 'admissions', 'results', 'reports'],
+  [ROLES.TEACHER]:       ['dashboard', 'admissions', 'exams', 'results', 'reports'],
 };
 
 const ROLE_LABELS = {
-  administrator: 'Administrator',
-  registrar: 'Registrar',
-  teacher: 'Teacher',
-  applicant: 'Student',
+  [ROLES.ADMIN]: 'Administrator',
+  [ROLES.REGISTRAR]: 'Registrar',
+  [ROLES.TEACHER]: 'Teacher',
+  [ROLES.APPLICANT]: 'Student',
 };
 
 /* Simple integrity hash to detect localStorage tampering */
@@ -91,10 +92,10 @@ export function AuthProvider({ children }) {
     }
   }, [user, logout]);
 
-  const isEmployee = user && user.role !== 'applicant';
+  const isEmployee = user && user.role !== ROLES.APPLICANT;
 
   const canAccess = useCallback((page) => {
-    if (!user || user.role === 'applicant') return false;
+    if (!user || user.role === ROLES.APPLICANT) return false;
     const perms = ROLE_PERMISSIONS[user.role];
     return perms ? perms.includes(page) : false;
   }, [user]);

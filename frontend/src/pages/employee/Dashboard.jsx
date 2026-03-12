@@ -7,7 +7,7 @@ import { getExams, getExamSchedules, getExamRegistrations } from '../../api/exam
 import { getExamResults, getEssayAnswers } from '../../api/results.js';
 import { StatCard, PageHeader, Badge, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert } from '../../components/UI.jsx';
 import { formatDate, badgeClass } from '../../utils/helpers.js';
-import { ADMISSION_IN_PROGRESS } from '../../utils/constants.js';
+import { ADMISSION_IN_PROGRESS, ROLES } from '../../utils/constants.js';
 import Icon from '../../components/Icons.jsx';
 
 const PER_PAGE = 5;
@@ -80,9 +80,9 @@ export default function EmployeeDashboard() {
   return (
     <div className="animate-[fadeIn_0.3s_ease-out]">
       <PageHeader title={`${roleLabel} Dashboard`} subtitle={
-        user.role === 'administrator' ? 'Full system overview — admissions, exams, and user management.' :
-        user.role === 'registrar' ? 'Monitor and manage admission applications.' :
-        user.role === 'teacher' ? 'Monitor exam registrations, scores, and essay reviews.' :
+        user.role === ROLES.ADMIN ? 'Full system overview — admissions, exams, and user management.' :
+        user.role === ROLES.REGISTRAR ? 'Monitor and manage admission applications.' :
+        user.role === ROLES.TEACHER ? 'Monitor exam registrations, scores, and essay reviews.' :
         'Monitor admission applications and exam activity.'
       } />
 

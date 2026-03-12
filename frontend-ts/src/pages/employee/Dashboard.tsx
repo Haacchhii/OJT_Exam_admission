@@ -12,6 +12,11 @@ import Icon from '../../components/Icons';
 import type { Admission, AdmissionStats, Exam, ExamSchedule, ExamRegistration, ExamResult as ExamResultType, EssayAnswer } from '../../types';
 
 const PER_PAGE = 5;
+const SLA_DAYS = 7;
+
+function daysPending(submittedAt: string) {
+  return Math.floor((Date.now() - new Date(submittedAt).getTime()) / 86400000);
+}
 
 interface DashboardData {
   stats: AdmissionStats;
@@ -25,6 +30,7 @@ interface DashboardData {
   avgScore: number | string;
   grades: string[];
   trends: { total: number; accepted: number; inProgress: number; rejected: number };
+  overdue: number;
 }
 
 export default function EmployeeDashboard() {
@@ -72,7 +78,9 @@ export default function EmployeeDashboard() {
       rejected: pct(thisWeek.filter((a: Admission) => a.status === 'Rejected').length, lastWeek.filter((a: Admission) => a.status === 'Rejected').length),
     };
 
-    return { stats, admissions, exams, schedules, regs, results, pendingEssays, completed, avgScore, grades, trends };
+    const overdue = admissions.filter((a: Admission) => (ADMISSION_IN_PROGRESS as readonly string[]).includes(a.status) && daysPending(a.submittedAt) > SLA_DAYS).length;
+
+    return { stats, admissions, exams, schedules, regs, results, pendingEssays, completed, avgScore, grades, trends, overdue };
   });
 
   const filtered = useMemo(() => {
@@ -110,6 +118,7 @@ export default function EmployeeDashboard() {
           <Link to="/employee/admissions?status=Accepted"><StatCard icon="checkCircle" value={rawData?.stats?.accepted || 0} label="Accepted" color="emerald" trend={rawData?.trends?.accepted} trendLabel="vs last week" /></Link>
           <Link to="/employee/admissions"><StatCard icon="clock" value={(rawData?.stats?.submitted || 0) + (rawData?.stats?.underScreening || 0) + (rawData?.stats?.underEvaluation || 0)} label="In Progress" color="amber" trend={rawData?.trends?.inProgress} trendLabel="vs last week" /></Link>
           <Link to="/employee/admissions?status=Rejected"><StatCard icon="xCircle" value={rawData?.stats?.rejected || 0} label="Rejected" color="red" trend={rawData?.trends?.rejected} trendLabel="vs last week" /></Link>
+          {(rawData?.overdue || 0) > 0 && <StatCard icon="exclamation" value={rawData?.overdue || 0} label={`Overdue (>${SLA_DAYS} days)`} color="red" />}
         </>}
         {canAccess('exams') && <>
           <Link to="/employee/exams"><StatCard icon="exam" value={rawData?.exams?.length || 0} label="Total Exams" color="blue" /></Link>
@@ -164,6 +173,7 @@ export default function EmployeeDashboard() {
                 <th scope="col">Grade Level</th>
                 <th scope="col">Status</th>
                 <th scope="col">Date Submitted</th>
+                <th scope="col">Days Pending</th>
                 <th scope="col">Action</th>
               </tr>
             </thead>
@@ -175,10 +185,13 @@ export default function EmployeeDashboard() {
                   <td>{a.gradeLevel}</td>
                   <td><Badge className={badgeClass(a.status)}>{a.status}</Badge></td>
                   <td className="text-gray-500">{formatDate(a.submittedAt)}</td>
+                  <td>{(ADMISSION_IN_PROGRESS as readonly string[]).includes(a.status) ? (
+                    <span className={`text-sm font-semibold ${daysPending(a.submittedAt) > SLA_DAYS ? 'text-red-600' : daysPending(a.submittedAt) > 5 ? 'text-amber-600' : 'text-gray-500'}`}>{daysPending(a.submittedAt)}d</span>
+                  ) : <span className="text-gray-400">—</span>}</td>
                   <td><Link to={`/employee/admissions?id=${a.id}`} className="text-forest-500 hover:text-forest-600 text-xs font-semibold transition-colors">View</Link></td>
                 </tr>
               ))}
-              {paginated.length === 0 && <tr><td colSpan={6} className="text-center text-gray-400 py-8">No admissions match your filters.</td></tr>}
+              {paginated.length === 0 && <tr><td colSpan={7} className="text-center text-gray-400 py-8">No admissions match your filters.</td></tr>}
             </tbody>
           </table>
         </div>

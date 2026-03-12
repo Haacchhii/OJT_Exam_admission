@@ -28,6 +28,8 @@ export interface User {
   email: string;
   role: UserRole;
   status: 'Active' | 'Inactive';
+  phone?: string | null;
+  address?: string | null;
   createdAt: string;
   updatedAt: string;
   applicantProfile?: ApplicantProfile | null;
@@ -77,7 +79,7 @@ export interface Admission {
   submittedAt: string;
   updatedAt: string;
   documents: string[];
-  documentFiles: { id: number; name: string; filePath: string | null }[];
+  documentFiles: { id: number; name: string; filePath: string | null; hasExtraction?: boolean; reviewStatus?: string; reviewNote?: string | null; reviewedAt?: string | null }[];
   academicYear: { id: number; year: string } | null;
   semester: { id: number; name: string } | null;
 }
@@ -121,6 +123,8 @@ export interface Exam {
   createdAt: string;
   updatedAt: string;
   questions: ExamQuestion[];
+  academicYear?: { id: number; year: string } | null;
+  semester?: { id: number; name: string } | null;
   _count?: { questions: number };
 }
 

@@ -8,10 +8,10 @@ import { useConfirm } from '../../components/ConfirmDialog.jsx';
 import { PageHeader, Badge, EmptyState, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert } from '../../components/UI.jsx';
 import Icon from '../../components/Icons.jsx';
 import { formatDate, badgeClass } from '../../utils/helpers.js';
-import { ADMISSION_STATUSES } from '../../utils/constants.js';
+import { ADMISSION_STATUSES, SCHOOL_NAME_SHORT, SCHOOL_NAME_SUBTITLE, SCHOOL_NAME, SCHOOL_ADDRESS, SCHOOL_PHONE, DEFAULT_PAGE_SIZE, PRINT_DELAY_MS } from '../../utils/constants.js';
 import ApplicationTracker from './ApplicationTracker.jsx';
 
-const PER_PAGE = 10;
+const PER_PAGE = DEFAULT_PAGE_SIZE;
 
 export default function EmployeeAdmissions() {
   const confirm = useConfirm();
@@ -205,7 +205,7 @@ export default function EmployeeAdmissions() {
           @media print { body { padding: 20px; } }
         </style>
       </head><body>
-        <div class="logo"><span>🔑</span><h1><span style="color:#fbbf24">GOLDEN KEY</span><br/><span style="color:#166534">Integrated School of St. Joseph</span></h1><p class="subtitle">Lapolapo 1st, San Jose, Batangas, Philippines &bull; Tel: (043)-702-2153<br/>Admission Application Form</p></div>
+        <div class="logo"><span>🔑</span><h1><span style="color:#fbbf24">${SCHOOL_NAME_SHORT}</span><br/><span style="color:#166534">${SCHOOL_NAME_SUBTITLE}</span></h1><p class="subtitle">${SCHOOL_ADDRESS} &bull; Tel: ${SCHOOL_PHONE}<br/>Admission Application Form</p></div>
         <h2>Student Information</h2>
         <div class="grid">
           <div class="field"><label>Full Name</label><span>${esc(adm.firstName)} ${esc(adm.lastName)}</span></div>
@@ -225,11 +225,11 @@ export default function EmployeeAdmissions() {
         <h2>Application Status</h2>
         <p><span class="status ${esc(adm.status).replace(/\s+/g, '-')}">${esc(adm.status)}</span></p>
         ${adm.notes ? `<p style="margin-top:8px;font-size:13px;color:#666"><strong>Notes:</strong> ${esc(adm.notes)}</p>` : ''}
-        <p style="margin-top:30px;font-size:11px;color:#aaa;text-align:center">Printed on ${new Date().toLocaleDateString()} — GOLDEN KEY Integrated School of St. Joseph &copy; ${new Date().getFullYear()}</p>
+        <p style="margin-top:30px;font-size:11px;color:#aaa;text-align:center">Printed on ${new Date().toLocaleDateString()} — ${SCHOOL_NAME} &copy; ${new Date().getFullYear()}</p>
       </body></html>`);
       printWin.document.close();
       printWin.focus();
-      setTimeout(() => printWin.print(), 300);
+      setTimeout(() => printWin.print(), PRINT_DELAY_MS);
     };
 
     return (

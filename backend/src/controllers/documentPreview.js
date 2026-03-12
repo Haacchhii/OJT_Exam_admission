@@ -4,6 +4,7 @@ import fs from 'fs/promises';
 import { existsSync } from 'fs';
 import jwt from 'jsonwebtoken';
 import env from '../config/env.js';
+import { ROLES, DOC_CACHE_MAX_AGE, MAX_KV_PAIRS } from '../utils/constants.js';
 
 // Lazy-loaded heavy modules
 let Tesseract = null;
@@ -59,7 +60,7 @@ async function authenticatePreview(req) {
 async function verifyAccess(user, admissionId) {
   const admission = await prisma.admission.findUnique({ where: { id: admissionId } });
   if (!admission) return { error: 'Admission not found', status: 404 };
-  if (user.role === 'applicant' && admission.userId !== user.id) {
+  if (user.role === ROLES.APPLICANT && admission.userId !== user.id) {
     return { error: 'Access denied', status: 403 };
   }
   return { admission };
@@ -98,7 +99,7 @@ export async function previewDocument(req, res, next) {
 
     res.setHeader('Content-Type', mime);
     res.setHeader('Content-Disposition', `inline; filename="${doc.documentName}"`);
-    res.setHeader('Cache-Control', 'private, max-age=300');
+    res.setHeader('Cache-Control', `private, max-age=${DOC_CACHE_MAX_AGE}`);
 
     const data = await fs.readFile(filePath);
     res.send(data);
@@ -308,7 +309,7 @@ function parseGeneric(text) {
   const kvPattern = /([A-Z][A-Za-z\s]{2,30})[:\-]\s*([^\n:]{2,80})/g;
   let match;
   let count = 0;
-  while ((match = kvPattern.exec(text)) !== null && count < 20) {
+  while ((match = kvPattern.exec(text)) !== null && count < MAX_KV_PAIRS) {
     const key = match[1].trim();
     const value = match[2].trim();
     if (key && value && !fields[key]) {

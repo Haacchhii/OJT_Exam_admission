@@ -1,6 +1,7 @@
 import prisma from '../config/db.js';
 import { logAudit } from '../utils/auditLog.js';
 import { sendExamResultEmail } from '../utils/email.js';
+import { EXAM_GRACE_MINUTES } from '../utils/constants.js';
 
 // ═══════════════════════════════════════════════════════
 // POST /api/results/submit
@@ -45,7 +46,7 @@ export async function submitExam(req, res, next) {
     // A 1-minute grace period accounts for network latency.
     if (reg.startedAt && exam.durationMinutes) {
       const elapsedMs = Date.now() - new Date(reg.startedAt).getTime();
-      const allowedMs = (exam.durationMinutes + 1) * 60 * 1000; // +1 min grace
+      const allowedMs = (exam.durationMinutes + EXAM_GRACE_MINUTES) * 60 * 1000;
       if (elapsedMs > allowedMs) {
         return res.status(400).json({
           error: 'Exam time has expired. Your submission was not accepted.',

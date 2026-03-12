@@ -7,12 +7,12 @@ import { PageHeader, StatCard, Badge, EmptyState, Pagination, usePaginationSlice
 import Icon from '../../components/Icons.jsx';
 import Modal from '../../components/Modal.jsx';
 import { useConfirm } from '../../components/ConfirmDialog.jsx';
-import { USER_ROLE_OPTIONS } from '../../utils/constants.js';
+import { USER_ROLE_OPTIONS, ROLES, DEFAULT_PAGE_SIZE } from '../../utils/constants.js';
 
-const USERS_PER_PAGE = 10;
-const ROLES = USER_ROLE_OPTIONS;
+const USERS_PER_PAGE = DEFAULT_PAGE_SIZE;
+const ROLE_OPTIONS = USER_ROLE_OPTIONS;
 
-const emptyForm = { firstName: '', lastName: '', email: '', role: 'applicant', status: 'Active', password: '' };
+const emptyForm = { firstName: '', lastName: '', email: '', role: ROLES.APPLICANT, status: 'Active', password: '' };
 
 export default function EmployeeUsers() {
   const { user: authUser } = useAuth();
@@ -46,10 +46,10 @@ export default function EmployeeUsers() {
     const list = users || [];
     return {
       total: list.length,
-      admins: list.filter(u => u.role === 'administrator').length,
-      registrars: list.filter(u => u.role === 'registrar').length,
-      teachers: list.filter(u => u.role === 'teacher').length,
-      applicants: list.filter(u => u.role === 'applicant').length,
+      admins: list.filter(u => u.role === ROLES.ADMIN).length,
+      registrars: list.filter(u => u.role === ROLES.REGISTRAR).length,
+      teachers: list.filter(u => u.role === ROLES.TEACHER).length,
+      applicants: list.filter(u => u.role === ROLES.APPLICANT).length,
     };
   }, [users]);
 
@@ -122,13 +122,13 @@ export default function EmployeeUsers() {
 
   const set = (key, val) => setForm(p => ({ ...p, [key]: val }));
 
-  const roleLabel = (r) => ROLES.find(ro => ro.value === r)?.label || r;
+  const roleLabel = (r) => ROLE_OPTIONS.find(ro => ro.value === r)?.label || r;
 
   if (loading && !users) return <SkeletonPage />;
   if (error) return <ErrorAlert error={error} onRetry={refetch} />;
 
   // Only administrators can manage users
-  if (authUser?.role !== 'administrator') {
+  if (authUser?.role !== ROLES.ADMIN) {
     return (
       <div className="text-center py-16">
         <div className="w-14 h-14 rounded-2xl bg-forest-50 flex items-center justify-center mx-auto mb-3"><Icon name="lock" className="w-7 h-7 text-forest-500" /></div>

@@ -1,6 +1,7 @@
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import { AuthProvider, ROLE_PERMISSIONS } from './context/AuthContext.jsx';
+import { ROLES } from './utils/constants.js';
 import { ToastContainer } from './components/Toast.jsx';
 import { ConfirmProvider } from './components/ConfirmDialog.jsx';
 import { StudentLayout, EmployeeLayout } from './components/Layout.jsx';
@@ -36,7 +37,7 @@ const EmployeeSettings = lazy(() => import('./pages/employee/Settings.jsx'));
 function RoleGuard({ page, children }) {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
-  if (user.role === 'applicant') return <Navigate to="/student" replace />;
+  if (user.role === ROLES.APPLICANT) return <Navigate to="/student" replace />;
   const perms = ROLE_PERMISSIONS[user.role] || [];
   if (!perms.includes(page)) return <Navigate to="/employee" replace />;
   return children;
@@ -46,7 +47,7 @@ function RoleGuard({ page, children }) {
 function StudentGuard({ children }) {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
-  if (user.role !== 'applicant') return <Navigate to="/employee" replace />;
+  if (user.role !== ROLES.APPLICANT) return <Navigate to="/employee" replace />;
   return children;
 }
 

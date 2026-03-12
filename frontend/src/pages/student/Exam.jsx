@@ -10,6 +10,7 @@ import { useConfirm } from '../../components/ConfirmDialog.jsx';
 import { PageHeader, SkeletonPage, ErrorAlert } from '../../components/UI.jsx';
 import Icon from '../../components/Icons.jsx';
 import { formatTime, asArray } from '../../utils/helpers.js';
+import { SCHEDULE_POLL_MS, REDIRECT_DELAY_MS } from '../../utils/constants.js';
 
 export default function StudentExam() {
   const [view, setView] = useState('schedule'); // schedule | lobby | exam
@@ -144,7 +145,7 @@ function ScheduleView({ myReg, myResult, onLobby, onRefresh, user }) {
     // Re-check canStart every 30 seconds so the button appears on time
     useEffect(() => {
       if (canStart) return; // already eligible, no need to poll
-      const interval = setInterval(() => setNow(new Date()), 30000);
+      const interval = setInterval(() => setNow(new Date()), SCHEDULE_POLL_MS);
       return () => clearInterval(interval);
     }, [canStart]);
     return (
@@ -301,7 +302,7 @@ function LiveExam({ exam, registration }) {
     }
     try { sessionStorage.removeItem(`gk_exam_answers_${registration.id}`); } catch {}
     if (title) setAutoModal({ title, msg });
-    else { showToast('Exam submitted successfully!', 'success'); setTimeout(() => navigate('/student/results'), 1500); }
+    else { showToast('Exam submitted successfully!', 'success'); setTimeout(() => navigate('/student/results'), REDIRECT_DELAY_MS); }
   }, [registration.id, navigate]);
 
   // Keep a stable ref to doSubmit for effects

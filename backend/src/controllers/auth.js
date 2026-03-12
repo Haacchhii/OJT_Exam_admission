@@ -4,6 +4,8 @@ import prisma from '../config/db.js';
 import env from '../config/env.js';
 import { sendWelcomeEmail } from '../utils/email.js';
 import { passwordSchema } from '../utils/schemas.js';
+import { logAudit } from '../utils/auditLog.js';
+import { ROLES, BCRYPT_ROUNDS, RESET_TOKEN_EXPIRY } from '../utils/constants.js';
 
 // ─── Password complexity (single source of truth: passwordSchema in schemas.js) ──
 function validatePassword(password) {
@@ -20,7 +22,7 @@ function signToken(user) {
 }
 
 function signResetToken(email) {
-  return jwt.sign({ email, purpose: 'password-reset' }, env.JWT_SECRET, { expiresIn: '15m' });
+  return jwt.sign({ email, purpose: 'password-reset' }, env.JWT_SECRET, { expiresIn: RESET_TOKEN_EXPIRY });
 }
 
 function verifyResetToken(token) {
@@ -66,20 +68,24 @@ export async function login(req, res, next) {
       where: { email },
       include: { applicantProfile: true, staffProfile: true },
     });
-    if (!user) {
+    if (!user || user.deletedAt) {
+      logAudit({ action: 'auth.login_failed', entity: 'user', details: { email, reason: 'user_not_found' }, ipAddress: req.ip });
       return res.status(401).json({ error: 'Invalid email or password', code: 'UNAUTHORIZED' });
     }
 
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) {
+      logAudit({ userId: user.id, action: 'auth.login_failed', entity: 'user', entityId: user.id, details: { reason: 'wrong_password' }, ipAddress: req.ip });
       return res.status(401).json({ error: 'Invalid email or password', code: 'UNAUTHORIZED' });
     }
 
     if (user.status !== 'Active') {
+      logAudit({ userId: user.id, action: 'auth.login_failed', entity: 'user', entityId: user.id, details: { reason: 'inactive_account' }, ipAddress: req.ip });
       return res.status(403).json({ error: 'Account is inactive', code: 'FORBIDDEN' });
     }
 
     const token = signToken(user);
+    logAudit({ userId: user.id, action: 'auth.login', entity: 'user', entityId: user.id, ipAddress: req.ip });
     res.json({ user: safeUser(user), token });
   } catch (err) { next(err); }
 }
@@ -107,9 +113,9 @@ export async function register(req, res, next) {
       return res.status(409).json({ error: 'Email already registered', code: 'CONFLICT' });
     }
 
-    const passwordHash = await bcrypt.hash(password, 12);
+    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
     const user = await prisma.user.create({
-      data: { firstName, lastName, email, passwordHash, role: 'applicant', status: 'Active' },
+      data: { firstName, lastName, email, passwordHash, role: ROLES.APPLICANT, status: 'Active' },
     });
 
     // Auto-create an empty applicant profile so it exists for later updates
@@ -125,6 +131,7 @@ export async function register(req, res, next) {
     sendWelcomeEmail({ to: user.email, firstName: user.firstName });
 
     const token = signToken(user);
+    logAudit({ userId: user.id, action: 'auth.register', entity: 'user', entityId: user.id, ipAddress: req.ip });
     res.status(201).json({ user: safeUser(fullUser), token });
   } catch (err) { next(err); }
 }
@@ -171,8 +178,9 @@ export async function resetPassword(req, res, next) {
     if (!user) {
       return res.status(404).json({ error: 'User not found', code: 'NOT_FOUND' });
     }
-    const passwordHash = await bcrypt.hash(password, 12);
+    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
     await prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
+    logAudit({ userId: user.id, action: 'auth.password_reset', entity: 'user', entityId: user.id, ipAddress: req.ip });
     res.json({ ok: true, message: 'Password updated successfully.' });
   } catch (err) { next(err); }
 }
@@ -180,7 +188,7 @@ export async function resetPassword(req, res, next) {
 // PATCH /api/auth/profile — update authenticated user's profile
 export async function updateProfile(req, res, next) {
   try {
-    const { firstName, lastName, currentPassword, newPassword } = req.body;
+    const { firstName, lastName, currentPassword, newPassword, phone, address } = req.body;
     const userId = req.user.id;
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
@@ -189,6 +197,8 @@ export async function updateProfile(req, res, next) {
     const data = {};
     if (firstName !== undefined) data.firstName = firstName.trim();
     if (lastName !== undefined) data.lastName = lastName.trim();
+    if (phone !== undefined) data.phone = phone.trim();
+    if (address !== undefined) data.address = address.trim();
 
     // Password change requires current password verification
     if (newPassword) {
@@ -203,7 +213,7 @@ export async function updateProfile(req, res, next) {
       if (pwErr) {
         return res.status(400).json({ error: pwErr, code: 'VALIDATION_ERROR' });
       }
-      data.passwordHash = await bcrypt.hash(newPassword, 12);
+      data.passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
     }
 
     if (Object.keys(data).length === 0) {
@@ -215,6 +225,10 @@ export async function updateProfile(req, res, next) {
       data,
       include: { applicantProfile: true, staffProfile: true },
     });
+
+    const changedFields = Object.keys(data).filter(k => k !== 'passwordHash');
+    if (data.passwordHash) changedFields.push('password');
+    logAudit({ userId, action: 'auth.profile_update', entity: 'user', entityId: userId, details: { fields: changedFields }, ipAddress: req.ip });
 
     res.json(safeUser(updated));
   } catch (err) { next(err); }

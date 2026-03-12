@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import { ROLES, ADMISSION_STATUSES, MAX_BULK_OPERATIONS } from './constants.js';
+
+const ROLE_VALUES = /** @type {[string, ...string[]]} */ (Object.values(ROLES));
+const STATUS_VALUES = /** @type {[string, ...string[]]} */ (ADMISSION_STATUSES);
 
 // ─── Shared helpers ─────────────────────────────────
 const passwordSchema = z.string()
@@ -68,17 +72,17 @@ export const createAdmissionSchema = z.object({
 });
 
 export const updateStatusSchema = z.object({
-  status: z.enum(['Submitted', 'Under Screening', 'Under Evaluation', 'Accepted', 'Rejected']),
+  status: z.enum(STATUS_VALUES),
   notes: z.string().max(1000).optional().nullable(),
 });
 
 export const bulkUpdateStatusSchema = z.object({
-  ids: z.array(z.number().int().positive()).min(1).max(100),
-  status: z.enum(['Submitted', 'Under Screening', 'Under Evaluation', 'Accepted', 'Rejected']),
+  ids: z.array(z.number().int().positive()).min(1).max(MAX_BULK_OPERATIONS),
+  status: z.enum(STATUS_VALUES),
 });
 
 export const bulkDeleteSchema = z.object({
-  ids: z.array(z.number().int().positive()).min(1).max(100),
+  ids: z.array(z.number().int().positive()).min(1).max(MAX_BULK_OPERATIONS),
 });
 
 // ─── Exam Schemas ─────────────────────────────────────
@@ -123,21 +127,21 @@ export const createUserSchema = z.object({
   lastName: z.string().min(1).max(100),
   email: z.string().email(),
   password: passwordSchema,
-  role: z.enum(['administrator', 'registrar', 'teacher', 'applicant']),
+  role: z.enum(ROLE_VALUES),
 });
 
 export const updateUserSchema = z.object({
   firstName: z.string().min(1).max(100).optional(),
   lastName: z.string().min(1).max(100).optional(),
   email: z.string().email().optional(),
-  role: z.enum(['administrator', 'registrar', 'teacher', 'applicant']).optional(),
+  role: z.enum(ROLE_VALUES).optional(),
   status: z.enum(['Active', 'Inactive']).optional(),
 });
 
 // ─── Query Parameter Schemas ──────────────────────────
 export const admissionsQuerySchema = z.object({
   ...paginationQuery,
-  status: z.enum(['Submitted', 'Under Screening', 'Under Evaluation', 'Accepted', 'Rejected']).optional(),
+  status: z.enum(STATUS_VALUES).optional(),
   grade:  optionalString,
   sort:   z.enum(['newest', 'oldest']).optional(),
   academicYearId: coerceOptionalInt,
@@ -183,7 +187,7 @@ export const essaysQuerySchema = z.object({
 
 export const usersQuerySchema = z.object({
   ...paginationQuery,
-  role:   z.enum(['administrator', 'registrar', 'teacher', 'applicant']).optional(),
+  role:   z.enum(ROLE_VALUES).optional(),
   status: z.enum(['Active', 'Inactive']).optional(),
 });
 

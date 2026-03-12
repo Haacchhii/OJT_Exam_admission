@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { showToast } from '../../components/Toast.jsx';
 import Icon from '../../components/Icons.jsx';
+import { SCHOOL_NAME, SCHOOL_NAME_SHORT, SCHOOL_NAME_SUBTITLE, ROLES } from '../../utils/constants';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -17,7 +18,7 @@ export default function Login() {
   // Redirect already logged-in users
   useEffect(() => {
     if (user) {
-      navigate(user.role === 'applicant' ? '/student' : '/employee', { replace: true });
+      navigate(user.role === ROLES.APPLICANT ? '/student' : '/employee', { replace: true });
     }
   }, [user, navigate]);
 
@@ -45,7 +46,7 @@ export default function Login() {
       if (!result.ok) { showToast(result.msg, 'error'); return; }
       if (remember) localStorage.setItem('gk_remember_email', email);
       else localStorage.removeItem('gk_remember_email');
-      if (result.user.role === 'applicant') navigate('/student');
+      if (result.user.role === ROLES.APPLICANT) navigate('/student');
       else navigate('/employee');
     } finally {
       setLoading(false);
@@ -65,9 +66,9 @@ export default function Login() {
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gold-400 to-gold-500 flex items-center justify-center shadow-lg">
               <Icon name="key" className="w-5 h-5 text-forest-800" />
             </div>
-            <span className="text-lg font-bold tracking-tight text-gold-400">GOLDEN KEY</span>
+            <span className="text-lg font-bold tracking-tight text-gold-400">{SCHOOL_NAME_SHORT}</span>
           </div>
-          <p className="text-forest-300 text-sm font-semibold">Integrated School of St. Joseph</p>
+          <p className="text-forest-300 text-sm font-semibold">{SCHOOL_NAME_SUBTITLE}</p>
         </div>
 
         <div className="relative z-10 space-y-6">
@@ -96,7 +97,7 @@ export default function Login() {
           </div>
         </div>
 
-        <p className="relative z-10 text-xs text-white/30">&copy; {new Date().getFullYear()} GOLDEN KEY Integrated School of St. Joseph. All rights reserved.</p>
+        <p className="relative z-10 text-xs text-white/30">&copy; {new Date().getFullYear()} {SCHOOL_NAME}. All rights reserved.</p>
       </div>
 
       {/* Right: Login Form */}
@@ -107,8 +108,8 @@ export default function Login() {
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-gold-400 to-gold-500 flex items-center justify-center mx-auto mb-3 shadow-lg">
               <Icon name="key" className="w-6 h-6 text-forest-800" />
             </div>
-            <h1 className="text-lg font-bold text-gold-400">GOLDEN KEY</h1>
-            <p className="text-sm text-forest-300 font-semibold">Integrated School of St. Joseph</p>
+            <h1 className="text-lg font-bold text-gold-400">{SCHOOL_NAME_SHORT}</h1>
+            <p className="text-sm text-forest-300 font-semibold">{SCHOOL_NAME_SUBTITLE}</p>
           </div>
 
           <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-elevated p-8 sm:p-10 border border-white/60">

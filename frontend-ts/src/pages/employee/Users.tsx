@@ -46,7 +46,7 @@ export default function EmployeeUsers() {
   const filtered = useMemo(() => {
     let list = users || [];
     if (roleFilter !== 'all') list = list.filter(u => u.role === roleFilter);
-    if (statusFilter !== 'all') list = list.filter(u => ((u as any).status || 'Active') === statusFilter);
+    if (statusFilter !== 'all') list = list.filter(u => u.status === statusFilter);
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(u => `${u.firstName} ${u.lastName} ${u.email}`.toLowerCase().includes(q));
@@ -69,7 +69,7 @@ export default function EmployeeUsers() {
   }, [users]);
 
   const openAdd = () => { setForm({ ...emptyForm }); setEditId(null); setErrors({}); setShowModal(true); };
-  const openEdit = (u: User) => { setForm({ firstName: u.firstName, lastName: u.lastName, email: u.email, role: u.role, status: (u as any).status || 'Active', password: '' }); setEditId(u.id); setErrors({}); setShowModal(true); };
+  const openEdit = (u: User) => { setForm({ firstName: u.firstName, lastName: u.lastName, email: u.email, role: u.role, status: u.status, password: '' }); setEditId(u.id); setErrors({}); setShowModal(true); };
 
   const validate = async (): Promise<boolean> => {
     const e: Record<string, string> = {};
@@ -224,7 +224,7 @@ export default function EmployeeUsers() {
                   <td className="py-3 px-4 font-medium text-forest-500">{u.firstName} {u.lastName}</td>
                   <td className="py-3 px-4 text-gray-500">{u.email}</td>
                   <td className="py-3 px-4"><Badge variant="info">{roleLabel(u.role)}</Badge></td>
-                  <td className="py-3 px-4"><Badge variant={((u as any).status || 'Active') === 'Active' ? 'success' : 'danger'}>{(u as any).status || 'Active'}</Badge></td>
+                  <td className="py-3 px-4"><Badge variant={u.status === 'Active' ? 'success' : 'danger'}>{u.status}</Badge></td>
                   <td className="py-3 px-4 text-right space-x-1">
                     <button onClick={() => openEdit(u)} className="text-forest-500 hover:bg-forest-50 px-2 py-1 rounded text-xs font-medium inline-flex items-center gap-0.5"><Icon name="edit" className="w-3.5 h-3.5" /> Edit</button>
                     <button onClick={() => confirmDelete(u.id)} className="text-red-600 hover:bg-red-50 px-2 py-1 rounded text-xs font-medium inline-flex items-center gap-0.5"><Icon name="trash" className="w-3.5 h-3.5" /> Delete</button>

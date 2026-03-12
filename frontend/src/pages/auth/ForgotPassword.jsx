@@ -4,13 +4,14 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { client } from '../../api/client.js';
 import { showToast } from '../../components/Toast.jsx';
 import Icon from '../../components/Icons.jsx';
+import { ROLES } from '../../utils/constants.js';
 
 export default function ForgotPassword() {
   const { user } = useAuth();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  if (user) return <Navigate to={user.role === 'applicant' ? '/student' : '/employee'} replace />;
+  if (user) return <Navigate to={user.role === ROLES.APPLICANT ? '/student' : '/employee'} replace />;
 
   const handleSubmit = async (e) => {
     e.preventDefault();

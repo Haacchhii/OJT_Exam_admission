@@ -1,0 +1,264 @@
+import { useState, useMemo } from 'react';
+import { useAsync } from '../../../hooks/useAsync';
+import { getAdmissions, getStats, bulkUpdateStatus, bulkDeleteAdmissions, VALID_TRANSITIONS } from '../../../api/admissions';
+import { getAcademicYears, getSemesters } from '../../../api/academicYears';
+import { showToast } from '../../../components/Toast';
+import { useConfirm } from '../../../components/ConfirmDialog';
+import { PageHeader, Badge, EmptyState, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert } from '../../../components/UI';
+import Icon from '../../../components/Icons';
+import { formatDate, badgeClass, asArray } from '../../../utils/helpers';
+import { ADMISSION_STATUSES, ADMISSION_IN_PROGRESS } from '../../../utils/constants';
+import { useAuth } from '../../../context/AuthContext';
+import type { Admission, AdmissionStats, AcademicYear, Semester } from '../../../types';
+
+const PER_PAGE = 10;
+const SLA_DAYS = 7;
+
+function daysPending(submittedAt: string) {
+  return Math.floor((Date.now() - new Date(submittedAt).getTime()) / 86400000);
+}
+
+interface RawData {
+  stats: AdmissionStats;
+  admissions: Admission[];
+  grades: string[];
+}
+
+interface Props {
+  onShowDetail: (id: number) => void;
+  directStatus: string | null;
+}
+
+export default function AdmissionList({ onShowDetail, directStatus }: Props) {
+  const { user } = useAuth();
+  const canManage = user?.role === 'administrator' || user?.role === 'registrar';
+  const confirm = useConfirm();
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState(directStatus || 'all');
+  const [gradeFilter, setGradeFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('newest');
+  const [yearFilter, setYearFilter] = useState('all');
+  const [semesterFilter, setSemesterFilter] = useState('all');
+  const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [bulkStatus, setBulkStatus] = useState<string>('Submitted');
+  const [saving, setSaving] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  const { data: rawData, loading, error, refetch } = useAsync<RawData>(async () => {
+    const [stats, rawAdm] = await Promise.all([getStats(), getAdmissions()]);
+    const admissions = asArray<Admission>(rawAdm);
+    const grades = [...new Set(admissions.map((a: Admission) => a.gradeLevel).filter(Boolean))].sort() as string[];
+    return { stats, admissions, grades };
+  });
+
+  const { data: academicYears } = useAsync<AcademicYear[]>(() => getAcademicYears());
+  const { data: allSemesters } = useAsync<Semester[]>(() => getSemesters());
+
+  const semesterOptions = useMemo(() => {
+    const list = allSemesters || [];
+    if (yearFilter === 'all') return list;
+    return list.filter(s => s.academicYearId === Number(yearFilter));
+  }, [allSemesters, yearFilter]);
+
+  const admissions = useMemo(() => {
+    let list = rawData?.admissions || [];
+    if (filter !== 'all') list = list.filter(a => a.status === filter);
+    if (gradeFilter !== 'all') list = list.filter(a => a.gradeLevel === gradeFilter);
+    if (yearFilter !== 'all') list = list.filter(a => a.academicYear?.id === Number(yearFilter));
+    if (semesterFilter !== 'all') list = list.filter(a => a.semester?.id === Number(semesterFilter));
+    if (search) list = list.filter(a => `${a.firstName} ${a.lastName} ${a.email}`.toLowerCase().includes(search.toLowerCase()));
+    if (sortBy === 'newest') list = [...list].sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+    else if (sortBy === 'oldest') list = [...list].sort((a, b) => new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime());
+    else if (sortBy === 'name') list = [...list].sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`));
+    else if (sortBy === 'status') list = [...list].sort((a, b) => a.status.localeCompare(b.status));
+    return list;
+  }, [rawData, search, filter, gradeFilter, yearFilter, semesterFilter, sortBy]);
+
+  const { paginated, totalPages, safePage, totalItems } = usePaginationSlice(admissions, page, PER_PAGE);
+
+  const resetPage = () => setPage(1);
+
+  const toggleSelect = (id: number) => setSelected(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggleAll = () => {
+    if (paginated.every((a: Admission) => selected.has(a.id))) {
+      setSelected(s => { const n = new Set(s); paginated.forEach((a: Admission) => n.delete(a.id)); return n; });
+    } else {
+      setSelected(s => { const n = new Set(s); paginated.forEach((a: Admission) => n.add(a.id)); return n; });
+    }
+  };
+
+  const handleBulkAction = async () => {
+    if (selected.size === 0 || saving) return;
+    const validIds: number[] = [];
+    const skippedIds: number[] = [];
+    selected.forEach(id => {
+      const adm = (rawData?.admissions || []).find(a => a.id === id);
+      if (!adm) return;
+      const allowed = VALID_TRANSITIONS[adm.status] || [];
+      if (adm.status === bulkStatus || (allowed as string[]).includes(bulkStatus)) {
+        validIds.push(id);
+      } else {
+        skippedIds.push(id);
+      }
+    });
+    if (validIds.length === 0) {
+      showToast(`None of the selected applications can transition to "${bulkStatus}".`, 'error');
+      return;
+    }
+    const skipNote = skippedIds.length > 0 ? ` (${skippedIds.length} will be skipped due to invalid transitions)` : '';
+    const ok = await confirm({
+      title: `Bulk ${bulkStatus}`,
+      message: `Are you sure you want to mark ${validIds.length} application(s) as "${bulkStatus}"?${skipNote}`,
+      confirmLabel: `${bulkStatus} All`,
+      variant: bulkStatus === 'Rejected' ? 'danger' : 'info',
+    });
+    if (!ok) return;
+    setSaving(true);
+    try {
+      await bulkUpdateStatus(validIds, bulkStatus);
+      showToast(`${validIds.length} application(s) updated to ${bulkStatus}.${skippedIds.length ? ` ${skippedIds.length} skipped.` : ''}`, 'success');
+      setSelected(new Set());
+      refetch();
+    } catch (err: any) {
+      showToast('Bulk update failed: ' + (err.message || 'Unknown error'), 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selected.size === 0 || bulkDeleting) return;
+    const ids = [...selected];
+    const ok = await confirm({
+      title: 'Delete Selected Applications',
+      message: `Are you sure you want to delete ${ids.length} application(s)? This action cannot be undone.`,
+      variant: 'danger',
+      confirmLabel: `Delete ${ids.length} Application(s)`,
+    });
+    if (!ok) return;
+    setBulkDeleting(true);
+    try {
+      await bulkDeleteAdmissions(ids);
+      showToast(`${ids.length} application(s) deleted.`, 'info');
+      setSelected(new Set());
+      refetch();
+    } catch {
+      showToast('Failed to delete applications.', 'error');
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
+  if (loading && !rawData) return <SkeletonPage />;
+  if (error) return <ErrorAlert error={error} onRetry={refetch} />;
+
+  const tabs = [
+    { key: 'all', label: 'All', count: rawData?.stats?.total || 0 },
+    { key: 'Submitted', label: 'Submitted', count: rawData?.stats?.submitted || 0 },
+    { key: 'Under Screening', label: 'Screening', count: rawData?.stats?.underScreening || 0 },
+    { key: 'Under Evaluation', label: 'Evaluation', count: rawData?.stats?.underEvaluation || 0 },
+    { key: 'Accepted', label: 'Accepted', count: rawData?.stats?.accepted || 0 },
+    { key: 'Rejected', label: 'Rejected', count: rawData?.stats?.rejected || 0 },
+  ];
+
+  return (
+    <div>
+      <PageHeader title="All Admission Applications" />
+
+      {/* Filter bar */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-4">
+        <input type="text" value={search} onChange={e => { setSearch(e.target.value); resetPage(); }} placeholder="Search by name or email..." aria-label="Search applications" className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none" />
+        <select value={filter} onChange={e => { setFilter(e.target.value); resetPage(); }} aria-label="Filter by status" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white">
+          <option value="all">All Status</option>
+          {ADMISSION_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <select value={gradeFilter} onChange={e => { setGradeFilter(e.target.value); resetPage(); }} aria-label="Filter by grade" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white">
+          <option value="all">All Grades</option>
+          {(rawData?.grades || []).map(g => <option key={g} value={g}>{g}</option>)}
+        </select>
+        <select value={yearFilter} onChange={e => { setYearFilter(e.target.value); setSemesterFilter('all'); resetPage(); }} aria-label="Filter by school year" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white">
+          <option value="all">All Years</option>
+          {(academicYears || []).map(y => <option key={y.id} value={y.id}>{y.year}</option>)}
+        </select>
+        <select value={semesterFilter} onChange={e => { setSemesterFilter(e.target.value); resetPage(); }} aria-label="Filter by semester" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white">
+          <option value="all">All Semesters</option>
+          {semesterOptions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </select>
+        <select value={sortBy} onChange={e => { setSortBy(e.target.value); resetPage(); }} aria-label="Sort by" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white">
+          <option value="newest">Newest First</option>
+          <option value="oldest">Oldest First</option>
+          <option value="name">Name A–Z</option>
+          <option value="status">Status</option>
+        </select>
+      </div>
+
+      <div className="flex gap-2 mb-4 flex-wrap" role="tablist">
+        {tabs.map(t => (
+          <button key={t.key} role="tab" aria-selected={filter === t.key} onClick={() => { setFilter(t.key); resetPage(); }} className={`px-4 py-2 rounded-lg text-sm font-medium transition ${filter === t.key ? 'bg-forest-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+            {t.label} ({t.count})
+          </button>
+        ))}
+      </div>
+
+      {/* Bulk action bar */}
+      {canManage && selected.size > 0 ? (
+        <div className="flex items-center gap-3 mb-4 bg-forest-50 border border-forest-200 rounded-lg px-4 py-3 animate-[fadeInUp_0.2s_ease-out]">
+          <span className="text-sm font-semibold text-forest-700">{selected.size} selected</span>
+          <select value={bulkStatus} onChange={e => setBulkStatus(e.target.value)} className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-forest-500/20 outline-none">
+            {ADMISSION_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <button onClick={handleBulkAction} disabled={saving} className="bg-forest-500 text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-forest-600 transition disabled:opacity-50 disabled:cursor-not-allowed">{saving ? 'Applying…' : 'Apply Status'}</button>
+          <button onClick={handleBulkDelete} disabled={bulkDeleting} className="bg-red-600 text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"><Icon name="trash" className="w-3.5 h-3.5" />{bulkDeleting ? 'Deleting…' : 'Delete Selected'}</button>
+          <button onClick={() => setSelected(new Set())} className="text-gray-500 text-sm hover:underline ml-auto">Clear selection</button>
+        </div>
+      ) : canManage ? (
+        <div className="flex items-center gap-2 mb-4 text-xs text-gray-400">
+          <Icon name="info" className="w-3.5 h-3.5" />
+          <span>Use checkboxes to select multiple applications for bulk status changes or deletion.</span>
+        </div>
+      ) : null}
+
+      <div className="gk-card p-4">
+        {paginated.length > 0 ? (
+          <>
+            <div className="table-scroll">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200 text-left text-gray-400 uppercase text-xs">
+                    {canManage && <th scope="col" className="py-3 px-2 w-8"><input type="checkbox" checked={paginated.length > 0 && paginated.every((a: Admission) => selected.has(a.id))} onChange={toggleAll} className="accent-forest-500 rounded" /></th>}
+                    <th scope="col" className="py-3 px-2">ID</th><th scope="col" className="py-3 px-2">Student Name</th><th scope="col" className="py-3 px-2">Email</th>
+                    <th scope="col" className="py-3 px-2">Grade Level</th><th scope="col" className="py-3 px-2">Type</th><th scope="col" className="py-3 px-2">Documents</th><th scope="col" className="py-3 px-2">Status</th>
+                    <th scope="col" className="py-3 px-2">Submitted</th><th scope="col" className="py-3 px-2">Days</th><th scope="col" className="py-3 px-2">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginated.map((a: Admission) => (
+                    <tr key={a.id} onClick={() => onShowDetail(a.id)} className={`border-b border-gray-50 hover:bg-gray-50 cursor-pointer ${selected.has(a.id) ? 'bg-gold-50/50' : ''}`}>
+                      {canManage && <td className="py-3 px-2" onClick={e => e.stopPropagation()}><input type="checkbox" checked={selected.has(a.id)} onChange={() => toggleSelect(a.id)} className="accent-forest-500 rounded" /></td>}
+                      <td className="py-3 px-2 text-gray-400">{a.id}</td>
+                      <td className="py-3 px-2 font-medium text-forest-500">{a.firstName} {a.lastName}</td>
+                      <td className="py-3 px-2 text-gray-500">{a.email}</td>
+                      <td className="py-3 px-2">{a.gradeLevel}</td>
+                      <td className="py-3 px-2"><Badge variant="info">{a.applicantType || 'New'}</Badge></td>
+                      <td className="py-3 px-2">{a.documents.length} file(s)</td>
+                      <td className="py-3 px-2"><Badge className={badgeClass(a.status)}>{a.status}</Badge></td>
+                      <td className="py-3 px-2 text-gray-500">{formatDate(a.submittedAt)}</td>
+                      <td className="py-3 px-2">{(ADMISSION_IN_PROGRESS as readonly string[]).includes(a.status) ? (
+                        <span className={`text-xs font-semibold ${daysPending(a.submittedAt) > SLA_DAYS ? 'text-red-600' : daysPending(a.submittedAt) > 5 ? 'text-amber-600' : 'text-gray-500'}`}>{daysPending(a.submittedAt)}d</span>
+                      ) : <span className="text-gray-400">—</span>}</td>
+                      <td className="py-3 px-2"><button onClick={(e) => { e.stopPropagation(); onShowDetail(a.id); }} className="text-forest-500 hover:underline text-xs font-medium">View</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <Pagination currentPage={safePage} totalPages={totalPages} onPageChange={setPage} totalItems={totalItems} itemsPerPage={PER_PAGE} />
+          </>
+        ) : (
+          <EmptyState icon="inbox" title="No applications found" text={search ? `No applications match "${search}"${filter !== 'all' ? ` with status "${filter}"` : ''}.` : filter !== 'all' ? `No applications with status "${filter}".` : 'No admission applications match your current filters.'} />
+        )}
+      </div>
+    </div>
+  );
+}

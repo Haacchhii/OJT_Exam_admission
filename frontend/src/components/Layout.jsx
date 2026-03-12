@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Outlet, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { ROLES } from '../utils/constants.js';
 import Sidebar from './Sidebar.jsx';
 import Topbar from './Topbar.jsx';
 import Breadcrumbs from './Breadcrumbs.jsx';
@@ -22,7 +23,7 @@ export function StudentLayout() {
   const [collapsed, setCollapsed] = useSidebarCollapsed();
 
   if (!user) return <Navigate to="/login" replace />;
-  if (user.role !== 'applicant') return <Navigate to="/employee" replace />;
+  if (user.role !== ROLES.APPLICANT) return <Navigate to="/employee" replace />;
 
   return (
     <KeyboardShortcutsProvider navigate={navigate} role={user.role}>
@@ -48,7 +49,7 @@ export function EmployeeLayout() {
   const [collapsed, setCollapsed] = useSidebarCollapsed();
 
   if (!user) return <Navigate to="/login" replace />;
-  if (user.role === 'applicant') return <Navigate to="/student" replace />;
+  if (user.role === ROLES.APPLICANT) return <Navigate to="/student" replace />;
 
   const ROLE_TITLE = {
     administrator: 'Admin Portal',

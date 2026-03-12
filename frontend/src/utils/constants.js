@@ -3,6 +3,8 @@
  * Update these values in one place to propagate across the entire app.
  */
 export const SCHOOL_NAME = 'GOLDEN KEY Integrated School of St. Joseph';
+export const SCHOOL_NAME_SHORT = 'GOLDEN KEY';
+export const SCHOOL_NAME_SUBTITLE = 'Integrated School of St. Joseph';
 export const SCHOOL_ADDRESS = 'Lapolapo 1st, San Jose, Batangas, Philippines';
 export const SCHOOL_PHONE = '(043)-702-2153';
 export const SCHOOL_YEAR = String(new Date().getFullYear());
@@ -39,7 +41,13 @@ export const SEMESTER_NAMES = ['First Semester', 'Second Semester', 'Summer'];
 /**
  * User roles known to the system.
  */
-export const USER_ROLES = ['administrator', 'registrar', 'teacher', 'applicant'];
+export const ROLES = {
+  ADMIN: 'administrator',
+  REGISTRAR: 'registrar',
+  TEACHER: 'teacher',
+  APPLICANT: 'applicant',
+};
+export const USER_ROLES = Object.values(ROLES);
 
 /**
  * Role options formatted for dropdowns ({ value, label }).
@@ -65,6 +73,16 @@ export const ADMISSION_IN_PROGRESS = ['Submitted', 'Under Screening', 'Under Eva
  * Per-page defaults used across list views.
  */
 export const DEFAULT_PAGE_SIZE = 10;
+
+/**
+ * UI timing constants (milliseconds).
+ */
+export const TOAST_DURATION_LONG = 5000;
+export const TOAST_DURATION_SHORT = 3000;
+export const NOTIFICATION_POLL_MS = 30000;
+export const PRINT_DELAY_MS = 300;
+export const REDIRECT_DELAY_MS = 1500;
+export const SCHEDULE_POLL_MS = 30000;
 
 /**
  * Dynamic school year — derives from current date.

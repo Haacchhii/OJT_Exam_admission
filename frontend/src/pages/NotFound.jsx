@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import Icon from '../components/Icons.jsx';
+import { SCHOOL_NAME_SHORT, SCHOOL_NAME_SUBTITLE } from '../utils/constants';
 
 export default function NotFound() {
   return (
@@ -27,7 +28,7 @@ export default function NotFound() {
             ← Go Back
           </button>
         </div>
-        <p className="text-xs text-gray-400 mt-8">&copy; 2026 <span className="text-gold-500 font-bold">GOLDEN KEY</span> <span className="text-forest-500">Integrated School of St. Joseph</span></p>
+        <p className="text-xs text-gray-400 mt-8">&copy; {new Date().getFullYear()} <span className="text-gold-500 font-bold">{SCHOOL_NAME_SHORT}</span> <span className="text-forest-500">{SCHOOL_NAME_SUBTITLE}</span></p>
       </div>
     </div>
   );

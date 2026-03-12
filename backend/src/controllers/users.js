@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import prisma from '../config/db.js';
 import { paginate, paginatedResponse } from '../utils/pagination.js';
 import { logAudit } from '../utils/auditLog.js';
+import { ROLES, BCRYPT_ROUNDS } from '../utils/constants.js';
 
 function safifyUser(user) {
   if (!user) return null;
@@ -15,7 +16,7 @@ export async function getUsers(req, res, next) {
     const { search, role, status, page, limit } = req.query;
     const pg = paginate(page, limit);
 
-    const where = {};
+    const where = { deletedAt: null };
     if (role)   where.role = role;
     if (status) where.status = status;
     if (search) {
@@ -39,7 +40,7 @@ export async function getUsers(req, res, next) {
 export async function getUser(req, res, next) {
   try {
     const user = await prisma.user.findUnique({ where: { id: Number(req.params.id) } });
-    if (!user) return res.status(404).json({ error: 'User not found', code: 'NOT_FOUND' });
+    if (!user || user.deletedAt) return res.status(404).json({ error: 'User not found', code: 'NOT_FOUND' });
     res.json(safifyUser(user));
   } catch (err) { next(err); }
 }
@@ -48,7 +49,7 @@ export async function getUser(req, res, next) {
 export async function getUserByEmail(req, res, next) {
   try {
     const user = await prisma.user.findUnique({ where: { email: req.params.email } });
-    if (!user) return res.status(404).json({ error: 'User not found', code: 'NOT_FOUND' });
+    if (!user || user.deletedAt) return res.status(404).json({ error: 'User not found', code: 'NOT_FOUND' });
     res.json(safifyUser(user));
   } catch (err) { next(err); }
 }
@@ -61,14 +62,14 @@ export async function createUser(req, res, next) {
       return res.status(400).json({ error: 'firstName, lastName, email, and password are required', code: 'VALIDATION_ERROR' });
     }
 
-    const passwordHash = await bcrypt.hash(password, 12);
+    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
     const user = await prisma.user.create({
-      data: { firstName, lastName, email, passwordHash, role: role || 'applicant', status: status || 'Active' },
+      data: { firstName, lastName, email, passwordHash, role: role || ROLES.APPLICANT, status: status || 'Active' },
     });
 
     res.status(201).json(safifyUser(user));
 
-    logAudit({ userId: req.user.id, action: 'user.create', entity: 'user', entityId: user.id, details: { email, role: role || 'applicant' }, ipAddress: req.ip });
+    logAudit({ userId: req.user.id, action: 'user.create', entity: 'user', entityId: user.id, details: { email, role: role || ROLES.APPLICANT }, ipAddress: req.ip });
   } catch (err) { next(err); }
 }
 
@@ -79,7 +80,7 @@ export async function updateUser(req, res, next) {
     const id = Number(req.params.id);
 
     // Only administrators can assign the administrator role
-    if (role === 'administrator' && req.user.role !== 'administrator') {
+    if (role === ROLES.ADMIN && req.user.role !== ROLES.ADMIN) {
       return res.status(403).json({ error: 'Only administrators can assign the administrator role', code: 'FORBIDDEN' });
     }
 
@@ -89,7 +90,7 @@ export async function updateUser(req, res, next) {
     if (email     !== undefined) data.email     = email;
     if (role      !== undefined) data.role      = role;
     if (status    !== undefined) data.status    = status;
-    if (password) data.passwordHash = await bcrypt.hash(password, 12);
+    if (password) data.passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
     // If email is changing, also update ExamRegistration.userEmail to keep the link intact
     if (email !== undefined) {
@@ -117,20 +118,14 @@ export async function updateUser(req, res, next) {
   } catch (err) { next(err); }
 }
 
-// DELETE /api/users/:id  — cascade deletes
+// DELETE /api/users/:id  — soft delete
 export async function deleteUser(req, res, next) {
   try {
     const id = Number(req.params.id);
     const user = await prisma.user.findUnique({ where: { id } });
-    if (!user) return res.status(404).json({ error: 'User not found', code: 'NOT_FOUND' });
+    if (!user || user.deletedAt) return res.status(404).json({ error: 'User not found', code: 'NOT_FOUND' });
 
-    // ExamRegistration is linked by userEmail (not FK), so cascade manually.
-    // Deleting registrations cascades to results, submitted_answers, essay_answers.
-    await prisma.$transaction([
-      prisma.examRegistration.deleteMany({ where: { userEmail: user.email } }),
-      // Deleting user cascades to: admissions → admission_documents, notifications
-      prisma.user.delete({ where: { id } }),
-    ]);
+    await prisma.user.update({ where: { id }, data: { deletedAt: new Date() } });
 
     logAudit({ userId: req.user.id, action: 'user.delete', entity: 'user', entityId: id, details: { email: user.email, role: user.role }, ipAddress: req.ip });
 
@@ -148,15 +143,12 @@ export async function bulkDeleteUsers(req, res, next) {
       return res.status(400).json({ error: 'No valid users to delete (you cannot delete yourself).', code: 'VALIDATION_ERROR' });
     }
 
-    const users = await prisma.user.findMany({ where: { id: { in: safeIds } } });
-    const emails = users.map(u => u.email);
+    const users = await prisma.user.findMany({ where: { id: { in: safeIds }, deletedAt: null } });
+    const ids = users.map(u => u.id);
 
-    await prisma.$transaction([
-      prisma.examRegistration.deleteMany({ where: { userEmail: { in: emails } } }),
-      prisma.user.deleteMany({ where: { id: { in: safeIds } } }),
-    ]);
+    await prisma.user.updateMany({ where: { id: { in: ids } }, data: { deletedAt: new Date() } });
 
-    logAudit({ userId: req.user.id, action: 'user.bulkDelete', entity: 'user', details: { count: users.length, ids: safeIds }, ipAddress: req.ip });
+    logAudit({ userId: req.user.id, action: 'user.bulkDelete', entity: 'user', details: { count: users.length, ids }, ipAddress: req.ip });
 
     res.json({ deleted: users.length });
   } catch (err) { next(err); }

@@ -9,13 +9,13 @@ import { showToast } from '../../components/Toast.jsx';
 import Modal from '../../components/Modal.jsx';
 import { useConfirm } from '../../components/ConfirmDialog.jsx';
 import { useUnsavedChanges } from '../../hooks/useUnsavedChanges.js';
-import { EXAM_GRADE_LEVELS } from '../../utils/constants.js';
+import { EXAM_GRADE_LEVELS, DEFAULT_PAGE_SIZE } from '../../utils/constants.js';
 import { PageHeader, StatCard, Badge, EmptyState, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert } from '../../components/UI.jsx';
 import Icon from '../../components/Icons.jsx';
 import { formatTime, badgeClass, uid } from '../../utils/helpers.js';
 
-const EXAMS_PER_PAGE = 10;
-const READINESS_PER_PAGE = 10;
+const EXAMS_PER_PAGE = DEFAULT_PAGE_SIZE;
+const READINESS_PER_PAGE = DEFAULT_PAGE_SIZE;
 const SCHED_PER_PAGE = 8;
 
 export default function EmployeeExams() {

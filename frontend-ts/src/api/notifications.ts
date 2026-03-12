@@ -19,3 +19,7 @@ export async function markNotificationRead(id: number) {
 export async function markAllRead(userId: string) {
   return client.patch<void>(`/notifications/${encodeURIComponent(userId)}/read-all`);
 }
+
+export async function createNotification(data: { userId: number; title: string; message: string; type?: string }) {
+  return client.post<Notification>('/notifications', data);
+}

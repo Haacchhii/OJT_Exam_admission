@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { getNotifications, markNotificationRead, markAllRead } from '../api/notifications.js';
 import { formatDate } from '../utils/helpers.js';
 import Icon from './Icons.jsx';
+import { ROLES, NOTIFICATION_POLL_MS } from '../utils/constants.js';
 
 export default function Topbar({ title, onMenuToggle, userId, user }) {
   const [showNotifs, setShowNotifs] = useState(false);
@@ -19,7 +20,7 @@ export default function Topbar({ title, onMenuToggle, userId, user }) {
 
   // Auto-refresh notifications every 30 seconds
   useEffect(() => {
-    const interval = setInterval(refresh, 30000);
+    const interval = setInterval(refresh, NOTIFICATION_POLL_MS);
     return () => clearInterval(interval);
   }, [refresh]);
 
@@ -31,7 +32,7 @@ export default function Topbar({ title, onMenuToggle, userId, user }) {
 
   const unread = notifs.filter(n => !n.isRead).length;
   const initials = user ? `${(user.firstName || '')[0] || ''}${(user.lastName || '')[0] || ''}`.toUpperCase() : 'U';
-  const isEmployee = user && user.role !== 'applicant';
+  const isEmployee = user && user.role !== ROLES.APPLICANT;
   const avatarCls = isEmployee ? 'bg-forest-500 text-gold-300' : 'bg-gold-400 text-forest-700';
   const fullName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : '';
 
@@ -121,7 +122,7 @@ export default function Topbar({ title, onMenuToggle, userId, user }) {
           </div>
           <div className="hidden sm:block">
             <p className="text-sm font-semibold text-gray-800 leading-tight">{fullName || 'User'}</p>
-            <p className="text-[11px] text-gray-400 leading-tight capitalize">{user?.role === 'applicant' ? 'Student' : user?.role || ''}</p>
+            <p className="text-[11px] text-gray-400 leading-tight capitalize">{user?.role === ROLES.APPLICANT ? 'Student' : user?.role || ''}</p>
           </div>
         </div>
       </div>

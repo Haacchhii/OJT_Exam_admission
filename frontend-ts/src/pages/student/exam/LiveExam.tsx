@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { submitExamAnswers } from '../../../api/results';
+import { saveDraftAnswers } from '../../../api/exams';
 import { showToast } from '../../../components/Toast';
 import Modal from '../../../components/Modal';
 import Icon from '../../../components/Icons';
@@ -18,7 +19,12 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
   const [answers, setAnswers] = useState<AnswerMap>(() => {
     try {
       const saved = sessionStorage.getItem(`gk_exam_answers_${registration.id}`);
-      return saved ? JSON.parse(saved) : {};
+      if (saved) return JSON.parse(saved);
+      // Fall back to server-saved draft
+      if ((registration as any).draftAnswers) {
+        try { return JSON.parse((registration as any).draftAnswers); } catch { /* ignore */ }
+      }
+      return {};
     } catch { return {}; }
   });
   const calcRemaining = () => {
@@ -83,8 +89,14 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
       if (document.hidden) {
         setCheatFlags(prev => {
           const next = prev + 1;
-          if (next >= 3) {
+          if (next >= 5) {
             doSubmitRef.current('⚠️ Exam Auto-Submitted', 'Your exam was automatically submitted due to multiple tab switches.');
+          } else if (next === 4) {
+            showToast('⚠️ Final warning! One more tab switch and your exam will be auto-submitted.', 'error');
+          } else if (next === 3) {
+            showToast('⚠️ Warning: You have switched tabs 3 times. 2 more and your exam will be auto-submitted.', 'error');
+          } else {
+            showToast(`Tab switch detected (${next}/5). Please stay on this page.`, 'error');
           }
           return next;
         });
@@ -97,6 +109,16 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
     window.addEventListener('beforeunload', beforeUnload);
     return () => { document.removeEventListener('visibilitychange', handler); document.removeEventListener('contextmenu', preventContext); window.removeEventListener('beforeunload', beforeUnload); };
   }, []);
+
+  // Auto-save answers to server every 30 seconds
+  useEffect(() => {
+    const autoSaveInterval = setInterval(() => {
+      if (!submittedRef.current) {
+        saveDraftAnswers(registration.id, answersRef.current).catch(() => {});
+      }
+    }, 30_000);
+    return () => clearInterval(autoSaveInterval);
+  }, [registration.id]);
 
   const q = questions[currentQ];
   const answered = Object.keys(answers).filter(k => answers[Number(k)] !== undefined && answers[Number(k)] !== '').length;
@@ -122,7 +144,7 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
         </div>
         {cheatFlags > 0 && (
           <div className="mt-2 bg-red-50 border border-red-200 text-red-600 text-sm px-3 py-1.5 rounded-lg" role="alert">
-            <Icon name="exclamation" className="w-4 h-4 inline" /> Tab switch detected! ({cheatFlags}/3)
+            <Icon name="exclamation" className="w-4 h-4 inline" /> Tab switch detected! ({cheatFlags}/5)
           </div>
         )}
       </div>

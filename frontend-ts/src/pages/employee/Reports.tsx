@@ -78,8 +78,8 @@ export default function EmployeeReports() {
     let adm = rawData?.admissions || [];
     if (statusFilter !== 'all') adm = adm.filter(a => a.status === statusFilter);
     if (gradeFilter !== 'all') adm = adm.filter(a => a.gradeLevel === gradeFilter);
-    if (yearFilter !== 'all') adm = adm.filter(a => (a as any).academicYear?.id === Number(yearFilter));
-    if (semesterFilter !== 'all') adm = adm.filter(a => (a as any).semester?.id === Number(semesterFilter));
+    if (yearFilter !== 'all') adm = adm.filter(a => a.academicYear?.id === Number(yearFilter));
+    if (semesterFilter !== 'all') adm = adm.filter(a => a.semester?.id === Number(semesterFilter));
     if (dateFrom) adm = adm.filter(a => new Date(a.submittedAt) >= new Date(dateFrom));
     if (dateTo) adm = adm.filter(a => new Date(a.submittedAt) <= new Date(dateTo + 'T23:59:59'));
 

@@ -8,6 +8,7 @@ import { createAdmissionSchema, updateStatusSchema, bulkUpdateStatusSchema, bulk
 import { writeLimiter } from '../middleware/rateLimits.js';
 import * as ctrl from '../controllers/admissions.js';
 import { previewDocument, extractDocument } from '../controllers/documentPreview.js';
+import { ROLES } from '../utils/constants.js';
 
 const router = Router();
 
@@ -18,28 +19,31 @@ router.use(authenticate);
 
 // Student scoped
 router.get('/mine',  ctrl.getMyAdmission);
-router.get('/stats', authorize('administrator', 'registrar', 'teacher'), validateQuery(admissionsStatsQuerySchema), ctrl.getStats);
+router.get('/stats', authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), validateQuery(admissionsStatsQuerySchema), ctrl.getStats);
 
 // Tracking (search by tracking ID — any authenticated user)
 router.get('/track/:trackingId', ctrl.trackApplication);
 
 // CRUD
-router.get('/',      authorize('administrator', 'registrar', 'teacher'), validateQuery(admissionsQuerySchema), ctrl.getAdmissions);
-router.get('/:id',   authorize('administrator', 'registrar', 'applicant'), ctrl.getAdmission);  // ownership checked in controller
-router.post('/',     authorize('applicant'), writeLimiter, validate(createAdmissionSchema), ctrl.createAdmission);
+router.get('/',      authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), validateQuery(admissionsQuerySchema), ctrl.getAdmissions);
+router.get('/:id',   authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.APPLICANT), ctrl.getAdmission);  // ownership checked in controller
+router.post('/',     authorize(ROLES.APPLICANT), writeLimiter, validate(createAdmissionSchema), ctrl.createAdmission);
 
 // Documents upload — ownership checked in controller
-router.post('/:id/documents', authorize('administrator', 'registrar', 'applicant'), upload.array('documents', 10), verifyMime, ctrl.uploadDocuments);
+router.post('/:id/documents', authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.APPLICANT), upload.array('documents', 10), verifyMime, ctrl.uploadDocuments);
 
 // Document download — ownership checked in controller
 router.get('/:id/documents/:docId/download', ctrl.downloadDocument);
 
 // Document OCR / text extraction — ownership checked in controller
-router.post('/:id/documents/:docId/extract', authorize('administrator', 'registrar'), extractDocument);
+router.post('/:id/documents/:docId/extract', authorize(ROLES.ADMIN, ROLES.REGISTRAR), extractDocument);
+
+// Document review (accept/reject)
+router.patch('/:id/documents/:docId/review', authorize(ROLES.ADMIN, ROLES.REGISTRAR), ctrl.reviewDocument);
 
 // Bulk operations (MUST come before /:id to avoid param capture)
-router.patch('/bulk-status',  authorize('administrator', 'registrar'), validate(bulkUpdateStatusSchema), ctrl.bulkUpdateStatus);
-router.post('/bulk-delete',   authorize('administrator', 'registrar'), validate(bulkDeleteSchema), ctrl.bulkDeleteAdmissions);
-router.patch('/:id/status',  authorize('administrator', 'registrar'), validate(updateStatusSchema), ctrl.updateStatus);
+router.patch('/bulk-status',  authorize(ROLES.ADMIN, ROLES.REGISTRAR), validate(bulkUpdateStatusSchema), ctrl.bulkUpdateStatus);
+router.post('/bulk-delete',   authorize(ROLES.ADMIN, ROLES.REGISTRAR), validate(bulkDeleteSchema), ctrl.bulkDeleteAdmissions);
+router.patch('/:id/status',  authorize(ROLES.ADMIN, ROLES.REGISTRAR), validate(updateStatusSchema), ctrl.updateStatus);
 
 export default router;

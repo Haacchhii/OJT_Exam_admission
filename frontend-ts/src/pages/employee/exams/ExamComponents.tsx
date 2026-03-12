@@ -11,7 +11,7 @@ export function FormInput({ label, required, ...props }: { label: string; requir
 }
 
 export function QuestionCard({ q, i }: { q: ParsedQuestion | ExamQuestion; i: number }) {
-  const choices = (q as any).choices || [];
+  const choices = q.choices || [];
   return (
     <div className="border border-gray-200 rounded-lg p-4">
       <div className="flex items-center gap-3 mb-2">

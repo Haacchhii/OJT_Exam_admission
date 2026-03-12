@@ -4,6 +4,7 @@ import { authorize } from '../middleware/rbac.js';
 import { validate, validateQuery } from '../middleware/validate.js';
 import { createExamSchema, updateExamSchema, createScheduleSchema, updateScheduleSchema, bulkDeleteSchema, examsQuerySchema, schedulesQuerySchema, registrationsQuerySchema } from '../utils/schemas.js';
 import * as ctrl from '../controllers/exams.js';
+import { ROLES } from '../utils/constants.js';
 
 const router = Router();
 router.use(authenticate);
@@ -11,24 +12,26 @@ router.use(authenticate);
 // ─── Schedules (MUST be before /:id to avoid param capture) ───
 router.get('/schedules',           validateQuery(schedulesQuerySchema), ctrl.getSchedules);
 router.get('/schedules/available', ctrl.getAvailableSchedules);
-router.post('/schedules',          authorize('administrator', 'teacher'), validate(createScheduleSchema), ctrl.createSchedule);
-router.put('/schedules/:id',       authorize('administrator', 'teacher'), validate(updateScheduleSchema), ctrl.updateSchedule);
-router.delete('/schedules/:id',    authorize('administrator', 'teacher'), ctrl.deleteSchedule);
+router.post('/schedules',          authorize(ROLES.ADMIN, ROLES.TEACHER), validate(createScheduleSchema), ctrl.createSchedule);
+router.put('/schedules/:id',       authorize(ROLES.ADMIN, ROLES.TEACHER), validate(updateScheduleSchema), ctrl.updateSchedule);
+router.delete('/schedules/:id',    authorize(ROLES.ADMIN, ROLES.TEACHER), ctrl.deleteSchedule);
 
 // ─── Registrations (MUST be before /:id to avoid param capture) ───
-router.get('/registrations',       authorize('administrator', 'registrar', 'teacher'), validateQuery(registrationsQuerySchema), ctrl.getRegistrations);
-router.get('/registrations/mine',  authorize('applicant'), ctrl.getMyRegistrations);
-router.post('/registrations',      authorize('administrator', 'registrar', 'applicant'), ctrl.createRegistration);
-router.patch('/registrations/:id/start', authorize('applicant'), ctrl.startExam);
+router.get('/registrations',       authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), validateQuery(registrationsQuerySchema), ctrl.getRegistrations);
+router.get('/registrations/mine',  authorize(ROLES.APPLICANT), ctrl.getMyRegistrations);
+router.post('/registrations',      authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.APPLICANT), ctrl.createRegistration);
+router.patch('/registrations/:id/start', authorize(ROLES.APPLICANT), ctrl.startExam);
+router.patch('/registrations/:id/save-draft', authorize(ROLES.APPLICANT), ctrl.saveDraftAnswers);
 
 // ─── Exams CRUD ────────────────────────────────────
 router.get('/',     validateQuery(examsQuerySchema), ctrl.getExams);
-router.post('/bulk-delete', authorize('administrator', 'teacher'), validate(bulkDeleteSchema), ctrl.bulkDeleteExams);
-router.get('/:id',  authorize('administrator', 'teacher'), ctrl.getExam);
-router.get('/:id/student', authorize('applicant'), ctrl.getExamForStudent);
-router.get('/:id/review',  authorize('applicant'), ctrl.getExamForReview);
-router.post('/',    authorize('administrator', 'teacher'), validate(createExamSchema), ctrl.createExam);
-router.put('/:id',  authorize('administrator', 'teacher'), validate(updateExamSchema), ctrl.updateExam);
-router.delete('/:id', authorize('administrator', 'teacher'), ctrl.deleteExam);
+router.post('/bulk-delete', authorize(ROLES.ADMIN, ROLES.TEACHER), validate(bulkDeleteSchema), ctrl.bulkDeleteExams);
+router.post('/:id/clone',  authorize(ROLES.ADMIN, ROLES.TEACHER), ctrl.cloneExam);
+router.get('/:id',  authorize(ROLES.ADMIN, ROLES.TEACHER, ROLES.REGISTRAR), ctrl.getExam);
+router.get('/:id/student', authorize(ROLES.APPLICANT), ctrl.getExamForStudent);
+router.get('/:id/review',  authorize(ROLES.APPLICANT), ctrl.getExamForReview);
+router.post('/',    authorize(ROLES.ADMIN, ROLES.TEACHER), validate(createExamSchema), ctrl.createExam);
+router.put('/:id',  authorize(ROLES.ADMIN, ROLES.TEACHER), validate(updateExamSchema), ctrl.updateExam);
+router.delete('/:id', authorize(ROLES.ADMIN, ROLES.TEACHER), ctrl.deleteExam);
 
 export default router;

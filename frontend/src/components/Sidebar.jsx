@@ -2,6 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useConfirm } from './ConfirmDialog.jsx';
 import Icon from './Icons.jsx';
+import { SCHOOL_NAME_SHORT, SCHOOL_NAME_SUBTITLE } from '../utils/constants';
 
 const studentLinks = [
   { to: '/student', icon: 'dashboard', label: 'Dashboard', end: true },
@@ -54,8 +55,8 @@ export default function Sidebar({ open, onClose, role, collapsed, onToggleCollap
               <Icon name="key" className="w-5 h-5 text-forest-800" />
             </div>
             <div className={`transition-opacity duration-200 ${collapsed ? 'lg:hidden' : ''}`}>
-              <h2 className="text-sm font-bold tracking-tight leading-tight"><span className="text-gold-400">GOLDEN KEY</span></h2>
-              <p className="text-[10px] text-forest-300 font-medium">Integrated School of St. Joseph</p>
+              <h2 className="text-sm font-bold tracking-tight leading-tight"><span className="text-gold-400">{SCHOOL_NAME_SHORT}</span></h2>
+              <p className="text-[10px] text-forest-300 font-medium">{SCHOOL_NAME_SUBTITLE}</p>
             </div>
           </div>
 
@@ -124,7 +125,7 @@ export default function Sidebar({ open, onClose, role, collapsed, onToggleCollap
               <Icon name="logout" className="w-[18px] h-[18px] shrink-0" />
               <span className={collapsed ? 'lg:hidden' : ''}>Log out</span>
             </button>
-            <p className={`text-[10px] text-gray-600 mt-3 px-3 ${collapsed ? 'lg:hidden' : ''}`}>&copy; 2026 GKISSJ</p>
+            <p className={`text-[10px] text-gray-600 mt-3 px-3 ${collapsed ? 'lg:hidden' : ''}`}>&copy; {new Date().getFullYear()} GKISSJ</p>
           </div>
         </div>
       </aside>

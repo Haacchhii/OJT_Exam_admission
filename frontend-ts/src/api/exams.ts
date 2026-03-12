@@ -17,6 +17,10 @@ export async function getExams(params?: ExamParams) {
   return client.get<Exam[]>(`/exams${qs(params)}`);
 }
 
+export async function getExam(id: number) {
+  return client.get<Exam>(`/exams/${id}`);
+}
+
 export async function getExamForStudent(id: number) {
   return client.get<Exam>(`/exams/${id}/student`);
 }
@@ -39,6 +43,10 @@ export async function deleteExam(id: number) {
 
 export async function bulkDeleteExams(ids: number[]) {
   return client.post<{ deleted: number }>('/exams/bulk-delete', { ids });
+}
+
+export async function cloneExam(id: number) {
+  return client.post<Exam>(`/exams/${id}/clone`, {});
 }
 
 export async function getExamSchedules(examId?: number, params?: ExamParams) {
@@ -83,5 +91,12 @@ export async function registerForExam(userEmail: string, scheduleId: number) {
 export async function startExam(registrationId: number) {
   return client.patch<ExamRegistration>(
     `/exams/registrations/${registrationId}/start`
+  );
+}
+
+export async function saveDraftAnswers(registrationId: number, answers: Record<string | number, unknown>) {
+  return client.patch<{ ok: boolean }>(
+    `/exams/registrations/${registrationId}/save-draft`,
+    { answers }
   );
 }

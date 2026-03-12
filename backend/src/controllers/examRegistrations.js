@@ -2,6 +2,7 @@ import prisma from '../config/db.js';
 import { paginate, paginatedResponse } from '../utils/pagination.js';
 import { generateTrackingId } from '../utils/tracking.js';
 import { sendExamBookingEmail } from '../utils/email.js';
+import { ROLES } from '../utils/constants.js';
 
 // GET /api/exams/registrations/list?search=&status=&page=&limit=
 export async function getRegistrations(req, res, next) {
@@ -48,7 +49,7 @@ export async function createRegistration(req, res, next) {
     }
 
     // For applicants, always use their authenticated email to prevent impersonation
-    const email = req.user.role === 'applicant' ? req.user.email : userEmail;
+    const email = req.user.role === ROLES.APPLICANT ? req.user.email : userEmail;
     if (!email) {
       return res.status(400).json({ error: 'userEmail is required', code: 'VALIDATION_ERROR' });
     }
@@ -158,5 +159,30 @@ export async function startExam(req, res, next) {
     });
 
     res.json(updated);
+  } catch (err) { next(err); }
+}
+
+// PATCH /api/exams/registrations/:id/save-draft
+export async function saveDraftAnswers(req, res, next) {
+  try {
+    const id = Number(req.params.id);
+    const reg = await prisma.examRegistration.findUnique({ where: { id } });
+    if (!reg) return res.status(404).json({ error: 'Registration not found', code: 'NOT_FOUND' });
+
+    if (reg.userEmail !== req.user.email) {
+      return res.status(403).json({ error: 'You can only save answers for your own exam', code: 'FORBIDDEN' });
+    }
+
+    if (reg.status !== 'started') {
+      return res.status(400).json({ error: 'Exam is not in progress', code: 'VALIDATION_ERROR' });
+    }
+
+    const { answers } = req.body;
+    await prisma.examRegistration.update({
+      where: { id },
+      data: { draftAnswers: JSON.stringify(answers) },
+    });
+
+    res.json({ ok: true });
   } catch (err) { next(err); }
 }

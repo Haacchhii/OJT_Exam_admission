@@ -1,7 +1,7 @@
 import prisma from '../config/db.js';
 import path from 'path';
 import { paginate, paginatedResponse } from '../utils/pagination.js';
-import { VALID_TRANSITIONS } from '../utils/constants.js';
+import { VALID_TRANSITIONS, ROLES, MAX_BULK_OPERATIONS } from '../utils/constants.js';
 import { generateTrackingId, generateStudentNumber } from '../utils/tracking.js';
 import { logAudit } from '../utils/auditLog.js';
 import { sendAdmissionSubmittedEmail, sendAdmissionStatusEmail } from '../utils/email.js';
@@ -14,7 +14,7 @@ function shapeAdmission(adm) {
   return {
     ...rest,
     documents: docs ? docs.map(d => d.documentName) : [],
-    documentFiles: docs ? docs.map(d => ({ id: d.id, name: d.documentName, filePath: d.filePath, hasExtraction: !!(d.extractedText && d.extractedData) })) : [],
+    documentFiles: docs ? docs.map(d => ({ id: d.id, name: d.documentName, filePath: d.filePath, hasExtraction: !!(d.extractedText && d.extractedData), reviewStatus: d.reviewStatus, reviewNote: d.reviewNote || null, reviewedAt: d.reviewedAt })) : [],
     academicYear: academicYear ? { id: academicYear.id, year: academicYear.year } : null,
     semester: semester ? { id: semester.id, name: semester.name } : null,
   };
@@ -26,7 +26,7 @@ export async function getAdmissions(req, res, next) {
     const { status, grade, search, sort, page, limit, academicYearId, semesterId } = req.query;
     const pg = paginate(page, limit);
 
-    const where = {};
+    const where = { deletedAt: null };
     if (status)        where.status = status;
     if (grade)         where.gradeLevel = grade;
     if (academicYearId) where.academicYearId = Number(academicYearId);
@@ -57,7 +57,7 @@ export async function getAdmissions(req, res, next) {
 export async function getMyAdmission(req, res, next) {
   try {
     const admission = await prisma.admission.findFirst({
-      where: { userId: req.user.id },
+      where: { userId: req.user.id, deletedAt: null },
       include: { documents: true, academicYear: true, semester: true },
       orderBy: { submittedAt: 'desc' },
     });
@@ -72,7 +72,7 @@ export async function getAdmission(req, res, next) {
       where: { id: Number(req.params.id) },
       include: { documents: true },
     });
-    if (!admission) return res.status(404).json({ error: 'Admission not found', code: 'NOT_FOUND' });
+    if (!admission || admission.deletedAt) return res.status(404).json({ error: 'Admission not found', code: 'NOT_FOUND' });
     // Ownership: applicants can only view their own admission
     if (req.user.role === 'applicant' && admission.userId !== req.user.id) {
       return res.status(403).json({ error: 'Access denied', code: 'FORBIDDEN' });
@@ -85,7 +85,7 @@ export async function getAdmission(req, res, next) {
 export async function getStats(req, res, next) {
   try {
     const { grade, from, to, academicYearId, semesterId } = req.query;
-    const where = {};
+    const where = { deletedAt: null };
     if (grade)         where.gradeLevel = grade;
     if (academicYearId) where.academicYearId = Number(academicYearId);
     if (semesterId)    where.semesterId = Number(semesterId);
@@ -158,7 +158,7 @@ export async function createAdmission(req, res, next) {
     }).catch(() => {});
 
     // Notify employees about new application
-    prisma.user.findMany({ where: { role: { in: ['administrator', 'registrar'] } }, select: { id: true } })
+    prisma.user.findMany({ where: { role: { in: [ROLES.ADMIN, ROLES.REGISTRAR] } }, select: { id: true } })
       .then(staff => {
         if (staff.length) {
           return prisma.notification.createMany({
@@ -184,7 +184,7 @@ export async function uploadDocuments(req, res, next) {
     // Ownership check
     const admission = await prisma.admission.findUnique({ where: { id: admissionId } });
     if (!admission) return res.status(404).json({ error: 'Admission not found', code: 'NOT_FOUND' });
-    if (req.user.role === 'applicant' && admission.userId !== req.user.id) {
+    if (req.user.role === ROLES.APPLICANT && admission.userId !== req.user.id) {
       return res.status(403).json({ error: 'Access denied', code: 'FORBIDDEN' });
     }
     const files = req.files;
@@ -218,7 +218,7 @@ export async function updateStatus(req, res, next) {
     const id = Number(req.params.id);
 
     const admission = await prisma.admission.findUnique({ where: { id }, include: { documents: true } });
-    if (!admission) return res.status(404).json({ error: 'Admission not found', code: 'NOT_FOUND' });
+    if (!admission || admission.deletedAt) return res.status(404).json({ error: 'Admission not found', code: 'NOT_FOUND' });
 
     // Validate transition
     const allowed = VALID_TRANSITIONS[admission.status] || [];
@@ -290,8 +290,8 @@ export async function bulkUpdateStatus(req, res, next) {
     if (!ids?.length || !status) {
       return res.status(400).json({ error: 'ids and status are required', code: 'VALIDATION_ERROR' });
     }
-    if (ids.length > 100) {
-      return res.status(400).json({ error: 'Cannot process more than 100 records at once', code: 'VALIDATION_ERROR' });
+    if (ids.length > MAX_BULK_OPERATIONS) {
+      return res.status(400).json({ error: `Cannot process more than ${MAX_BULK_OPERATIONS} records at once`, code: 'VALIDATION_ERROR' });
     }
 
     // Validate each admission's transition
@@ -354,9 +354,9 @@ export async function trackApplication(req, res, next) {
         where: { trackingId: upper },
         include: { documents: true },
       });
-      if (admission) {
+      if (admission && !admission.deletedAt) {
         // Ownership: applicants can only view their own tracking data
-        if (req.user.role === 'applicant' && admission.userId !== req.user.id) {
+        if (req.user.role === ROLES.APPLICANT && admission.userId !== req.user.id) {
           return res.status(403).json({ error: 'Access denied', code: 'FORBIDDEN' });
         }
         results.type = 'admission';
@@ -376,7 +376,7 @@ export async function trackApplication(req, res, next) {
       });
       if (registration) {
         // Ownership: applicants can only view their own tracking data
-        if (req.user.role === 'applicant' && registration.userEmail !== req.user.email) {
+        if (req.user.role === ROLES.APPLICANT && registration.userEmail !== req.user.email) {
           return res.status(403).json({ error: 'Access denied', code: 'FORBIDDEN' });
         }
         results.type = 'exam';
@@ -424,10 +424,7 @@ export async function bulkDeleteAdmissions(req, res, next) {
   try {
     const { ids } = req.body;
 
-    await prisma.$transaction([
-      prisma.admissionDocument.deleteMany({ where: { admissionId: { in: ids } } }),
-      prisma.admission.deleteMany({ where: { id: { in: ids } } }),
-    ]);
+    await prisma.admission.updateMany({ where: { id: { in: ids } }, data: { deletedAt: new Date() } });
 
     logAudit({ userId: req.user.id, action: 'admission.bulkDelete', entity: 'admission', details: { count: ids.length, ids }, ipAddress: req.ip });
 
@@ -447,7 +444,7 @@ export async function downloadDocument(req, res, next) {
     }
 
     // Ownership check
-    if (req.user.role === 'applicant') {
+    if (req.user.role === ROLES.APPLICANT) {
       const admission = await prisma.admission.findUnique({ where: { id: admissionId } });
       if (!admission || admission.userId !== req.user.id) {
         return res.status(403).json({ error: 'Access denied', code: 'FORBIDDEN' });
@@ -460,5 +457,39 @@ export async function downloadDocument(req, res, next) {
 
     const filePath = path.resolve(env.UPLOAD_DIR, doc.filePath);
     res.download(filePath, doc.documentName);
+  } catch (err) { next(err); }
+}
+
+// PATCH /api/admissions/:id/documents/:docId/review
+export async function reviewDocument(req, res, next) {
+  try {
+    const admissionId = Number(req.params.id);
+    const docId = Number(req.params.docId);
+    const { reviewStatus, reviewNote } = req.body;
+
+    if (!['accepted', 'rejected'].includes(reviewStatus)) {
+      return res.status(400).json({ error: 'reviewStatus must be "accepted" or "rejected"', code: 'VALIDATION_ERROR' });
+    }
+
+    const doc = await prisma.admissionDocument.findUnique({ where: { id: docId } });
+    if (!doc || doc.admissionId !== admissionId) {
+      return res.status(404).json({ error: 'Document not found', code: 'NOT_FOUND' });
+    }
+
+    const updated = await prisma.admissionDocument.update({
+      where: { id: docId },
+      data: {
+        reviewStatus,
+        reviewNote: reviewNote || null,
+        reviewedAt: new Date(),
+        reviewedById: req.user.id,
+      },
+    });
+
+    await logAudit(req.user.id, 'document.review', 'AdmissionDocument', docId, {
+      admissionId, reviewStatus, reviewNote,
+    });
+
+    res.json({ id: updated.id, reviewStatus: updated.reviewStatus, reviewNote: updated.reviewNote, reviewedAt: updated.reviewedAt });
   } catch (err) { next(err); }
 }

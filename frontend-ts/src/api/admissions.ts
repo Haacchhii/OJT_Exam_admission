@@ -62,3 +62,23 @@ export function getDocumentDownloadUrl(admissionId: number, docId: number): stri
   const base = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
   return `${base}/admissions/${admissionId}/documents/${docId}/download`;
 }
+
+export function getDocumentPreviewUrl(admissionId: number, docId: number): string {
+  const base = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
+  return `${base}/admissions/${admissionId}/documents/${docId}/preview`;
+}
+
+export interface ExtractedResult {
+  text: string;
+  data: { type: string; fields: Record<string, string> };
+  extractedAt: string;
+  cached: boolean;
+}
+
+export async function extractDocumentData(admissionId: number, docId: number): Promise<ExtractedResult> {
+  return client.post<ExtractedResult>(`/admissions/${admissionId}/documents/${docId}/extract`, {});
+}
+
+export async function reviewDocument(admissionId: number, docId: number, reviewStatus: 'accepted' | 'rejected', reviewNote?: string) {
+  return client.patch<{ id: number; reviewStatus: string; reviewNote: string | null; reviewedAt: string }>(`/admissions/${admissionId}/documents/${docId}/review`, { reviewStatus, reviewNote });
+}

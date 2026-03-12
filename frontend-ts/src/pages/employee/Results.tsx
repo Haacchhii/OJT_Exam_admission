@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAsync } from '../../hooks/useAsync';
-import { getExamResults, getEssayAnswers, scoreEssay } from '../../api/results';
+import { getExamResults, getEssayAnswers, scoreEssay, getQuestionAnalytics } from '../../api/results';
 import { getExamRegistrations, getExamSchedules, getExams } from '../../api/exams';
 import { getAcademicYears, getSemesters } from '../../api/academicYears';
 import { getUsers } from '../../api/users';
@@ -25,7 +25,7 @@ interface RawData {
 
 interface EnrichedResult extends ExamResult {
   student: User | null | undefined;
-  exam: (Exam & { academicYear?: { id: number }; semester?: { id: number } }) | null | undefined;
+  exam: Exam | null | undefined;
 }
 
 interface EssayCardProps {
@@ -39,7 +39,7 @@ interface EssayCardProps {
 export default function EmployeeResults() {
   const { user: authUser } = useAuth();
   const canScoreEssays = authUser?.role === 'administrator' || authUser?.role === 'teacher';
-  const [tab, setTab] = useState<'results' | 'essays'>('results');
+  const [tab, setTab] = useState<'results' | 'essays' | 'analytics'>('results');
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const [examFilter, setExamFilter] = useState('all');
@@ -50,6 +50,9 @@ export default function EmployeeResults() {
   const [scoreVal, setScoreVal] = useState('');
   const [commentVal, setCommentVal] = useState('');
   const [saving, setSaving] = useState(false);
+  const [analyticsExamId, setAnalyticsExamId] = useState<number | null>(null);
+  const [analyticsData, setAnalyticsData] = useState<Awaited<ReturnType<typeof getQuestionAnalytics>> | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [resultsPage, setResultsPage] = useState(1);
 
   const { data: rawData, loading, error, refetch } = useAsync<RawData>(async () => {
@@ -88,13 +91,13 @@ export default function EmployeeResults() {
   let filtered = enriched;
   if (search) filtered = filtered.filter(r => {
     const name = r.student ? `${r.student.firstName} ${r.student.lastName}`.toLowerCase() : '';
-    return name.includes(search.toLowerCase()) || ((r.exam as any)?.title || '').toLowerCase().includes(search.toLowerCase());
+    return name.includes(search.toLowerCase()) || (r.exam?.title || '').toLowerCase().includes(search.toLowerCase());
   });
   if (filter === 'passed') filtered = filtered.filter(r => r.passed);
   if (filter === 'failed') filtered = filtered.filter(r => !r.passed);
   if (examFilter !== 'all') filtered = filtered.filter(r => r.exam && String(r.exam.id) === examFilter);
-  if (yearFilter !== 'all') filtered = filtered.filter(r => (r.exam as any)?.academicYear?.id === Number(yearFilter));
-  if (semesterFilter !== 'all') filtered = filtered.filter(r => (r.exam as any)?.semester?.id === Number(semesterFilter));
+  if (yearFilter !== 'all') filtered = filtered.filter(r => r.exam?.academicYear?.id === Number(yearFilter));
+  if (semesterFilter !== 'all') filtered = filtered.filter(r => r.exam?.semester?.id === Number(semesterFilter));
   if (essayStatusFilter === 'reviewed') filtered = filtered.filter(r => r.essayReviewed);
   if (essayStatusFilter === 'pending') filtered = filtered.filter(r => !r.essayReviewed);
 
@@ -142,7 +145,7 @@ export default function EmployeeResults() {
   const handlePrintResult = (r: EnrichedResult) => {
     const esc = (s: unknown) => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     const studentName = r.student ? `${esc(r.student.firstName)} ${esc(r.student.lastName)}` : 'Unknown';
-    const examTitle = r.exam ? esc((r.exam as any).title) : 'N/A';
+    const examTitle = r.exam ? esc(r.exam.title) : 'N/A';
     const printWin = window.open('', '_blank');
     if (!printWin || printWin.closed) {
       showToast('Popup blocked — please allow popups for this site and try again.', 'error');
@@ -173,14 +176,14 @@ export default function EmployeeResults() {
       <div class="grid">
         <div class="field"><label>Student Name</label><span>${studentName}</span></div>
         <div class="field"><label>Email</label><span>${r.student ? esc(r.student.email) : 'N/A'}</span></div>
-        <div class="field"><label>Grade Level</label><span>${r.student ? esc((r.student as any).gradeLevel || '') : 'N/A'}</span></div>
+        <div class="field"><label>Grade Level</label><span>${r.student ? esc(r.student.applicantProfile?.gradeLevel || '') : 'N/A'}</span></div>
         <div class="field"><label>Exam</label><span>${examTitle}</span></div>
       </div>
       <h2>Exam Results</h2>
       <div class="score-circle"><div class="pct ${r.passed ? 'passed' : 'failed'}">${r.percentage.toFixed(1)}%</div><p style="color:#888;font-size:13px">Overall Score</p></div>
       <div class="grid">
         <div class="field"><label>Total Score</label><span>${r.totalScore} / ${r.maxPossible}</span></div>
-        <div class="field"><label>Passing Score</label><span>${(r.exam as any)?.passingScore || '—'}%</span></div>
+        <div class="field"><label>Passing Score</label><span>${r.exam?.passingScore || '—'}%</span></div>
         <div class="field"><label>Result</label><span class="result-badge ${r.passed ? 'passed' : 'failed'}">${r.passed ? 'PASSED' : 'FAILED'}</span></div>
         <div class="field"><label>Essay Review</label><span>${r.essayReviewed ? 'Reviewed' : 'Pending'}</span></div>
         <div class="field"><label>Date Taken</label><span>${r.createdAt ? new Date(r.createdAt).toLocaleDateString() : 'N/A'}</span></div>
@@ -192,6 +195,16 @@ export default function EmployeeResults() {
     setTimeout(() => printWin.print(), 300);
   };
 
+  const loadAnalytics = async (examId: number) => {
+    setAnalyticsExamId(examId);
+    setAnalyticsLoading(true);
+    try {
+      const data = await getQuestionAnalytics(examId);
+      setAnalyticsData(data);
+    } catch { showToast('Failed to load analytics', 'error'); }
+    finally { setAnalyticsLoading(false); }
+  };
+
   return (
     <div>
       <div className="flex gap-2 mb-6 flex-wrap" role="tablist">
@@ -199,6 +212,7 @@ export default function EmployeeResults() {
         {canScoreEssays && (
           <button role="tab" aria-selected={tab === 'essays'} onClick={() => setTab('essays')} className={`px-4 py-2 rounded-lg text-sm font-medium transition inline-flex items-center gap-1.5 ${tab === 'essays' ? 'bg-forest-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}><Icon name="documentText" className="w-4 h-4" /> Essay Review ({pending.length})</button>
         )}
+        <button role="tab" aria-selected={tab === 'analytics'} onClick={() => setTab('analytics')} className={`px-4 py-2 rounded-lg text-sm font-medium transition inline-flex items-center gap-1.5 ${tab === 'analytics' ? 'bg-forest-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}><Icon name="arrowTrendUp" className="w-4 h-4" /> Analytics</button>
       </div>
 
       {tab === 'results' && (
@@ -247,7 +261,7 @@ export default function EmployeeResults() {
                       {paginatedResults.map(r => (
                         <tr key={r.registrationId} className="border-b border-gray-50 hover:bg-gray-50">
                           <td className="py-3 px-2 font-medium text-forest-500">{r.student ? `${r.student.firstName} ${r.student.lastName}` : 'Unknown'}</td>
-                          <td className="py-3 px-2">{(r.exam as any)?.title || 'N/A'}</td>
+                          <td className="py-3 px-2">{r.exam?.title || 'N/A'}</td>
                           <td className="py-3 px-2">{r.totalScore} / {r.maxPossible}</td>
                           <td className="py-3 px-2">{r.percentage.toFixed(1)}%</td>
                           <td className="py-3 px-2"><Badge className={r.passed ? 'gk-badge gk-badge-passed' : 'gk-badge gk-badge-failed'}>{r.passed ? 'Passed' : 'Failed'}</Badge></td>
@@ -285,8 +299,81 @@ export default function EmployeeResults() {
               ))}
               {scored.length > 0 && <h3 className="font-bold text-forest-500 text-lg mt-6 flex items-center gap-1.5"><Icon name="checkCircle" className="w-5 h-5" /> Scored ({scored.length})</h3>}
               {scored.map(e => (
-                <EssayCard key={e.id} essay={e} student={getStudentName(e.registrationId)} question={getQuestionText(e.questionId)} status="scored" />
+                <EssayCard key={e.id} essay={e} student={getStudentName(e.registrationId)} question={getQuestionText(e.questionId)} status="scored" onScore={() => { setScoreModal(e); setScoreVal(String(e.pointsAwarded ?? '')); setCommentVal(e.comment || ''); }} />
               ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === 'analytics' && (
+        <div>
+          <PageHeader title="Per-Question Analytics" subtitle="See how applicants performed on each question." />
+          <div className="gk-card p-4 mb-6">
+            <label className="text-sm font-medium text-gray-700 mr-2">Select Exam</label>
+            <select value={analyticsExamId ?? ''} onChange={e => { const v = Number(e.target.value); if (v) loadAnalytics(v); }} className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
+              <option value="">— Choose an exam —</option>
+              {exams.map(ex => <option key={ex.id} value={ex.id}>{ex.title}</option>)}
+            </select>
+          </div>
+          {analyticsLoading && <SkeletonPage />}
+          {!analyticsLoading && analyticsData && (
+            <div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                <StatCard icon="users" value={analyticsData.totalTakers} label="Total Takers" color="blue" />
+                <StatCard icon="chartBar" value={analyticsData.analytics.length} label="Questions" color="amber" />
+                <StatCard icon="checkCircle" value={analyticsData.analytics.filter(q => q.questionType === 'multiple_choice' && (q.correctRate ?? 0) >= 0.7).length} label="Easy Questions (≥70%)" color="emerald" />
+              </div>
+              <div className="space-y-4">
+                {analyticsData.analytics.map((q, idx) => (
+                  <div key={q.questionId} className="gk-card p-5">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <span className="text-xs font-semibold text-gray-400">Q{idx + 1}</span>
+                        <p className="font-medium text-forest-500">{q.questionText}</p>
+                      </div>
+                      <Badge className={`gk-badge ml-2 ${q.questionType === 'multiple_choice' ? 'gk-badge-reviewed' : 'gk-badge-pending'}`}>
+                        {q.questionType === 'multiple_choice' ? 'Multiple Choice' : 'Essay'} · {q.points} pts
+                      </Badge>
+                    </div>
+                    {q.questionType === 'multiple_choice' && (
+                      <div>
+                        <div className="flex items-center gap-3 mb-3">
+                          <span className="text-sm text-gray-600">Correct rate:</span>
+                          <div className="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden">
+                            <div className={`h-full rounded-full ${(q.correctRate ?? 0) >= 0.7 ? 'bg-emerald-500' : (q.correctRate ?? 0) >= 0.4 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${((q.correctRate ?? 0) * 100).toFixed(0)}%` }} />
+                          </div>
+                          <span className="text-sm font-semibold">{((q.correctRate ?? 0) * 100).toFixed(0)}%</span>
+                          <span className="text-xs text-gray-400">({q.correctCount}/{q.totalAnswered})</span>
+                        </div>
+                        {q.choiceDistribution && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {q.choiceDistribution.map(c => (
+                              <div key={c.choiceId} className={`flex items-center gap-2 text-sm rounded-lg px-3 py-2 ${c.isCorrect ? 'bg-emerald-50 border border-emerald-200' : 'bg-gray-50 border border-gray-200'}`}>
+                                <span className="flex-1 truncate">{c.choiceText}</span>
+                                <span className="font-semibold">{c.count}</span>
+                                {c.isCorrect && <Icon name="checkCircle" className="w-4 h-4 text-emerald-500 shrink-0" />}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {q.questionType === 'essay' && (
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm text-gray-600">Avg score:</span>
+                        <span className="font-semibold text-forest-500">{q.avgScore != null ? `${Number(q.avgScore).toFixed(1)} / ${q.points}` : 'Not yet scored'}</span>
+                        <span className="text-xs text-gray-400">({q.scoredCount ?? 0} scored of {q.totalAnswered})</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {!analyticsLoading && !analyticsData && analyticsExamId && (
+            <div className="gk-card p-8 text-center">
+              <p className="text-gray-500">No analytics data available for this exam.</p>
             </div>
           )}
         </div>
@@ -339,10 +426,17 @@ function EssayCard({ essay, student, question, status, onScore }: EssayCardProps
       {status === 'pending' && onScore && (
         <button onClick={onScore} className="bg-forest-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-forest-600">Score This Answer</button>
       )}
-      {status === 'scored' && essay.comment && (
-        <div className="mt-2">
-          <span className="text-xs text-gray-400 uppercase font-semibold">Feedback</span>
-          <div className="bg-gold-50 border border-gold-200 rounded-lg p-3 text-sm text-gray-700 leading-relaxed mt-1">{essay.comment}</div>
+      {status === 'scored' && (
+        <div className="flex items-center gap-3 mt-2">
+          {essay.comment && (
+            <div className="flex-1">
+              <span className="text-xs text-gray-400 uppercase font-semibold">Feedback</span>
+              <div className="bg-gold-50 border border-gold-200 rounded-lg p-3 text-sm text-gray-700 leading-relaxed mt-1">{essay.comment}</div>
+            </div>
+          )}
+          {onScore && (
+            <button onClick={onScore} className="border border-forest-300 text-forest-600 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-forest-50 inline-flex items-center gap-1 shrink-0"><Icon name="edit" className="w-3.5 h-3.5" /> Edit Score</button>
+          )}
         </div>
       )}
     </div>

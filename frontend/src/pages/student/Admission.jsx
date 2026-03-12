@@ -12,7 +12,7 @@ import { PageHeader, Badge, SkeletonPage, ErrorAlert } from '../../components/UI
 import Icon from '../../components/Icons.jsx';
 import { formatDate, badgeClass } from '../../utils/helpers.js';
 import { useUnsavedChanges } from '../../hooks/useUnsavedChanges.js';
-import { GRADE_OPTIONS, DOC_REQUIREMENTS, DOC_SLOT_LABELS, ALLOWED_FILE_TYPES, MAX_FILE_SIZE, getCurrentSchoolYear, GENDER_OPTIONS, GUARDIAN_RELATIONS, APPLICANT_TYPES, ADMISSION_PROGRESS_STEPS } from '../../utils/constants.js';
+import { GRADE_OPTIONS, DOC_REQUIREMENTS, DOC_SLOT_LABELS, ALLOWED_FILE_TYPES, MAX_FILE_SIZE, getCurrentSchoolYear, GENDER_OPTIONS, GUARDIAN_RELATIONS, APPLICANT_TYPES, ADMISSION_PROGRESS_STEPS, SCHOOL_NAME } from '../../utils/constants.js';
 
 function getRequiredDocs(gradeLevel) {
   const reqs = DOC_REQUIREMENTS[gradeLevel] || DOC_REQUIREMENTS['Grade 2']; // default fallback
@@ -220,7 +220,7 @@ export default function StudentAdmission() {
   if (!existingApp && !examPassed) {
     return (
       <div>
-        <PageHeader title="Admission Application" subtitle="GOLDEN KEY Integrated School of St. Joseph — Admission Form" />
+        <PageHeader title="Admission Application" subtitle={`${SCHOOL_NAME} — Admission Form`} />
         <div className="gk-card p-8 text-center">
           <div className="w-16 h-16 rounded-2xl bg-forest-50 flex items-center justify-center mx-auto mb-4"><Icon name="lock" className="w-8 h-8 text-forest-500" /></div>
           <h3 className="text-xl font-bold text-forest-500 mb-2">Entrance Exam Required</h3>
@@ -291,7 +291,7 @@ export default function StudentAdmission() {
 
   return (
     <div>
-      <PageHeader title="Admission Application" subtitle="GOLDEN KEY Integrated School of St. Joseph — Admission Form" />
+      <PageHeader title="Admission Application" subtitle={`${SCHOOL_NAME} — Admission Form`} />
 
       {/* Admission Policy Summary */}
       <div className="bg-forest-50 border border-forest-200 rounded-xl p-4 mb-6">
@@ -365,7 +365,7 @@ export default function StudentAdmission() {
                 ...f,
                 applicantType: type,
                 // Auto-fill prev school for continuing students
-                prevSchool: type === 'Continuing' ? 'GOLDEN KEY Integrated School of St. Joseph' : (f.prevSchool === 'GOLDEN KEY Integrated School of St. Joseph' ? '' : f.prevSchool),
+                prevSchool: type === 'Continuing' ? SCHOOL_NAME : (f.prevSchool === SCHOOL_NAME ? '' : f.prevSchool),
                 // Auto-fill student number for continuing students if available from user profile
                 studentNumber: type === 'Continuing' && user?.applicantProfile?.studentNumber ? user.applicantProfile.studentNumber : (type !== 'Continuing' ? '' : f.studentNumber),
               }));
@@ -438,7 +438,7 @@ export default function StudentAdmission() {
           {/* Continuing student note */}
           {form.applicantType === 'Continuing' && (
             <div className="bg-forest-50 border border-forest-200 text-forest-700 rounded-lg px-4 py-3 mb-4 text-sm">
-              ℹ️ As a continuing student of Golden Key Integrated School of St. Joseph, your student number {user?.applicantProfile?.studentNumber ? 'has been auto-detected' : 'should be entered above'}. This application is for re-enrollment in the next school year.
+              ℹ️ As a continuing student of {SCHOOL_NAME}, your student number {user?.applicantProfile?.studentNumber ? 'has been auto-detected' : 'should be entered above'}. This application is for re-enrollment in the next school year.
             </div>
           )}
 
@@ -566,7 +566,7 @@ export default function StudentAdmission() {
           {/* Data privacy consent */}
           <label className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 mb-6 text-xs text-gray-500 flex items-start gap-3 cursor-pointer select-none">
             <input type="checkbox" checked={privacyConsent} onChange={e => setPrivacyConsent(e.target.checked)} className="accent-forest-500 mt-0.5 shrink-0" />
-            <span><Icon name="lock" className="w-4 h-4 inline shrink-0 mr-1" /> By submitting this application, I consent to the collection and processing of my personal information in accordance with the Data Privacy Act of 2012 (RA 10173) and GOLDEN KEY Integrated School of St. Joseph's privacy policies. Personal data shall not be disclosed without consent, except as required by law.</span>
+            <span><Icon name="lock" className="w-4 h-4 inline shrink-0 mr-1" /> By submitting this application, I consent to the collection and processing of my personal information in accordance with the Data Privacy Act of 2012 (RA 10173) and {SCHOOL_NAME}'s privacy policies. Personal data shall not be disclosed without consent, except as required by law.</span>
           </label>
 
           <div className="flex justify-between">
@@ -587,7 +587,7 @@ export default function StudentAdmission() {
               <p className="text-xs text-gray-400 mt-1">Save this ID to track your application status anytime.</p>
             </div>
           )}
-          <p className="text-gray-500 mt-2">Your admission application has been received by <strong>GOLDEN KEY Integrated School of St. Joseph</strong>.</p>
+          <p className="text-gray-500 mt-2">Your admission application has been received by <strong>{SCHOOL_NAME}</strong>.</p>
           <p className="text-xs text-gray-400 mt-2">Next step: The school will screen your application and notify you of your admission status.</p>
           <Link to="/student/dashboard" className="mt-4 inline-block bg-forest-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-forest-600">Go to Dashboard</Link>
         </div>

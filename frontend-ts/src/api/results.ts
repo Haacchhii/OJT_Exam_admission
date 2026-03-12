@@ -39,6 +39,26 @@ export async function getSubmittedAnswers(registrationId: number) {
   return client.get<SubmittedAnswer[]>(`/results/answers/${registrationId}`);
 }
 
+export async function getQuestionAnalytics(examId: number) {
+  return client.get<{
+    examId: number;
+    examTitle: string;
+    totalTakers: number;
+    analytics: Array<{
+      questionId: number;
+      questionText: string;
+      questionType: string;
+      points: number;
+      totalAnswered: number;
+      correctCount?: number;
+      correctRate?: number;
+      choiceDistribution?: Array<{ choiceId: number; choiceText: string; isCorrect: boolean; count: number }>;
+      scoredCount?: number;
+      avgScore?: number | null;
+    }>;
+  }>(`/results/analytics/${examId}`);
+}
+
 export async function submitExamAnswers(
   registrationId: number,
   answersObj: Record<string | number, unknown>

@@ -1,5 +1,8 @@
 import nodemailer from 'nodemailer';
 import env from '../config/env.js';
+import { SCHOOL_NAME } from './constants.js';
+
+const appUrl = env.APP_URL;
 
 // ─── Transporter ──────────────────────────────────────────────────────────────
 // If SMTP_HOST is set, use generic SMTP. Otherwise fall back to Gmail service
@@ -44,7 +47,7 @@ export async function sendEmail({ to, subject, html }) {
   }
   try {
     await transporter.sendMail({
-      from: `"Golden Key School" <${env.SMTP_FROM || env.SMTP_USER}>`,
+      from: `"${SCHOOL_NAME}" <${env.SMTP_FROM || env.SMTP_USER}>`,
       to,
       subject,
       html,
@@ -104,9 +107,9 @@ function wrap(body) {
       ${body}
     </div>
     <div class="footer">
-      <p>This is an automated email from Golden Key Integrated School of St. Joseph.<br/>
+      <p>This is an automated email from ${SCHOOL_NAME}.<br/>
       Please do not reply to this email. For inquiries, contact the registrar's office.<br/>
-      &copy; ${new Date().getFullYear()} Golden Key Integrated School of St. Joseph. All rights reserved.</p>
+      &copy; ${new Date().getFullYear()} ${SCHOOL_NAME}. All rights reserved.</p>
     </div>
   </div>
 </body>
@@ -117,7 +120,7 @@ function wrap(body) {
 export function sendWelcomeEmail({ to, firstName }) {
   return sendEmail({
     to,
-    subject: 'Welcome to Golden Key Integrated School of St. Joseph!',
+    subject: `Welcome to ${SCHOOL_NAME}!`,
     html: wrap(`
       <h2 class="title">Welcome, ${firstName}! 👋</h2>
       <p class="subtitle">Your account has been created successfully.</p>
@@ -134,7 +137,7 @@ export function sendWelcomeEmail({ to, firstName }) {
         <span class="step-num">3</span>
         <div><strong>Submit your admission application</strong><br/><span style="color:#6b7280;font-size:13px;">Once you pass, fill out the admission form and upload the required documents.</span></div>
       </div>
-      <a class="btn" href="${env.APP_URL || 'http://localhost:5173'}/#/login">Go to the Portal</a>
+      <a class="btn" href="${appUrl}/#/login">Go to the Portal</a>
       <p style="font-size:13px;color:#9ca3af;">If you didn't create this account, please ignore this email.</p>
     `),
   });
@@ -157,7 +160,7 @@ export function sendExamBookingEmail({ to, firstName, examTitle, scheduleDate, s
         <span><b>Booking Reference:</b> ${trackingId}</span>
       </div>
       <p>Please make sure to log in on time. The exam will be available in the <b>Exam</b> section of your student portal.</p>
-      <a class="btn" href="${env.APP_URL || 'http://localhost:5173'}/#/student/exam">View My Exam</a>
+      <a class="btn" href="${appUrl}/#/student/exam">View My Exam</a>
       <p style="font-size:13px;color:#6b7280;">If you need to cancel or reschedule, please contact the registrar's office before your scheduled date.</p>
     `),
   });
@@ -183,9 +186,9 @@ export function sendExamResultEmail({ to, firstName, examTitle, score, maxPossib
       </div>
       ${passed
         ? `<p>Congratulations! You passed the entrance exam. You can now proceed to submit your <b>Admission Application</b> through the portal.</p>
-           <a class="btn" href="${env.APP_URL || 'http://localhost:5173'}/#/student/admission">Submit Admission Application</a>`
+           <a class="btn" href="${appUrl}/#/student/admission">Submit Admission Application</a>`
         : `<p>Unfortunately, you did not meet the passing score for this exam. Please contact the registrar's office if you have questions about re-examination options.</p>
-           <a class="btn" href="${env.APP_URL || 'http://localhost:5173'}/#/student">Go to Portal</a>`
+           <a class="btn" href="${appUrl}/#/student">Go to Portal</a>`
       }
     `),
   });
@@ -207,7 +210,7 @@ export function sendAdmissionSubmittedEmail({ to, firstName, trackingId, gradeLe
         <span><b>Status:</b> <span class="badge badge-amber">Submitted</span></span>
       </div>
       <p>You will receive an email notification as your application progresses through each stage of the review process. You can also check your status anytime in the student portal.</p>
-      <a class="btn" href="${env.APP_URL || 'http://localhost:5173'}/#/student">Track My Application</a>
+      <a class="btn" href="${appUrl}/#/student">Track My Application</a>
     `),
   });
 }
@@ -234,9 +237,9 @@ const STATUS_CONFIG = {
     badge: '<span class="badge badge-green">Accepted</span>',
     boxClass: '',
     heading: 'Congratulations — Application Accepted! 🎉',
-    subtitle: 'Welcome to Golden Key Integrated School of St. Joseph!',
+    subtitle: `Welcome to ${SCHOOL_NAME}!`,
     body: 'We are thrilled to inform you that your admission application has been <b>accepted</b>. Please visit the registrar\'s office or contact us to complete the enrollment process.',
-    cta: `<a class="btn" href="${env?.APP_URL || 'http://localhost:5173'}/#/student">Go to Portal</a>`,
+    cta: `<a class="btn" href="${appUrl}/#/student">Go to Portal</a>`,
   },
   'Rejected': {
     badge: '<span class="badge badge-red">Not Accepted</span>',
@@ -266,7 +269,7 @@ export function sendAdmissionStatusEmail({ to, firstName, trackingId, status, no
         ${notes ? `<br/><span><b>Note from Registrar:</b> ${notes}</span>` : ''}
       </div>
       <p>${cfg.body}</p>
-      ${cfg.cta || `<a class="btn" href="${env.APP_URL || 'http://localhost:5173'}/#/student">View My Application</a>`}
+      ${cfg.cta || `<a class="btn" href="${appUrl}/#/student">View My Application</a>`}
     `),
   });
 }

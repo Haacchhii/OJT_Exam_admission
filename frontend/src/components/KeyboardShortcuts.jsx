@@ -1,6 +1,7 @@
 import { useState, useEffect, createContext, useContext } from 'react';
 import Modal from './Modal.jsx';
 import { ROLE_PERMISSIONS } from '../context/AuthContext.jsx';
+import { ROLES } from '../utils/constants.js';
 
 /* ===== Keyboard Shortcuts Context ===== */
 const ShortcutsContext = createContext(null);
@@ -17,7 +18,7 @@ const SHORTCUTS = [
 
 export function KeyboardShortcutsProvider({ children, navigate, role }) {
   const [helpOpen, setHelpOpen] = useState(false);
-  const perms = ROLE_PERMISSIONS[role] || (role === 'applicant' ? ['admissions', 'exams', 'results'] : []);
+  const perms = ROLE_PERMISSIONS[role] || (role === ROLES.APPLICANT ? ['admissions', 'exams', 'results'] : []);
 
   useEffect(() => {
     const handler = (e) => {
@@ -30,11 +31,11 @@ export function KeyboardShortcutsProvider({ children, navigate, role }) {
         return;
       }
 
-      const base = role === 'applicant' ? '/student' : '/employee';
+      const base = role === ROLES.APPLICANT ? '/student' : '/employee';
 
       if (e.altKey && e.key.toLowerCase() === 'd') { e.preventDefault(); navigate(base); }
-      else if (e.altKey && e.key.toLowerCase() === 'a' && perms.includes('admissions')) { e.preventDefault(); navigate(`${base}/${role === 'applicant' ? 'admission' : 'admissions'}`); }
-      else if (e.altKey && e.key.toLowerCase() === 'e' && perms.includes('exams')) { e.preventDefault(); navigate(`${base}/${role === 'applicant' ? 'exam' : 'exams'}`); }
+      else if (e.altKey && e.key.toLowerCase() === 'a' && perms.includes('admissions')) { e.preventDefault(); navigate(`${base}/${role === ROLES.APPLICANT ? 'admission' : 'admissions'}`); }
+      else if (e.altKey && e.key.toLowerCase() === 'e' && perms.includes('exams')) { e.preventDefault(); navigate(`${base}/${role === ROLES.APPLICANT ? 'exam' : 'exams'}`); }
       else if (e.altKey && e.key.toLowerCase() === 'r' && perms.includes('results')) { e.preventDefault(); navigate(`${base}/results`); }
       else if (e.altKey && e.key.toLowerCase() === 'u' && perms.includes('users')) { e.preventDefault(); navigate(`${base}/users`); }
       else if (e.key === '?' && !e.altKey && !e.ctrlKey && !e.metaKey) { setHelpOpen(true); }

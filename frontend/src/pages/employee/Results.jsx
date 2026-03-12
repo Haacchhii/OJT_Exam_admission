@@ -10,12 +10,13 @@ import Modal from '../../components/Modal.jsx';
 import { PageHeader, StatCard, Badge, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert } from '../../components/UI.jsx';
 import Icon from '../../components/Icons.jsx';
 import { formatDate } from '../../utils/helpers.js';
+import { SCHOOL_NAME_SHORT, SCHOOL_NAME_SUBTITLE, SCHOOL_NAME, SCHOOL_ADDRESS, SCHOOL_PHONE, ROLES, DEFAULT_PAGE_SIZE, PRINT_DELAY_MS } from '../../utils/constants.js';
 
-const RESULTS_PER_PAGE = 10;
+const RESULTS_PER_PAGE = DEFAULT_PAGE_SIZE;
 
 export default function EmployeeResults() {
   const { user: authUser } = useAuth();
-  const canScoreEssays = authUser?.role === 'administrator' || authUser?.role === 'teacher';
+  const canScoreEssays = authUser?.role === ROLES.ADMIN || authUser?.role === ROLES.TEACHER;
   const [tab, setTab] = useState('results');
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
@@ -145,7 +146,7 @@ export default function EmployeeResults() {
         @media print { body { padding: 20px; } }
       </style>
     </head><body>
-      <div class="logo"><span>🔑</span><h1><span style="color:#fbbf24">GOLDEN KEY</span><br/><span style="color:#166534">Integrated School of St. Joseph</span></h1><p class="subtitle">Lapolapo 1st, San Jose, Batangas, Philippines &bull; Tel: (043)-702-2153<br/>Entrance Examination Result</p></div>
+      <div class="logo"><span>🔑</span><h1><span style="color:#fbbf24">${SCHOOL_NAME_SHORT}</span><br/><span style="color:#166534">${SCHOOL_NAME_SUBTITLE}</span></h1><p class="subtitle">${SCHOOL_ADDRESS} &bull; Tel: ${SCHOOL_PHONE}<br/>Entrance Examination Result</p></div>
       <h2>Student Information</h2>
       <div class="grid">
         <div class="field"><label>Student Name</label><span>${studentName}</span></div>
@@ -162,11 +163,11 @@ export default function EmployeeResults() {
         <div class="field"><label>Essay Review</label><span>${r.essayReviewed ? 'Reviewed' : 'Pending'}</span></div>
         <div class="field"><label>Date Taken</label><span>${r.createdAt ? new Date(r.createdAt).toLocaleDateString() : 'N/A'}</span></div>
       </div>
-      <p style="margin-top:40px;font-size:11px;color:#aaa;text-align:center">Printed on ${new Date().toLocaleDateString()} — GOLDEN KEY Integrated School of St. Joseph &copy; ${new Date().getFullYear()}</p>
+      <p style="margin-top:40px;font-size:11px;color:#aaa;text-align:center">Printed on ${new Date().toLocaleDateString()} — ${SCHOOL_NAME} &copy; ${new Date().getFullYear()}</p>
     </body></html>`);
     printWin.document.close();
     printWin.focus();
-    setTimeout(() => printWin.print(), 300);
+    setTimeout(() => printWin.print(), PRINT_DELAY_MS);
   };
 
   return (

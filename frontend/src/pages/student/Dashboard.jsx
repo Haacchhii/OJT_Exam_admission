@@ -8,6 +8,7 @@ import { StatCard, PageHeader, SkeletonPage, ErrorAlert } from '../../components
 import { formatDate } from '../../utils/helpers.js';
 import { ADMISSION_PROGRESS_STEPS } from '../../utils/constants.js';
 import Icon from '../../components/Icons.jsx';
+import { SCHOOL_NAME_SHORT } from '../../utils/constants';
 
 export default function StudentDashboard() {
   const { user } = useAuth();
@@ -50,7 +51,7 @@ export default function StudentDashboard() {
               <Icon name="key" className="w-5 h-5 text-gold-600" />
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="font-bold text-gray-800 mb-1">Welcome to Golden Key!</h3>
+              <h3 className="font-bold text-gray-800 mb-1">Welcome to {SCHOOL_NAME_SHORT}!</h3>
               <p className="text-gray-500 text-sm mb-4">You're all set. Here's what to do next to complete your application:</p>
               <div className="flex flex-wrap gap-4 mb-5">
                 {[

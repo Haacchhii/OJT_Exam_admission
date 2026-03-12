@@ -1,12 +1,12 @@
-import { useState, type ChangeEvent, type DragEvent } from 'react';
+import { useState, useEffect, type ChangeEvent, type DragEvent } from 'react';
 import { useAsync } from '../../../hooks/useAsync';
-import { addExam, updateExam } from '../../../api/exams';
+import { addExam, updateExam, getExam } from '../../../api/exams';
 import { getAcademicYears, getSemesters } from '../../../api/academicYears';
 import { showToast } from '../../../components/Toast';
 import Modal from '../../../components/Modal';
 import { useUnsavedChanges } from '../../../hooks/useUnsavedChanges';
 import { EXAM_GRADE_LEVELS } from '../../../utils/constants';
-import { PageHeader, Badge, EmptyState } from '../../../components/UI';
+import { PageHeader, Badge, EmptyState, SkeletonPage } from '../../../components/UI';
 import Icon from '../../../components/Icons';
 import { uid } from '../../../utils/helpers';
 import { parseCSVQuestions, parseJSONQuestions, parseExcelQuestions, downloadTemplate } from './examParsers';
@@ -19,9 +19,9 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
   const [grade, setGrade] = useState(editExam?.gradeLevel || '');
   const [duration, setDuration] = useState<string | number>(editExam?.durationMinutes || '');
   const [passing, setPassing] = useState<string | number>(editExam?.passingScore || '');
-  const [yearId, setYearId] = useState<string | number>((editExam as any)?.academicYear?.id || '');
-  const [semId, setSemId] = useState<string | number>((editExam as any)?.semester?.id || '');
-  const [questions, setQuestions] = useState<ParsedQuestion[]>(editExam ? JSON.parse(JSON.stringify(editExam.questions)) : []);
+  const [yearId, setYearId] = useState<string | number>(editExam?.academicYear?.id || '');
+  const [semId, setSemId] = useState<string | number>(editExam?.semester?.id || '');
+  const [questions, setQuestions] = useState<ParsedQuestion[]>([]);
   const [qModal, setQModal] = useState<'mc' | 'essay' | null>(null);
   const [qText, setQText] = useState('');
   const [qPts, setQPts] = useState('');
@@ -30,6 +30,19 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
   const [dragOver, setDragOver] = useState(false);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Fetch full exam details (with questions) when editing
+  const { data: fullExam, loading: examLoading } = useAsync<Exam | null>(
+    () => editExam ? getExam(editExam.id) : Promise.resolve(null),
+    [editExam?.id]
+  );
+
+  // Populate questions from the full exam once loaded
+  useEffect(() => {
+    if (fullExam?.questions) {
+      setQuestions(JSON.parse(JSON.stringify(fullExam.questions)));
+    }
+  }, [fullExam]);
 
   const { data: years } = useAsync<AcademicYear[]>(() => getAcademicYears());
   const { data: allSems } = useAsync<Semester[]>(() => getSemesters());
@@ -161,6 +174,8 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
   const totalPoints = questions.reduce((s, q) => s + (q.points || 0), 0);
   const mcCount = questions.filter(q => q.questionType === 'mc').length;
   const essayCount = questions.filter(q => q.questionType === 'essay').length;
+
+  if (editExam && examLoading && !fullExam) return <SkeletonPage />;
 
   return (
     <div>

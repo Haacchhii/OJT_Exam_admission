@@ -17,13 +17,17 @@ model User {
   passwordHash  String   @map("password_hash")
   role          String   @default("applicant") // administrator | registrar | teacher | applicant
   status        String   @default("Active")    // Active | Inactive
+  phone         String?
+  address       String?
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
 
   admissions      Admission[]
   examsCreated    Exam[]             @relation("ExamCreator")
   reviewedResults ExamResult[]       @relation("ResultReviewer")
   scoredEssays    EssayAnswer[]      @relation("EssayScorer")
+  reviewedDocs    AdmissionDocument[] @relation("DocumentReviewer")
   notifications   Notification[]
   auditLogs       AuditLog[]
   examRegistrations ExamRegistration[] @relation("ExamRegistrationUser")
@@ -62,6 +66,7 @@ model Admission {
   semesterId      Int?     @map("semester_id")
   submittedAt     DateTime @default(now()) @map("submitted_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
 
   user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   documents     AdmissionDocument[]
@@ -84,8 +89,13 @@ model AdmissionDocument {
   extractedText String?   @map("extracted_text")
   extractedData String?   @map("extracted_data") // JSON string of parsed key-value fields
   extractedAt   DateTime? @map("extracted_at")
+  reviewStatus  String    @default("pending") @map("review_status") // pending | accepted | rejected
+  reviewedAt    DateTime? @map("reviewed_at")
+  reviewedById  Int?      @map("reviewed_by_id")
+  reviewNote    String?   @map("review_note")
 
-  admission Admission @relation(fields: [admissionId], references: [id], onDelete: Cascade)
+  admission  Admission @relation(fields: [admissionId], references: [id], onDelete: Cascade)
+  reviewedBy User?     @relation("DocumentReviewer", fields: [reviewedById], references: [id])
 
   @@index([admissionId])
   @@map("admission_documents")
@@ -104,6 +114,7 @@ model Exam {
   createdById     Int?     @map("created_by")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
 
   createdBy    User?          @relation("ExamCreator", fields: [createdById], references: [id], onDelete: SetNull)
   questions    ExamQuestion[]
@@ -178,6 +189,7 @@ model ExamRegistration {
   status      String    @default("scheduled") // scheduled | started | done
   startedAt   DateTime? @map("started_at")
   submittedAt DateTime? @map("submitted_at")
+  draftAnswers String?  @map("draft_answers") // JSON draft for auto-save during exam
   createdAt   DateTime  @default(now()) @map("created_at")
 
   schedule         ExamSchedule      @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
