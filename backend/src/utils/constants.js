@@ -45,6 +45,7 @@ export const RATE_LIMITS = {
 export const BODY_SIZE_LIMIT        = '1mb';
 export const BCRYPT_ROUNDS          = 12;
 export const RESET_TOKEN_EXPIRY     = '15m';
+export const EMAIL_VERIFY_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
 export const CACHE_DEFAULT_TTL_MS   = 5 * 60 * 1000;
 export const EXAM_GRACE_MINUTES     = 1;
 export const DOC_CACHE_MAX_AGE      = 300;

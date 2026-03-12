@@ -24,6 +24,7 @@ export function StudentLayout() {
 
   if (!user) return <Navigate to="/login" replace />;
   if (user.role !== ROLES.APPLICANT) return <Navigate to="/employee" replace />;
+  if (!user.emailVerified) return <Navigate to="/verify-email" replace />;
 
   return (
     <KeyboardShortcutsProvider navigate={navigate} role={user.role}>

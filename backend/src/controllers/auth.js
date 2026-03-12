@@ -1,11 +1,12 @@
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import prisma from '../config/db.js';
 import env from '../config/env.js';
-import { sendWelcomeEmail } from '../utils/email.js';
+import { sendWelcomeEmail, sendVerificationEmail } from '../utils/email.js';
 import { passwordSchema } from '../utils/schemas.js';
 import { logAudit } from '../utils/auditLog.js';
-import { ROLES, BCRYPT_ROUNDS, RESET_TOKEN_EXPIRY } from '../utils/constants.js';
+import { ROLES, BCRYPT_ROUNDS, RESET_TOKEN_EXPIRY, EMAIL_VERIFY_EXPIRY_MS } from '../utils/constants.js';
 
 // ─── Password complexity (single source of truth: passwordSchema in schemas.js) ──
 function validatePassword(password) {
@@ -34,7 +35,7 @@ function verifyResetToken(token) {
 }
 
 function safeUser(user) {
-  const { passwordHash, ...rest } = user;
+  const { passwordHash, emailVerifyToken, emailVerifyExpires, ...rest } = user;
   // Flatten applicantProfile into the user object for frontend convenience
   if (rest.applicantProfile) {
     rest.applicantProfile = { ...rest.applicantProfile };
@@ -86,7 +87,11 @@ export async function login(req, res, next) {
 
     const token = signToken(user);
     logAudit({ userId: user.id, action: 'auth.login', entity: 'user', entityId: user.id, ipAddress: req.ip });
-    res.json({ user: safeUser(user), token });
+    const response = { user: safeUser(user), token };
+    if (user.role === ROLES.APPLICANT && !user.emailVerified) {
+      response.emailVerificationRequired = true;
+    }
+    res.json(response);
   } catch (err) { next(err); }
 }
 
@@ -114,8 +119,15 @@ export async function register(req, res, next) {
     }
 
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+    const verifyToken = crypto.randomBytes(32).toString('hex');
     const user = await prisma.user.create({
-      data: { firstName, lastName, email, passwordHash, role: ROLES.APPLICANT, status: 'Active' },
+      data: {
+        firstName, lastName, email, passwordHash,
+        role: ROLES.APPLICANT, status: 'Active',
+        emailVerified: false,
+        emailVerifyToken: verifyToken,
+        emailVerifyExpires: new Date(Date.now() + EMAIL_VERIFY_EXPIRY_MS),
+      },
     });
 
     // Auto-create an empty applicant profile so it exists for later updates
@@ -127,12 +139,75 @@ export async function register(req, res, next) {
       include: { applicantProfile: true },
     });
 
-    // Fire-and-forget welcome email
-    sendWelcomeEmail({ to: user.email, firstName: user.firstName });
+    // Send verification email
+    sendVerificationEmail({ to: user.email, firstName: user.firstName, verifyToken });
 
     const token = signToken(user);
     logAudit({ userId: user.id, action: 'auth.register', entity: 'user', entityId: user.id, ipAddress: req.ip });
-    res.status(201).json({ user: safeUser(fullUser), token });
+    res.status(201).json({ user: safeUser(fullUser), token, emailVerificationRequired: true });
+  } catch (err) { next(err); }
+}
+
+// POST /api/auth/verify-email
+export async function verifyEmail(req, res, next) {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({ error: 'Verification token is required', code: 'VALIDATION_ERROR' });
+    }
+
+    const user = await prisma.user.findFirst({
+      where: { emailVerifyToken: token, deletedAt: null },
+    });
+    if (!user) {
+      return res.status(400).json({ error: 'Invalid verification token', code: 'VALIDATION_ERROR' });
+    }
+    if (user.emailVerified) {
+      return res.json({ ok: true, message: 'Email is already verified.' });
+    }
+    if (user.emailVerifyExpires && user.emailVerifyExpires < new Date()) {
+      return res.status(400).json({ error: 'Verification token has expired. Please request a new one.', code: 'TOKEN_EXPIRED' });
+    }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { emailVerified: true, emailVerifyToken: null, emailVerifyExpires: null },
+    });
+
+    // Send the welcome email now that the email is verified
+    sendWelcomeEmail({ to: user.email, firstName: user.firstName });
+
+    logAudit({ userId: user.id, action: 'auth.email_verified', entity: 'user', entityId: user.id });
+    res.json({ ok: true, message: 'Email verified successfully!' });
+  } catch (err) { next(err); }
+}
+
+// POST /api/auth/resend-verification
+export async function resendVerification(req, res, next) {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required', code: 'VALIDATION_ERROR' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { email } });
+    // Always return success to prevent email enumeration
+    if (!user || user.deletedAt || user.emailVerified) {
+      return res.json({ ok: true, message: 'If an unverified account exists with this email, a verification link has been sent.' });
+    }
+
+    const verifyToken = crypto.randomBytes(32).toString('hex');
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerifyToken: verifyToken,
+        emailVerifyExpires: new Date(Date.now() + EMAIL_VERIFY_EXPIRY_MS),
+      },
+    });
+
+    sendVerificationEmail({ to: user.email, firstName: user.firstName, verifyToken });
+
+    res.json({ ok: true, message: 'If an unverified account exists with this email, a verification link has been sent.' });
   } catch (err) { next(err); }
 }
 

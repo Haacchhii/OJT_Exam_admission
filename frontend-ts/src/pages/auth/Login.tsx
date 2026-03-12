@@ -56,6 +56,7 @@ export default function Login() {
       <div className="hidden lg:flex lg:w-[45%] relative flex-col justify-between p-12 text-white overflow-hidden">
         <div className="absolute top-20 -left-16 w-64 h-64 bg-gold-400/10 rounded-full blur-3xl" />
         <div className="absolute bottom-32 right-0 w-48 h-48 bg-white/5 rounded-full blur-2xl" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gold-400/5 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-2">
@@ -67,15 +68,38 @@ export default function Login() {
           <p className="text-forest-300 text-sm font-semibold">Integrated School of St. Joseph</p>
         </div>
 
-        <div className="relative z-10 space-y-6">
-          <h2 className="text-4xl font-bold leading-tight">
-            Empowering<br />
-            <span className="text-gold-400">Bright Futures</span>
-          </h2>
-          <p className="text-white/60 text-sm leading-relaxed max-w-sm">
-            Access your exams, track admissions, and manage your academic journey — all in one place.
-          </p>
-          <div className="flex gap-6 pt-2">
+        <div className="relative z-10 space-y-8">
+          {/* Main headline */}
+          <div className="space-y-3">
+            <div className="inline-flex items-center gap-2 bg-gold-400/15 border border-gold-400/30 rounded-full px-4 py-1.5">
+              <div className="w-1.5 h-1.5 bg-gold-400 rounded-full animate-pulse" />
+              <span className="text-gold-400 text-xs font-semibold tracking-wider uppercase">Now Accepting Applications</span>
+            </div>
+            <h2 className="text-5xl font-extrabold leading-tight tracking-tight">
+              Start Your<br />
+              <span className="text-gold-400">Journey Here.</span>
+            </h2>
+          </div>
+
+          {/* New applicant CTA block */}
+          <div className="bg-white/8 border border-white/15 rounded-2xl p-6 space-y-4 backdrop-blur-sm">
+            <p className="text-white text-lg font-semibold leading-snug">
+              Want to get started with your application and join Golden Key Integrated School of St. Joseph?
+            </p>
+            <p className="text-white/60 text-sm leading-relaxed">
+              Take your first step toward academic excellence. Submit your application, register for entrance exams, and track every stage of your admission — all in one place.
+            </p>
+            <Link
+              to="/register"
+              className="inline-flex items-center gap-2 bg-gold-400 hover:bg-gold-300 text-forest-900 font-bold text-sm px-6 py-3 rounded-xl shadow-lg transition-all duration-200 hover:shadow-gold-400/30 hover:shadow-xl hover:-translate-y-0.5"
+            >
+              <Icon name="userPlus" className="w-4 h-4" />
+              Apply Now — It's Free
+            </Link>
+          </div>
+
+          {/* Stats */}
+          <div className="flex gap-6 pt-1">
             <div className="text-center">
               <div className="text-2xl font-bold text-gold-400">500+</div>
               <div className="text-xs text-white/40">Students</div>
@@ -187,9 +211,19 @@ export default function Login() {
             </div>
             )}
 
-            <p className="text-sm text-gray-500 text-center mt-6">
-              Don't have an account? <Link to="/register" className="text-forest-500 hover:text-forest-600 font-semibold transition-colors">Create one</Link>
-            </p>
+            <div className="mt-6 rounded-2xl border-2 border-forest-100 bg-forest-50/60 p-5 text-center space-y-3">
+              <p className="text-base font-bold text-gray-800">New to Golden Key?</p>
+              <p className="text-xs text-gray-500 leading-relaxed">
+                Ready to start your application and join our school? Create a free account and begin your admission journey today.
+              </p>
+              <Link
+                to="/register"
+                className="inline-flex items-center justify-center gap-2 w-full bg-forest-600 hover:bg-forest-700 text-white font-bold text-sm py-3 px-5 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg"
+              >
+                <Icon name="userPlus" className="w-4 h-4" />
+                Create an Account — Apply Now
+              </Link>
+            </div>
           </div>
         </div>
       </div>

@@ -35,6 +35,11 @@ export default function Register() {
         showToast(result.msg || 'Registration failed. Please try again.', 'error');
         return;
       }
+      if (result.emailVerificationRequired) {
+        showToast('Account created! Please check your email to verify your account.', 'success');
+        navigate('/verify-email', { state: { email: form.email } });
+        return;
+      }
       showToast('Account created! Welcome aboard.', 'success');
       navigate('/student');
     } catch (err) {

@@ -46,6 +46,11 @@ export default function Login() {
       if (!result.ok) { showToast(result.msg, 'error'); return; }
       if (remember) localStorage.setItem('gk_remember_email', email);
       else localStorage.removeItem('gk_remember_email');
+      if (result.emailVerificationRequired) {
+        showToast('Please verify your email address to continue.', 'warning');
+        navigate('/verify-email', { state: { email } });
+        return;
+      }
       if (result.user.role === ROLES.APPLICANT) navigate('/student');
       else navigate('/employee');
     } finally {

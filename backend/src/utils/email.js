@@ -116,6 +116,28 @@ function wrap(body) {
 </html>`;
 }
 
+// ─── 0. Email verification — on registration ─────────────────────────────────
+export function sendVerificationEmail({ to, firstName, verifyToken }) {
+  const verifyUrl = `${appUrl}/#/verify-email?token=${verifyToken}`;
+  return sendEmail({
+    to,
+    subject: `Verify Your Email — ${SCHOOL_NAME}`,
+    html: wrap(`
+      <h2 class="title">Verify Your Email Address ✉️</h2>
+      <p class="subtitle">One last step to activate your account.</p>
+      <p>Hi ${firstName}, thank you for registering at <b>${SCHOOL_NAME}</b>. Please verify your email address by clicking the button below:</p>
+      <a class="btn" href="${verifyUrl}">Verify My Email</a>
+      <div class="highlight-box info">
+        <strong>Why verify?</strong>
+        <span>Email verification ensures you can receive important notifications about your exams, admission status, and account recovery.</span>
+      </div>
+      <p style="font-size:13px;color:#6b7280;">This link expires in <b>24 hours</b>. If you didn't create this account, you can safely ignore this email.</p>
+      <hr class="divider" />
+      <p style="font-size:12px;color:#9ca3af;">If the button doesn't work, copy and paste this link into your browser:<br/><a href="${verifyUrl}" style="color:#1a3a2a;word-break:break-all;">${verifyUrl}</a></p>
+    `),
+  });
+}
+
 // ─── 1. Welcome — on registration ─────────────────────────────────────────────
 export function sendWelcomeEmail({ to, firstName }) {
   return sendEmail({

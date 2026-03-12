@@ -65,12 +65,12 @@ export function AuthProvider({ children }) {
       const res = opts.registerPayload
         ? await client.post('/auth/register', opts.registerPayload)
         : await client.post('/auth/login', { email, password });
-      // Backend returns { user, token }
+      // Backend returns { user, token, emailVerificationRequired? }
       setToken(res.token);
       localStorage.setItem('gk_current_user', JSON.stringify(res.user));
       localStorage.setItem('gk_user_hash', computeHash(res.user));
       setUser(res.user);
-      return { ok: true, user: res.user };
+      return { ok: true, user: res.user, emailVerificationRequired: res.emailVerificationRequired || false };
     } catch (err) {
       return { ok: false, msg: err.message || 'Login failed.' };
     }

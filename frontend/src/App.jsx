@@ -16,6 +16,7 @@ const Login = lazy(() => import('./pages/auth/Login.jsx'));
 const Register = lazy(() => import('./pages/auth/Register.jsx'));
 const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword.jsx'));
 const ResetPassword = lazy(() => import('./pages/auth/ResetPassword.jsx'));
+const VerifyEmail = lazy(() => import('./pages/auth/VerifyEmail.jsx'));
 
 /* Student pages (lazy) */
 const StudentDashboard = lazy(() => import('./pages/student/Dashboard.jsx'));
@@ -48,6 +49,7 @@ function StudentGuard({ children }) {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
   if (user.role !== ROLES.APPLICANT) return <Navigate to="/employee" replace />;
+  if (!user.emailVerified) return <Navigate to="/verify-email" replace />;
   return children;
 }
 
@@ -65,6 +67,7 @@ export default function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
 
           {/* Student routes */}
           <Route path="/student" element={<StudentLayout />}>
