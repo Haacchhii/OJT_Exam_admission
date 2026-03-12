@@ -3,6 +3,7 @@ import { getNotifications, markNotificationRead, markAllRead } from '../api/noti
 import { formatDate } from '../utils/helpers.js';
 import Icon from './Icons.jsx';
 import { ROLES, NOTIFICATION_POLL_MS } from '../utils/constants.js';
+import { useSSE } from '../hooks/useSSE.js';
 
 export default function Topbar({ title, onMenuToggle, userId, user }) {
   const [showNotifs, setShowNotifs] = useState(false);
@@ -18,9 +19,15 @@ export default function Topbar({ title, onMenuToggle, userId, user }) {
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  // Auto-refresh notifications every 30 seconds
+  // SSE: receive real-time push notifications (replaces aggressive polling)
+  const handleSSE = useCallback((data) => {
+    setNotifs(prev => [data, ...prev]);
+  }, []);
+  useSSE(userId, handleSSE);
+
+  // Fallback: still poll but much less frequently (safety net if SSE disconnects)
   useEffect(() => {
-    const interval = setInterval(refresh, NOTIFICATION_POLL_MS);
+    const interval = setInterval(refresh, NOTIFICATION_POLL_MS * 4);
     return () => clearInterval(interval);
   }, [refresh]);
 

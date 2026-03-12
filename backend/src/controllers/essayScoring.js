@@ -2,6 +2,7 @@ import prisma from '../config/db.js';
 import { paginate, paginatedResponse } from '../utils/pagination.js';
 import { logAudit } from '../utils/auditLog.js';
 import { sendExamResultEmail } from '../utils/email.js';
+import { sendEvent } from '../utils/sse.js';
 
 // ═══════════════════════════════════════════════════════
 // GET /api/results/essays?status=&page=&limit=
@@ -122,7 +123,7 @@ export async function scoreEssay(req, res, next) {
               title: 'Essay Review Complete',
               message: `Your exam has been fully reviewed. Final score: ${newTotal}/${maxPossible} (${newPct}%). ${passed ? 'You passed!' : 'Unfortunately, you did not pass.'}`,
             },
-          }).catch(() => {});
+          }).then(n => sendEvent(student.id, 'notification', n)).catch(() => {});
 
           // Send result email now that all essays are scored
           sendExamResultEmail({

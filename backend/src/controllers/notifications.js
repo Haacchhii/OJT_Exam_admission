@@ -1,12 +1,14 @@
 import prisma from '../config/db.js';
 import { paginate, paginatedResponse } from '../utils/pagination.js';
+import { sendEvent } from '../utils/sse.js';
+import { ROLES } from '../utils/constants.js';
 
 // GET /api/notifications/:userId?page=&limit=
 export async function getNotifications(req, res, next) {
   try {
     const userId = Number(req.params.userId);
     // Ownership check: users can only access their own notifications (admins can access any)
-    if (req.user.role !== 'administrator' && req.user.id !== userId) {
+    if (req.user.role !== ROLES.ADMIN && req.user.id !== userId) {
       return res.status(403).json({ error: 'You can only access your own notifications', code: 'FORBIDDEN' });
     }
     const { page, limit } = req.query;
@@ -26,7 +28,7 @@ export async function getNotifications(req, res, next) {
 export async function getUnreadCount(req, res, next) {
   try {
     const userId = Number(req.params.userId);
-    if (req.user.role !== 'administrator' && req.user.id !== userId) {
+    if (req.user.role !== ROLES.ADMIN && req.user.id !== userId) {
       return res.status(403).json({ error: 'You can only access your own notifications', code: 'FORBIDDEN' });
     }
     const count = await prisma.notification.count({ where: { userId, isRead: false } });
@@ -39,7 +41,7 @@ export async function markRead(req, res, next) {
   try {
     const notification = await prisma.notification.findUnique({ where: { id: Number(req.params.id) } });
     if (!notification) return res.status(404).json({ error: 'Notification not found', code: 'NOT_FOUND' });
-    if (req.user.role !== 'administrator' && req.user.id !== notification.userId) {
+    if (req.user.role !== ROLES.ADMIN && req.user.id !== notification.userId) {
       return res.status(403).json({ error: 'You can only modify your own notifications', code: 'FORBIDDEN' });
     }
     await prisma.notification.update({
@@ -54,7 +56,7 @@ export async function markRead(req, res, next) {
 export async function markAllRead(req, res, next) {
   try {
     const userId = Number(req.params.userId);
-    if (req.user.role !== 'administrator' && req.user.id !== userId) {
+    if (req.user.role !== ROLES.ADMIN && req.user.id !== userId) {
       return res.status(403).json({ error: 'You can only modify your own notifications', code: 'FORBIDDEN' });
     }
     await prisma.notification.updateMany({
@@ -76,6 +78,9 @@ export async function createNotification(req, res, next) {
     const notification = await prisma.notification.create({
       data: { userId, title, message, type: type || 'info' },
     });
+
+    // Push real-time event to connected SSE clients
+    sendEvent(userId, 'notification', notification);
 
     res.status(201).json(notification);
   } catch (err) { next(err); }

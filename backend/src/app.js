@@ -11,6 +11,8 @@ import prisma from './config/db.js';
 import { errorHandler } from './middleware/errors.js';
 import { authenticate } from './middleware/auth.js';
 import { RATE_LIMITS, BODY_SIZE_LIMIT } from './utils/constants.js';
+import { clientCount } from './utils/sse.js';
+import { cachePublic, cachePrivate, noStore } from './middleware/cache.js';
 
 // Route imports
 import authRoutes          from './routes/auth.js';
@@ -97,14 +99,14 @@ const bulkOpLimiter = rateLimit({
 app.use('/uploads', authenticate, express.static(path.resolve(env.UPLOAD_DIR)));
 
 // ─── API routes ───────────────────────────────────────
-app.use('/api/auth', authLimiter, authRoutes);
-app.use('/api/admissions',    admissionsRoutes);
-app.use('/api/exams',         examsRoutes);
-app.use('/api/results',       resultsRoutes);
-app.use('/api/users',         usersRoutes);
-app.use('/api/notifications', notificationsRoutes);
-app.use('/api/audit-logs',    auditLogRoutes);
-app.use('/api/academic-years', academicYearsRoutes);
+app.use('/api/auth', authLimiter, noStore, authRoutes);
+app.use('/api/admissions',    cachePrivate, admissionsRoutes);
+app.use('/api/exams',         cachePrivate, examsRoutes);
+app.use('/api/results',       cachePrivate, resultsRoutes);
+app.use('/api/users',         cachePrivate, usersRoutes);
+app.use('/api/notifications', cachePrivate, notificationsRoutes);
+app.use('/api/audit-logs',    cachePrivate, auditLogRoutes);
+app.use('/api/academic-years', cachePublic, academicYearsRoutes);
 
 // Apply specific rate limiters to sensitive operations
 app.use('/api/admissions/bulk-status', bulkOpLimiter);
@@ -115,7 +117,7 @@ app.use('/api/exams/registrations', examSubmitLimiter);
 app.get('/api/health', async (_req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
-    res.json({ status: 'ok', uptime: process.uptime(), db: 'connected' });
+    res.json({ status: 'ok', uptime: process.uptime(), db: 'connected', sseClients: clientCount() });
   } catch {
     res.status(503).json({ status: 'degraded', uptime: process.uptime(), db: 'disconnected' });
   }

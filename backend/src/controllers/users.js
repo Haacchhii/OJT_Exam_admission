@@ -144,11 +144,11 @@ export async function bulkDeleteUsers(req, res, next) {
     }
 
     const users = await prisma.user.findMany({ where: { id: { in: safeIds }, deletedAt: null } });
-    const ids = users.map(u => u.id);
+    const foundIds = users.map(u => u.id);
 
-    await prisma.user.updateMany({ where: { id: { in: ids } }, data: { deletedAt: new Date() } });
+    await prisma.user.updateMany({ where: { id: { in: foundIds } }, data: { deletedAt: new Date() } });
 
-    logAudit({ userId: req.user.id, action: 'user.bulkDelete', entity: 'user', details: { count: users.length, ids }, ipAddress: req.ip });
+    logAudit({ userId: req.user.id, action: 'user.bulkDelete', entity: 'user', details: { count: users.length, ids: foundIds }, ipAddress: req.ip });
 
     res.json({ deleted: users.length });
   } catch (err) { next(err); }

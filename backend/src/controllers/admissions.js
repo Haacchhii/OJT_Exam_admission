@@ -5,6 +5,8 @@ import { VALID_TRANSITIONS, ROLES, MAX_BULK_OPERATIONS } from '../utils/constant
 import { generateTrackingId, generateStudentNumber } from '../utils/tracking.js';
 import { logAudit } from '../utils/auditLog.js';
 import { sendAdmissionSubmittedEmail, sendAdmissionStatusEmail } from '../utils/email.js';
+import { sendEvent } from '../utils/sse.js';
+import { cached, invalidatePrefix } from '../utils/cache.js';
 import env from '../config/env.js';
 
 // Helper: shape admission for API response (include document names and file paths)
@@ -95,15 +97,22 @@ export async function getStats(req, res, next) {
       if (to)   { const d = new Date(to);   if (!isNaN(d.getTime())) where.submittedAt.lte = d; }
     }
 
-    const all = await prisma.admission.findMany({ where, select: { status: true } });
-    const counts = {
-      total:            all.length,
-      submitted:        all.filter(a => a.status === 'Submitted').length,
-      underScreening:   all.filter(a => a.status === 'Under Screening').length,
-      underEvaluation:  all.filter(a => a.status === 'Under Evaluation').length,
-      accepted:         all.filter(a => a.status === 'Accepted').length,
-      rejected:         all.filter(a => a.status === 'Rejected').length,
-    };
+    const cacheKey = `admStats:${JSON.stringify(where)}`;
+    const counts = await cached(cacheKey, async () => {
+      const [total, grouped] = await Promise.all([
+        prisma.admission.count({ where }),
+        prisma.admission.groupBy({ by: ['status'], _count: { _all: true }, where }),
+      ]);
+      const statusMap = Object.fromEntries(grouped.map(g => [g.status, g._count._all]));
+      return {
+        total,
+        submitted:        statusMap['Submitted'] || 0,
+        underScreening:   statusMap['Under Screening'] || 0,
+        underEvaluation:  statusMap['Under Evaluation'] || 0,
+        accepted:         statusMap['Accepted'] || 0,
+        rejected:         statusMap['Rejected'] || 0,
+      };
+    }, 15_000);
 
     res.json(counts);
   } catch (err) { next(err); }
@@ -147,6 +156,8 @@ export async function createAdmission(req, res, next) {
 
     logAudit({ userId: req.user.id, action: 'admission.create', entity: 'admission', entityId: admission.id, details: { trackingId, gradeLevel, applicantType: applicantType || 'New' }, ipAddress: req.ip });
 
+    invalidatePrefix('admStats:');
+
     // Notify the applicant about their submission
     prisma.notification.create({
       data: {
@@ -155,7 +166,7 @@ export async function createAdmission(req, res, next) {
         title: 'Application Submitted',
         message: `Your admission application (${trackingId}) for ${gradeLevel} has been submitted successfully and is now under review.`,
       },
-    }).catch(() => {});
+    }).then(n => sendEvent(req.user.id, 'notification', n)).catch(() => {});
 
     // Notify employees about new application
     prisma.user.findMany({ where: { role: { in: [ROLES.ADMIN, ROLES.REGISTRAR] } }, select: { id: true } })
@@ -265,10 +276,12 @@ export async function updateStatus(req, res, next) {
           title: `Admission Status: ${status}`,
           message: statusMessages[status] || `Your admission status has been updated to ${status}.`,
         },
-      });
+      }).then(n => sendEvent(admission.userId, 'notification', n));
     } catch (_) { /* notification failure should not block the response */ }
 
     logAudit({ userId: req.user.id, action: 'admission.status_update', entity: 'admission', entityId: id, details: { from: admission.status, to: status, notes: notes || null }, ipAddress: req.ip });
+
+    invalidatePrefix('admStats:');
 
     // Fire-and-forget status update email to the applicant
     sendAdmissionStatusEmail({
@@ -327,11 +340,13 @@ export async function bulkUpdateStatus(req, res, next) {
             title: `Admission Status: ${status}`,
             message: statusMessages[status] || `Your admission status has been updated to ${status}.`,
           },
-        })
+        }).then(n => sendEvent(adm.userId, 'notification', n))
       ));
     } catch (_) { /* notification failure should not block the response */ }
 
     logAudit({ userId: req.user.id, action: 'admission.bulk_status_update', entity: 'admission', entityId: null, details: { ids, to: status, count: result.count }, ipAddress: req.ip });
+
+    invalidatePrefix('admStats:');
 
     res.json({ updated: result.count });
   } catch (err) { next(err); }
@@ -427,6 +442,8 @@ export async function bulkDeleteAdmissions(req, res, next) {
     await prisma.admission.updateMany({ where: { id: { in: ids } }, data: { deletedAt: new Date() } });
 
     logAudit({ userId: req.user.id, action: 'admission.bulkDelete', entity: 'admission', details: { count: ids.length, ids }, ipAddress: req.ip });
+
+    invalidatePrefix('admStats:');
 
     res.json({ deleted: ids.length });
   } catch (err) { next(err); }

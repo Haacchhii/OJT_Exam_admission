@@ -46,7 +46,7 @@ export function qs(params = {}) {
 }
 
 // ---- Core request function ----
-async function request(method, path, body, { isFormData = false } = {}) {
+async function request(method, path, body, { isFormData = false, signal } = {}) {
   const headers = {};
   if (!isFormData) headers['Content-Type'] = 'application/json';
   if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
@@ -56,11 +56,13 @@ async function request(method, path, body, { isFormData = false } = {}) {
     res = await fetch(`${BASE_URL}${path}`, {
       method,
       headers,
+      signal,
       body: isFormData ? body
         : body !== undefined ? JSON.stringify(body)
         : undefined,
     });
-  } catch {
+  } catch (err) {
+    if (err.name === 'AbortError') throw err;
     throw new ApiError('Network error. Please check your connection and try again.', 0);
   }
 
@@ -99,7 +101,7 @@ async function request(method, path, body, { isFormData = false } = {}) {
 
 // ---- Public client interface ----
 export const client = {
-  get:    (path)       => request('GET', path),
+  get:    (path, { signal } = {}) => request('GET', path, undefined, { signal }),
   post:   (path, body) => request('POST', path, body),
   put:    (path, body) => request('PUT', path, body),
   patch:  (path, body) => request('PATCH', path, body),

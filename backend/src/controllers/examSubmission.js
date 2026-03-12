@@ -2,6 +2,7 @@ import prisma from '../config/db.js';
 import { logAudit } from '../utils/auditLog.js';
 import { sendExamResultEmail } from '../utils/email.js';
 import { EXAM_GRACE_MINUTES } from '../utils/constants.js';
+import { sendEvent } from '../utils/sse.js';
 
 // ═══════════════════════════════════════════════════════
 // POST /api/results/submit
@@ -139,7 +140,11 @@ export async function submitExam(req, res, next) {
           userId: e.id, type: 'exam', title: 'Exam Submitted',
           message: `${req.user.email} has completed the exam. Score: ${totalScore}/${maxPossible} (${percentage}%).`,
         }));
-        if (notifs.length) return prisma.notification.createMany({ data: notifs });
+        if (notifs.length) {
+          return prisma.notification.createMany({ data: notifs }).then(() => {
+            notifs.forEach(n => sendEvent(n.userId, 'notification', n));
+          });
+        }
       }).catch(() => {});
 
     // If no essays, result is final → send result email now

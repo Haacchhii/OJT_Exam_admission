@@ -3,6 +3,7 @@ import { paginate, paginatedResponse } from '../utils/pagination.js';
 import { generateTrackingId } from '../utils/tracking.js';
 import { sendExamBookingEmail } from '../utils/email.js';
 import { ROLES } from '../utils/constants.js';
+import { sendEvent } from '../utils/sse.js';
 
 // GET /api/exams/registrations/list?search=&status=&page=&limit=
 export async function getRegistrations(req, res, next) {
@@ -110,7 +111,7 @@ export async function createRegistration(req, res, next) {
           title: 'Exam Registration Confirmed',
           message: `You have been registered for "${sched.exam?.title || 'Entrance Exam'}" (Tracking ID: ${registration.trackingId}).`,
         },
-      }).catch(() => {});
+      }).then(n => sendEvent(req.user.id, 'notification', n)).catch(() => {});
     }).catch(() => {});
 
     // Fire-and-forget booking confirmation email

@@ -159,16 +159,37 @@ export async function getQuestionAnalytics(req, res, next) {
     });
 
     const totalTakers = registrationIds.length;
+
+    // Build Maps for O(1) lookup instead of O(n) .filter() per question
+    const subsByQuestion = new Map();
+    for (const s of submissions) {
+      const arr = subsByQuestion.get(s.questionId);
+      if (arr) arr.push(s);
+      else subsByQuestion.set(s.questionId, [s]);
+    }
+    const essaysByQuestion = new Map();
+    for (const e of essayAnswers) {
+      const arr = essaysByQuestion.get(e.questionId);
+      if (arr) arr.push(e);
+      else essaysByQuestion.set(e.questionId, [e]);
+    }
+
     const analytics = exam.questions.map(q => {
       if (q.questionType === 'mc') {
-        const qSubs = submissions.filter(s => s.questionId === q.id);
+        const qSubs = subsByQuestion.get(q.id) || [];
         const correctChoice = q.choices.find(c => c.isCorrect);
-        const correctCount = qSubs.filter(s => correctChoice && s.selectedChoiceId === correctChoice.id).length;
+        // Build choice count map in one pass
+        const choiceCounts = new Map();
+        let correctCount = 0;
+        for (const s of qSubs) {
+          choiceCounts.set(s.selectedChoiceId, (choiceCounts.get(s.selectedChoiceId) || 0) + 1);
+          if (correctChoice && s.selectedChoiceId === correctChoice.id) correctCount++;
+        }
         const choiceDistribution = q.choices.map(c => ({
           choiceId: c.id,
           choiceText: c.choiceText,
           isCorrect: c.isCorrect,
-          count: qSubs.filter(s => s.selectedChoiceId === c.id).length,
+          count: choiceCounts.get(c.id) || 0,
         }));
         return {
           questionId: q.id,
@@ -181,7 +202,7 @@ export async function getQuestionAnalytics(req, res, next) {
           choiceDistribution,
         };
       } else {
-        const qEssays = essayAnswers.filter(e => e.questionId === q.id);
+        const qEssays = essaysByQuestion.get(q.id) || [];
         const scoredEssays = qEssays.filter(e => e.scored);
         const avgScore = scoredEssays.length > 0
           ? Math.round((scoredEssays.reduce((sum, e) => sum + (e.pointsAwarded || 0), 0) / scoredEssays.length) * 10) / 10

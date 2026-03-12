@@ -1,17 +1,16 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 /**
- * Custom hook for async data fetching.
+ * Custom hook for async data fetching with AbortController and stale-while-revalidate.
  *
- * @param {() => Promise<T>} asyncFn  — factory that returns a Promise
+ * @param {(signal: AbortSignal) => Promise<T>} asyncFn — factory that returns a Promise (receives AbortSignal)
  * @param {any[]}            deps     — additional dependency values (re-fetches when they change)
  * @returns {{ data: T|null, loading: boolean, error: Error|null, refetch: () => void }}
  *
  * Usage:
+ *   const { data, loading, error, refetch } = useAsync((signal) => getAdmissions({ signal }));
+ *   // Or without signal (backward-compatible):
  *   const { data, loading, error, refetch } = useAsync(() => getAdmissions());
- *   const { data, loading, error, refetch } = useAsync(
- *     () => Promise.all([getStats(), getAdmissions()]).then(([stats, adm]) => ({ stats, adm }))
- *   );
  */
 export function useAsync(asyncFn, deps = []) {
   const [data, setData]       = useState(null);
@@ -26,25 +25,27 @@ export function useAsync(asyncFn, deps = []) {
   const refetch = useCallback(() => setRefreshCount(c => c + 1), []);
 
   useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
+    const controller = new AbortController();
+
+    // Stale-while-revalidate: only show loading spinner on initial fetch (no data yet)
+    setLoading(prev => data === null ? true : prev);
     setError(null);
 
-    fnRef.current()
+    fnRef.current(controller.signal)
       .then(result => {
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           setData(result);
           setLoading(false);
         }
       })
       .catch(err => {
-        if (!cancelled) {
+        if (!controller.signal.aborted && err?.name !== 'AbortError') {
           setError(err);
           setLoading(false);
         }
       });
 
-    return () => { cancelled = true; };
+    return () => { controller.abort(); };
     // deps are user-provided values that should trigger refetch (e.g. userId)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshCount, ...deps]);
