@@ -9,13 +9,13 @@ import PageErrorBoundary from './components/PageErrorBoundary';
 import ScrollToTop from './components/ScrollToTop';
 import NotFound from './pages/NotFound';
 import { useAuth } from './context/AuthContext';
-import { SkeletonPage } from './components/UI';
+import { SkeletonPage, LoadingSpinner } from './components/UI';
 
-/* Auth pages (lazy) */
-const Login = lazy(() => import('./pages/auth/Login'));
-const Register = lazy(() => import('./pages/auth/Register'));
-const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword'));
-const ResetPassword = lazy(() => import('./pages/auth/ResetPassword'));
+/* Auth pages — eager load (first paint for most users) */
+import Login from './pages/auth/Login';
+import Register from './pages/auth/Register';
+import ForgotPassword from './pages/auth/ForgotPassword';
+import ResetPassword from './pages/auth/ResetPassword';
 
 /* Student pages (lazy) */
 const StudentDashboard = lazy(() => import('./pages/student/Dashboard'));
@@ -59,7 +59,7 @@ export default function App() {
       <ConfirmProvider>
       <HashRouter>
         <ScrollToTop />
-        <Suspense fallback={<div className="p-6"><SkeletonPage /></div>}>
+        <Suspense fallback={<div className="min-h-[50vh] flex items-center justify-center"><LoadingSpinner /></div>}>
         <Routes>
           {/* Public auth routes */}
           <Route path="/login" element={<Login />} />

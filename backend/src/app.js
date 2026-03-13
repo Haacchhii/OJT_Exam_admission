@@ -126,7 +126,8 @@ app.get('/api/health', async (_req, res) => {
 // ─── Serve frontend in production ─────────────────────
 // Only serve static frontend if the dist folder exists (monolith deploy).
 // When frontend is deployed separately (e.g. Railway), this is skipped.
-const frontendDist = path.resolve(__dirname, '../../frontend/dist');
+// Uses frontend-ts (TypeScript) — frontend/ is deprecated.
+const frontendDist = path.resolve(__dirname, '../../frontend-ts/dist');
 if (fs.existsSync(frontendDist)) {
   app.use(express.static(frontendDist));
   app.get('/{*path}', (_req, res) => {
