@@ -1,0 +1,35 @@
+# Global safety net for secrets and local artifacts across all subprojects
+
+# Environment files
+**/.env
+**/.env.local
+**/.env.*.local
+
+# Node artifacts
+**/node_modules/
+**/dist/
+**/dist-ssr/
+
+# Logs
+**/logs/
+**/*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Databases and temp files
+**/*.db
+**/*.db-journal
+**/.tmp-*
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
