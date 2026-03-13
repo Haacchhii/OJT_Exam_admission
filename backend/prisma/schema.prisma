@@ -52,15 +52,20 @@ model Admission {
   phone           String?
   dob             String   // stored as ISO date string
   gender          String   // Male | Female
+  placeOfBirth    String?  @map("place_of_birth")
+  religion        String?
   address         String
   gradeLevel      String   @map("grade_level")
   prevSchool      String?  @map("prev_school")
+  schoolAddress   String?  @map("school_address")
   schoolYear      String   @map("school_year")
   lrn             String?
   applicantType   String   @default("New") @map("applicant_type") // New | Transferee | Returning | Continuing
   studentNumber   String?  @map("student_number") // pre-filled for continuing students, assigned for new on acceptance
-  guardian        String
-  guardianRelation String  @map("guardian_relation")
+  fatherNameOccupation String? @map("father_name_occupation")
+  motherNameOccupation String? @map("mother_name_occupation")
+  guardian        String?  // Guardian name if applicable (optional)
+  guardianRelation String?  @map("guardian_relation")
   guardianPhone   String?  @map("guardian_phone")
   guardianEmail   String?  @map("guardian_email")
   status          String   @default("Submitted") // Submitted | Under Screening | Under Evaluation | Accepted | Rejected

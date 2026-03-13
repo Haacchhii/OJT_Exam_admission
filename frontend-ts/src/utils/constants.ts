@@ -49,10 +49,9 @@ export function getCurrentSchoolYear(): string {
 }
 
 export const GENDER_OPTIONS: { v: string; l: string }[] = [
-  { v: '', l: 'Select gender' },
+  { v: '', l: 'Select sex' },
   { v: 'Male', l: 'Male' },
   { v: 'Female', l: 'Female' },
-  { v: 'Other', l: 'Other' },
 ];
 
 export const GUARDIAN_RELATIONS: { v: string; l: string }[] = [

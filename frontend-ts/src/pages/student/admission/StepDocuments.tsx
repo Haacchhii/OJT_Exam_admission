@@ -18,7 +18,7 @@ interface Props {
 export default function StepDocuments({ form, requiredDocs, slotFiles, extraFiles, goTo, handleSlotFile, handleExtraFiles, removeSlot, removeExtra }: Props) {
   return (
     <div className="gk-card p-6">
-      <h3 className="text-lg font-bold text-forest-500 mb-1">Step 3: Required Documents</h3>
+      <h3 className="text-lg font-bold text-forest-500 mb-1">Step 4: Required Documents</h3>
       <p className="text-gray-500 text-sm mb-2">Upload the documents required for <strong>{form.gradeLevel || 'your grade level'}</strong>.</p>
       <p className="text-xs text-gray-400 mb-6">Accepted formats: PDF, JPG, PNG, DOC, DOCX.</p>
       <h4 className="font-semibold text-forest-500 mb-3 flex items-center gap-1.5"><Icon name="document" className="w-4 h-4" /> Required Documents</h4>
@@ -59,8 +59,8 @@ export default function StepDocuments({ form, requiredDocs, slotFiles, extraFile
         </div>
       )}
       <div className="flex justify-between mt-6">
-        <button onClick={() => goTo(2)} className="border border-gray-300 text-gray-700 px-5 py-2.5 rounded-lg hover:bg-gray-50">← Back</button>
-        <button onClick={() => goTo(4)} className="bg-gradient-to-r from-forest-500 to-forest-400 text-white px-6 py-2.5 rounded-lg font-semibold hover:from-gold-500 hover:to-gold-600">Next: Review →</button>
+        <button onClick={() => goTo(3)} className="border border-gray-300 text-gray-700 px-5 py-2.5 rounded-lg hover:bg-gray-50">← Back</button>
+        <button onClick={() => goTo(5)} className="bg-gradient-to-r from-forest-500 to-forest-400 text-white px-6 py-2.5 rounded-lg font-semibold hover:from-gold-500 hover:to-gold-600">Next: Review →</button>
       </div>
     </div>
   );

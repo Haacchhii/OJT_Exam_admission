@@ -123,14 +123,14 @@ export async function createAdmission(req, res, next) {
   try {
     const {
       firstName, lastName, email, phone, dob, gender, address,
-      gradeLevel, prevSchool, schoolYear, lrn, applicantType,
-      guardian, guardianRelation, guardianPhone, guardianEmail,
+      placeOfBirth, religion, gradeLevel, prevSchool, schoolAddress, schoolYear, lrn, applicantType,
+      fatherNameOccupation, motherNameOccupation, guardian, guardianRelation, guardianPhone, guardianEmail,
       academicYearId, semesterId, studentNumber,
       documents: docNames,
     } = req.body;
 
     // Validate required fields
-    if (!firstName || !lastName || !email || !dob || !gender || !address || !gradeLevel || !schoolYear || !guardian || !guardianRelation) {
+    if (!firstName || !lastName || !email || !dob || !gender || !address || !placeOfBirth || !schoolAddress || !gradeLevel || !schoolYear || !fatherNameOccupation || !motherNameOccupation) {
       return res.status(400).json({ error: 'Missing required fields', code: 'VALIDATION_ERROR' });
     }
 
@@ -141,12 +141,13 @@ export async function createAdmission(req, res, next) {
         trackingId,
         userId: req.user.id,
         firstName, lastName, email, phone, dob, gender, address,
-        gradeLevel, prevSchool: prevSchool || null, schoolYear,
+        placeOfBirth: placeOfBirth || null, religion: religion || null,
+        gradeLevel, prevSchool: prevSchool || null, schoolAddress: schoolAddress || null, schoolYear,
         lrn: lrn || null, applicantType: applicantType || 'New',
         studentNumber: studentNumber || null,
-        guardian, guardianRelation,
-        guardianPhone: guardianPhone || null,
-        guardianEmail: guardianEmail || null,
+        fatherNameOccupation, motherNameOccupation,
+        guardian: guardian || null, guardianRelation: guardianRelation || null,
+        guardianPhone: guardianPhone || null, guardianEmail: guardianEmail || null,
         ...(academicYearId && { academicYearId: Number(academicYearId) }),
         ...(semesterId && { semesterId: Number(semesterId) }),
         status: 'Submitted',

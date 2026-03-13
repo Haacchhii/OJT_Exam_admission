@@ -10,10 +10,12 @@ import { DOC_REQUIREMENTS, DOC_SLOT_LABELS, ALLOWED_FILE_TYPES, MAX_FILE_SIZE, g
 import type { Admission } from '../../../types';
 
 export interface AdmissionForm {
-  firstName: string; lastName: string; email: string; phone: string; dob: string; gender: string; address: string;
-  guardian: string; guardianRelation: string; guardianPhone: string; guardianEmail: string;
-  gradeLevel: string; prevSchool: string; schoolYear: string; lrn: string; applicantType: string;
+  firstName: string; lastName: string; email: string; phone: string; dob: string; gender: string;
+  placeOfBirth: string; religion: string; address: string;
+  prevSchool: string; schoolAddress: string; gradeLevel: string; schoolYear: string; lrn: string; applicantType: string;
   studentNumber: string;
+  fatherNameOccupation: string; motherNameOccupation: string; guardian: string;
+  guardianRelation: string; guardianPhone: string; guardianEmail: string;
   [key: string]: string;
 }
 
@@ -51,7 +53,7 @@ export function checkAgeRequirement(gradeLevel: string, dob: string, schoolYear:
 
 export function useAdmissionWizard() {
   const [step, setStep] = useState(() => {
-    try { const s = localStorage.getItem('gk_admission_step'); return s ? Math.min(Math.max(parseInt(s), 1), 4) : 1; } catch { return 1; }
+    try { const s = localStorage.getItem('gk_admission_step'); return s ? Math.min(Math.max(parseInt(s), 1), 5) : 1; } catch { return 1; }
   });
   const [showWizard, setShowWizard] = useState(true);
   const [successOpen, setSuccessOpen] = useState(false);
@@ -61,10 +63,11 @@ export function useAdmissionWizard() {
   const [saving, setSaving] = useState(false);
   const [privacyConsent, setPrivacyConsent] = useState(false);
   const [form, setForm] = useState<AdmissionForm>({
-    firstName: '', lastName: '', email: '', phone: '', dob: '', gender: '', address: '',
-    guardian: '', guardianRelation: '', guardianPhone: '', guardianEmail: '',
-    gradeLevel: '', prevSchool: '', schoolYear: getCurrentSchoolYear(), lrn: '', applicantType: 'New',
+    firstName: '', lastName: '', email: '', phone: '', dob: '', gender: '', placeOfBirth: '', religion: '', address: '',
+    prevSchool: '', schoolAddress: '', gradeLevel: '', schoolYear: getCurrentSchoolYear(), lrn: '', applicantType: 'New',
     studentNumber: '',
+    fatherNameOccupation: '', motherNameOccupation: '', guardian: '',
+    guardianRelation: '', guardianPhone: '', guardianEmail: '',
   });
 
   const { user } = useAuth();
@@ -108,32 +111,33 @@ export function useAdmissionWizard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, existingApp]);
 
-  const set = useCallback((k: string) => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm(f => ({ ...f, [k]: e.target.value })), []);
+  const set = useCallback((k: string) => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setForm(f => ({ ...f, [k]: e.target.value })), []);
 
   const requiredDocs = useMemo(() => getRequiredDocs(form.gradeLevel), [form.gradeLevel]);
 
   const goTo = (n: number) => {
     if (n > step) {
       const required: Record<number, string[]> = {
-        1: ['firstName','lastName','email','dob','gender','address','guardian','guardianRelation','guardianPhone'],
-        2: ['gradeLevel'],
-        3: [],
+        1: ['firstName','lastName','email','dob','gender','placeOfBirth','phone','address'],
+        2: ['prevSchool','schoolAddress','gradeLevel','lrn','schoolYear'],
+        3: ['fatherNameOccupation','motherNameOccupation'],
+        4: [],
       };
       const missing = (required[step] || []).filter(k => !form[k]?.trim());
       if (missing.length) { showToast('Please fill in all required fields.', 'error'); return; }
       if (step === 1) {
         if (form.email && !/^\S+@\S+\.\S+$/.test(form.email)) { showToast('Please enter a valid email address.', 'error'); return; }
         if (form.phone && !/^[+\d][\d\s()-]{6,}$/.test(form.phone)) { showToast('Please enter a valid phone number.', 'error'); return; }
-        if (form.guardianPhone && !/^[+\d][\d\s()-]{6,}$/.test(form.guardianPhone)) { showToast('Please enter a valid guardian phone number.', 'error'); return; }
       }
       if (step === 2) {
+        if (form.lrn && form.lrn.replace(/\D/g, '').length !== 12) { showToast('LRN must be exactly 12 digits.', 'error'); return; }
         if (form.applicantType === 'Continuing' && !form.studentNumber?.trim()) {
           showToast('Continuing students must provide their student number.', 'error'); return;
         }
         const ageWarning = checkAgeRequirement(form.gradeLevel, form.dob, form.schoolYear);
         if (ageWarning) { showToast(ageWarning, 'error'); return; }
       }
-      if (step === 3) {
+      if (step === 4) {
         const missingDocs = requiredDocs.filter(k => !slotFiles[k]);
         if (missingDocs.length > 0) {
           showToast(`Please upload all required documents. Missing: ${missingDocs.map(k => (DOC_SLOT_LABELS as Record<string, string>)[k]?.split('(')[0]?.trim() || k).join(', ')}`, 'error');

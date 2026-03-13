@@ -85,13 +85,19 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
         <div class="field"><label>Email</label><span>${esc(adm.email)}</span></div>
         <div class="field"><label>Phone</label><span>${esc(adm.phone) || 'N/A'}</span></div>
         <div class="field"><label>Date of Birth</label><span>${esc(adm.dob)}</span></div>
-        <div class="field"><label>Gender</label><span>${esc(adm.gender)}</span></div>
+        <div class="field"><label>Sex</label><span>${esc(adm.gender)}</span></div>
+        <div class="field"><label>Place of Birth</label><span>${esc(adm.placeOfBirth) || 'N/A'}</span></div>
+        <div class="field"><label>Religion</label><span>${esc(adm.religion) || 'N/A'}</span></div>
         <div class="field"><label>Grade Level</label><span>${esc(adm.gradeLevel)}</span></div>
+        <div class="field"><label>LRN</label><span>${esc(adm.lrn) || 'N/A'}</span></div>
       </div>
       <div style="margin-top:12px" class="grid">
-        <div class="field"><label>Address</label><span>${esc(adm.address)}</span></div>
-        <div class="field"><label>Previous School</label><span>${esc(adm.prevSchool) || 'N/A'}</span></div>
-        <div class="field"><label>Parent / Guardian</label><span>${esc(adm.guardian)}</span></div>
+        <div class="field" style="grid-column:span 3"><label>Complete Address</label><span>${esc(adm.address)}</span></div>
+        <div class="field" style="grid-column:span 3"><label>Last School Attended</label><span>${esc(adm.prevSchool) || 'N/A'}</span></div>
+        <div class="field" style="grid-column:span 3"><label>School Address</label><span>${esc(adm.schoolAddress) || 'N/A'}</span></div>
+        <div class="field"><label>Father's Name & Occupation</label><span>${esc(adm.fatherNameOccupation) || 'N/A'}</span></div>
+        <div class="field"><label>Mother's Name & Occupation</label><span>${esc(adm.motherNameOccupation) || 'N/A'}</span></div>
+        <div class="field"><label>Guardian (if applicable)</label><span>${esc(adm.guardian) || 'N/A'}</span></div>
       </div>
       <h2>Submitted Documents</h2>
       <ul class="docs">${adm.documents.map((d: string) => `<li>📄 ${esc(d)}</li>`).join('')}</ul>
@@ -148,13 +154,19 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
           <D label="Email" value={adm.email} />
           <D label="Phone" value={adm.phone || 'N/A'} />
           <D label="Date of Birth" value={adm.dob} />
-          <D label="Gender" value={adm.gender} />
+          <D label="Sex" value={adm.gender} />
+          <D label="Place of Birth" value={adm.placeOfBirth || 'N/A'} />
+          <D label="Religion" value={adm.religion || 'N/A'} />
+          <div className="md:col-span-2"><D label="Complete Address" value={adm.address} /></div>
           <D label="Grade Level" value={adm.gradeLevel} />
           <D label="Applicant Type" value={adm.applicantType || 'New'} />
           <D label="Student Number" value={adm.studentNumber || (adm.applicantType === 'New' || adm.applicantType === 'Transferee' ? 'Will be assigned on acceptance' : 'N/A')} />
-          <div className="md:col-span-2"><D label="Address" value={adm.address} /></div>
-          <D label="Previous School" value={adm.prevSchool || 'N/A'} />
-          <D label="Parent / Guardian" value={adm.guardian} />
+          <D label="LRN" value={adm.lrn || 'N/A'} />
+          <D label="Last School Attended" value={adm.prevSchool || 'N/A'} />
+          <div className="md:col-span-2"><D label="School Address" value={adm.schoolAddress || 'N/A'} /></div>
+          <D label="Father's Name & Occupation" value={adm.fatherNameOccupation || 'N/A'} />
+          <D label="Mother's Name & Occupation" value={adm.motherNameOccupation || 'N/A'} />
+          <D label="Guardian (if applicable)" value={adm.guardian || 'N/A'} />
           <D label="Date Submitted" value={formatDate(adm.submittedAt)} />
         </div>
       </div>
