@@ -293,7 +293,7 @@
 .animate-stagger > *:nth-child(7) { animation-delay: 300ms; }
 .animate-stagger > *:nth-child(8) { animation-delay: 350ms; }
 
-/* Notification dot pulse */
+/* Indicator pulse */
 .animate-bell-pulse {
   animation: pulse-ring 2s ease-in-out infinite;
 }

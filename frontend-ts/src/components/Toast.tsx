@@ -71,7 +71,7 @@ export function ToastContainer() {
         <div key={t.id} className={`${styles[t.type] || styles.success} backdrop-blur-xl border rounded-2xl shadow-elevated px-4 py-3.5 text-sm font-medium animate-[slideInRight_0.3s_ease-out] flex items-center gap-3 min-w-[280px] max-w-sm`} role="alert">
           <span className={`shrink-0 ${iconColors[t.type] || iconColors.info}`}>{iconSymbols[t.type] || 'i'}</span>
           <span className="flex-1 text-gray-700">{t.message}</span>
-          <button onClick={() => dismissToast(t.id)} className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors shrink-0" aria-label="Dismiss notification">&times;</button>
+          <button onClick={() => dismissToast(t.id)} className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors shrink-0" aria-label="Dismiss message">&times;</button>
         </div>
       ))}
     </div>,

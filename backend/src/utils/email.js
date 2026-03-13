@@ -129,7 +129,7 @@ export function sendVerificationEmail({ to, firstName, verifyToken }) {
       <a class="btn" href="${verifyUrl}">Verify My Email</a>
       <div class="highlight-box info">
         <strong>Why verify?</strong>
-        <span>Email verification ensures you can receive important notifications about your exams, admission status, and account recovery.</span>
+        <span>Email verification ensures you can receive important updates about your exams, admission status, and account recovery.</span>
       </div>
       <p style="font-size:13px;color:#6b7280;">This link expires in <b>24 hours</b>. If you didn't create this account, you can safely ignore this email.</p>
       <hr class="divider" />
@@ -231,7 +231,7 @@ export function sendAdmissionSubmittedEmail({ to, firstName, trackingId, gradeLe
         <span><b>Grade Level:</b> ${gradeLevel}</span><br/>
         <span><b>Status:</b> <span class="badge badge-amber">Submitted</span></span>
       </div>
-      <p>You will receive an email notification as your application progresses through each stage of the review process. You can also check your status anytime in the student portal.</p>
+      <p>You will receive email updates as your application progresses through each stage of the review process. You can also check your status anytime in the student portal.</p>
       <a class="btn" href="${appUrl}/#/student">Track My Application</a>
     `),
   });

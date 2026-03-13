@@ -15,7 +15,7 @@ export default function Topbar({ title, onMenuToggle, userId, user }: TopbarProp
   const navigate = useNavigate();
   void userId;
 
-  // Keep a stable app title now that in-app notifications are removed.
+  // Keep a stable app title.
   useEffect(() => {
     const titleValue = `${SCHOOL_NAME} — Admission & Exam System`;
     document.title = titleValue;

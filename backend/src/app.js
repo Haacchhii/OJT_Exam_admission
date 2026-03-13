@@ -11,7 +11,6 @@ import prisma from './config/db.js';
 import { errorHandler } from './middleware/errors.js';
 import { authenticate } from './middleware/auth.js';
 import { RATE_LIMITS, BODY_SIZE_LIMIT } from './utils/constants.js';
-import { clientCount } from './utils/sse.js';
 import { cachePublic, cachePrivate, noStore } from './middleware/cache.js';
 
 // Route imports
@@ -133,7 +132,7 @@ app.use('/api/exams/registrations', examSubmitLimiter);
 app.get('/api/health', async (_req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
-    res.json({ status: 'ok', uptime: process.uptime(), db: 'connected', sseClients: clientCount() });
+    res.json({ status: 'ok', uptime: process.uptime(), db: 'connected' });
   } catch {
     res.status(503).json({ status: 'degraded', uptime: process.uptime(), db: 'disconnected' });
   }

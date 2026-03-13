@@ -3,7 +3,7 @@ import { RATE_LIMITS } from '../utils/constants.js';
 
 /**
  * Write rate limiter — for creation/mutation endpoints that lack
- * a dedicated limiter (admissions create, users CRUD, notifications).
+ * a dedicated limiter (admissions create, users CRUD).
  */
 export const writeLimiter = rateLimit({
   windowMs: RATE_LIMITS.WRITE.windowMs,
