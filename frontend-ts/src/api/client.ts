@@ -12,6 +12,8 @@ export function setToken(token: string | null): void {
   authToken = token;
   if (token) localStorage.setItem('gk_auth_token', token);
   else localStorage.removeItem('gk_auth_token');
+  inflightGetRequests.clear();
+  recentGetResponses.clear();
 }
 
 export function getToken(): string | null { return authToken; }
@@ -45,6 +47,21 @@ export function qs(params: Record<string, any> = {}): string {
 const MAX_RETRIES = 2;
 const RETRY_BASE_MS = 500;
 const RETRYABLE_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
+const GET_BURST_CACHE_MS = 1500;
+
+const inflightGetRequests = new Map<string, Promise<unknown>>();
+const recentGetResponses = new Map<string, { data: unknown; expiresAt: number }>();
+
+function makeRequestKey(path: string): string {
+  return `${authToken || 'anon'}::${path}`;
+}
+
+function clearExpiredGetCache() {
+  const now = Date.now();
+  for (const [key, cached] of recentGetResponses.entries()) {
+    if (cached.expiresAt <= now) recentGetResponses.delete(key);
+  }
+}
 
 async function withRetry<T>(fn: () => Promise<T>, retries = MAX_RETRIES): Promise<T> {
   let lastError: unknown;
@@ -125,7 +142,32 @@ async function request<T = unknown>(
 
 // ---- Public client interface ----
 export const client = {
-  get:    <T = unknown>(path: string) => withRetry(() => request<T>('GET', path)),
+  get:    <T = unknown>(path: string) => {
+    clearExpiredGetCache();
+    const key = makeRequestKey(path);
+    const cached = recentGetResponses.get(key);
+    if (cached && cached.expiresAt > Date.now()) {
+      return Promise.resolve(cached.data as T);
+    }
+
+    const inFlight = inflightGetRequests.get(key);
+    if (inFlight) return inFlight as Promise<T>;
+
+    const req = withRetry(() => request<T>('GET', path))
+      .then((data) => {
+        recentGetResponses.set(key, {
+          data,
+          expiresAt: Date.now() + GET_BURST_CACHE_MS,
+        });
+        return data;
+      })
+      .finally(() => {
+        inflightGetRequests.delete(key);
+      });
+
+    inflightGetRequests.set(key, req as Promise<unknown>);
+    return req;
+  },
   post:   <T = unknown>(path: string, body?: unknown) => request<T>('POST', path, body),
   put:    <T = unknown>(path: string, body?: unknown) => request<T>('PUT', path, body),
   patch:  <T = unknown>(path: string, body?: unknown) => request<T>('PATCH', path, body),

@@ -9,6 +9,8 @@ import Modal from './Modal';
 import Icon from './Icons';
 import type { User, Notification } from '../types';
 
+const NOTIFICATION_POLL_MS = 60000;
+
 interface TopbarProps {
   title: string;
   onMenuToggle: () => void;
@@ -26,6 +28,7 @@ export default function Topbar({ title, onMenuToggle, userId, user }: TopbarProp
   const [composeMsg, setComposeMsg] = useState('');
   const [composeSending, setComposeSending] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const refreshInFlightRef = useRef(false);
   const navigate = useNavigate();
   const isStaff = user.role !== 'applicant';
 
@@ -51,18 +54,36 @@ export default function Topbar({ title, onMenuToggle, userId, user }: TopbarProp
   }, [composeTo, composeTitle, composeMsg]);
 
   const refresh = useCallback(async () => {
+    if (refreshInFlightRef.current) return;
+    refreshInFlightRef.current = true;
     try {
       const result = await getNotifications(String(userId));
       const arr = Array.isArray(result) ? result : (result as any)?.data ?? [];
       setNotifs(arr);
-    } catch { /* ignore notification fetch errors */ }
+    } catch {
+      /* ignore notification fetch errors */
+    } finally {
+      refreshInFlightRef.current = false;
+    }
   }, [userId]);
 
   useEffect(() => { refresh(); }, [refresh]);
 
   useEffect(() => {
-    const interval = setInterval(refresh, 30000);
-    return () => clearInterval(interval);
+    const interval = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      refresh();
+    }, NOTIFICATION_POLL_MS);
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [refresh]);
 
   const unread = notifs.filter(n => !n.isRead).length;
