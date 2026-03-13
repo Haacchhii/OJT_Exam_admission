@@ -5,7 +5,6 @@ import { VALID_TRANSITIONS, ROLES, MAX_BULK_OPERATIONS } from '../utils/constant
 import { generateTrackingId, generateStudentNumber } from '../utils/tracking.js';
 import { logAudit } from '../utils/auditLog.js';
 import { sendAdmissionSubmittedEmail, sendAdmissionStatusEmail } from '../utils/email.js';
-import { sendEvent } from '../utils/sse.js';
 import { cached, invalidatePrefix } from '../utils/cache.js';
 import env from '../config/env.js';
 
@@ -123,14 +122,14 @@ export async function createAdmission(req, res, next) {
   try {
     const {
       firstName, lastName, email, phone, dob, gender, address,
-      placeOfBirth, religion, gradeLevel, prevSchool, schoolAddress, schoolYear, lrn, applicantType,
-      fatherNameOccupation, motherNameOccupation, guardian, guardianRelation, guardianPhone, guardianEmail,
+      gradeLevel, prevSchool, schoolYear, lrn, applicantType,
+      guardian, guardianRelation, guardianPhone, guardianEmail,
       academicYearId, semesterId, studentNumber,
       documents: docNames,
     } = req.body;
 
     // Validate required fields
-    if (!firstName || !lastName || !email || !dob || !gender || !address || !placeOfBirth || !schoolAddress || !gradeLevel || !schoolYear || !fatherNameOccupation || !motherNameOccupation) {
+    if (!firstName || !lastName || !email || !dob || !gender || !address || !gradeLevel || !schoolYear || !guardian || !guardianRelation) {
       return res.status(400).json({ error: 'Missing required fields', code: 'VALIDATION_ERROR' });
     }
 
@@ -141,13 +140,12 @@ export async function createAdmission(req, res, next) {
         trackingId,
         userId: req.user.id,
         firstName, lastName, email, phone, dob, gender, address,
-        placeOfBirth: placeOfBirth || null, religion: religion || null,
-        gradeLevel, prevSchool: prevSchool || null, schoolAddress: schoolAddress || null, schoolYear,
+        gradeLevel, prevSchool: prevSchool || null, schoolYear,
         lrn: lrn || null, applicantType: applicantType || 'New',
         studentNumber: studentNumber || null,
-        fatherNameOccupation, motherNameOccupation,
-        guardian: guardian || null, guardianRelation: guardianRelation || null,
-        guardianPhone: guardianPhone || null, guardianEmail: guardianEmail || null,
+        guardian, guardianRelation,
+        guardianPhone: guardianPhone || null,
+        guardianEmail: guardianEmail || null,
         ...(academicYearId && { academicYearId: Number(academicYearId) }),
         ...(semesterId && { semesterId: Number(semesterId) }),
         status: 'Submitted',
@@ -158,29 +156,6 @@ export async function createAdmission(req, res, next) {
     logAudit({ userId: req.user.id, action: 'admission.create', entity: 'admission', entityId: admission.id, details: { trackingId, gradeLevel, applicantType: applicantType || 'New' }, ipAddress: req.ip });
 
     invalidatePrefix('admStats:');
-
-    // Notify the applicant about their submission
-    prisma.notification.create({
-      data: {
-        userId: req.user.id,
-        type: 'admission',
-        title: 'Application Submitted',
-        message: `Your admission application (${trackingId}) for ${gradeLevel} has been submitted successfully and is now under review.`,
-      },
-    }).then(n => sendEvent(req.user.id, 'notification', n)).catch(() => {});
-
-    // Notify employees about new application
-    prisma.user.findMany({ where: { role: { in: [ROLES.ADMIN, ROLES.REGISTRAR] } }, select: { id: true } })
-      .then(staff => {
-        if (staff.length) {
-          return prisma.notification.createMany({
-            data: staff.map(s => ({
-              userId: s.id, type: 'admission', title: 'New Admission Application',
-              message: `${firstName} ${lastName} submitted an admission application for ${gradeLevel}. Tracking ID: ${trackingId}`,
-            })),
-          });
-        }
-      }).catch(() => {});
 
     // Fire-and-forget confirmation email to the applicant
     sendAdmissionSubmittedEmail({ to: email, firstName, trackingId, gradeLevel });
@@ -262,24 +237,6 @@ export async function updateStatus(req, res, next) {
       } catch (_) { /* student number failure should not block the response */ }
     }
 
-    // Create notification for the applicant
-    try {
-      const statusMessages = {
-        'Under Screening': 'Your application is now under screening.',
-        'Under Evaluation': 'Your application is being evaluated.',
-        'Accepted': 'Congratulations! Your admission has been accepted.',
-        'Rejected': 'Your application has been reviewed. Please contact the registrar for details.',
-      };
-      await prisma.notification.create({
-        data: {
-          userId: admission.userId,
-          type: status === 'Rejected' ? 'warning' : status === 'Accepted' ? 'success' : 'info',
-          title: `Admission Status: ${status}`,
-          message: statusMessages[status] || `Your admission status has been updated to ${status}.`,
-        },
-      }).then(n => sendEvent(admission.userId, 'notification', n));
-    } catch (_) { /* notification failure should not block the response */ }
-
     logAudit({ userId: req.user.id, action: 'admission.status_update', entity: 'admission', entityId: id, details: { from: admission.status, to: status, notes: notes || null }, ipAddress: req.ip });
 
     invalidatePrefix('admStats:');
@@ -324,26 +281,6 @@ export async function bulkUpdateStatus(req, res, next) {
       where: { id: { in: ids } },
       data: { status },
     });
-
-    // Create notifications for each affected applicant (best-effort)
-    const statusMessages = {
-      'Under Screening': 'Your application is now under screening.',
-      'Under Evaluation': 'Your application is being evaluated.',
-      'Accepted': 'Congratulations! Your admission has been accepted.',
-      'Rejected': 'Your application has been reviewed. Please contact the registrar for details.',
-    };
-    try {
-      await Promise.all(admissions.map(adm =>
-        prisma.notification.create({
-          data: {
-            userId: adm.userId,
-            type: status === 'Rejected' ? 'warning' : status === 'Accepted' ? 'success' : 'info',
-            title: `Admission Status: ${status}`,
-            message: statusMessages[status] || `Your admission status has been updated to ${status}.`,
-          },
-        }).then(n => sendEvent(adm.userId, 'notification', n))
-      ));
-    } catch (_) { /* notification failure should not block the response */ }
 
     logAudit({ userId: req.user.id, action: 'admission.bulk_status_update', entity: 'admission', entityId: null, details: { ids, to: status, count: result.count }, ipAddress: req.ip });
 

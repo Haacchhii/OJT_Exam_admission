@@ -3,7 +3,6 @@ import { paginate, paginatedResponse } from '../utils/pagination.js';
 import { generateTrackingId } from '../utils/tracking.js';
 import { sendExamBookingEmail } from '../utils/email.js';
 import { ROLES } from '../utils/constants.js';
-import { sendEvent } from '../utils/sse.js';
 
 // GET /api/exams/registrations/list?search=&status=&page=&limit=
 export async function getRegistrations(req, res, next) {
@@ -102,22 +101,6 @@ export async function createRegistration(req, res, next) {
     });
 
     res.status(201).json(registration);
-
-    // Fire-and-forget in-app notification for exam booking
-    prisma.examSchedule.findUnique({
-      where: { id: scheduleId },
-      include: { exam: { select: { title: true } } },
-    }).then(sched => {
-      if (!sched) return;
-      prisma.notification.create({
-        data: {
-          userId: req.user.id,
-          type: 'exam',
-          title: 'Exam Registration Confirmed',
-          message: `You have been registered for "${sched.exam?.title || 'Entrance Exam'}" (Tracking ID: ${registration.trackingId}).`,
-        },
-      }).then(n => sendEvent(req.user.id, 'notification', n)).catch(() => {});
-    }).catch(() => {});
 
     // Fire-and-forget booking confirmation email
     prisma.user.findUnique({ where: { id: req.user.id }, select: { firstName: true, email: true } })

@@ -8,7 +8,6 @@ async function main() {
 
   // Clear all data
   await prisma.$transaction([
-    prisma.notification.deleteMany(),
     prisma.essayAnswer.deleteMany(),
     prisma.submittedAnswer.deleteMany(),
     prisma.examResult.deleteMany(),
@@ -217,25 +216,12 @@ async function main() {
   });
   console.log('  ✅ 2 exam results');
 
-  // ─── Notifications ────────────────────────────────
-  await prisma.notification.createMany({
-    data: [
-      { userId: 5, type: 'admission', title: 'Application Received', message: 'Your admission application has been received.', isRead: true },
-      { userId: 5, type: 'status', title: 'Status Updated', message: 'Your application status has been updated to: Under Screening.', isRead: false },
-      { userId: 5, type: 'exam', title: 'Exam Scheduled', message: 'You have been scheduled for the Entrance Exam on March 5, 2026.', isRead: false },
-      { userId: 1, type: 'admission', title: 'New Application', message: 'New admission application received from Miguel Ramos.', isRead: false },
-      { userId: 1, type: 'exam', title: 'Exam Update', message: 'Entrance Exam Batch 1 has 12 registered applicants.', isRead: true },
-      { userId: 1, type: 'scoring', title: 'Essay Review', message: '2 essay answers are pending review.', isRead: false },
-    ],
-  });
-  console.log('  ✅ 6 notifications');
-
   // ─── Reset PostgreSQL auto-increment sequences ───
   const tables = [
     'users', 'admissions', 'admission_documents', 'exams',
     'exam_questions', 'question_choices', 'exam_schedules',
     'exam_registrations', 'exam_results', 'submitted_answers',
-    'essay_answers', 'notifications', 'academic_years', 'semesters',
+    'essay_answers', 'academic_years', 'semesters',
   ];
   for (const table of tables) {
     await prisma.$executeRawUnsafe(

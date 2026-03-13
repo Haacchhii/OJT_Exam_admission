@@ -20,7 +20,6 @@ import admissionsRoutes    from './routes/admissions.js';
 import examsRoutes         from './routes/exams.js';
 import resultsRoutes       from './routes/results.js';
 import usersRoutes         from './routes/users.js';
-import notificationsRoutes from './routes/notifications.js';
 import auditLogRoutes      from './routes/auditLog.js';
 import academicYearsRoutes from './routes/academicYears.js';
 
@@ -122,7 +121,6 @@ app.use('/api/admissions',    cachePrivate, admissionsRoutes);
 app.use('/api/exams',         cachePrivate, examsRoutes);
 app.use('/api/results',       cachePrivate, resultsRoutes);
 app.use('/api/users',         cachePrivate, usersRoutes);
-app.use('/api/notifications', cachePrivate, notificationsRoutes);
 app.use('/api/audit-logs',    cachePrivate, auditLogRoutes);
 app.use('/api/academic-years', cachePublic, academicYearsRoutes);
 

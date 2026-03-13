@@ -2,7 +2,6 @@ import prisma from '../config/db.js';
 import { paginate, paginatedResponse } from '../utils/pagination.js';
 import { logAudit } from '../utils/auditLog.js';
 import { sendExamResultEmail } from '../utils/email.js';
-import { sendEvent } from '../utils/sse.js';
 
 // ═══════════════════════════════════════════════════════
 // GET /api/results/essays?status=&page=&limit=
@@ -113,19 +112,9 @@ export async function scoreEssay(req, res, next) {
           },
         });
 
-        // Notify the student that their essay has been reviewed
+        // Send final result email once essay review is complete.
         const student = await prisma.user.findFirst({ where: { email: reg.userEmail } });
         if (student) {
-          await prisma.notification.create({
-            data: {
-              userId: student.id,
-              type: passed ? 'success' : 'warning',
-              title: 'Essay Review Complete',
-              message: `Your exam has been fully reviewed. Final score: ${newTotal}/${maxPossible} (${newPct}%). ${passed ? 'You passed!' : 'Unfortunately, you did not pass.'}`,
-            },
-          }).then(n => sendEvent(student.id, 'notification', n)).catch(() => {});
-
-          // Send result email now that all essays are scored
           sendExamResultEmail({
             to: student.email,
             firstName: student.firstName,

@@ -2,7 +2,6 @@ import prisma from '../config/db.js';
 import { logAudit } from '../utils/auditLog.js';
 import { sendExamResultEmail } from '../utils/email.js';
 import { EXAM_GRACE_MINUTES } from '../utils/constants.js';
-import { sendEvent } from '../utils/sse.js';
 
 // ═══════════════════════════════════════════════════════
 // POST /api/results/submit
@@ -132,20 +131,6 @@ export async function submitExam(req, res, next) {
     res.json({ totalScore, maxPossible, percentage, passed: hasEssays ? false : passed });
 
     logAudit({ userId: req.user.id, action: 'exam.submit', entity: 'result', entityId: registrationId, details: { totalScore, maxPossible, percentage, hasEssays }, ipAddress: req.ip });
-
-    // Fire-and-forget notification for employees
-    prisma.user.findMany({ where: { role: { in: ['administrator', 'registrar', 'teacher'] } }, select: { id: true } })
-      .then(employees => {
-        const notifs = employees.map(e => ({
-          userId: e.id, type: 'exam', title: 'Exam Submitted',
-          message: `${req.user.email} has completed the exam. Score: ${totalScore}/${maxPossible} (${percentage}%).`,
-        }));
-        if (notifs.length) {
-          return prisma.notification.createMany({ data: notifs }).then(() => {
-            notifs.forEach(n => sendEvent(n.userId, 'notification', n));
-          });
-        }
-      }).catch(() => {});
 
     // If no essays, result is final → send result email now
     if (!hasEssays) {

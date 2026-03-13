@@ -73,8 +73,8 @@ export interface Admission {
   studentNumber: string | null;
   fatherNameOccupation?: string | null;
   motherNameOccupation?: string | null;
-  guardian: string | null;
-  guardianRelation: string | null;
+  guardian: string;
+  guardianRelation: string;
   guardianPhone: string | null;
   guardianEmail: string | null;
   status: AdmissionStatus;
@@ -197,19 +197,6 @@ export interface SubmittedAnswer {
   essayText: string | null;
   pointsAwarded?: number | null;
   question?: ExamQuestion;
-}
-
-// ─── Notifications ──────────────────────────────────
-export type NotificationType = 'info' | 'success' | 'warning' | 'exam' | 'admission' | 'status' | 'scoring';
-
-export interface Notification {
-  id: number;
-  userId: number;
-  type: NotificationType;
-  title: string;
-  message: string;
-  isRead: boolean;
-  createdAt: string;
 }
 
 // ─── Audit ──────────────────────────────────────────

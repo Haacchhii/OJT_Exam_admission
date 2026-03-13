@@ -3,7 +3,6 @@ const prisma = new PrismaClient();
 
 async function clear() {
   console.log('Clearing all tables...');
-  await prisma.notification.deleteMany();
   await prisma.essayAnswer.deleteMany();
   await prisma.submittedAnswer.deleteMany();
   await prisma.examResult.deleteMany();
