@@ -105,10 +105,18 @@ async function request<T = unknown>(
   const data = contentType.includes('json') ? await res.json() : await res.text();
 
   if (!res.ok) {
-    const message =
-      typeof data === 'object' && data !== null && 'message' in data ? (data as { message: string }).message
-      : typeof data === 'object' && data !== null && 'error' in data ? (data as { error: string }).error
-      : `Request failed (${res.status})`;
+    let message = `Request failed (${res.status})`;
+    if (typeof data === 'object' && data !== null) {
+      if ('message' in data) message = (data as { message: string }).message;
+      else if ('error' in data) message = (data as { error: string }).error;
+      // Surface field-level validation errors from Zod
+      if ('errors' in data && Array.isArray((data as any).errors)) {
+        const fields = (data as { errors: { path?: string; message: string }[] }).errors
+          .map(e => e.path ? `${e.path}: ${e.message}` : e.message)
+          .join('; ');
+        if (fields) message = fields;
+      }
+    }
     throw new ApiError(message, res.status, data);
   }
 

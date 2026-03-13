@@ -28,7 +28,7 @@ export async function getUsers(req, res, next) {
     }
 
     const [users, total] = await Promise.all([
-      prisma.user.findMany({ where, ...(pg && { skip: pg.skip, take: pg.take }), orderBy: { createdAt: 'desc' } }),
+      prisma.user.findMany({ where, ...(pg && { skip: pg.skip, take: pg.take }), orderBy: { createdAt: 'desc' }, include: { applicantProfile: { select: { gradeLevel: true } } } }),
       prisma.user.count({ where }),
     ]);
 

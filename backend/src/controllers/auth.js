@@ -98,8 +98,8 @@ export async function login(req, res, next) {
 // POST /api/auth/register
 export async function register(req, res, next) {
   try {
-    const { firstName, lastName, email, password } = req.body;
-    if (!firstName || !lastName || !email || !password) {
+    const { firstName, lastName, email, password, gradeLevel } = req.body;
+    if (!firstName || !lastName || !email || !password || !gradeLevel) {
       return res.status(400).json({ error: 'All fields are required', code: 'VALIDATION_ERROR' });
     }
     // Email format validation
@@ -130,8 +130,8 @@ export async function register(req, res, next) {
       },
     });
 
-    // Auto-create an empty applicant profile so it exists for later updates
-    await prisma.applicantProfile.create({ data: { userId: user.id } });
+    // Auto-create applicant profile with the chosen grade level
+    await prisma.applicantProfile.create({ data: { userId: user.id, gradeLevel: gradeLevel || null } });
 
     // Re-fetch with profile included for the response
     const fullUser = await prisma.user.findUnique({

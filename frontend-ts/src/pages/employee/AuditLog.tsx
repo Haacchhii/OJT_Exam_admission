@@ -69,7 +69,7 @@ export default function AuditLog() {
   return (
     <div className="space-y-6">
       <PageHeader title="Audit Trail" subtitle="Track all system actions and changes">
-        <button onClick={refetch} className="border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50" title="Refresh">
+        <button onClick={refetch} className="border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50" title="Refresh" aria-label="Refresh audit log">
           <Icon name="refresh" className="w-4 h-4" />
         </button>
       </PageHeader>

@@ -9,7 +9,7 @@ import { getAcademicYears, getSemesters } from '../../api/academicYears';
 import { showToast } from '../../components/Toast';
 import { PageHeader, SkeletonPage, ErrorAlert } from '../../components/UI';
 import Icon from '../../components/Icons';
-import { ADMISSION_STATUSES } from '../../utils/constants';
+import { ADMISSION_STATUSES, SCHOOL_NAME } from '../../utils/constants';
 import type { Admission, ExamResult, Exam, ExamSchedule, ExamRegistration, EssayAnswer, User, AcademicYear, Semester } from '../../types';
 
 function downloadCSV(filename: string, rows: (string | number)[][]) {
@@ -19,6 +19,17 @@ function downloadCSV(filename: string, rows: (string | number)[][]) {
   const a = document.createElement('a');
   a.href = url; a.download = filename; a.click();
   URL.revokeObjectURL(url);
+}
+
+function printPDF(title: string, headers: string[], rows: (string | number)[][]) {
+  const w = window.open('', '_blank');
+  if (!w) { showToast('Please allow popups to export PDF', 'error'); return; }
+  const ths = headers.map(h => `<th style="border:1px solid #ccc;padding:6px 10px;background:#f5f5f0;font-size:12px;text-align:left">${h}</th>`).join('');
+  const trs = rows.map(r => `<tr>${r.map(c => `<td style="border:1px solid #ddd;padding:5px 10px;font-size:11px">${c}</td>`).join('')}</tr>`).join('');
+  w.document.write(`<!DOCTYPE html><html><head><title>${title}</title><style>@page{size:landscape;margin:1cm}body{font-family:system-ui,sans-serif;padding:20px}h1{font-size:18px;color:#1a3c2a}table{width:100%;border-collapse:collapse;margin-top:12px}p.meta{color:#888;font-size:11px}</style></head><body><h1>🔑 ${SCHOOL_NAME} — ${title}</h1><p class="meta">Generated on ${new Date().toLocaleString()} &bull; ${rows.length} records</p><table><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></body></html>`);
+  w.document.close();
+  w.onafterprint = () => w.close();
+  setTimeout(() => w.print(), 400);
 }
 
 interface ReportData {
@@ -107,31 +118,34 @@ export default function EmployeeReports() {
   const now = new Date();
   const thisMonth = admissions.filter(a => { const d = new Date(a.submittedAt); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); }).length;
 
-  const exportApplicants = () => {
-    const rows: (string | number)[][] = [['ID', 'First Name', 'Last Name', 'Email', 'Grade Level', 'Status', 'Submitted']];
-    admissions.forEach(a => rows.push([a.id, a.firstName, a.lastName, a.email, a.gradeLevel, a.status, a.submittedAt]));
-    downloadCSV('applicants.csv', rows);
-    showToast('Applicant list downloaded!', 'success');
+  const exportApplicants = (format: 'csv' | 'pdf' = 'csv') => {
+    const headers = ['ID', 'First Name', 'Last Name', 'Email', 'Grade Level', 'Status', 'Submitted'];
+    const rows: (string | number)[][] = admissions.map(a => [a.id, a.firstName, a.lastName, a.email, a.gradeLevel, a.status, a.submittedAt]);
+    if (format === 'pdf') { printPDF('Applicant List', headers, rows); }
+    else { downloadCSV('applicants.csv', [headers, ...rows]); }
+    showToast(`Applicant list ${format === 'pdf' ? 'exported' : 'downloaded'}!`, 'success');
   };
 
-  const exportResults = () => {
-    const rows: (string | number)[][] = [['Student', 'Exam', 'Score', 'Max', 'Percentage', 'Passed', 'Essay Reviewed', 'Date']];
-    results.forEach(r => {
+  const exportResults = (format: 'csv' | 'pdf' = 'csv') => {
+    const headers = ['Student', 'Exam', 'Score', 'Max', 'Percentage', 'Passed', 'Essay Reviewed', 'Date'];
+    const rows: (string | number)[][] = results.map(r => {
       const reg = regs.find(rg => rg.id === r.registrationId);
       const student = reg ? users.find(u => u.email === reg.userEmail) : null;
       const sched = reg ? schedules.find(s => s.id === reg.scheduleId) : null;
       const exam = sched ? exams.find(e => e.id === sched.examId) : null;
-      rows.push([student ? `${student.firstName} ${student.lastName}` : 'Unknown', exam?.title || 'N/A', r.totalScore, r.maxPossible, r.percentage.toFixed(1) + '%', r.passed ? 'Yes' : 'No', r.essayReviewed ? 'Yes' : 'No', r.createdAt || '']);
+      return [student ? `${student.firstName} ${student.lastName}` : 'Unknown', exam?.title || 'N/A', r.totalScore, r.maxPossible, r.percentage.toFixed(1) + '%', r.passed ? 'Yes' : 'No', r.essayReviewed ? 'Yes' : 'No', r.createdAt || ''];
     });
-    downloadCSV('exam_results.csv', rows);
-    showToast('Results downloaded!', 'success');
+    if (format === 'pdf') { printPDF('Exam Results', headers, rows); }
+    else { downloadCSV('exam_results.csv', [headers, ...rows]); }
+    showToast(`Results ${format === 'pdf' ? 'exported' : 'downloaded'}!`, 'success');
   };
 
-  const exportSchedules = () => {
-    const rows: (string | number)[][] = [['Exam', 'Date', 'Start Time', 'End Time', 'Max Slots', 'Booked']];
-    schedules.forEach(s => { const exam = exams.find(e => e.id === s.examId); rows.push([exam?.title || 'N/A', s.scheduledDate, s.startTime, s.endTime, s.maxSlots, s.slotsTaken]); });
-    downloadCSV('exam_schedules.csv', rows);
-    showToast('Schedules downloaded!', 'success');
+  const exportSchedules = (format: 'csv' | 'pdf' = 'csv') => {
+    const headers = ['Exam', 'Date', 'Start Time', 'End Time', 'Max Slots', 'Booked'];
+    const rows: (string | number)[][] = schedules.map(s => { const exam = exams.find(e => e.id === s.examId); return [exam?.title || 'N/A', s.scheduledDate, s.startTime, s.endTime, s.maxSlots, s.slotsTaken]; });
+    if (format === 'pdf') { printPDF('Exam Schedules', headers, rows); }
+    else { downloadCSV('exam_schedules.csv', [headers, ...rows]); }
+    showToast(`Schedules ${format === 'pdf' ? 'exported' : 'downloaded'}!`, 'success');
   };
 
   const examStats = exams.map(exam => {
@@ -210,15 +224,18 @@ export default function EmployeeReports() {
       {/* Export Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         {[
-          { icon: 'clipboard', title: 'Applicant List', desc: 'Download a full list of all applicants with their admission status.', onClick: exportApplicants },
-          { icon: 'chartBar', title: 'Exam Results', desc: 'Download exam scores and pass/fail data for all applicants.', onClick: exportResults },
-          { icon: 'calendar', title: 'Exam Schedules', desc: 'Download all exam schedule data and slot availability.', onClick: exportSchedules },
+          { icon: 'clipboard', title: 'Applicant List', desc: 'Download a full list of all applicants with their admission status.', onCSV: () => exportApplicants('csv'), onPDF: () => exportApplicants('pdf') },
+          { icon: 'chartBar', title: 'Exam Results', desc: 'Download exam scores and pass/fail data for all applicants.', onCSV: () => exportResults('csv'), onPDF: () => exportResults('pdf') },
+          { icon: 'calendar', title: 'Exam Schedules', desc: 'Download all exam schedule data and slot availability.', onCSV: () => exportSchedules('csv'), onPDF: () => exportSchedules('pdf') },
         ].map((c, i) => (
           <div key={i} className="gk-card p-6 text-center">
             <div className="w-14 h-14 rounded-2xl bg-forest-50 flex items-center justify-center mx-auto mb-3"><Icon name={c.icon} className="w-7 h-7 text-forest-500" /></div>
             <h3 className="font-bold text-forest-500 mb-1">{c.title}</h3>
             <p className="text-gray-500 text-sm mb-4">{c.desc}</p>
-            <button onClick={c.onClick} className="bg-forest-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-forest-600 inline-flex items-center gap-1.5"><Icon name="document" className="w-4 h-4" /> Download CSV</button>
+            <div className="flex gap-2 justify-center">
+              <button onClick={c.onCSV} className="bg-forest-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-forest-600 inline-flex items-center gap-1.5 text-sm"><Icon name="document" className="w-4 h-4" /> CSV</button>
+              <button onClick={c.onPDF} className="bg-gold-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-gold-600 inline-flex items-center gap-1.5 text-sm"><Icon name="document" className="w-4 h-4" /> PDF</button>
+            </div>
           </div>
         ))}
       </div>

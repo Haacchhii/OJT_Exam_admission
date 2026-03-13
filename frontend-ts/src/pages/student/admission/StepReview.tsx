@@ -1,6 +1,6 @@
 import Icon from '../../../components/Icons';
 import { Detail, ReviewSection } from './AdmissionFormFields';
-import { DOC_SLOT_LABELS } from '../../../utils/constants';
+import { DOC_SLOT_LABELS, SCHOOL_NAME } from '../../../utils/constants';
 import type { AdmissionForm, SlotFiles } from './useAdmissionWizard';
 
 interface Props {
@@ -61,7 +61,7 @@ export default function StepReview({ form, slotFiles, extraFiles, requiredDocs, 
       </div>
       <label className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 mb-6 text-xs text-gray-500 flex items-start gap-3 cursor-pointer select-none">
         <input type="checkbox" checked={privacyConsent} onChange={e => setPrivacyConsent(e.target.checked)} className="accent-forest-500 mt-0.5 shrink-0" />
-        <span><Icon name="lock" className="w-4 h-4 inline shrink-0 mr-1" /> By submitting this application, I consent to the collection and processing of my personal information in accordance with the Data Privacy Act of 2012 (RA 10173) and GOLDEN KEY Integrated School of St. Joseph's privacy policies. Personal data shall not be disclosed without consent, except as required by law.</span>
+        <span><Icon name="lock" className="w-4 h-4 inline shrink-0 mr-1" /> By submitting this application, I consent to the collection and processing of my personal information in accordance with the Data Privacy Act of 2012 (RA 10173) and {SCHOOL_NAME}'s privacy policies. Personal data shall not be disclosed without consent, except as required by law.</span>
       </label>
       <div className="flex justify-between">
         <button onClick={() => goTo(3)} className="border border-gray-300 text-gray-700 px-5 py-2.5 rounded-lg hover:bg-gray-50">← Back</button>

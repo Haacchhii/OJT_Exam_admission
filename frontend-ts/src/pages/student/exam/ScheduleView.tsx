@@ -87,7 +87,14 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, user
       <div className="gk-card p-4 mb-6">
         <div className="flex items-center gap-3 text-forest-600">
           <Icon name="clipboard" className="w-6 h-6 text-forest-500" />
-          <div><strong className="text-forest-500">Welcome to the Entrance Exam</strong><p className="text-gray-500 text-sm">Select an available exam slot below to book your entrance examination.</p></div>
+          <div>
+            <strong className="text-forest-500">Welcome to the Entrance Exam</strong>
+            <p className="text-gray-500 text-sm">
+              {user?.applicantProfile?.gradeLevel
+                ? <>Showing exams for <span className="font-semibold text-forest-600">{user.applicantProfile.gradeLevel}</span>. Select an available slot to book.</>
+                : 'Select an available exam slot below to book your entrance examination.'}
+            </p>
+          </div>
         </div>
       </div>
       <div className="gk-card p-6">
@@ -107,6 +114,7 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, user
                   <div className="flex-1">
                     <h4 className="font-semibold text-forest-500">{exam?.title || 'Exam'}</h4>
                     <p className="text-gray-500 text-sm">{formatTime(s.startTime)} - {formatTime(s.endTime)} · {remaining} slots left</p>
+                    {(exam as any)?.gradeLevel && <span className="inline-block mt-1 text-xs bg-gold-100 text-gold-700 px-2 py-0.5 rounded-full font-medium">{(exam as any).gradeLevel}</span>}
                   </div>
                   <button
                     onClick={() => bookSlot(s.id)}

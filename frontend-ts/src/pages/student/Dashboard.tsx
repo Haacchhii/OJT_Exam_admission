@@ -5,11 +5,11 @@ import { getMyAdmission } from '../../api/admissions';
 import { getMyRegistrations } from '../../api/exams';
 import { getMyResult } from '../../api/results';
 import { StatCard, PageHeader, SkeletonPage, ErrorAlert } from '../../components/UI';
-import { formatDate } from '../../utils/helpers';
-import { ADMISSION_PROGRESS_STEPS } from '../../utils/constants';
+import { formatDate, formatTime } from '../../utils/helpers';
+import { ADMISSION_PROGRESS_STEPS, SCHOOL_BRAND } from '../../utils/constants';
 import Icon from '../../components/Icons';
 import type { Admission, ExamRegistration, ExamResult } from '../../types';
-import type { ReactNode } from 'react';
+import { type ReactNode, useState, useEffect } from 'react';
 
 interface DashboardData {
   myApp: Admission | null;
@@ -58,7 +58,7 @@ export default function StudentDashboard() {
               <Icon name="key" className="w-5 h-5 text-gold-600" />
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="font-bold text-gray-800 mb-1">Welcome to Golden Key!</h3>
+              <h3 className="font-bold text-gray-800 mb-1">Welcome to {SCHOOL_BRAND}!</h3>
               <p className="text-gray-500 text-sm mb-4">You're all set. Here's what to do next to complete your application:</p>
               <div className="flex flex-wrap gap-4 mb-5">
                 {[
@@ -82,6 +82,64 @@ export default function StudentDashboard() {
           </div>
         </div>
       )}
+
+      {/* Step-by-step journey tracker */}
+      <div className="gk-card p-6 mb-6">
+        <h3 className="gk-heading-sm text-gray-800 mb-5 flex items-center gap-2">
+          <span className="p-1.5 bg-gold-50 rounded-lg"><Icon name="star" className="w-5 h-5 text-gold-500" /></span>
+          Your Application Journey
+        </h3>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          {[
+            { step: 1, label: 'Register', desc: 'Create your account', icon: 'check', done: true },
+            { step: 2, label: 'Book Exam', desc: 'Schedule entrance exam', icon: 'calendar', done: !!myReg },
+            { step: 3, label: 'Pass Exam', desc: 'Complete & pass the exam', icon: 'trophy', done: !!myResult?.passed },
+            { step: 4, label: 'Apply', desc: 'Submit admission form', icon: 'admissions', done: !!myApp },
+            { step: 5, label: 'Accepted', desc: 'Admission confirmed', icon: 'graduationCap', done: myApp?.status === 'Accepted' },
+          ].map(({ step, label, desc, icon, done }) => (
+            <div key={step} className={`relative rounded-xl border-2 p-4 text-center transition-all ${done ? 'border-forest-300 bg-forest-50/50' : 'border-gray-200 bg-gray-50/30'}`}>
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-2 ${done ? 'bg-forest-500 text-white' : 'bg-gray-200 text-gray-400'}`}>
+                {done ? <Icon name="check" className="w-5 h-5" /> : <Icon name={icon} className="w-5 h-5" />}
+              </div>
+              <p className={`text-sm font-bold ${done ? 'text-forest-700' : 'text-gray-500'}`}>{label}</p>
+              <p className="text-xs text-gray-400 mt-0.5">{desc}</p>
+              {done && <span className="absolute top-2 right-2 text-forest-500"><Icon name="checkCircle" className="w-4 h-4" /></span>}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Exam countdown */}
+      {myReg && myReg.status === 'scheduled' && myReg.schedule && (() => {
+        const schedDate = new Date(myReg.schedule.scheduledDate + 'T' + (myReg.schedule.startTime || '09:00'));
+        const now = new Date();
+        const diffMs = schedDate.getTime() - now.getTime();
+        if (diffMs <= 0) return null;
+        const days = Math.floor(diffMs / 86400000);
+        const hours = Math.floor((diffMs % 86400000) / 3600000);
+        return (
+          <div className="gk-card p-5 mb-6 border-l-4 border-amber-400 bg-gradient-to-r from-amber-50 to-white">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+                <Icon name="clock" className="w-6 h-6 text-amber-600" />
+              </div>
+              <div className="flex-1">
+                <h4 className="font-bold text-gray-800">Exam Coming Up!</h4>
+                <p className="text-sm text-gray-500">
+                  Your entrance exam is on <strong>{formatDate(myReg.schedule.scheduledDate)}</strong> at <strong>{formatTime(myReg.schedule.startTime)}</strong>
+                </p>
+              </div>
+              <div className="text-center px-4">
+                <div className="text-2xl font-extrabold text-amber-600">{days > 0 ? `${days}d ${hours}h` : `${hours}h`}</div>
+                <div className="text-xs text-gray-400">until exam</div>
+              </div>
+              <Link to="/student/exam" className="gk-btn-primary px-4 py-2 text-sm whitespace-nowrap">
+                <Icon name="exam" className="w-4 h-4 mr-1.5 inline" />Go to Exam
+              </Link>
+            </div>
+          </div>
+        );
+      })()}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8 animate-stagger">
         <StatCard icon={examStatus.icon} value={examStatus.text} label="Exam Status" color={examStatus.color} />

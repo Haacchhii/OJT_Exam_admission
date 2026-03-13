@@ -29,12 +29,17 @@ export async function getRegistrations(req, res, next) {
   } catch (err) { next(err); }
 }
 
-// GET /api/exams/registrations/mine
+// GET /api/exams/registrations/mine?academicYearId=
 export async function getMyRegistrations(req, res, next) {
   try {
+    const where = { userEmail: req.user.email };
+    const { academicYearId } = req.query;
+    if (academicYearId) {
+      where.schedule = { exam: { academicYearId: Number(academicYearId) } };
+    }
     const registrations = await prisma.examRegistration.findMany({
-      where: { userEmail: req.user.email },
-      include: { schedule: { include: { exam: { select: { title: true, gradeLevel: true, durationMinutes: true } } } } },
+      where,
+      include: { schedule: { include: { exam: { select: { title: true, gradeLevel: true, durationMinutes: true, academicYearId: true } } } } },
       orderBy: { createdAt: 'desc' },
     });
     res.json(registrations);

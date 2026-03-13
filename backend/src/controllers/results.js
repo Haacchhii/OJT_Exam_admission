@@ -54,12 +54,17 @@ export async function getResults(req, res, next) {
 // ═══════════════════════════════════════════════════════
 export async function getMyResult(req, res, next) {
   try {
+    const where = { registration: { userEmail: req.user.email } };
+    const { academicYearId } = req.query;
+    if (academicYearId) {
+      where.registration = { ...where.registration, schedule: { exam: { academicYearId: Number(academicYearId) } } };
+    }
     const results = await prisma.examResult.findMany({
-      where: { registration: { userEmail: req.user.email } },
+      where,
       include: {
         registration: {
           include: {
-            schedule: { include: { exam: { select: { title: true, gradeLevel: true } } } },
+            schedule: { include: { exam: { select: { title: true, gradeLevel: true, academicYearId: true } } } },
           },
         },
       },

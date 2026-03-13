@@ -298,6 +298,57 @@
   animation: pulse-ring 2s ease-in-out infinite;
 }
 
+/* ──── Dark Mode ──── */
+.dark body {
+  background-color: #111827;
+  color: #e5e7eb;
+}
+
+.dark .gk-mesh-bg {
+  background-color: #111827;
+}
+
+.dark .gk-card,
+.dark .lpu-card {
+  background-color: #1f2937;
+  border-color: #374151;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.2);
+}
+
+.dark .gk-input {
+  background-color: #1f2937;
+  border-color: #4b5563;
+  color: #e5e7eb;
+}
+.dark .gk-input::placeholder { color: #6b7280; }
+.dark .gk-input:focus {
+  border-color: #3d9b6a;
+  --tw-ring-color: rgb(61 155 106 / 0.25);
+}
+
+.dark .stat-value { color: #f9fafb; }
+.dark .gk-heading { color: #f9fafb; }
+.dark .gk-heading-sm { color: #e5e7eb; }
+
+.dark .gk-table th {
+  background-color: #1f2937;
+  color: #9ca3af;
+  border-color: #374151;
+}
+.dark .gk-table td { color: #d1d5db; }
+.dark .gk-table thead tr { border-color: #374151; }
+.dark .gk-table tbody tr { border-color: #1f2937; }
+.dark .gk-table tbody tr:hover { background-color: #374151; }
+
+.dark select {
+  background-color: #1f2937;
+  border-color: #4b5563;
+  color: #e5e7eb;
+}
+
+.dark ::-webkit-scrollbar-thumb { background: #4b5563; }
+.dark ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

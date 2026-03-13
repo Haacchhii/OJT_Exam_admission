@@ -37,6 +37,7 @@ export const registerSchema = z.object({
   lastName: z.string().min(1, 'Last name is required').max(100),
   email: z.string().email('Invalid email format'),
   password: passwordSchema,
+  gradeLevel: z.string().min(1, 'Grade level is required').max(50),
 });
 
 export const forgotPasswordSchema = z.object({

@@ -144,6 +144,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const roleLabel = ROLE_LABELS[user?.role as string] || user?.role || '';
 
+  // Session inactivity timeout — logout after 30 minutes of no interaction
+  useEffect(() => {
+    if (!user) return;
+    const INACTIVITY_MS = 30 * 60 * 1000;
+    let timer: ReturnType<typeof setTimeout>;
+    const reset = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => { logout(); }, INACTIVITY_MS);
+    };
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart'] as const;
+    events.forEach(e => window.addEventListener(e, reset));
+    reset();
+    return () => {
+      clearTimeout(timer);
+      events.forEach(e => window.removeEventListener(e, reset));
+    };
+  }, [user, logout]);
+
+  // Periodically validate session with backend (every 5 min)
+  useEffect(() => {
+    if (!user) return;
+    const id = setInterval(() => { refreshUser(); }, 5 * 60 * 1000);
+    return () => clearInterval(id);
+  }, [user, refreshUser]);
+
   const value = useMemo<AuthContextValue>(
     () => ({ user, login, logout, refreshUser, isEmployee, canAccess, roleLabel }),
     [user, login, logout, refreshUser, isEmployee, canAccess, roleLabel]

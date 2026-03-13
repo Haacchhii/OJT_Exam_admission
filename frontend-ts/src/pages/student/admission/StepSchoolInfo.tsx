@@ -2,7 +2,7 @@ import type { ChangeEvent } from 'react';
 import Icon from '../../../components/Icons';
 import { Input, Select } from './AdmissionFormFields';
 import { checkAgeRequirement } from './useAdmissionWizard';
-import { GRADE_OPTIONS, DOC_SLOT_LABELS, APPLICANT_TYPES } from '../../../utils/constants';
+import { GRADE_OPTIONS, DOC_SLOT_LABELS, APPLICANT_TYPES, SCHOOL_NAME } from '../../../utils/constants';
 import type { AdmissionForm, SlotFiles } from './useAdmissionWizard';
 import type { User } from '../../../types';
 
@@ -27,7 +27,7 @@ export default function StepSchoolInfo({ form, set, setForm, goTo, requiredDocs,
           setForm(f => ({
             ...f,
             applicantType: type,
-            prevSchool: type === 'Continuing' ? 'GOLDEN KEY Integrated School of St. Joseph' : (f.prevSchool === 'GOLDEN KEY Integrated School of St. Joseph' ? '' : f.prevSchool),
+            prevSchool: type === 'Continuing' ? SCHOOL_NAME : (f.prevSchool === SCHOOL_NAME ? '' : f.prevSchool),
             studentNumber: type === 'Continuing' && user?.applicantProfile?.studentNumber ? user.applicantProfile.studentNumber : (type !== 'Continuing' ? '' : f.studentNumber),
           }));
         }} required options={APPLICANT_TYPES} />
@@ -90,7 +90,7 @@ export default function StepSchoolInfo({ form, set, setForm, goTo, requiredDocs,
       )}
       {form.applicantType === 'Continuing' && (
         <div className="bg-forest-50 border border-forest-200 text-forest-700 rounded-lg px-4 py-3 mb-4 text-sm">
-          ℹ️ As a continuing student of Golden Key Integrated School of St. Joseph, your student number {user?.applicantProfile?.studentNumber ? 'has been auto-detected' : 'should be entered above'}. This application is for re-enrollment in the next school year.
+          ℹ️ As a continuing student of {SCHOOL_NAME}, your student number {user?.applicantProfile?.studentNumber ? 'has been auto-detected' : 'should be entered above'}. This application is for re-enrollment in the next school year.
         </div>
       )}
       <div className="flex justify-between">

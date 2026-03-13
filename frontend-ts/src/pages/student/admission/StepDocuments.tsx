@@ -53,7 +53,7 @@ export default function StepDocuments({ form, requiredDocs, slotFiles, extraFile
           {extraFiles.map((f, i) => (
             <div key={i} className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded-lg text-sm">
               <span>📄 {f.name} <span className="text-gray-400 text-xs">({(f.size/1024).toFixed(1)} KB)</span></span>
-              <button onClick={() => removeExtra(i)} className="text-red-400 hover:text-red-600">✕</button>
+              <button onClick={() => removeExtra(i)} className="text-red-400 hover:text-red-600" aria-label="Remove file">✕</button>
             </div>
           ))}
         </div>

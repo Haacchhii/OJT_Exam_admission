@@ -23,6 +23,7 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
   const [semId, setSemId] = useState<string | number>(editExam?.semester?.id || '');
   const [questions, setQuestions] = useState<ParsedQuestion[]>([]);
   const [qModal, setQModal] = useState<'mc' | 'essay' | null>(null);
+  const [editIdx, setEditIdx] = useState<number | null>(null);
   const [qText, setQText] = useState('');
   const [qPts, setQPts] = useState('');
   const [choices, setChoices] = useState<ChoiceState[]>([{ text: '', correct: true }, { text: '' }, { text: '' }, { text: '' }]);
@@ -61,10 +62,24 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
   };
 
   const openQ = (type: 'mc' | 'essay') => {
+    setEditIdx(null);
     setQModal(type);
     setQText('');
     setQPts('');
     setChoices([{ text: '', correct: true }, { text: '' }, { text: '' }, { text: '' }]);
+  };
+
+  const openEditQ = (idx: number) => {
+    const q = questions[idx];
+    setEditIdx(idx);
+    setQModal(q.questionType as 'mc' | 'essay');
+    setQText(q.questionText);
+    setQPts(String(q.points));
+    if (q.questionType === 'mc' && q.choices?.length) {
+      setChoices(q.choices.map((c: any) => ({ text: c.choiceText, correct: !!c.isCorrect })));
+    } else {
+      setChoices([{ text: '', correct: true }, { text: '' }, { text: '' }, { text: '' }]);
+    }
   };
 
   const addQuestion = () => {
@@ -76,13 +91,26 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
       if (filledChoices.length < 2) { showToast('At least 2 choices are required.', 'error'); return; }
       if (!filledChoices.some(c => c.correct)) { showToast('Mark at least one correct answer.', 'error'); return; }
     }
-    const q: ParsedQuestion = { id: uid(), questionText: qText, questionType: qModal!, points: pts, orderNum: questions.length + 1, choices: [] };
+    const newQ: ParsedQuestion = {
+      id: editIdx !== null ? questions[editIdx].id : uid(),
+      questionText: qText,
+      questionType: qModal!,
+      points: pts,
+      orderNum: editIdx !== null ? questions[editIdx].orderNum : questions.length + 1,
+      choices: [],
+    };
     if (qModal === 'mc') {
-      q.choices = choices.filter(c => c.text.trim()).map(c => ({ id: uid(), choiceText: c.text, isCorrect: !!c.correct }));
+      newQ.choices = choices.filter(c => c.text.trim()).map(c => ({ id: uid(), choiceText: c.text, isCorrect: !!c.correct }));
     }
-    setQuestions([...questions, q]);
+    if (editIdx !== null) {
+      setQuestions(qs => qs.map((q, i) => i === editIdx ? newQ : q));
+      showToast('Question updated!', 'success');
+    } else {
+      setQuestions([...questions, newQ]);
+      showToast('Question added!', 'success');
+    }
     setQModal(null);
-    showToast('Question added!', 'success');
+    setEditIdx(null);
   };
 
   const handleUploadFile = (file: File) => {
@@ -412,6 +440,7 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
                   <QuestionCard q={q} i={i} />
                 </div>
                 <button onClick={() => setQuestions(qs => qs.filter((_, j) => j !== i))} className="absolute top-2 right-2 text-red-400 hover:text-red-600 text-xs bg-white rounded px-2 py-1 border border-red-200">Remove</button>
+                <button onClick={() => openEditQ(i)} className="absolute top-2 right-[70px] text-forest-500 hover:text-forest-700 text-xs bg-white rounded px-2 py-1 border border-forest-200">Edit</button>
               </div>
             ))}
           </div>
@@ -428,8 +457,12 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
       </div>
 
       {/* Question Modal */}
-      <Modal open={!!qModal} onClose={() => setQModal(null)}>
-        <h3 className="text-lg font-bold text-forest-500 mb-4">{qModal === 'mc' ? 'Add Multiple Choice Question' : 'Add Essay Question'}</h3>
+      <Modal open={!!qModal} onClose={() => { setQModal(null); setEditIdx(null); }}>
+        <h3 className="text-lg font-bold text-forest-500 mb-4">
+          {editIdx !== null
+            ? (qModal === 'mc' ? 'Edit Multiple Choice Question' : 'Edit Essay Question')
+            : (qModal === 'mc' ? 'Add Multiple Choice Question' : 'Add Essay Question')}
+        </h3>
         <div className="space-y-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Question Text</label>
@@ -455,8 +488,10 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
             </div>
           )}
           <div className="flex gap-3 pt-2">
-            <button onClick={addQuestion} className="bg-forest-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-forest-600">Add Question</button>
-            <button onClick={() => setQModal(null)} className="border border-gray-300 text-gray-700 px-5 py-2 rounded-lg hover:bg-gray-50">Cancel</button>
+            <button onClick={addQuestion} className="bg-forest-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-forest-600">
+              {editIdx !== null ? 'Update Question' : 'Add Question'}
+            </button>
+            <button onClick={() => { setQModal(null); setEditIdx(null); }} className="border border-gray-300 text-gray-700 px-5 py-2 rounded-lg hover:bg-gray-50">Cancel</button>
           </div>
         </div>
       </Modal>

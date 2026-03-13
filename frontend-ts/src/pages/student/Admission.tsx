@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { showToast } from '../../components/Toast';
 import { useAdmissionWizard } from './admission/useAdmissionWizard';
 import ExistingApplication from './admission/ExistingApplication';
 import StepPersonalInfo from './admission/StepPersonalInfo';
@@ -7,6 +8,7 @@ import StepDocuments from './admission/StepDocuments';
 import StepReview from './admission/StepReview';
 import Modal from '../../components/Modal';
 import { PageHeader, SkeletonPage, ErrorAlert } from '../../components/UI';
+import { SCHOOL_NAME } from '../../utils/constants';
 import Icon from '../../components/Icons';
 
 const STEPS = ['Personal Info', 'School Info', 'Documents', 'Review & Submit'];
@@ -21,7 +23,7 @@ export default function StudentAdmission() {
   if (!w.existingApp && !w.examPassed) {
     return (
       <div>
-        <PageHeader title="Admission Application" subtitle="GOLDEN KEY Integrated School of St. Joseph — Admission Form" />
+        <PageHeader title="Admission Application" subtitle={`${SCHOOL_NAME} \u2014 Admission Form`} />
         <div className="gk-card p-8 text-center">
           <div className="w-16 h-16 rounded-2xl bg-forest-50 flex items-center justify-center mx-auto mb-4"><Icon name="lock" className="w-8 h-8 text-forest-500" /></div>
           <h3 className="text-xl font-bold text-forest-500 mb-2">Entrance Exam Required</h3>
@@ -41,7 +43,7 @@ export default function StudentAdmission() {
   /* Multi-step wizard */
   return (
     <div>
-      <PageHeader title="Admission Application" subtitle="GOLDEN KEY Integrated School of St. Joseph — Admission Form" />
+      <PageHeader title="Admission Application" subtitle={`${SCHOOL_NAME} \u2014 Admission Form`} />
 
       <div className="bg-forest-50 border border-forest-200 rounded-xl p-4 mb-6">
         <h4 className="font-semibold text-forest-700 text-sm mb-2 flex items-center gap-1.5"><Icon name="clipboard" className="w-4 h-4" /> Admission Policy & Procedure</h4>
@@ -98,11 +100,24 @@ export default function StudentAdmission() {
           {w.submittedTrackingId && (
             <div className="mt-3 bg-forest-50 border border-forest-200 rounded-lg px-4 py-3">
               <p className="text-xs text-gray-500 mb-1">Your Tracking ID</p>
-              <p className="text-lg font-mono font-bold text-forest-700">{w.submittedTrackingId}</p>
+              <div className="flex items-center justify-center gap-2">
+                <p className="text-lg font-mono font-bold text-forest-700">{w.submittedTrackingId}</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(w.submittedTrackingId);
+                    showToast('Tracking ID copied to clipboard!', 'success');
+                  }}
+                  className="p-1.5 rounded-lg hover:bg-forest-100 text-forest-500 transition-colors"
+                  title="Copy to clipboard"
+                >
+                  <Icon name="clipboard" className="w-4 h-4" />
+                </button>
+              </div>
               <p className="text-xs text-gray-400 mt-1">Save this ID to track your application status anytime.</p>
             </div>
           )}
-          <p className="text-gray-500 mt-2">Your admission application has been received by <strong>GOLDEN KEY Integrated School of St. Joseph</strong>.</p>
+          <p className="text-gray-500 mt-2">Your admission application has been received by <strong>{SCHOOL_NAME}</strong>.</p>
           <p className="text-xs text-gray-400 mt-2">Next step: The school will screen your application and notify you of your admission status.</p>
           <Link to="/student/dashboard" className="mt-4 inline-block bg-forest-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-forest-600">Go to Dashboard</Link>
         </div>

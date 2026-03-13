@@ -1,7 +1,9 @@
+import { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useConfirm } from './ConfirmDialog';
 import Icon from './Icons';
+import { SCHOOL_BRAND, SCHOOL_SUBTITLE } from '../utils/constants';
 
 interface LinkItem {
   to: string;
@@ -51,6 +53,12 @@ export default function Sidebar({ open, onClose, role, collapsed, onToggleCollap
     ? (roleLabel === 'Administrator' ? 'AD' : roleLabel === 'Registrar' ? 'RG' : roleLabel === 'Teacher' ? 'TC' : 'EM')
     : 'ST';
 
+  const [dark, setDark] = useState(() => document.documentElement.classList.contains('dark'));
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', dark);
+    try { localStorage.setItem('gk_dark', dark ? '1' : '0'); } catch { /* ignore */ }
+  }, [dark]);
+
   return (
     <>
       {open && <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 lg:hidden transition-opacity" onClick={onClose} />}
@@ -64,8 +72,8 @@ export default function Sidebar({ open, onClose, role, collapsed, onToggleCollap
               <Icon name="key" className="w-4.5 h-4.5 text-gold-400" />
             </div>
             <div className={`transition-opacity duration-200 ${collapsed ? 'lg:hidden' : ''}`}>
-              <h2 className="text-sm font-bold tracking-wide text-white leading-tight">GOLDEN KEY</h2>
-              <p className="text-[11px] text-forest-300/70 font-normal mt-0.5">Integrated School of St. Joseph</p>
+              <h2 className="text-sm font-bold tracking-wide text-white leading-tight">{SCHOOL_BRAND}</h2>
+              <p className="text-[11px] text-forest-300/70 font-normal mt-0.5">{SCHOOL_SUBTITLE}</p>
             </div>
           </div>
 
@@ -125,6 +133,15 @@ export default function Sidebar({ open, onClose, role, collapsed, onToggleCollap
 
           {/* Footer */}
           <div className={`border-t border-forest-700/40 ${collapsed ? 'lg:flex lg:flex-col lg:items-center lg:p-3' : 'p-4'}`}>
+            <button
+              onClick={() => setDark(d => !d)}
+              className={`group flex items-center gap-2.5 text-sm w-full px-3 py-2 rounded-lg text-forest-300 hover:text-white hover:bg-forest-700/50 transition-colors duration-150 mb-1 ${collapsed ? 'lg:justify-center lg:px-0' : ''}`}
+              title={collapsed ? (dark ? 'Light mode' : 'Dark mode') : undefined}
+              aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              <Icon name={dark ? 'sun' : 'moon'} className="w-[18px] h-[18px] shrink-0" />
+              <span className={`font-medium ${collapsed ? 'lg:hidden' : ''}`}>{dark ? 'Light mode' : 'Dark mode'}</span>
+            </button>
             <button
               onClick={async () => {
                 const ok = await confirm({ title: 'Log Out', message: 'Are you sure you want to log out?', confirmLabel: 'Log Out', variant: 'warning' });

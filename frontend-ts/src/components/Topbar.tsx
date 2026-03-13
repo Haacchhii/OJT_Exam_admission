@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getNotifications, markNotificationRead, markAllRead, createNotification } from '../api/notifications';
 import { getUsers } from '../api/users';
 import { formatDate } from '../utils/helpers';
+import { SCHOOL_NAME } from '../utils/constants';
 import { showToast } from './Toast';
 import Modal from './Modal';
 import Icon from './Icons';
@@ -64,6 +65,15 @@ export default function Topbar({ title, onMenuToggle, userId, user }: TopbarProp
     return () => clearInterval(interval);
   }, [refresh]);
 
+  const unread = notifs.filter(n => !n.isRead).length;
+
+  // Update browser tab title with unread count
+  useEffect(() => {
+    const baseTitle = `${SCHOOL_NAME} — Admission & Exam System`;
+    document.title = unread > 0 ? `(${unread}) ${baseTitle}` : baseTitle;
+    return () => { document.title = baseTitle; };
+  }, [unread]);
+
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setShowNotifs(false);
@@ -71,8 +81,6 @@ export default function Topbar({ title, onMenuToggle, userId, user }: TopbarProp
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
-
-  const unread = notifs.filter(n => !n.isRead).length;
   const initials = `${(user.firstName || '')[0] || ''}${(user.lastName || '')[0] || ''}`.toUpperCase();
   const isEmployee = user.role !== 'applicant';
   const avatarCls = isEmployee ? 'bg-forest-500 text-gold-300' : 'bg-gold-400 text-forest-700';

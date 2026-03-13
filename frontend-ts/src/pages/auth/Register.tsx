@@ -4,18 +4,19 @@ import { useAuth } from '../../context/AuthContext';
 import { showToast } from '../../components/Toast';
 import { getPasswordStrength } from '../../utils/passwordStrength';
 import Icon from '../../components/Icons';
+import { SCHOOL_NAME, SCHOOL_BRAND, SCHOOL_SUBTITLE, GRADE_OPTIONS } from '../../utils/constants';
 
 export default function Register() {
   const { user, login } = useAuth();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', password: '', confirmPassword: '' });
+  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', password: '', confirmPassword: '', gradeLevel: '' });
   const [showPw, setShowPw] = useState(false);
   const [showConfirmPw, setShowConfirmPw] = useState(false);
   const [loading, setLoading] = useState(false);
 
   if (user) return <Navigate to={user.role === 'applicant' ? '/student' : '/employee'} replace />;
 
-  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) => setForm(f => ({ ...f, [k]: e.target.value }));
+  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm(f => ({ ...f, [k]: e.target.value }));
 
   const strength = getPasswordStrength(form.password);
 
@@ -25,10 +26,11 @@ export default function Register() {
     if (strength.score < 3) { showToast('Password is too weak. Include uppercase, numbers, or symbols.', 'error'); return; }
     if (form.password !== form.confirmPassword) { showToast('Passwords do not match', 'error'); return; }
     if (!/\S+@\S+\.\S+/.test(form.email)) { showToast('Please enter a valid email address.', 'error'); return; }
+    if (!form.gradeLevel) { showToast('Please select your grade level.', 'error'); return; }
     setLoading(true);
     try {
       const result = await login(form.email, form.password, {
-        registerPayload: { firstName: form.firstName, lastName: form.lastName, email: form.email, password: form.password },
+        registerPayload: { firstName: form.firstName, lastName: form.lastName, email: form.email, password: form.password, gradeLevel: form.gradeLevel },
       });
       if (!result.ok) {
         showToast(result.msg || 'Registration failed. Please try again.', 'error');
@@ -54,9 +56,9 @@ export default function Register() {
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gold-400 to-gold-500 flex items-center justify-center shadow-lg">
               <Icon name="key" className="w-5 h-5 text-forest-800" />
             </div>
-            <span className="text-lg font-bold tracking-tight text-gold-400">GOLDEN KEY</span>
+            <span className="text-lg font-bold tracking-tight text-gold-400">{SCHOOL_BRAND}</span>
           </div>
-          <p className="text-forest-300 text-sm font-semibold">Integrated School of St. Joseph</p>
+          <p className="text-forest-300 text-sm font-semibold">{SCHOOL_SUBTITLE}</p>
         </div>
 
         <div className="relative z-10 space-y-6">
@@ -87,7 +89,7 @@ export default function Register() {
           </div>
         </div>
 
-        <p className="relative z-10 text-xs text-white/30">&copy; {new Date().getFullYear()} GOLDEN KEY Integrated School of St. Joseph. All rights reserved.</p>
+        <p className="relative z-10 text-xs text-white/30">&copy; {new Date().getFullYear()} {SCHOOL_NAME}. All rights reserved.</p>
       </div>
 
       <div className="flex-1 flex items-center justify-center p-6 lg:p-12">
@@ -96,8 +98,8 @@ export default function Register() {
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-gold-400 to-gold-500 flex items-center justify-center mx-auto mb-3 shadow-lg">
               <Icon name="key" className="w-6 h-6 text-forest-800" />
             </div>
-            <h1 className="text-lg font-bold text-gold-400">GOLDEN KEY</h1>
-            <p className="text-sm text-forest-300 font-semibold">Integrated School of St. Joseph</p>
+            <h1 className="text-lg font-bold text-gold-400">{SCHOOL_BRAND}</h1>
+            <p className="text-sm text-forest-300 font-semibold">{SCHOOL_SUBTITLE}</p>
           </div>
 
           <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-elevated p-8 sm:p-10 border border-white/60">
@@ -124,6 +126,22 @@ export default function Register() {
                     <Icon name="mail" className="w-4.5 h-4.5" />
                   </div>
                   <input type="email" value={form.email} onChange={set('email')} required className="gk-input pl-11" placeholder="your@email.com" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Applying for Grade Level</label>
+                <div className="relative">
+                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400">
+                    <Icon name="academicCap" className="w-4.5 h-4.5" />
+                  </div>
+                  <select value={form.gradeLevel} onChange={set('gradeLevel')} required className="gk-input pl-11 appearance-none cursor-pointer">
+                    <option value="">Select your grade level</option>
+                    {GRADE_OPTIONS.map(g => (
+                      <optgroup key={g.group} label={g.group}>
+                        {g.items.map(item => <option key={item} value={item}>{item}</option>)}
+                      </optgroup>
+                    ))}
+                  </select>
                 </div>
               </div>
               <div>

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { showToast } from '../../components/Toast';
 import Icon from '../../components/Icons';
+import { SCHOOL_NAME, SCHOOL_BRAND, SCHOOL_SUBTITLE } from '../../utils/constants';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -63,9 +64,9 @@ export default function Login() {
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gold-400 to-gold-500 flex items-center justify-center shadow-lg">
               <Icon name="key" className="w-5 h-5 text-forest-800" />
             </div>
-            <span className="text-lg font-bold tracking-tight text-gold-400">GOLDEN KEY</span>
+            <span className="text-lg font-bold tracking-tight text-gold-400">{SCHOOL_BRAND}</span>
           </div>
-          <p className="text-forest-300 text-sm font-semibold">Integrated School of St. Joseph</p>
+          <p className="text-forest-300 text-sm font-semibold">{SCHOOL_SUBTITLE}</p>
         </div>
 
         <div className="relative z-10 space-y-8">
@@ -84,7 +85,7 @@ export default function Login() {
           {/* New applicant CTA block */}
           <div className="bg-white/8 border border-white/15 rounded-2xl p-6 space-y-4 backdrop-blur-sm">
             <p className="text-white text-lg font-semibold leading-snug">
-              Want to get started with your application and join Golden Key Integrated School of St. Joseph?
+              Want to get started with your application and join {SCHOOL_NAME}?
             </p>
             <p className="text-white/60 text-sm leading-relaxed">
               Take your first step toward academic excellence. Submit your application, register for entrance exams, and track every stage of your admission — all in one place.
@@ -117,7 +118,7 @@ export default function Login() {
           </div>
         </div>
 
-        <p className="relative z-10 text-xs text-white/30">&copy; {new Date().getFullYear()} GOLDEN KEY Integrated School of St. Joseph. All rights reserved.</p>
+        <p className="relative z-10 text-xs text-white/30">&copy; {new Date().getFullYear()} {SCHOOL_NAME}. All rights reserved.</p>
       </div>
 
       {/* Right: Login Form */}
@@ -127,8 +128,8 @@ export default function Login() {
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-gold-400 to-gold-500 flex items-center justify-center mx-auto mb-3 shadow-lg">
               <Icon name="key" className="w-6 h-6 text-forest-800" />
             </div>
-            <h1 className="text-lg font-bold text-gold-400">GOLDEN KEY</h1>
-            <p className="text-sm text-forest-300 font-semibold">Integrated School of St. Joseph</p>
+            <h1 className="text-lg font-bold text-gold-400">{SCHOOL_BRAND}</h1>
+            <p className="text-sm text-forest-300 font-semibold">{SCHOOL_SUBTITLE}</p>
           </div>
 
           <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-elevated p-8 sm:p-10 border border-white/60">
@@ -212,7 +213,7 @@ export default function Login() {
             )}
 
             <div className="mt-6 rounded-2xl border-2 border-forest-100 bg-forest-50/60 p-5 text-center space-y-3">
-              <p className="text-base font-bold text-gray-800">New to Golden Key?</p>
+              <p className="text-base font-bold text-gray-800">New to {SCHOOL_BRAND}?</p>
               <p className="text-xs text-gray-500 leading-relaxed">
                 Ready to start your application and join our school? Create a free account and begin your admission journey today.
               </p>

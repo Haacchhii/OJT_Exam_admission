@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { SCHOOL_BRAND, SCHOOL_SUBTITLE, SCHOOL_YEAR } from '../utils/constants';
 
 interface Props {
   children: ReactNode;
@@ -53,8 +54,8 @@ export default class ErrorBoundary extends Component<Props, State> {
               Reload Application
             </button>
             <p className="text-xs text-gray-400 mt-6">
-              &copy; 2026 <span className="text-gold-500 font-bold">GOLDEN KEY</span>{' '}
-              <span className="text-forest-500">Integrated School of St. Joseph</span>
+              &copy; {SCHOOL_YEAR} <span className="text-gold-500 font-bold">{SCHOOL_BRAND}</span>{' '}
+              <span className="text-forest-500">{SCHOOL_SUBTITLE}</span>
             </p>
           </div>
         </div>

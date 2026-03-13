@@ -298,9 +298,10 @@ export default function EmployeeSettings() {
               placeholder="e.g. 2026-2027"
               value={yearForm.year}
               onChange={e => setYearForm(f => ({ ...f, year: e.target.value }))}
+              aria-describedby={yearErrors.year ? 'year-error' : undefined}
               className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-forest-500 ${yearErrors.year ? 'border-red-400' : 'border-gray-200'}`}
             />
-            {yearErrors.year && <p className="text-xs text-red-500 mt-1">{yearErrors.year}</p>}
+            {yearErrors.year && <p id="year-error" className="text-xs text-red-500 mt-1" role="alert">{yearErrors.year}</p>}
           </div>
           <label className="flex items-center gap-2 cursor-pointer">
             <input
@@ -334,23 +335,25 @@ export default function EmployeeSettings() {
             <select
               value={semForm.name}
               onChange={e => setSemForm(f => ({ ...f, name: e.target.value }))}
+              aria-describedby={semErrors.name ? 'sem-name-error' : undefined}
               className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-forest-500 ${semErrors.name ? 'border-red-400' : 'border-gray-200'}`}
             >
               {SEMESTER_NAMES.map(n => <option key={n} value={n}>{n}</option>)}
             </select>
-            {semErrors.name && <p className="text-xs text-red-500 mt-1">{semErrors.name}</p>}
+            {semErrors.name && <p id="sem-name-error" className="text-xs text-red-500 mt-1" role="alert">{semErrors.name}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">School Year <span className="text-red-500">*</span></label>
             <select
               value={semForm.academicYearId}
               onChange={e => setSemForm(f => ({ ...f, academicYearId: Number(e.target.value) }))}
+              aria-describedby={semErrors.academicYearId ? 'sem-year-error' : undefined}
               className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-forest-500 ${semErrors.academicYearId ? 'border-red-400' : 'border-gray-200'}`}
             >
               <option value="">Select school year…</option>
               {years.map(y => <option key={y.id} value={y.id}>{y.year}</option>)}
             </select>
-            {semErrors.academicYearId && <p className="text-xs text-red-500 mt-1">{semErrors.academicYearId}</p>}
+            {semErrors.academicYearId && <p id="sem-year-error" className="text-xs text-red-500 mt-1" role="alert">{semErrors.academicYearId}</p>}
           </div>
           <label className="flex items-center gap-2 cursor-pointer">
             <input

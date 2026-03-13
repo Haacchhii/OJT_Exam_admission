@@ -17,6 +17,8 @@ const env = {
   SMTP_FROM:        process.env.SMTP_FROM || '',
   // Public URL of the frontend (used in email links)
   APP_URL:          process.env.APP_URL || 'http://localhost:5173',
+  // Toggle whether applicants must verify email before accessing protected routes
+  EMAIL_VERIFICATION_REQUIRED: (process.env.EMAIL_VERIFICATION_REQUIRED || 'true').toLowerCase() === 'true',
 };
 
 // ─── Validate critical env vars ───────────────────────
