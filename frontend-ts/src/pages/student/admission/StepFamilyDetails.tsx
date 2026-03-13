@@ -7,9 +7,10 @@ interface Props {
   form: AdmissionForm;
   set: (k: string) => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => void;
   goTo: (n: number) => void;
+  errors?: Record<string, string>;
 }
 
-export default function StepFamilyDetails({ form, set, goTo }: Props) {
+export default function StepFamilyDetails({ form, set, goTo, errors = {} }: Props) {
   return (
     <div className="gk-card p-6">
       <h3 className="text-lg font-bold text-forest-500 mb-1">Step 3: Family Details</h3>
@@ -22,6 +23,8 @@ export default function StepFamilyDetails({ form, set, goTo }: Props) {
           onChange={set('fatherNameOccupation')}
           required
           placeholder="e.g. Juan Dela Cruz, Engineer"
+          maxLength={200}
+          error={errors.fatherNameOccupation}
         />
         <Input
           label="Mother's Name & Occupation"
@@ -29,6 +32,8 @@ export default function StepFamilyDetails({ form, set, goTo }: Props) {
           onChange={set('motherNameOccupation')}
           required
           placeholder="e.g. Maria Dela Cruz, Teacher"
+          maxLength={200}
+          error={errors.motherNameOccupation}
         />
         <div className="md:col-span-2">
           <Input
@@ -36,6 +41,8 @@ export default function StepFamilyDetails({ form, set, goTo }: Props) {
             value={form.guardian}
             onChange={set('guardian')}
             placeholder="Leave blank if parents are the guardians"
+            maxLength={200}
+            error={errors.guardian}
           />
         </div>
       </div>

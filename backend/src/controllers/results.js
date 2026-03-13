@@ -59,7 +59,19 @@ export async function getMyResult(req, res, next) {
     if (academicYearId) {
       where.registration = { ...where.registration, schedule: { exam: { academicYearId: Number(academicYearId) } } };
     }
-    const results = await prisma.examResult.findMany({
+
+    const summary = await prisma.examResult.aggregate({
+      where,
+      _count: { _all: true },
+      _max: { id: true, updatedAt: true },
+    });
+
+    const etag = `W/"results-mine:${req.user.id}:${academicYearId || 'all'}:${summary._count._all}:${summary._max.id || 0}:${summary._max.updatedAt ? summary._max.updatedAt.getTime() : 0}"`;
+    res.set('ETag', etag);
+    res.vary('Authorization');
+    if (req.fresh) return res.status(304).end();
+
+    const latest = await prisma.examResult.findFirst({
       where,
       include: {
         registration: {
@@ -70,10 +82,8 @@ export async function getMyResult(req, res, next) {
       },
       orderBy: { createdAt: 'desc' },
     });
-    // Return the most recent result for backward compatibility (single object),
-    // but also include all results in an 'all' property.
-    const latest = results[0] || null;
-    res.json(latest);
+
+    res.json(latest || null);
   } catch (err) { next(err); }
 }
 

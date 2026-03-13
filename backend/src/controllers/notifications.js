@@ -15,10 +15,26 @@ export async function getNotifications(req, res, next) {
     const pg = paginate(page, limit);
 
     const where = { userId };
-    const [notifications, total] = await Promise.all([
-      prisma.notification.findMany({ where, ...(pg && { skip: pg.skip, take: pg.take }), orderBy: { createdAt: 'desc' } }),
-      prisma.notification.count({ where }),
+    const [summary, unreadCount] = await Promise.all([
+      prisma.notification.aggregate({
+        where,
+        _count: { _all: true },
+        _max: { id: true, createdAt: true },
+      }),
+      prisma.notification.count({ where: { userId, isRead: false } }),
     ]);
+
+    const total = summary._count._all;
+    const etag = `W/"notifications:${userId}:${page || 1}:${limit || 'all'}:${total}:${unreadCount}:${summary._max.id || 0}:${summary._max.createdAt ? summary._max.createdAt.getTime() : 0}"`;
+    res.set('ETag', etag);
+    res.vary('Authorization');
+    if (req.fresh) return res.status(304).end();
+
+    const notifications = await prisma.notification.findMany({
+      where,
+      ...(pg && { skip: pg.skip, take: pg.take }),
+      orderBy: { createdAt: 'desc' },
+    });
 
     res.json(paginatedResponse(notifications, total, pg));
   } catch (err) { next(err); }

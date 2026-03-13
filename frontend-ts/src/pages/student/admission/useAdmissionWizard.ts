@@ -8,7 +8,9 @@ import { useConfirm } from '../../../components/ConfirmDialog';
 import { useUnsavedChanges } from '../../../hooks/useUnsavedChanges';
 import { DOC_REQUIREMENTS, DOC_SLOT_LABELS, ALLOWED_FILE_TYPES, MAX_FILE_SIZE, getCurrentSchoolYear } from '../../../utils/constants';
 import type { Admission } from '../../../types';
+import { validateStep1, validateStep2, validateStep3, checkAgeRequirement } from './admissionValidation';
 
+export { checkAgeRequirement };
 export interface AdmissionForm {
   firstName: string; lastName: string; email: string; phone: string; dob: string; gender: string;
   placeOfBirth: string; religion: string; address: string;
@@ -31,26 +33,6 @@ export function getRequiredDocs(gradeLevel: string): string[] {
   return Object.keys(reqs).filter(k => reqs[k]);
 }
 
-export function checkAgeRequirement(gradeLevel: string, dob: string, schoolYear: string): string | null {
-  if (!dob || !gradeLevel) return null;
-  const birthDate = new Date(dob);
-  if (isNaN(birthDate.getTime())) return null;
-  if (gradeLevel === 'Kinder' || gradeLevel === 'Nursery' || gradeLevel === 'Grade 1') {
-    const startYear = parseInt(schoolYear) || 2026;
-    const cutoff = new Date(startYear, 9, 31);
-    const age = cutoff.getFullYear() - birthDate.getFullYear();
-    const monthDiff = cutoff.getMonth() - birthDate.getMonth();
-    const actualAge = monthDiff < 0 || (monthDiff === 0 && cutoff.getDate() < birthDate.getDate()) ? age - 1 : age;
-    if (gradeLevel === 'Kinder' && actualAge < 5)
-      return `Kindergarten requires the student to be at least 5 years old by October 31, ${startYear}. Student will be ${actualAge} years old by that date.`;
-    if (gradeLevel === 'Nursery' && actualAge < 4)
-      return `Nursery requires the student to be at least 4 years old by October 31, ${startYear}. Student will be ${actualAge} years old by that date.`;
-    if (gradeLevel === 'Grade 1' && actualAge < 6)
-      return `Grade 1 requires the student to be at least 6 years old by October 31, ${startYear}. Student will be ${actualAge} years old by that date.`;
-  }
-  return null;
-}
-
 export function useAdmissionWizard() {
   const [step, setStep] = useState(() => {
     try { const s = localStorage.getItem('gk_admission_step'); return s ? Math.min(Math.max(parseInt(s), 1), 5) : 1; } catch { return 1; }
@@ -62,6 +44,7 @@ export function useAdmissionWizard() {
   const [extraFiles, setExtraFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
   const [privacyConsent, setPrivacyConsent] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [form, setForm] = useState<AdmissionForm>({
     firstName: '', lastName: '', email: '', phone: '', dob: '', gender: '', placeOfBirth: '', religion: '', address: '',
     prevSchool: '', schoolAddress: '', gradeLevel: '', schoolYear: getCurrentSchoolYear(), lrn: '', applicantType: 'New',
@@ -111,39 +94,34 @@ export function useAdmissionWizard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, existingApp]);
 
-  const set = useCallback((k: string) => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setForm(f => ({ ...f, [k]: e.target.value })), []);
+  const clearError = useCallback((k: string) => setErrors(e => { if (!e[k]) return e; const { [k]: _, ...r } = e; return r; }), []);
+  const set = useCallback((k: string) => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    setForm(f => ({ ...f, [k]: e.target.value }));
+    clearError(k);
+  }, [clearError]);
 
   const requiredDocs = useMemo(() => getRequiredDocs(form.gradeLevel), [form.gradeLevel]);
 
   const goTo = (n: number) => {
     if (n > step) {
-      const required: Record<number, string[]> = {
-        1: ['firstName','lastName','email','dob','gender','placeOfBirth','phone','address'],
-        2: ['prevSchool','schoolAddress','gradeLevel','lrn','schoolYear'],
-        3: ['fatherNameOccupation','motherNameOccupation'],
-        4: [],
-      };
-      const missing = (required[step] || []).filter(k => !form[k]?.trim());
-      if (missing.length) { showToast('Please fill in all required fields.', 'error'); return; }
-      if (step === 1) {
-        if (form.email && !/^\S+@\S+\.\S+$/.test(form.email)) { showToast('Please enter a valid email address.', 'error'); return; }
-        if (form.phone && !/^[+\d][\d\s()-]{6,}$/.test(form.phone)) { showToast('Please enter a valid phone number.', 'error'); return; }
-      }
-      if (step === 2) {
-        if (form.lrn && form.lrn.replace(/\D/g, '').length !== 12) { showToast('LRN must be exactly 12 digits.', 'error'); return; }
-        if (form.applicantType === 'Continuing' && !form.studentNumber?.trim()) {
-          showToast('Continuing students must provide their student number.', 'error'); return;
-        }
-        const ageWarning = checkAgeRequirement(form.gradeLevel, form.dob, form.schoolYear);
-        if (ageWarning) { showToast(ageWarning, 'error'); return; }
-      }
-      if (step === 4) {
+      let stepErrors: Record<string, string> = {};
+      if (step === 1) stepErrors = validateStep1(form);
+      else if (step === 2) stepErrors = validateStep2(form);
+      else if (step === 3) stepErrors = validateStep3(form);
+      else if (step === 4) {
         const missingDocs = requiredDocs.filter(k => !slotFiles[k]);
         if (missingDocs.length > 0) {
           showToast(`Please upload all required documents. Missing: ${missingDocs.map(k => (DOC_SLOT_LABELS as Record<string, string>)[k]?.split('(')[0]?.trim() || k).join(', ')}`, 'error');
           return;
         }
       }
+      if (Object.keys(stepErrors).length > 0) {
+        setErrors(stepErrors);
+        const firstMsg = Object.values(stepErrors)[0];
+        showToast(firstMsg, 'error');
+        return;
+      }
+      setErrors({});
     }
     setStep(n);
     try { localStorage.setItem('gk_admission_step', String(n)); } catch { /* ignore */ }
@@ -214,6 +192,7 @@ export function useAdmissionWizard() {
     requiredDocs, isDirty, existingApp, examPassed, showWizard, setShowWizard,
     successOpen, setSuccessOpen, submittedTrackingId,
     gateLoading, gateError, gateData, refetch, user,
+    errors, setErrors, clearError,
     goTo, handleSubmit, handleSlotFile, handleExtraFiles, removeSlot, removeExtra,
   };
 }

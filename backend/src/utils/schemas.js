@@ -49,29 +49,47 @@ export const resetPasswordSchema = z.object({
   password: passwordSchema,
 });
 
+// ─── Admission validation helpers ─────────────────────
+const nameRegex = /^[\p{L}\p{M}\s\-'.]+$/u;
+const nameOccupationRegex = /^[\p{L}\p{M}\p{N}\s\-'.,()]+$/u;
+const addressRegex = /^[\p{L}\p{M}\p{N}\s\-'.,/()]+$/u;
+const phoneRegex = /^[+\d][\d\s()-]{6,}$/;
+const schoolYearRegex = /^\d{4}-\d{4}$/;
+
 // ─── Admission Schemas ────────────────────────────────
 export const createAdmissionSchema = z.object({
-  firstName: z.string().min(1).max(100),
-  lastName: z.string().min(1).max(100),
-  email: z.string().email(),
-  phone: z.string().max(20).optional().nullable(),
-  dob: z.string().min(1, 'Date of birth is required'),
+  firstName: z.string().trim().min(1, 'First name is required').max(100)
+    .regex(nameRegex, 'Use only letters, spaces, hyphens, or apostrophes'),
+  lastName: z.string().trim().min(1, 'Last name is required').max(100)
+    .regex(nameRegex, 'Use only letters, spaces, hyphens, or apostrophes'),
+  email: z.string().trim().email('Invalid email format'),
+  phone: z.string().trim().max(20).optional().nullable()
+    .refine(v => !v || phoneRegex.test(v) && v.replace(/\D/g, '').length >= 10, 'Invalid phone format (min 10 digits)'),
+  dob: z.string().trim().min(1, 'Date of birth is required'),
   gender: z.enum(['Male', 'Female']),
-  placeOfBirth: z.string().min(1, 'Place of birth is required').max(200),
-  religion: z.string().max(100).optional().nullable(),
-  address: z.string().min(1).max(500),
-  gradeLevel: z.string().min(1),
-  prevSchool: z.string().max(200).optional().nullable(),
-  schoolAddress: z.string().min(1, 'School address is required').max(500),
-  schoolYear: z.string().min(1),
-  lrn: z.string().min(12, 'LRN must be exactly 12 digits').max(12).regex(/^\d{12}$/, 'LRN must be numeric'),
+  placeOfBirth: z.string().trim().min(1, 'Place of birth is required').max(200)
+    .regex(addressRegex, 'Invalid characters'),
+  religion: z.string().trim().max(100).optional().nullable().or(z.literal('')),
+  address: z.string().trim().min(1, 'Address is required').max(500)
+    .refine(v => v.length >= 10, 'Please provide a complete address'),
+  gradeLevel: z.string().trim().min(1, 'Grade level is required'),
+  prevSchool: z.string().trim().max(200).optional().nullable().or(z.literal('')),
+  schoolAddress: z.string().trim().min(1, 'School address is required').max(500)
+    .refine(v => v.length >= 5, 'Please provide a complete school address'),
+  schoolYear: z.string().trim().min(1, 'School year is required')
+    .regex(schoolYearRegex, 'Use format YYYY-YYYY (e.g. 2026-2027)'),
+  lrn: z.string().trim().transform(s => s.replace(/\D/g, ''))
+    .refine(s => s.length === 12, 'LRN must be exactly 12 digits')
+    .refine(s => /^\d{12}$/.test(s), 'LRN must be numeric'),
   applicantType: z.enum(['New', 'Transferee', 'Returning', 'Continuing']).default('New'),
-  studentNumber: z.string().max(50).optional().nullable(),
-  fatherNameOccupation: z.string().min(1, 'Father\'s name & occupation is required').max(200),
-  motherNameOccupation: z.string().min(1, 'Mother\'s name & occupation is required').max(200),
-  guardian: z.string().max(200).optional().nullable(),
-  guardianRelation: z.string().max(50).optional().nullable(),
-  guardianPhone: z.string().max(20).optional().nullable(),
+  studentNumber: z.string().trim().max(50).optional().nullable().or(z.literal('')),
+  fatherNameOccupation: z.string().trim().min(1, 'Father\'s name & occupation is required').max(200)
+    .regex(nameOccupationRegex, 'Use only letters, numbers, spaces, commas, hyphens'),
+  motherNameOccupation: z.string().trim().min(1, 'Mother\'s name & occupation is required').max(200)
+    .regex(nameOccupationRegex, 'Use only letters, numbers, spaces, commas, hyphens'),
+  guardian: z.string().trim().max(200).optional().nullable().or(z.literal('')),
+  guardianRelation: z.string().trim().max(50).optional().nullable().or(z.literal('')),
+  guardianPhone: z.string().trim().max(20).optional().nullable().or(z.literal('')),
   guardianEmail: z.string().email().optional().nullable().or(z.literal('')),
   academicYearId: z.number().int().positive().optional().nullable(),
   semesterId: z.number().int().positive().optional().nullable(),

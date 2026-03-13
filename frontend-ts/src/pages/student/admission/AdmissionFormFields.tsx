@@ -3,14 +3,17 @@ import type { ReactNode, InputHTMLAttributes, SelectHTMLAttributes } from 'react
 /* ─── Input ─── */
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label: string;
+  error?: string;
 }
 
-export function Input({ label, type = 'text', required, ...props }: InputProps) {
+export function Input({ label, type = 'text', required, error, className, ...props }: InputProps) {
   const id = props.id || `input-${label?.replace(/\s+/g, '-').toLowerCase()}`;
+  const inputCls = `w-full px-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none ${error ? 'border-red-400 focus:ring-red-500/20' : 'border-gray-300'}`;
   return (
-    <div>
+    <div className={className}>
       <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">{label} {required && <span className="text-red-500">*</span>}</label>
-      <input id={id} type={type} {...props} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none" />
+      <input id={id} type={type} {...props} className={inputCls} aria-invalid={!!error} aria-describedby={error ? `${id}-error` : undefined} />
+      {error && <p id={`${id}-error`} className="mt-1 text-xs text-red-500" role="alert">{error}</p>}
     </div>
   );
 }
@@ -18,14 +21,17 @@ export function Input({ label, type = 'text', required, ...props }: InputProps) 
 /* ─── TextArea ─── */
 interface TextAreaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   label: string;
+  error?: string;
 }
 
-export function TextArea({ label, required, ...props }: TextAreaProps) {
+export function TextArea({ label, required, error, className, ...props }: TextAreaProps) {
   const id = props.id || `textarea-${label?.replace(/\s+/g, '-').toLowerCase()}`;
+  const textareaCls = `w-full px-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none min-h-[80px] ${error ? 'border-red-400 focus:ring-red-500/20' : 'border-gray-300'}`;
   return (
-    <div>
+    <div className={className}>
       <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">{label} {required && <span className="text-red-500">*</span>}</label>
-      <textarea id={id} {...props} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none min-h-[80px]" />
+      <textarea id={id} {...props} className={textareaCls} aria-invalid={!!error} aria-describedby={error ? `${id}-error` : undefined} />
+      {error && <p id={`${id}-error`} className="mt-1 text-xs text-red-500" role="alert">{error}</p>}
     </div>
   );
 }

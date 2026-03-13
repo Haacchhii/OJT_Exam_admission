@@ -41,15 +41,32 @@ app.use(compression());
 // ─── Global middleware ────────────────────────────────
 // Support comma-separated CORS origins (e.g. "https://frontend.up.railway.app,http://localhost:5174")
 const allowedOrigins = env.CORS_ORIGIN.split(',').map(o => o.trim()).filter(Boolean);
-app.use(cors({
+const corsConfig = {
   origin: allowedOrigins.length === 1 ? allowedOrigins[0] : allowedOrigins,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
-}));
+  maxAge: env.CORS_MAX_AGE_SECONDS,
+  optionsSuccessStatus: 204,
+};
+app.use(cors(corsConfig));
+app.options('/{*path}', cors(corsConfig));
 
 app.use(express.json({ limit: BODY_SIZE_LIMIT }));
 app.use(express.urlencoded({ extended: true, limit: BODY_SIZE_LIMIT }));
+
+// Lightweight API timing log to track endpoint p95 improvements.
+app.use((req, res, next) => {
+  const startedAt = process.hrtime.bigint();
+  res.on('finish', () => {
+    if (!req.originalUrl.startsWith('/api/')) return;
+    const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
+    if (elapsedMs >= env.PERF_LOG_THRESHOLD_MS) {
+      console.log(`[perf] ${req.method} ${req.originalUrl} ${res.statusCode} ${elapsedMs.toFixed(1)}ms`);
+    }
+  });
+  next();
+});
 
 // ─── Global rate limit (all routes) ──────────────────
 const globalLimiter = rateLimit({
@@ -57,6 +74,7 @@ const globalLimiter = rateLimit({
   max: RATE_LIMITS.GLOBAL.max,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => req.method === 'OPTIONS',
   message: { error: 'Too many requests, please try again later.', code: 'RATE_LIMIT' },
 });
 app.use(globalLimiter);

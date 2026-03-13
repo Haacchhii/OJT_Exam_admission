@@ -48,6 +48,10 @@ function safeUser(user) {
 // GET /api/auth/me — return authenticated user's profile
 export async function getMe(req, res, next) {
   try {
+    if (req.user && (req.user.applicantProfile !== undefined || req.user.staffProfile !== undefined)) {
+      return res.json(req.user);
+    }
+
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
       include: { applicantProfile: true, staffProfile: true },

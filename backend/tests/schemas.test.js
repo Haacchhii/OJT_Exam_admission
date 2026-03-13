@@ -23,7 +23,7 @@ describe('loginSchema', () => {
 });
 
 describe('registerSchema', () => {
-  const valid = { firstName: 'John', lastName: 'Doe', email: 'john@example.com', password: 'Str0ng!Pass' };
+  const valid = { firstName: 'John', lastName: 'Doe', email: 'john@example.com', password: 'Str0ng!Pass', gradeLevel: 'Grade 7' };
 
   it('accepts valid registration', () => {
     expect(() => registerSchema.parse(valid)).not.toThrow();

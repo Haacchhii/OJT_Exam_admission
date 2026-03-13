@@ -19,6 +19,9 @@ const env = {
   APP_URL:          process.env.APP_URL || 'http://localhost:5173',
   // Toggle whether applicants must verify email before accessing protected routes
   EMAIL_VERIFICATION_REQUIRED: (process.env.EMAIL_VERIFICATION_REQUIRED || 'true').toLowerCase() === 'true',
+  CORS_MAX_AGE_SECONDS: parseInt(process.env.CORS_MAX_AGE_SECONDS, 10) || 600,
+  PERF_LOG_THRESHOLD_MS: parseInt(process.env.PERF_LOG_THRESHOLD_MS, 10) || 200,
+  AUTH_USER_CACHE_TTL_MS: parseInt(process.env.AUTH_USER_CACHE_TTL_MS, 10) || 5000,
 };
 
 // ─── Validate critical env vars ───────────────────────

@@ -89,9 +89,9 @@ export default function StudentAdmission() {
         ))}
       </div>
 
-      {w.step === 1 && <StepPersonalInfo form={w.form} set={w.set} setForm={w.setForm} goTo={w.goTo} />}
-      {w.step === 2 && <StepSchoolInfo form={w.form} set={w.set} setForm={w.setForm} goTo={w.goTo} requiredDocs={w.requiredDocs} slotFiles={w.slotFiles} user={w.user} />}
-      {w.step === 3 && <StepFamilyDetails form={w.form} set={w.set} goTo={w.goTo} />}
+      {w.step === 1 && <StepPersonalInfo form={w.form} set={w.set} setForm={w.setForm} goTo={w.goTo} errors={w.errors} clearError={w.clearError} />}
+      {w.step === 2 && <StepSchoolInfo form={w.form} set={w.set} setForm={w.setForm} goTo={w.goTo} requiredDocs={w.requiredDocs} slotFiles={w.slotFiles} user={w.user} errors={w.errors} clearError={w.clearError} />}
+      {w.step === 3 && <StepFamilyDetails form={w.form} set={w.set} goTo={w.goTo} errors={w.errors} />}
       {w.step === 4 && <StepDocuments form={w.form} requiredDocs={w.requiredDocs} slotFiles={w.slotFiles} extraFiles={w.extraFiles} goTo={w.goTo} handleSlotFile={w.handleSlotFile} handleExtraFiles={w.handleExtraFiles} removeSlot={w.removeSlot} removeExtra={w.removeExtra} />}
       {w.step === 5 && <StepReview form={w.form} slotFiles={w.slotFiles} extraFiles={w.extraFiles} requiredDocs={w.requiredDocs} privacyConsent={w.privacyConsent} setPrivacyConsent={w.setPrivacyConsent} saving={w.saving} goTo={w.goTo} handleSubmit={w.handleSubmit} />}
 

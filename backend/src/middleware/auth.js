@@ -3,6 +3,27 @@ import env from '../config/env.js';
 import prisma from '../config/db.js';
 import { ROLES } from '../utils/constants.js';
 
+const userCache = new Map();
+
+function getCachedUser(cacheKey) {
+  const cached = userCache.get(cacheKey);
+  if (!cached) return null;
+  if (cached.expiresAt <= Date.now()) {
+    userCache.delete(cacheKey);
+    return null;
+  }
+  return cached.user;
+}
+
+function setCachedUser(cacheKey, user) {
+  if (env.AUTH_USER_CACHE_TTL_MS <= 0) return;
+  if (userCache.size > 1000) userCache.clear();
+  userCache.set(cacheKey, {
+    user,
+    expiresAt: Date.now() + env.AUTH_USER_CACHE_TTL_MS,
+  });
+}
+
 /**
  * Verify JWT and attach req.user
  */
@@ -15,8 +36,24 @@ export async function authenticate(req, res, next) {
   try {
     const token = header.split(' ')[1];
     const payload = jwt.verify(token, env.JWT_SECRET);
+    const includeProfiles = req.originalUrl.startsWith('/api/auth/me');
+    const cacheKey = `${payload.sub}:${includeProfiles ? 'full' : 'base'}`;
 
-    const user = await prisma.user.findUnique({ where: { id: payload.sub } });
+    let user = null;
+    if (req.method === 'GET' || req.method === 'HEAD') {
+      user = getCachedUser(cacheKey);
+    }
+
+    if (!user) {
+      user = await prisma.user.findUnique({
+        where: { id: payload.sub },
+        ...(includeProfiles && { include: { applicantProfile: true, staffProfile: true } }),
+      });
+      if (user && (req.method === 'GET' || req.method === 'HEAD')) {
+        setCachedUser(cacheKey, user);
+      }
+    }
+
     if (!user || user.status !== 'Active') {
       return res.status(401).json({ error: 'User not found or inactive', code: 'UNAUTHORIZED' });
     }
