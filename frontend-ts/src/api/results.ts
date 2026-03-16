@@ -40,6 +40,10 @@ export async function getSubmittedAnswers(registrationId: number) {
 }
 
 export async function getQuestionAnalytics(examId: number) {
+  return getQuestionAnalyticsPage(examId);
+}
+
+export async function getQuestionAnalyticsPage(examId: number, params?: { page?: number; limit?: number }) {
   return client.get<{
     examId: number;
     examTitle: string;
@@ -47,7 +51,7 @@ export async function getQuestionAnalytics(examId: number) {
     analytics: Array<{
       questionId: number;
       questionText: string;
-      questionType: string;
+      questionType: 'mc' | 'essay';
       points: number;
       totalAnswered: number;
       correctCount?: number;
@@ -56,7 +60,13 @@ export async function getQuestionAnalytics(examId: number) {
       scoredCount?: number;
       avgScore?: number | null;
     }>;
-  }>(`/results/analytics/${examId}`);
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
+  }>(`/results/analytics/${examId}${qs(params)}`);
 }
 
 export async function submitExamAnswers(

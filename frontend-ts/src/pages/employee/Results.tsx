@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAsync } from '../../hooks/useAsync';
-import { getExamResults, getEssayAnswers, scoreEssay, getQuestionAnalytics } from '../../api/results';
+import { getExamResults, getEssayAnswers, scoreEssay, getQuestionAnalyticsPage } from '../../api/results';
 import { getExamRegistrations, getExamSchedules, getExams } from '../../api/exams';
 import { getAcademicYears, getSemesters } from '../../api/academicYears';
 import { getUsers } from '../../api/users';
@@ -14,6 +14,7 @@ import { formatDate, asArray } from '../../utils/helpers';
 import type { ExamResult, EssayAnswer, ExamRegistration, ExamSchedule, Exam, User, AcademicYear, Semester } from '../../types';
 
 const RESULTS_PER_PAGE = 10;
+const ANALYTICS_PER_PAGE = 8;
 
 interface RawData {
   results: ExamResult[];
@@ -52,8 +53,9 @@ export default function EmployeeResults() {
   const [commentVal, setCommentVal] = useState('');
   const [saving, setSaving] = useState(false);
   const [analyticsExamId, setAnalyticsExamId] = useState<number | null>(null);
-  const [analyticsData, setAnalyticsData] = useState<Awaited<ReturnType<typeof getQuestionAnalytics>> | null>(null);
+  const [analyticsData, setAnalyticsData] = useState<Awaited<ReturnType<typeof getQuestionAnalyticsPage>> | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsPage, setAnalyticsPage] = useState(1);
   const [resultsPage, setResultsPage] = useState(1);
 
   const { data: rawData, loading, error, refetch } = useAsync<RawData>(async () => {
@@ -196,11 +198,12 @@ export default function EmployeeResults() {
     setTimeout(() => printWin.print(), 300);
   };
 
-  const loadAnalytics = async (examId: number) => {
+  const loadAnalytics = async (examId: number, page = 1) => {
     setAnalyticsExamId(examId);
+    setAnalyticsPage(page);
     setAnalyticsLoading(true);
     try {
-      const data = await getQuestionAnalytics(examId);
+      const data = await getQuestionAnalyticsPage(examId, { page, limit: ANALYTICS_PER_PAGE });
       setAnalyticsData(data);
     } catch { showToast('Failed to load analytics', 'error'); }
     finally { setAnalyticsLoading(false); }
@@ -312,7 +315,15 @@ export default function EmployeeResults() {
           <PageHeader title="Per-Question Analytics" subtitle="See how applicants performed on each question." />
           <div className="gk-card p-4 mb-6">
             <label className="text-sm font-medium text-gray-700 mr-2">Select Exam</label>
-            <select value={analyticsExamId ?? ''} onChange={e => { const v = Number(e.target.value); if (v) loadAnalytics(v); }} className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
+            <select
+              value={analyticsExamId ?? ''}
+              onChange={e => {
+                const v = Number(e.target.value);
+                setAnalyticsData(null);
+                if (v) loadAnalytics(v, 1);
+              }}
+              className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm"
+            >
               <option value="">— Choose an exam —</option>
               {exams.map(ex => <option key={ex.id} value={ex.id}>{ex.title}</option>)}
             </select>
@@ -322,29 +333,74 @@ export default function EmployeeResults() {
             <div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
                 <StatCard icon="users" value={analyticsData.totalTakers} label="Total Takers" color="blue" />
-                <StatCard icon="chartBar" value={analyticsData.analytics.length} label="Questions" color="amber" />
-                <StatCard icon="checkCircle" value={analyticsData.analytics.filter(q => q.questionType === 'multiple_choice' && (q.correctRate ?? 0) >= 0.7).length} label="Easy Questions (≥70%)" color="emerald" />
+                <StatCard icon="chartBar" value={`${analyticsData.analytics.length} / ${analyticsData.pagination.total}`} label="Questions (Page/Total)" color="amber" />
+                <StatCard icon="checkCircle" value={analyticsData.analytics.filter(q => q.questionType === 'mc' && (q.correctRate ?? 0) >= 70).length} label="Easy Questions (≥70%)" color="emerald" />
               </div>
+
+              {(() => {
+                const mcQuestions = analyticsData.analytics.filter(q => q.questionType === 'mc');
+                const avgCorrect = mcQuestions.length > 0
+                  ? mcQuestions.reduce((sum, q) => sum + (q.correctRate ?? 0), 0) / mcQuestions.length
+                  : 0;
+
+                return (
+                  <div className="gk-card p-5 mb-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-semibold text-forest-500">Question Percentage Summary</h3>
+                      <span className="text-sm text-gray-500">Page {analyticsData.pagination.page} of {analyticsData.pagination.totalPages}</span>
+                    </div>
+                    <div className="text-sm text-gray-600 mb-4">
+                      Average MC correctness on this page: <span className="font-semibold text-forest-500">{avgCorrect.toFixed(1)}%</span>
+                    </div>
+                    {mcQuestions.length === 0 ? (
+                      <p className="text-sm text-gray-500">No multiple-choice questions on this page.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {mcQuestions.map((q, idx) => {
+                          const questionNumber = ((analyticsData.pagination.page - 1) * analyticsData.pagination.limit) + idx + 1;
+                          const pct = Math.max(0, Math.min(100, q.correctRate ?? 0));
+                          return (
+                            <div key={q.questionId}>
+                              <div className="flex items-center gap-3 text-sm mb-1">
+                                <span className="font-medium text-gray-700 w-14 shrink-0">Q{questionNumber}</span>
+                                <span className="text-gray-600 truncate flex-1">{q.questionText}</span>
+                                <span className="font-semibold text-forest-500 w-16 text-right">{pct.toFixed(1)}%</span>
+                              </div>
+                              <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full ${pct >= 70 ? 'bg-emerald-500' : pct >= 40 ? 'bg-amber-500' : 'bg-red-500'}`}
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
               <div className="space-y-4">
                 {analyticsData.analytics.map((q, idx) => (
                   <div key={q.questionId} className="gk-card p-5">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
-                        <span className="text-xs font-semibold text-gray-400">Q{idx + 1}</span>
+                        <span className="text-xs font-semibold text-gray-400">Q{((analyticsData.pagination.page - 1) * analyticsData.pagination.limit) + idx + 1}</span>
                         <p className="font-medium text-forest-500">{q.questionText}</p>
                       </div>
-                      <Badge className={`gk-badge ml-2 ${q.questionType === 'multiple_choice' ? 'gk-badge-reviewed' : 'gk-badge-pending'}`}>
-                        {q.questionType === 'multiple_choice' ? 'Multiple Choice' : 'Essay'} · {q.points} pts
+                      <Badge className={`gk-badge ml-2 ${q.questionType === 'mc' ? 'gk-badge-reviewed' : 'gk-badge-pending'}`}>
+                        {q.questionType === 'mc' ? 'Multiple Choice' : 'Essay'} · {q.points} pts
                       </Badge>
                     </div>
-                    {q.questionType === 'multiple_choice' && (
+                    {q.questionType === 'mc' && (
                       <div>
                         <div className="flex items-center gap-3 mb-3">
                           <span className="text-sm text-gray-600">Correct rate:</span>
                           <div className="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden">
-                            <div className={`h-full rounded-full ${(q.correctRate ?? 0) >= 0.7 ? 'bg-emerald-500' : (q.correctRate ?? 0) >= 0.4 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${((q.correctRate ?? 0) * 100).toFixed(0)}%` }} />
+                            <div className={`h-full rounded-full ${(q.correctRate ?? 0) >= 70 ? 'bg-emerald-500' : (q.correctRate ?? 0) >= 40 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${Math.max(0, Math.min(100, q.correctRate ?? 0)).toFixed(1)}%` }} />
                           </div>
-                          <span className="text-sm font-semibold">{((q.correctRate ?? 0) * 100).toFixed(0)}%</span>
+                          <span className="text-sm font-semibold">{(q.correctRate ?? 0).toFixed(1)}%</span>
                           <span className="text-xs text-gray-400">({q.correctCount}/{q.totalAnswered})</span>
                         </div>
                         {q.choiceDistribution && (
@@ -370,6 +426,19 @@ export default function EmployeeResults() {
                   </div>
                 ))}
               </div>
+              {analyticsData.pagination.totalPages > 1 && (
+                <div className="mt-6">
+                  <Pagination
+                    currentPage={analyticsPage}
+                    totalPages={analyticsData.pagination.totalPages}
+                    onPageChange={nextPage => {
+                      if (analyticsExamId) loadAnalytics(analyticsExamId, nextPage);
+                    }}
+                    totalItems={analyticsData.pagination.total}
+                    itemsPerPage={analyticsData.pagination.limit}
+                  />
+                </div>
+              )}
             </div>
           )}
           {!analyticsLoading && !analyticsData && analyticsExamId && (

@@ -153,11 +153,24 @@ export async function getSubmittedAnswers(req, res, next) {
 export async function getQuestionAnalytics(req, res, next) {
   try {
     const examId = Number(req.params.examId);
+    const { page, limit } = req.query;
+    const pg = paginate(page, limit);
+
     const exam = await prisma.exam.findUnique({
       where: { id: examId },
-      include: { questions: { orderBy: { orderNum: 'asc' }, include: { choices: { orderBy: { orderNum: 'asc' } } } } },
+      select: { id: true, title: true },
     });
     if (!exam) return res.status(404).json({ error: 'Exam not found', code: 'NOT_FOUND' });
+
+    const totalQuestions = await prisma.examQuestion.count({ where: { examId } });
+
+    const questions = await prisma.examQuestion.findMany({
+      where: { examId },
+      ...(pg && { skip: pg.skip, take: pg.take }),
+      orderBy: { orderNum: 'asc' },
+      include: { choices: { orderBy: { orderNum: 'asc' } } },
+    });
+    const questionIds = questions.map(q => q.id);
 
     // Get all schedules for this exam then all submitted answers
     const scheduleIds = (await prisma.examSchedule.findMany({ where: { examId }, select: { id: true } })).map(s => s.id);
@@ -167,10 +180,16 @@ export async function getQuestionAnalytics(req, res, next) {
     })).map(r => r.id);
 
     const submissions = await prisma.submittedAnswer.findMany({
-      where: { registrationId: { in: registrationIds } },
+      where: {
+        registrationId: { in: registrationIds },
+        ...(questionIds.length > 0 && { questionId: { in: questionIds } }),
+      },
     });
     const essayAnswers = await prisma.essayAnswer.findMany({
-      where: { registrationId: { in: registrationIds } },
+      where: {
+        registrationId: { in: registrationIds },
+        ...(questionIds.length > 0 && { questionId: { in: questionIds } }),
+      },
     });
 
     const totalTakers = registrationIds.length;
@@ -189,7 +208,7 @@ export async function getQuestionAnalytics(req, res, next) {
       else essaysByQuestion.set(e.questionId, [e]);
     }
 
-    const analytics = exam.questions.map(q => {
+    const analytics = questions.map(q => {
       if (q.questionType === 'mc') {
         const qSubs = subsByQuestion.get(q.id) || [];
         const correctChoice = q.choices.find(c => c.isCorrect);
@@ -234,6 +253,17 @@ export async function getQuestionAnalytics(req, res, next) {
       }
     });
 
-    res.json({ examId, examTitle: exam.title, totalTakers, analytics });
+    res.json({
+      examId,
+      examTitle: exam.title,
+      totalTakers,
+      analytics,
+      pagination: {
+        page: pg?.page || 1,
+        limit: pg?.limit || totalQuestions,
+        total: totalQuestions,
+        totalPages: pg ? Math.ceil(totalQuestions / pg.limit) : 1,
+      },
+    });
   } catch (err) { next(err); }
 }
