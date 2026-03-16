@@ -1,6 +1,6 @@
 import prisma from '../config/db.js';
 import { paginate, paginatedResponse } from '../utils/pagination.js';
-import { GRADE_TO_EXAM_LEVEL } from '../utils/constants.js';
+import { GRADE_TO_EXAM_LEVEL, GRADE_TO_LEGACY_EXAM_LEVEL } from '../utils/constants.js';
 
 // GET /api/exams/schedules?examId=&search=&page=&limit=
 export async function getSchedules(req, res, next) {
@@ -40,8 +40,10 @@ export async function getAvailableSchedules(req, res, next) {
       const profile = await prisma.applicantProfile.findUnique({ where: { userId: req.user.id } });
       if (profile?.gradeLevel) {
         const examLevel = GRADE_TO_EXAM_LEVEL[profile.gradeLevel];
-        if (examLevel) {
-          gradeFilter = { gradeLevel: { in: [examLevel, 'All Levels'] } };
+        const legacyLevel = GRADE_TO_LEGACY_EXAM_LEVEL[profile.gradeLevel];
+        const allowedLevels = [examLevel, legacyLevel, 'All Levels'].filter(Boolean);
+        if (allowedLevels.length > 0) {
+          gradeFilter = { gradeLevel: { in: allowedLevels } };
         }
       }
     }

@@ -80,12 +80,12 @@ async function main() {
   console.log(`  ✅ ${admissions.length} admissions`);
 
   // ─── Exams ────────────────────────────────────────
-  // Exam 1: Grade 7-10
+  // Exam 1: Grade 7
   await prisma.exam.create({
     data: {
       id: 1,
-      title: 'Entrance Exam — Grade 7-10',
-      gradeLevel: 'Grade 7-10',
+      title: 'Entrance Exam — Grade 7',
+      gradeLevel: 'Grade 7',
       durationMinutes: 60,
       passingScore: 60,
       isActive: true,
@@ -154,12 +154,12 @@ async function main() {
     },
   });
 
-  // Exam 2: Senior High
+  // Exam 2: Senior High (Grade 11 STEM)
   await prisma.exam.create({
     data: {
       id: 2,
       title: 'Entrance Exam — Senior High',
-      gradeLevel: 'Grade 11-12',
+      gradeLevel: 'Grade 11 — STEM',
       durationMinutes: 90,
       passingScore: 70,
       isActive: true,

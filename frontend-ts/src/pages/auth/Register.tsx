@@ -7,9 +7,13 @@ import Icon from '../../components/Icons';
 import { SCHOOL_NAME, SCHOOL_BRAND, SCHOOL_SUBTITLE, GRADE_OPTIONS } from '../../utils/constants';
 
 export default function Register() {
+  const gradeStages = GRADE_OPTIONS.map(g => g.group);
+  const gradeOptionsByStage = Object.fromEntries(GRADE_OPTIONS.map(g => [g.group, g.items])) as Record<string, string[]>;
+
   const { user, login } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({ firstName: '', lastName: '', email: '', password: '', confirmPassword: '', gradeLevel: '' });
+  const [gradeStage, setGradeStage] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [showConfirmPw, setShowConfirmPw] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -129,18 +133,30 @@ export default function Register() {
                 </div>
               </div>
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">School Stage</label>
+                <select
+                  value={gradeStage}
+                  onChange={e => {
+                    const nextStage = e.target.value;
+                    setGradeStage(nextStage);
+                    setForm(f => ({ ...f, gradeLevel: '' }));
+                  }}
+                  required
+                  className="gk-input"
+                >
+                  <option value="">Select school stage</option>
+                  {gradeStages.map(stage => <option key={stage} value={stage}>{stage}</option>)}
+                </select>
+              </div>
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Applying for Grade Level</label>
                 <div className="relative">
                   <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400">
                     <Icon name="academicCap" className="w-4.5 h-4.5" />
                   </div>
-                  <select value={form.gradeLevel} onChange={set('gradeLevel')} required className="gk-input pl-11 appearance-none cursor-pointer">
-                    <option value="">Select your grade level</option>
-                    {GRADE_OPTIONS.map(g => (
-                      <optgroup key={g.group} label={g.group}>
-                        {g.items.map(item => <option key={item} value={item}>{item}</option>)}
-                      </optgroup>
-                    ))}
+                  <select value={form.gradeLevel} onChange={set('gradeLevel')} required disabled={!gradeStage} className="gk-input pl-11 appearance-none cursor-pointer disabled:bg-gray-50 disabled:text-gray-400">
+                    <option value="">{gradeStage ? 'Select your grade level' : 'Select stage first'}</option>
+                    {(gradeOptionsByStage[gradeStage] || []).map(item => <option key={item} value={item}>{item}</option>)}
                   </select>
                 </div>
               </div>

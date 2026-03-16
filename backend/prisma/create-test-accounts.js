@@ -44,7 +44,7 @@ async function ensureExamAndSchedule() {
     where: {
       isActive: true,
       deletedAt: null,
-      gradeLevel: { in: ['Grade 7-10', 'All Levels', 'Grade 11-12'] },
+      gradeLevel: { in: ['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11 — ABM', 'Grade 11 — STEM', 'Grade 11 — HUMSS', 'All Levels', 'Grade 7-10', 'Grade 11-12'] },
     },
     orderBy: { id: 'asc' },
   });
@@ -54,7 +54,7 @@ async function ensureExamAndSchedule() {
     exam = await prisma.exam.create({
       data: {
         title: 'QA Exam Access Test',
-        gradeLevel: 'Grade 7-10',
+        gradeLevel: 'Grade 7',
         durationMinutes: 30,
         passingScore: 60,
         isActive: true,

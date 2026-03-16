@@ -5,7 +5,7 @@ import { getAcademicYears, getSemesters } from '../../../api/academicYears';
 import { showToast } from '../../../components/Toast';
 import Modal from '../../../components/Modal';
 import { useUnsavedChanges } from '../../../hooks/useUnsavedChanges';
-import { EXAM_GRADE_LEVELS } from '../../../utils/constants';
+import { GRADE_OPTIONS } from '../../../utils/constants';
 import { PageHeader, Badge, EmptyState, SkeletonPage } from '../../../components/UI';
 import Icon from '../../../components/Icons';
 import { uid } from '../../../utils/helpers';
@@ -15,8 +15,12 @@ import type { ParsedQuestion, UploadPreview, ChoiceState } from './types';
 import type { Exam, AcademicYear, Semester } from '../../../types';
 
 export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | null; onDone: () => void }) {
+  const examGradeGroups = [...GRADE_OPTIONS, { group: 'General', items: ['All Levels'] }];
+  const detectExamStage = (gradeLevel: string) => examGradeGroups.find(g => g.items.includes(gradeLevel))?.group || '';
+
   const [title, setTitle] = useState(editExam?.title || '');
   const [grade, setGrade] = useState(editExam?.gradeLevel || '');
+  const [gradeStage, setGradeStage] = useState(detectExamStage(editExam?.gradeLevel || ''));
   const [duration, setDuration] = useState<string | number>(editExam?.durationMinutes || '');
   const [passing, setPassing] = useState<string | number>(editExam?.passingScore || '');
   const [yearId, setYearId] = useState<string | number>(editExam?.academicYear?.id || '');
@@ -48,6 +52,15 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
   const { data: years } = useAsync<AcademicYear[]>(() => getAcademicYears());
   const { data: allSems } = useAsync<Semester[]>(() => getSemesters());
   const semesterOptions = (allSems || []).filter(s => !yearId || s.academicYearId === Number(yearId));
+  const selectedExamGroup = examGradeGroups.find(g => g.group === gradeStage);
+
+  useEffect(() => {
+    if (!gradeStage) return;
+    const validInStage = examGradeGroups.find(g => g.group === gradeStage)?.items || [];
+    if (grade && !validInStage.includes(grade)) {
+      setGrade('');
+    }
+  }, [gradeStage, grade]);
 
   const isDirty = !!(title || questions.length > 0);
   const { clear } = useUnsavedChanges(isDirty);
@@ -213,10 +226,17 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormInput label="Exam Title" value={title} onChange={(e: ChangeEvent<HTMLInputElement>) => setTitle(e.target.value)} placeholder="e.g. Entrance Exam - Grade 7" />
           <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">School Stage</label>
+            <select value={gradeStage} onChange={e => setGradeStage(e.target.value)} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white">
+              <option value="">Select stage</option>
+              {examGradeGroups.map(g => <option key={g.group} value={g.group}>{g.group}</option>)}
+            </select>
+          </div>
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Grade Level</label>
-            <select value={grade} onChange={e => setGrade(e.target.value)} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white">
-              <option value="">Select grade level</option>
-              {EXAM_GRADE_LEVELS.map(g => <option key={g}>{g}</option>)}
+            <select value={grade} onChange={e => setGrade(e.target.value)} disabled={!gradeStage} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white disabled:bg-gray-50 disabled:text-gray-400">
+              <option value="">{gradeStage ? 'Select grade level' : 'Select stage first'}</option>
+              {(selectedExamGroup?.items || []).map(g => <option key={g} value={g}>{g}</option>)}
             </select>
           </div>
           <FormInput label="Duration (minutes)" type="number" value={duration} onChange={(e: ChangeEvent<HTMLInputElement>) => setDuration(e.target.value)} placeholder="60" />
