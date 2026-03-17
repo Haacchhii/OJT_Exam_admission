@@ -18,7 +18,7 @@ export default function ForgotPassword() {
     try {
       const res = await client.post<{ resetToken: string }>('/auth/forgot-password', { email });
       sessionStorage.setItem('gk_reset_token', JSON.stringify({ resetToken: res.resetToken, email, expires: Date.now() + 15 * 60 * 1000 }));
-      showToast('Email verified! You may now reset your password.', 'success');
+      showToast('You can now reset your password.', 'success');
       navigate('/reset-password');
     } catch (err: unknown) {
       showToast((err as Error).message || 'Something went wrong. Please try again.', 'error');

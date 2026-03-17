@@ -1,7 +1,10 @@
 import prisma from '../config/db.js';
 import { paginate, paginatedResponse } from '../utils/pagination.js';
-import { EMPLOYEE_ROLES } from '../utils/constants.js';
+import { EMPLOYEE_ROLES, getLevelGroup } from '../utils/constants.js';
 import { logAudit } from '../utils/auditLog.js';
+import { getIo } from '../utils/socket.js';
+import { cached } from '../utils/cache.js';
+
 
 // Re-export schedule and registration controllers so routes/exams.js keeps working
 export { getSchedules, getAvailableSchedules, createSchedule, updateSchedule, deleteSchedule } from './examSchedules.js';
@@ -68,11 +71,12 @@ function stripAnswers(exam) {
 // GET /api/exams?search=&grade=&status=&academicYearId=&semesterId=&page=&limit=
 export async function getExams(req, res, next) {
   try {
-    const { search, grade, status, academicYearId, semesterId, page, limit } = req.query;
+    const { search, grade, levelGroup, status, academicYearId, semesterId, page, limit } = req.query;
     const pg = paginate(page, limit);
 
     const where = { deletedAt: null };
-    if (grade)          where.gradeLevel = grade;
+    if (grade)  where.gradeLevel = grade;
+    if (levelGroup) where.levelGroup = levelGroup;
     if (academicYearId) where.academicYearId = Number(academicYearId);
     if (semesterId)     where.semesterId = Number(semesterId);
     if (status === 'active')   where.isActive = true;
@@ -84,10 +88,14 @@ export async function getExams(req, res, next) {
       ];
     }
 
-    const [exams, total] = await Promise.all([
-      prisma.exam.findMany({ where, ...(pg && { skip: pg.skip, take: pg.take }), orderBy: { createdAt: 'desc' }, include: examListInclude }),
-      prisma.exam.count({ where }),
-    ]);
+    const cacheKey = `exams:list:${JSON.stringify({ where, page: pg?.page || 1, limit: pg?.limit || null })}`;
+    const { exams, total } = await cached(cacheKey, async () => {
+      const [rows, count] = await Promise.all([
+        prisma.exam.findMany({ where, ...(pg && { skip: pg.skip, take: pg.take }), orderBy: { createdAt: 'desc' }, include: examListInclude }),
+        prisma.exam.count({ where }),
+      ]);
+      return { exams: rows, total: count };
+    }, 30_000);
 
     // Strip correct answers for non-employee roles (prevents students from seeing answer keys)
     const isEmployee = EMPLOYEE_ROLES.includes(req.user.role);
@@ -147,6 +155,7 @@ export async function createExam(req, res, next) {
       data: {
         title,
         gradeLevel,
+        levelGroup: getLevelGroup(gradeLevel),
         durationMinutes,
         passingScore,
         isActive: isActive ?? true,
@@ -187,7 +196,10 @@ export async function updateExam(req, res, next) {
     // Update exam fields
     const data = {};
     if (title !== undefined)           data.title = title;
-    if (gradeLevel !== undefined)      data.gradeLevel = gradeLevel;
+    if (gradeLevel !== undefined) {
+      data.gradeLevel = gradeLevel;
+      data.levelGroup = getLevelGroup(gradeLevel);
+    }
     if (durationMinutes !== undefined) data.durationMinutes = durationMinutes;
     if (passingScore !== undefined)    data.passingScore = passingScore;
     if (isActive !== undefined)        data.isActive = isActive;
@@ -268,6 +280,7 @@ export async function cloneExam(req, res, next) {
       data: {
         title: `${source.title} (Copy)`,
         gradeLevel: source.gradeLevel,
+        levelGroup: source.levelGroup,
         durationMinutes: source.durationMinutes,
         passingScore: source.passingScore,
         isActive: false,
@@ -302,3 +315,4 @@ export async function cloneExam(req, res, next) {
 // ═══════════════════════════════════════════════════════
 // SCHEDULES & REGISTRATIONS → see examSchedules.js & examRegistrations.js
 // ═══════════════════════════════════════════════════════
+

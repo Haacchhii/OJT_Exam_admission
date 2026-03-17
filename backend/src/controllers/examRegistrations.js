@@ -60,8 +60,21 @@ export async function createRegistration(req, res, next) {
     }
 
     // Check for existing active registration for this specific schedule's exam
-    const schedule = await prisma.examSchedule.findUnique({ where: { id: scheduleId } });
+    const schedule = await prisma.examSchedule.findUnique({
+      where: { id: scheduleId },
+      include: {
+        exam: {
+          select: {
+            id: true,
+            academicYear: { select: { id: true, isActive: true } },
+          },
+        },
+      },
+    });
     if (!schedule) return res.status(404).json({ error: 'Schedule not found', code: 'NOT_FOUND' });
+    if (!schedule.exam?.academicYear?.isActive) {
+      return res.status(400).json({ error: 'Registration is only allowed for exams in the active academic year', code: 'VALIDATION_ERROR' });
+    }
 
     const existing = await prisma.examRegistration.findFirst({
       where: {

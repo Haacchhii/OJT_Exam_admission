@@ -12,6 +12,7 @@ export const VALID_TRANSITIONS: Record<string, AdmissionStatus[]> = {
 interface AdmissionParams {
   status?: string;
   grade?: string;
+  levelGroup?: string;
   search?: string;
   sort?: string;
   page?: number;

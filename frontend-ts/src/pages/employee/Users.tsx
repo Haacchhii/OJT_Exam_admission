@@ -9,8 +9,9 @@ import Modal from '../../components/Modal';
 import { useConfirm } from '../../components/ConfirmDialog';
 import BulkActionBar from '../../components/BulkActionBar';
 import { useSelection } from '../../hooks/useSelection';
+import { CSVUploader } from '../../components/CSVUploader';
 import { USER_ROLE_OPTIONS } from '../../utils/constants';
-import { asArray } from '../../utils/helpers';
+import { asArray, exportToCSV } from '../../utils/helpers';
 import type { User } from '../../types';
 
 const USERS_PER_PAGE = 10;
@@ -35,6 +36,7 @@ export default function EmployeeUsers() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
+  const [showBulkImport, setShowBulkImport] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [form, setForm] = useState<UserForm>({ ...emptyForm });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -89,6 +91,30 @@ export default function EmployeeUsers() {
     else if (form.password && form.password.length < 8) e.password = 'Min 8 characters';
     setErrors(e);
     return Object.keys(e).length === 0;
+  };
+
+  const handleBulkImportUsers = async (data: any[]) => {
+    let successCount = 0;
+    setSaving(true);
+    try {
+      for (const row of data) {
+        try {
+          await addUser({
+            firstName: row.firstName || '',
+            lastName: row.lastName || '',
+            email: row.email,
+            role: row.role || 'applicant',
+            status: row.status || 'Active',
+            password: row.password || 'password123',
+          });
+          successCount++;
+        } catch (e) {}
+      }
+      showToast(`Successfully imported  users!`, 'success');
+      refetch();
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleSave = async () => {
@@ -182,11 +208,29 @@ export default function EmployeeUsers() {
   return (
     <div>
       <PageHeader title="User Management" subtitle="Manage system user accounts.">
-        <button onClick={openAdd} className="bg-forest-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-forest-600 flex items-center gap-2">
-          <span>＋</span> Add User
-        </button>
-      </PageHeader>
-
+        <div className="flex gap-2">
+            <button 
+              onClick={() => exportToCSV(filtered.map(u => ({
+                'First Name': u.firstName,
+                'Last Name': u.lastName,
+                'Email': u.email,
+                'Role': u.role,
+                'Status': u.status
+              })), 'Users_Export.csv')}
+              className="bg-white text-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 flex items-center gap-2 border border-gray-300"
+              title="Download full list as CSV"
+            >
+              <Icon name="download" className="w-5 h-5" /> Export
+            </button>
+            <CSVUploader title="Bulk Import Users" isOpen={showBulkImport} onClose={() => setShowBulkImport(false)} onImport={handleBulkImportUsers} templateHeaders={['firstName', 'lastName', 'email', 'role', 'status', 'password']} />
+            <button onClick={() => setShowBulkImport(true)} className="bg-white text-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 flex items-center gap-2 border border-gray-300">
+              <span>&#8690;</span> Import Users
+            </button>
+            <button onClick={openAdd} className="bg-forest-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-forest-600 flex items-center gap-2">
+            <span>&#65291;</span> Add User
+            </button>
+          </div>
+        </PageHeader>
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <StatCard label="Total Users" value={stats.total} icon="users" />
         <StatCard label="Administrators" value={stats.admins} icon="shieldCheck" />
@@ -213,7 +257,7 @@ export default function EmployeeUsers() {
         <BulkActionBar count={selectedCount} onDelete={handleBulkDelete} onClear={clearSelection} deleting={bulkDeleting} />
         <div className="gk-card table-scroll">
           <table className="w-full text-sm">
-            <thead><tr className="border-b border-gray-200 text-left text-gray-400 uppercase text-xs">
+            <thead><tr className="border-b border-gray-200 text-left text-gray-400 uppercase text-xs bg-gray-50/95 sticky top-0 z-10 backdrop-blur-sm">
               <th scope="col" className="py-3 px-2 w-8"><input type="checkbox" checked={isAllSelected(paginated)} onChange={() => togglePage(paginated)} className="accent-forest-500 rounded" aria-label="Select all users" /></th>
               <th scope="col" className="py-3 px-4">Name</th><th scope="col" className="py-3 px-4">Email</th><th scope="col" className="py-3 px-4">Role</th><th scope="col" className="py-3 px-4">Grade Level</th><th scope="col" className="py-3 px-4">Status</th><th scope="col" className="py-3 px-4 text-right">Actions</th>
             </tr></thead>
@@ -292,3 +336,4 @@ export default function EmployeeUsers() {
     </div>
   );
 }
+

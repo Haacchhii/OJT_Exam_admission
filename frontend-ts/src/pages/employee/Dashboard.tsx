@@ -1,13 +1,14 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useSocket } from '../../context/SocketContext';
 import { useAsync } from '../../hooks/useAsync';
 import { getAdmissions, getStats } from '../../api/admissions';
 import { getExams, getExamSchedules, getExamRegistrations } from '../../api/exams';
 import { getExamResults, getEssayAnswers } from '../../api/results';
 import { StatCard, PageHeader, Badge, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert } from '../../components/UI';
 import { formatDate, badgeClass, asArray } from '../../utils/helpers';
-import { ADMISSION_IN_PROGRESS } from '../../utils/constants';
+import { ADMISSION_IN_PROGRESS, GRADE_OPTIONS, ALL_GRADE_LEVELS } from '../../utils/constants';
 import Icon from '../../components/Icons';
 import type { Admission, AdmissionStats, Exam, ExamSchedule, ExamRegistration, ExamResult as ExamResultType, EssayAnswer } from '../../types';
 
@@ -36,9 +37,10 @@ interface DashboardData {
 export default function EmployeeDashboard() {
   const { user, canAccess, roleLabel } = useAuth();
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [gradeFilter, setGradeFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');    const [levelGroupFilter, setLevelGroupFilter] = useState('all');  const [gradeFilter, setGradeFilter] = useState('all');
   const [page, setPage] = useState(1);
+
+  const { socket, isConnected } = useSocket();
 
   const { data: rawData, loading, error, refetch } = useAsync<DashboardData>(async () => {
     const canAdm = canAccess('admissions');
@@ -83,23 +85,35 @@ export default function EmployeeDashboard() {
     return { stats, admissions, exams, schedules, regs, results, pendingEssays, completed, avgScore, grades, trends, overdue };
   });
 
+
+  useEffect(() => {
+    if (!socket || !isConnected) return;
+    const handleUpdate = () => {
+      console.log('Update received, refetching dashboard...');
+      refetch();
+    };
+    socket.on('admission_status_updated', handleUpdate);
+    return () => {
+      socket.off('admission_status_updated', handleUpdate);
+    };
+  }, [socket, isConnected, refetch]);
+
   const filtered = useMemo(() => {
     let list = rawData?.admissions || [];
-    if (statusFilter !== 'all') list = list.filter(a => a.status === statusFilter);
-    if (gradeFilter !== 'all') list = list.filter(a => a.gradeLevel === gradeFilter);
+    if (statusFilter !== 'all') list = list.filter(a => a.status === statusFilter);      if (levelGroupFilter !== 'all') list = list.filter(a => a.levelGroup === levelGroupFilter);    if (gradeFilter !== 'all') list = list.filter(a => a.gradeLevel === gradeFilter);
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(a => `${a.firstName} ${a.lastName} ${a.email}`.toLowerCase().includes(q));
     }
     return list;
-  }, [rawData, statusFilter, gradeFilter, search]);
+  }, [rawData, statusFilter, levelGroupFilter, gradeFilter, search]);
 
   const { paginated, totalPages, safePage, totalItems } = usePaginationSlice(filtered, page, PER_PAGE);
 
   const handleSearch = (v: string) => { setSearch(v); setPage(1); };
   const handleStatus = (v: string) => { setStatusFilter(v); setPage(1); };
+    const handleLevelGroup = (v: string) => { setLevelGroupFilter(v); setGradeFilter('all'); setPage(1); };
   const handleGrade = (v: string) => { setGradeFilter(v); setPage(1); };
-
   if (loading && !rawData) return <SkeletonPage />;
   if (error) return <ErrorAlert error={error} onRetry={refetch} />;
 
@@ -158,9 +172,13 @@ export default function EmployeeDashboard() {
             <option value="Accepted">Accepted</option>
             <option value="Rejected">Rejected</option>
           </select>
+          <select value={levelGroupFilter} onChange={e => handleLevelGroup(e.target.value)} className="gk-input bg-white">
+            <option value="all">All Level Groups</option>
+            {GRADE_OPTIONS.map(g => <option key={g.group} value={g.group}>{g.group}</option>)}
+          </select>
           <select value={gradeFilter} onChange={e => handleGrade(e.target.value)} className="gk-input bg-white">
             <option value="all">All Grades</option>
-            {(rawData?.grades || []).map(g => <option key={g} value={g}>{g}</option>)}
+            {(levelGroupFilter === 'all' ? ALL_GRADE_LEVELS : GRADE_OPTIONS.find(g => g.group === levelGroupFilter)?.items || []).map(g => <option key={g} value={g}>{g}</option>)}
           </select>
         </div>
 
@@ -227,7 +245,7 @@ export default function EmployeeDashboard() {
                   <tr key={exam.id}>
                     <td className="font-medium text-gray-800">{exam.title}</td>
                     <td>{exam.gradeLevel}</td>
-                    <td>{exam.questions.length}</td>
+                    <td>{exam.questionCount ?? exam.questions?.length ?? 0}</td>
                     <td>{regCount}</td>
                     <td><Badge className={exam.isActive ? 'gk-badge gk-badge-active' : 'gk-badge gk-badge-inactive'}>{exam.isActive ? 'Active' : 'Inactive'}</Badge></td>
                     <td><Link to="/employee/exams" className="text-forest-500 hover:text-forest-600 text-xs font-semibold transition-colors">Manage</Link></td>

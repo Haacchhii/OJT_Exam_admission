@@ -1,14 +1,18 @@
 import app from './app.js';
 import env from './config/env.js';
 import prisma from './config/db.js';
+import { initIo } from './utils/socket.js';
 
 const server = app.listen(env.PORT, () => {
   console.log(`Golden Key API running on port ${env.PORT} [${env.NODE_ENV}]`);
 });
 
-// ─── Graceful shutdown ────────────────────────────────
+// Initialize Socket.io attached to the HTTP server
+initIo(server);
+
+// --- Graceful shutdown ----------------------------------------------
 async function shutdown(signal) {
-  console.log(`\n${signal} received — shutting down gracefully…`);
+  console.log(`\n${signal} received - shutting down gracefully...`);
   server.close(async () => {
     await prisma.$disconnect();
     console.log('Database disconnected. Goodbye.');

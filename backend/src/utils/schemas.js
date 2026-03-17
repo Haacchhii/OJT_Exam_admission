@@ -144,6 +144,7 @@ export const admissionsQuerySchema = z.object({
   ...paginationQuery,
   status: z.enum(STATUS_VALUES).optional(),
   grade:  optionalString,
+  levelGroup: optionalString,
   sort:   z.enum(['newest', 'oldest']).optional(),
   academicYearId: coerceOptionalInt,
   semesterId:     coerceOptionalInt,
@@ -151,6 +152,7 @@ export const admissionsQuerySchema = z.object({
 
 export const admissionsStatsQuerySchema = z.object({
   grade:          optionalString,
+  levelGroup:     optionalString,
   from:           isoDateStr.optional(),
   to:             isoDateStr.optional(),
   academicYearId: coerceOptionalInt,
@@ -160,6 +162,7 @@ export const admissionsStatsQuerySchema = z.object({
 export const examsQuerySchema = z.object({
   ...paginationQuery,
   grade:          optionalString,
+  levelGroup:     optionalString,
   status:         z.enum(['active', 'inactive']).optional(),
   academicYearId: coerceOptionalInt,
   semesterId:     coerceOptionalInt,

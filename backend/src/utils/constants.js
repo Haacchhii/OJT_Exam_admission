@@ -98,3 +98,15 @@ export const GRADE_TO_LEGACY_EXAM_LEVEL = {
   'Grade 12 — STEM':  'Grade 11-12',
   'Grade 12 — HUMSS': 'Grade 11-12',
 };
+
+export const GRADE_OPTIONS = [
+  { group: 'Preschool', items: ['Nursery', 'Kinder'] },
+  { group: 'Grade School', items: ['Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6'] },
+  { group: 'Junior High School', items: ['Grade 7','Grade 8','Grade 9','Grade 10'] },
+  { group: 'Senior High School', items: ['Grade 11 — ABM','Grade 11 — STEM','Grade 11 — HUMSS','Grade 12 — ABM','Grade 12 — STEM','Grade 12 — HUMSS'] }
+];
+
+export function getLevelGroup(grade) {
+  const stage = GRADE_OPTIONS.find(g => g.items.includes(grade));
+  return stage ? stage.group : null;
+}

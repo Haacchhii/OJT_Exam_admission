@@ -1,5 +1,4 @@
-import { Link } from 'react-router-dom';
-import { getDocumentDownloadUrl } from '../../../api/admissions';
+import DocumentReview from '../../../components/DocumentReview';
 import { PageHeader, Badge } from '../../../components/UI';
 import Icon from '../../../components/Icons';
 import { Detail } from './AdmissionFormFields';
@@ -94,23 +93,7 @@ export default function ExistingApplication({ existingApp, onNewApplication }: P
           <Detail label="Submitted" value={formatDate(existingApp.submittedAt)} />
           <Detail label="Documents">
             {existingApp.documentFiles?.length > 0 ? (
-              <ul className="space-y-1">
-                {existingApp.documentFiles.map((df) => (
-                  <li key={df.id} className="flex items-center gap-2">
-                    <Icon name="documentText" className="w-4 h-4 text-forest-500 flex-shrink-0" />
-                    {df.filePath ? (
-                      <a
-                        href={getDocumentDownloadUrl(existingApp.id, df.id)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-forest-600 hover:text-forest-800 underline"
-                      >{df.name}</a>
-                    ) : (
-                      <span className="text-sm text-gray-600">{df.name}</span>
-                    )}
-                  </li>
-                ))}
-              </ul>
+              <DocumentReview admissionId={existingApp.id} documents={existingApp.documentFiles} />
             ) : (
               <span className="text-sm text-gray-500">{existingApp.documents.join(', ') || 'None'}</span>
             )}

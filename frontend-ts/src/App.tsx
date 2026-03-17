@@ -1,6 +1,7 @@
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { lazy, Suspense, type ReactNode } from 'react';
 import { AuthProvider, ROLE_PERMISSIONS, type Permission } from './context/AuthContext';
+import { SocketProvider } from './context/SocketContext';
 import { ToastContainer } from './components/Toast';
 import { ConfirmProvider } from './components/ConfirmDialog';
 import { StudentLayout, EmployeeLayout } from './components/Layout';
@@ -56,7 +57,8 @@ export default function App() {
   return (
     <ErrorBoundary>
     <AuthProvider>
-      <ConfirmProvider>
+      <SocketProvider>
+        <ConfirmProvider>
       <HashRouter>
         <ScrollToTop />
         <Suspense fallback={<div className="min-h-[50vh] flex items-center justify-center"><LoadingSpinner /></div>}>
@@ -100,6 +102,7 @@ export default function App() {
         </Suspense>
       </HashRouter>
       </ConfirmProvider>
+        </SocketProvider>
       <ToastContainer />
     </AuthProvider>
     </ErrorBoundary>

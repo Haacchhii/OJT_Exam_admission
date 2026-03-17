@@ -10,12 +10,12 @@ export default function ExamPreviewModal({ exam, onClose }: { exam: Exam | null;
           <div className="flex justify-between items-start mb-4">
             <div>
               <h3 className="text-lg font-bold text-forest-500">{exam.title}</h3>
-              <p className="text-sm text-gray-500">Grade {exam.gradeLevel} • {exam.durationMinutes} minutes • {exam.questions.length} questions</p>
+              <p className="text-sm text-gray-500">Grade {exam.gradeLevel} • {exam.durationMinutes} minutes • {exam.questions?.length ?? 0} questions</p>
             </div>
             <Badge className="gk-badge gk-badge-preview">Preview Mode</Badge>
           </div>
           <div className="space-y-4">
-            {exam.questions
+            {(exam.questions || [])
               .slice()
               .sort((a: ExamQuestion, b: ExamQuestion) => a.orderNum - b.orderNum)
               .map((q: ExamQuestion, i: number) => (

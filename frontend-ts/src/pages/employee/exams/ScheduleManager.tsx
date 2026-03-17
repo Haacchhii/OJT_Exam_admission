@@ -49,7 +49,8 @@ export default function ScheduleManager() {
     e.preventDefault();
     if (form.examId) {
       const selectedExam = exams.find(ex => String(ex.id) === String(form.examId));
-      if (selectedExam && (!selectedExam.questions || selectedExam.questions.length === 0)) {
+      const qCount = selectedExam?.questionCount ?? selectedExam?.questions?.length ?? 0;
+      if (selectedExam && qCount === 0) {
         showToast('Cannot schedule an exam with zero questions. Add questions first.', 'error');
         return;
       }

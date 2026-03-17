@@ -8,6 +8,7 @@ import type {
 interface ExamParams {
   search?: string;
   grade?: string;
+  levelGroup?: string;
   status?: string;
   page?: number;
   limit?: number;

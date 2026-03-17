@@ -50,6 +50,7 @@ interface LoginResult {
   ok: boolean;
   user?: User;
   msg?: string;
+  emailVerificationRequired?: boolean;
 }
 
 interface LoginOpts {
@@ -105,6 +106,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!res?.user || !res?.token) {
         throw new Error(`API misconfiguration: expected {user,token} but got ${typeof res === 'string' ? 'HTML page' : JSON.stringify(res)?.slice(0, 80)}. Check VITE_API_URL.`);
       }
+      if (res.emailVerificationRequired) {
+        setToken(null);
+        localStorage.removeItem('gk_current_user');
+        localStorage.removeItem('gk_user_hash');
+        setUser(null);
+        return {
+          ok: false,
+          emailVerificationRequired: true,
+          msg: 'Please verify your email before signing in.',
+        };
+      }
+
       setToken(res.token);
       localStorage.setItem('gk_current_user', JSON.stringify(res.user));
       localStorage.setItem('gk_user_hash', computeHash(res.user));

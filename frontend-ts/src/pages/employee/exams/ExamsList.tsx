@@ -10,21 +10,26 @@ import { useSelection } from '../../../hooks/useSelection';
 import BulkActionBar from '../../../components/BulkActionBar';
 import { PageHeader, StatCard, Badge, EmptyState, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert } from '../../../components/UI';
 import Icon from '../../../components/Icons';
-import { formatTime, badgeClass, asArray } from '../../../utils/helpers';
+import { formatTime, badgeClass, asArray, exportToCSV } from '../../../utils/helpers';
 import { DetailField, QuestionCard } from './ExamComponents';
 import ExamPreviewModal from './ExamPreviewModal';
+import { CSVUploader } from '../../../components/CSVUploader';
+import { addExam } from '../../../api/exams';
 import type { Exam, ExamSchedule, ExamRegistration, ExamResult, User, AcademicYear, Semester } from '../../../types';
+import { GRADE_OPTIONS, ALL_GRADE_LEVELS } from '../../../utils/constants';
 
 const EXAMS_PER_PAGE = 10;
 const READINESS_PER_PAGE = 10;
+const QUESTIONS_PER_PAGE = 5;
 
 export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void }) {
   const canManageExams = !!onEdit;
   const confirm = useConfirm();
   const [detailId, setDetailId] = useState<number | null>(null);
   const [previewExam, setPreviewExam] = useState<Exam | null>(null);
-  const [searchExam, setSearchExam] = useState('');
-  const [gradeFilterExam, setGradeFilterExam] = useState('all');
+  const [showBulkImport, setShowBulkImport] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [searchExam, setSearchExam] = useState('');    const [levelGroupFilterExam, setLevelGroupFilterExam] = useState('all');  const [gradeFilterExam, setGradeFilterExam] = useState('all');
   const [statusFilterExam, setStatusFilterExam] = useState('all');
   const [yearFilterExam, setYearFilterExam] = useState('all');
   const [semesterFilterExam, setSemesterFilterExam] = useState('all');
@@ -32,6 +37,7 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
   const [readSearch, setReadSearch] = useState('');
   const [readStatusFilter, setReadStatusFilter] = useState('all');
   const [readPage, setReadPage] = useState(1);
+  const [questionPage, setQuestionPage] = useState(1);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const { selected, toggle, togglePage, clear: clearSelection, isAllSelected, count: selectedCount } = useSelection();
 
@@ -70,18 +76,73 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
     if (searchExam.trim()) {
       const q = searchExam.toLowerCase();
       list = list.filter(e => e.title.toLowerCase().includes(q));
-    }
-    if (gradeFilterExam !== 'all') list = list.filter(e => e.gradeLevel === gradeFilterExam);
+    }      if (levelGroupFilterExam !== 'all') list = list.filter(e => e.levelGroup === levelGroupFilterExam);    if (gradeFilterExam !== 'all') list = list.filter(e => e.gradeLevel === gradeFilterExam);
     if (statusFilterExam !== 'all') list = list.filter(e => (statusFilterExam === 'active') === e.isActive);
     if (yearFilterExam !== 'all') list = list.filter(e => e.academicYear?.id === Number(yearFilterExam));
     if (semesterFilterExam !== 'all') list = list.filter(e => e.semester?.id === Number(semesterFilterExam));
     return list;
-  }, [exams, searchExam, gradeFilterExam, statusFilterExam, yearFilterExam, semesterFilterExam]);
+  }, [exams, searchExam, levelGroupFilterExam, gradeFilterExam, statusFilterExam, yearFilterExam, semesterFilterExam]);
 
   const examGrades = useMemo(() => [...new Set(exams.map(e => e.gradeLevel).filter(Boolean))].sort(), [exams]);
 
   const { paginated: paginatedExams, totalPages: examTotalPages, safePage: examSafePage, totalItems: examTotal } = usePaginationSlice(filteredExams, examPage, EXAMS_PER_PAGE);
   const resetExamPage = () => setExamPage(1);
+
+  const handleBulkImportExams = async (data: any[]) => {
+    let successCount = 0;
+    setSaving(true);
+    try {
+      for (const row of data) {
+        try {
+          const questions = [];
+          for (let i = 1; i <= 200; i++) {
+            const qtext = row['q' + i + '_text'];
+            if (!qtext) continue;
+            
+            const qType = row['q' + i + '_type'] || 'mc';
+            const qPoints = parseInt(row['q' + i + '_points']) || 1;
+            
+            const choices = [];
+            const correctAns = (row['q' + i + '_ans'] || 'a').toLowerCase();
+            const optionMap = ['a', 'b', 'c', 'd'];
+            
+            for (let j = 0; j < 4; j++) {
+              const choiceText = row['q' + i + '_' + optionMap[j]];
+              if (choiceText) {
+                choices.push({
+                  choiceText,
+                  isCorrect: correctAns === optionMap[j],
+                  orderNum: j + 1
+                });
+              }
+            }
+            
+            questions.push({
+              questionText: qtext,
+              questionType: qType,
+              points: qPoints,
+              orderNum: questions.length + 1,
+              choices
+            });
+          }
+
+          await addExam({
+            title: row.title || 'Untitled Exam',
+            gradeLevel: row.gradeLevel || 'Grade 10',
+            durationMinutes: parseInt(row.durationMinutes) || 60,
+            passingScore: parseInt(row.passingScore) || 50,
+            isActive: row.isActive === 'true' || row.isActive === '1' || row.isActive?.toLowerCase() === 'yes',
+            questions
+          });
+          successCount++;
+        } catch (e) {}
+      }
+      showToast(`Successfully imported ${successCount} exams!`, 'success');
+      refetch();
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleBulkDelete = async () => {
     if (selectedCount === 0 || bulkDeleting) return;
@@ -134,6 +195,9 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
   const { paginated: paginatedReadiness, totalPages: readTotalPages, safePage: readSafePage, totalItems: readTotal } = usePaginationSlice(filteredReadiness, readPage, READINESS_PER_PAGE);
   const resetReadPage = () => setReadPage(1);
 
+  const detailQuestions = useMemo(() => fullExam?.questions || exams.find(e => e.id === detailId)?.questions || [], [fullExam, exams, detailId]);
+  const { paginated: paginatedQuestions, totalPages: qTotalPages, safePage: qSafePage, totalItems: qTotal } = usePaginationSlice(detailQuestions, questionPage, QUESTIONS_PER_PAGE);
+
   if (loading && !data) return <SkeletonPage />;
   if (error) return <ErrorAlert error={error} onRetry={refetch} />;
 
@@ -143,7 +207,7 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
     const eSched = schedules.filter(s => s.examId === exam.id);
     const eRegs = regs.filter(r => eSched.some(s => s.id === r.scheduleId));
     const completed = eRegs.filter(r => r.status === 'done').length;
-    const detailQuestions = fullExam?.questions || exam.questions;
+    
 
     return (
       <div>
@@ -174,20 +238,20 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
             <p className="text-gray-400 text-center py-6">Loading questions…</p>
           ) : (
           <div className="space-y-3">
-            {detailQuestions.map((q, i) => (
-              <QuestionCard key={q.id} q={q} i={i} />
+            {paginatedQuestions.map((q, i) => (
+              <QuestionCard key={q.id} q={q} i={(qSafePage - 1) * QUESTIONS_PER_PAGE + i} />
             ))}
-            {detailQuestions.length === 0 && <p className="text-gray-400 text-center py-6">No questions in this exam.</p>}
-          </div>
+              {detailQuestions.length === 0 && <p className="text-gray-400 text-center py-6">No questions in this exam.</p>}
+            </div>
           )}
+          {detailQuestions.length > 0 && <div className="mt-4"><Pagination currentPage={qSafePage} totalPages={qTotalPages} onPageChange={setQuestionPage} totalItems={qTotal} itemsPerPage={QUESTIONS_PER_PAGE} /></div>}
         </div>
-
         <div className="gk-card p-6 mt-4">
           <h3 className="text-lg font-bold text-forest-500 mb-4">Registered Students ({eRegs.length})</h3>
           {eRegs.length > 0 ? (
             <div className="table-scroll">
               <table className="w-full text-sm">
-                <thead><tr className="border-b border-gray-200 text-left text-gray-400 uppercase text-xs">
+                <thead><tr className="border-b border-gray-200 text-left text-gray-400 uppercase text-xs bg-gray-50/95 sticky top-0 z-10 backdrop-blur-sm">
                   <th scope="col" className="py-3 px-2">Student</th><th scope="col" className="py-3 px-2">Email</th><th scope="col" className="py-3 px-2">Status</th><th scope="col" className="py-3 px-2">Schedule</th>
                 </tr></thead>
                 <tbody>
@@ -217,7 +281,25 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
 
   return (
     <div>
-      <PageHeader title="All Exams" subtitle="View and manage created exams." />
+      <PageHeader title="All Exams" subtitle="View and manage created exams.">
+        <div className="flex gap-2">          <button onClick={() => {
+            const exportData = exams.map(e => ({
+              ID: e.id,
+              Title: e.title,
+              Grade: e.gradeLevel,
+              Duration_Mins: e.durationMinutes,
+              Passing_Score: e.passingScore,
+              Status: e.isActive ? 'Active' : 'Inactive'
+            }));
+            exportToCSV(exportData, 'exams_export.csv');
+          }} className="bg-white text-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 flex items-center gap-2 border border-gray-300">
+            Export
+          </button>          <CSVUploader title="Bulk Import Exams" isOpen={showBulkImport} onClose={() => setShowBulkImport(false)} onImport={handleBulkImportExams} templateHeaders={['title', 'gradeLevel', 'durationMinutes', 'passingScore', 'isActive']} />
+          <button onClick={() => setShowBulkImport(true)} className="bg-white text-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 flex items-center gap-2 border border-gray-300">
+            <span>?</span> Import Exams
+          </button>
+        </div>
+      </PageHeader>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard icon="exam" value={exams.length} label="Total Exams" color="blue" />
         <StatCard icon="calendar" value={schedules.length} label="Schedules" color="emerald" />
@@ -226,10 +308,12 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
-        <input value={searchExam} onChange={e => { setSearchExam(e.target.value); resetExamPage(); }} placeholder="Search exams…" className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm" />
-        <select value={gradeFilterExam} onChange={e => { setGradeFilterExam(e.target.value); resetExamPage(); }} className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
+        <input value={searchExam} onChange={e => { setSearchExam(e.target.value); resetExamPage(); }} placeholder="Search exams…" className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm" />          <select value={levelGroupFilterExam} onChange={e => { setLevelGroupFilterExam(e.target.value); setGradeFilterExam('all'); resetExamPage(); }} className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
+            <option value="all">All Level Groups</option>
+            {GRADE_OPTIONS.map(g => <option key={g.group} value={g.group}>{g.group}</option>)}
+          </select>        <select value={gradeFilterExam} onChange={e => { setGradeFilterExam(e.target.value); resetExamPage(); }} className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
           <option value="all">All Grades</option>
-          {examGrades.map(g => <option key={g} value={g}>{g}</option>)}
+          {(levelGroupFilterExam === 'all' ? ALL_GRADE_LEVELS : GRADE_OPTIONS.find(g => g.group === levelGroupFilterExam)?.items || []).map(g => <option key={g} value={g}>{g}</option>)}
         </select>
         <select value={statusFilterExam} onChange={e => { setStatusFilterExam(e.target.value); resetExamPage(); }} className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
           <option value="all">All Status</option>
@@ -253,10 +337,10 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
           <>
             <div className="table-scroll">
               <table className="w-full text-sm">
-                <thead><tr className="border-b border-gray-200 text-left text-gray-400 uppercase text-xs">
+                <thead><tr className="border-b border-gray-200 text-left text-gray-400 uppercase text-xs bg-gray-50/95 sticky top-0 z-10 backdrop-blur-sm">
                   {canManageExams && <th scope="col" className="py-3 px-2 w-8"><input type="checkbox" checked={isAllSelected(paginatedExams)} onChange={() => togglePage(paginatedExams)} className="accent-forest-500 rounded" aria-label="Select all exams" /></th>}
                   <th scope="col" className="py-3 px-2">ID</th><th scope="col" className="py-3 px-2">Title</th><th scope="col" className="py-3 px-2">Grade</th>
-                  <th scope="col" className="py-3 px-2">Duration</th><th scope="col" className="py-3 px-2">Questions</th><th scope="col" className="py-3 px-2">Passing</th>
+                    <th scope="col" className="py-3 px-2">Duration</th><th scope="col" className="py-3 px-2">Questions</th><th scope="col" className="py-3 px-2">Registrations</th><th scope="col" className="py-3 px-2">Passing</th>
                   <th scope="col" className="py-3 px-2">Status</th><th scope="col" className="py-3 px-2">Actions</th>
                 </tr></thead>
                 <tbody>
@@ -267,7 +351,8 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
                       <td className="py-3 px-2 font-medium text-forest-500">{e.title}</td>
                       <td className="py-3 px-2">{e.gradeLevel}</td>
                       <td className="py-3 px-2">{e.durationMinutes} min</td>
-                      <td className="py-3 px-2">{e.questions.length}</td>
+                      <td className="py-3 px-2">{e.questionCount ?? e.questions?.length ?? 0}</td>
+                      <td className="py-3 px-2">{regs.filter(r => schedules.some(s => s.examId === e.id && s.id === r.scheduleId)).length}</td>
                       <td className="py-3 px-2">{e.passingScore}%</td>
                       <td className="py-3 px-2"><Badge className={e.isActive ? 'gk-badge gk-badge-active' : 'gk-badge gk-badge-inactive'}>{e.isActive ? 'Active' : 'Inactive'}</Badge></td>
                       <td className="py-3 px-2">
@@ -308,7 +393,7 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
           <>
             <div className="table-scroll">
               <table className="w-full text-sm">
-                <thead><tr className="border-b border-gray-200 text-left text-gray-400 uppercase text-xs">
+                <thead><tr className="border-b border-gray-200 text-left text-gray-400 uppercase text-xs bg-gray-50/95 sticky top-0 z-10 backdrop-blur-sm">
                   <th scope="col" className="py-3 px-2">Student</th><th scope="col" className="py-3 px-2">Exam</th><th scope="col" className="py-3 px-2">Registration Status</th><th scope="col" className="py-3 px-2">Score</th><th scope="col" className="py-3 px-2">Result</th>
                 </tr></thead>
                 <tbody>

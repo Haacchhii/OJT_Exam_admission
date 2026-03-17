@@ -65,6 +65,7 @@ export interface Admission {
   religion?: string | null;
   address: string;
   gradeLevel: string;
+  levelGroup?: string;
   prevSchool: string | null;
   schoolAddress?: string | null;
   schoolYear: string;
@@ -119,6 +120,7 @@ export interface Exam {
   id: number;
   title: string;
   gradeLevel: string;
+  levelGroup?: string;
   durationMinutes: number;
   passingScore: number;
   isActive: boolean;
@@ -128,6 +130,8 @@ export interface Exam {
   createdAt: string;
   updatedAt: string;
   questions: ExamQuestion[];
+  questionCount?: number;
+  scheduleCount?: number;
   academicYear?: { id: number; year: string } | null;
   semester?: { id: number; name: string } | null;
   _count?: { questions: number };
@@ -251,3 +255,4 @@ export interface GradeGroup {
   group: string;
   items: string[];
 }
+

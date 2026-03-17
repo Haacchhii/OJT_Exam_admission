@@ -1,9 +1,10 @@
-import prisma from '../config/db.js';
+﻿import prisma from '../config/db.js';
 import path from 'path';
 import { paginate, paginatedResponse } from '../utils/pagination.js';
-import { VALID_TRANSITIONS, ROLES, MAX_BULK_OPERATIONS } from '../utils/constants.js';
+import { VALID_TRANSITIONS, ROLES, MAX_BULK_OPERATIONS, getLevelGroup } from '../utils/constants.js';
 import { generateTrackingId, generateStudentNumber } from '../utils/tracking.js';
 import { logAudit } from '../utils/auditLog.js';
+import { getIo } from '../utils/socket.js';
 import { sendAdmissionSubmittedEmail, sendAdmissionStatusEmail } from '../utils/email.js';
 import { cached, invalidatePrefix } from '../utils/cache.js';
 import env from '../config/env.js';
@@ -135,19 +136,29 @@ export async function createAdmission(req, res, next) {
 
     const trackingId = await generateTrackingId('ADM');
 
+    // Auto-link to active academic year/semester when not provided by client
+    const resolvedYearId = academicYearId
+      ? Number(academicYearId)
+      : (await prisma.academicYear.findFirst({ where: { isActive: true } }))?.id || null;
+    const resolvedSemesterId = semesterId
+      ? Number(semesterId)
+      : resolvedYearId
+        ? (await prisma.semester.findFirst({ where: { academicYearId: resolvedYearId, isActive: true }, orderBy: { id: 'asc' } }))?.id || null
+        : null;
+
     const admission = await prisma.admission.create({
       data: {
         trackingId,
         userId: req.user.id,
         firstName, lastName, email, phone, dob, gender, address,
-        gradeLevel, prevSchool: prevSchool || null, schoolYear,
+        gradeLevel, levelGroup: getLevelGroup(gradeLevel), prevSchool: prevSchool || null, schoolYear,
         lrn: lrn || null, applicantType: applicantType || 'New',
         studentNumber: studentNumber || null,
         guardian, guardianRelation,
         guardianPhone: guardianPhone || null,
         guardianEmail: guardianEmail || null,
-        ...(academicYearId && { academicYearId: Number(academicYearId) }),
-        ...(semesterId && { semesterId: Number(semesterId) }),
+        ...(resolvedYearId && { academicYearId: resolvedYearId }),
+        ...(resolvedSemesterId && { semesterId: resolvedSemesterId }),
         status: 'Submitted',
       },
       include: { documents: true, academicYear: true, semester: true },
@@ -250,6 +261,8 @@ export async function updateStatus(req, res, next) {
       notes: notes || null,
     });
 
+    try { getIo().to('role_administrator').to('role_registrar').emit('admission_status_updated', { id, status, prevStatus: admission.status }); } catch (_) {}
+
     res.json(shapeAdmission(updated));
   } catch (err) { next(err); }
 }
@@ -285,6 +298,8 @@ export async function bulkUpdateStatus(req, res, next) {
     logAudit({ userId: req.user.id, action: 'admission.bulk_status_update', entity: 'admission', entityId: null, details: { ids, to: status, count: result.count }, ipAddress: req.ip });
 
     invalidatePrefix('admStats:');
+
+    try { getIo().to('role_administrator').to('role_registrar').emit('admission_bulk_status_updated', { ids, status, count: result.count }); } catch (_) {}
 
     res.json({ updated: result.count });
   } catch (err) { next(err); }

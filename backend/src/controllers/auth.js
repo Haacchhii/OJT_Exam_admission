@@ -6,7 +6,7 @@ import env from '../config/env.js';
 import { sendWelcomeEmail, sendVerificationEmail } from '../utils/email.js';
 import { passwordSchema } from '../utils/schemas.js';
 import { logAudit } from '../utils/auditLog.js';
-import { ROLES, BCRYPT_ROUNDS, RESET_TOKEN_EXPIRY, EMAIL_VERIFY_EXPIRY_MS } from '../utils/constants.js';
+import { ROLES, BCRYPT_ROUNDS, RESET_TOKEN_EXPIRY, EMAIL_VERIFY_EXPIRY_MS, getLevelGroup } from '../utils/constants.js';
 
 // ─── Password complexity (single source of truth: passwordSchema in schemas.js) ──
 function validatePassword(password) {
@@ -135,7 +135,7 @@ export async function register(req, res, next) {
     });
 
     // Auto-create applicant profile with the chosen grade level
-    await prisma.applicantProfile.create({ data: { userId: user.id, gradeLevel: gradeLevel || null } });
+    await prisma.applicantProfile.create({ data: { userId: user.id, gradeLevel: gradeLevel || null, levelGroup: gradeLevel ? getLevelGroup(gradeLevel) : null } });
 
     // Re-fetch with profile included for the response
     const fullUser = await prisma.user.findUnique({

@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SCHOOL_NAME } from '../utils/constants';
 import Icon from './Icons';
+import { GlobalSearch } from './GlobalSearch';
 import type { User } from '../types';
 
 interface TopbarProps {
@@ -38,7 +39,7 @@ export default function Topbar({ title, onMenuToggle, userId, user }: TopbarProp
       </div>
       <div className="flex items-center gap-3">
 
-        <div className="w-px h-7 bg-gray-200 mx-1 hidden sm:block" />
+        {isEmployee && <GlobalSearch />}<div className="w-px h-7 bg-gray-200 mx-1 hidden sm:block" />
 
         <div className="flex items-center gap-3 cursor-pointer hover:opacity-85 transition-all duration-200 group pl-1" onClick={() => navigate(isEmployee ? '/employee/profile' : '/student/profile')} title="View Profile">
           <div className={`w-9 h-9 rounded-lg ${avatarCls} flex items-center justify-center text-xs font-bold`}>
@@ -55,3 +56,5 @@ export default function Topbar({ title, onMenuToggle, userId, user }: TopbarProp
     </header>
   );
 }
+
+

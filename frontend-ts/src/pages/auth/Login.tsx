@@ -1,6 +1,7 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { client } from '../../api/client';
 import { showToast } from '../../components/Toast';
 import Icon from '../../components/Icons';
 import { SCHOOL_NAME, SCHOOL_BRAND, SCHOOL_SUBTITLE } from '../../utils/constants';
@@ -12,6 +13,8 @@ export default function Login() {
   const [remember, setRemember] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const [verificationRequired, setVerificationRequired] = useState(false);
+  const [resendingVerification, setResendingVerification] = useState(false);
   const { login, user } = useAuth();
   const navigate = useNavigate();
 
@@ -39,8 +42,14 @@ export default function Login() {
     e.preventDefault();
     if (!validate()) return;
     setLoading(true);
+    setVerificationRequired(false);
     try {
       const result = await login(email, password);
+      if (result.emailVerificationRequired) {
+        setVerificationRequired(true);
+        showToast(result.msg || 'Please verify your email before signing in.', 'warning');
+        return;
+      }
       if (!result.ok) { showToast(result.msg || 'Login failed', 'error'); return; }
       if (remember) localStorage.setItem('gk_remember_email', email);
       else localStorage.removeItem('gk_remember_email');
@@ -48,6 +57,22 @@ export default function Login() {
       else navigate('/employee');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (!email) {
+      showToast('Enter your email first so we can resend the verification link.', 'error');
+      return;
+    }
+    setResendingVerification(true);
+    try {
+      await client.post('/auth/resend-verification', { email });
+      showToast('Verification email sent. Please check your inbox.', 'success');
+    } catch (err) {
+      showToast((err as Error).message || 'Failed to resend verification email.', 'error');
+    } finally {
+      setResendingVerification(false);
     }
   };
 
@@ -137,6 +162,22 @@ export default function Login() {
               <h2 className="text-2xl font-bold text-gray-800">Welcome back</h2>
               <p className="text-gray-500 text-sm mt-1">Sign in to continue to your account</p>
             </div>
+
+            {verificationRequired && (
+              <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <p className="text-sm text-amber-900 font-medium">Your email is not verified yet.</p>
+                <p className="text-xs text-amber-800 mt-1">Please verify your email to continue. If you did not receive the email, request a new link below.</p>
+                <button
+                  type="button"
+                  onClick={handleResendVerification}
+                  disabled={resendingVerification}
+                  className="mt-3 inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-60"
+                >
+                  {resendingVerification ? <Icon name="spinner" className="w-3.5 h-3.5 animate-spin" /> : <Icon name="mail" className="w-3.5 h-3.5" />}
+                  {resendingVerification ? 'Sending...' : 'Resend verification email'}
+                </button>
+              </div>
+            )}
 
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>

@@ -7,9 +7,9 @@ import { asArray } from '../../utils/helpers';
 import { getUsers } from '../../api/users';
 import { getAcademicYears, getSemesters } from '../../api/academicYears';
 import { showToast } from '../../components/Toast';
-import { PageHeader, SkeletonPage, ErrorAlert } from '../../components/UI';
+import { PageHeader, SkeletonPage, ErrorAlert, Pagination, usePaginationSlice } from '../../components/UI';
 import Icon from '../../components/Icons';
-import { ADMISSION_STATUSES, SCHOOL_NAME } from '../../utils/constants';
+import { ADMISSION_STATUSES, SCHOOL_NAME, GRADE_OPTIONS, ALL_GRADE_LEVELS } from '../../utils/constants';
 import type { Admission, ExamResult, Exam, ExamSchedule, ExamRegistration, EssayAnswer, User, AcademicYear, Semester } from '../../types';
 
 function downloadCSV(filename: string, rows: (string | number)[][]) {
@@ -43,12 +43,12 @@ interface ReportData {
 }
 
 export default function EmployeeReports() {
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [gradeFilter, setGradeFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');    const [levelGroupFilter, setLevelGroupFilter] = useState('all');  const [gradeFilter, setGradeFilter] = useState('all');
   const [yearFilter, setYearFilter] = useState('all');
   const [semesterFilter, setSemesterFilter] = useState('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [examStatsPage, setExamStatsPage] = useState(1);
 
   const { data: rawData, loading, error, refetch } = useAsync<ReportData>(async () => {
     const settled = await Promise.allSettled([
@@ -87,8 +87,7 @@ export default function EmployeeReports() {
 
   const { admissions, results, exams, schedules, regs, essays, users } = useMemo(() => {
     let adm = rawData?.admissions || [];
-    if (statusFilter !== 'all') adm = adm.filter(a => a.status === statusFilter);
-    if (gradeFilter !== 'all') adm = adm.filter(a => a.gradeLevel === gradeFilter);
+    if (statusFilter !== 'all') adm = adm.filter(a => a.status === statusFilter);      if (levelGroupFilter !== 'all') adm = adm.filter(a => a.levelGroup === levelGroupFilter);    if (gradeFilter !== 'all') adm = adm.filter(a => a.gradeLevel === gradeFilter);
     if (yearFilter !== 'all') adm = adm.filter(a => a.academicYear?.id === Number(yearFilter));
     if (semesterFilter !== 'all') adm = adm.filter(a => a.semester?.id === Number(semesterFilter));
     if (dateFrom) adm = adm.filter(a => new Date(a.submittedAt) >= new Date(dateFrom));
@@ -104,7 +103,7 @@ export default function EmployeeReports() {
       schedules: rawData?.schedules || [], regs: filteredRegs, essays: rawData?.essays || [],
       users: rawData?.users || [],
     };
-  }, [rawData, statusFilter, gradeFilter, yearFilter, semesterFilter, dateFrom, dateTo]);
+  }, [rawData, statusFilter, levelGroupFilter, gradeFilter, yearFilter, semesterFilter, dateFrom, dateTo]);
 
   if (loading && !rawData) return <SkeletonPage />;
   if (error) return <ErrorAlert error={error} onRetry={refetch} />;
@@ -165,7 +164,14 @@ export default function EmployeeReports() {
     const count = admissions.filter(a => { const ad = new Date(a.submittedAt); return `${ad.getFullYear()}-${String(ad.getMonth()).padStart(2, '0')}` === key; }).length;
     monthData.push({ label: monthNames[d.getMonth()], count });
   }
+  
+
   const maxMonth = Math.max(...monthData.map(m => m.count), 1);
+
+    const sortedStats = [...examStats].sort((a, b) => b.rate - a.rate);
+    const startIndexObject = (examStatsPage - 1) * 5;
+    const paginatedStats = sortedStats.slice(startIndexObject, startIndexObject + 5);
+    const statTotalPages = Math.ceil(sortedStats.length / 5);
 
   const metrics = [
     { label: 'Total Applicants', value: totalApplicants, change: `+${thisMonth} this month` },
@@ -192,10 +198,12 @@ export default function EmployeeReports() {
           <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} aria-label="Filter by status" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
             <option value="all">All Status</option>
             {ADMISSION_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <select value={gradeFilter} onChange={e => setGradeFilter(e.target.value)} className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
+          </select>            <select value={levelGroupFilter} onChange={e => { setLevelGroupFilter(e.target.value); setGradeFilter('all'); } } aria-label="Filter by level group" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
+              <option value="all">All Level Groups</option>
+              {GRADE_OPTIONS.map(g => <option key={g.group} value={g.group}>{g.group}</option>)}
+            </select>          <select value={gradeFilter} onChange={e => setGradeFilter(e.target.value)} className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
             <option value="all">All Grades</option>
-            {grades.map(g => <option key={g} value={g}>{g}</option>)}
+            {(levelGroupFilter === 'all' ? ALL_GRADE_LEVELS : GRADE_OPTIONS.find(g => g.group === levelGroupFilter)?.items || []).map(g => <option key={g} value={g}>{g}</option>)}
           </select>
           <select value={yearFilter} onChange={e => { setYearFilter(e.target.value); setSemesterFilter('all'); }} aria-label="Filter by school year" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
             <option value="all">All Years</option>
@@ -213,8 +221,8 @@ export default function EmployeeReports() {
             <label className="text-sm text-gray-500 whitespace-nowrap">To</label>
             <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm" />
           </div>
-          {(statusFilter !== 'all' || gradeFilter !== 'all' || yearFilter !== 'all' || semesterFilter !== 'all' || dateFrom || dateTo) && (
-            <button onClick={() => { setStatusFilter('all'); setGradeFilter('all'); setYearFilter('all'); setSemesterFilter('all'); setDateFrom(''); setDateTo(''); }} className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+            {(statusFilter !== 'all' || levelGroupFilter !== 'all' || gradeFilter !== 'all' || yearFilter !== 'all' || semesterFilter !== 'all' || dateFrom || dateTo) && (
+              <button onClick={() => { setStatusFilter('all'); setLevelGroupFilter('all'); setGradeFilter('all'); setYearFilter('all'); setSemesterFilter('all'); setDateFrom(''); setDateTo(''); }} className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
               ✕ Clear
             </button>
           )}
@@ -241,12 +249,12 @@ export default function EmployeeReports() {
       </div>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 items-start">
         <div className="gk-card p-6">
           <h3 className="gk-heading-sm text-forest-500 mb-4 flex items-center gap-1.5"><span className="p-1.5 bg-forest-50 rounded-lg"><Icon name="chartBar" className="w-5 h-5" /></span> Pass Rate by Exam</h3>
           {examStats.length > 0 && examStats.some(e => e.total > 0) ? (
             <div className="space-y-3">
-              {examStats.map((e, i) => (
+              {paginatedStats.map((e, i) => (
                 <div key={i}>
                   <div className="flex justify-between text-sm mb-1">
                     <span className="text-gray-600 truncate">{e.name}</span>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAsync } from '../../hooks/useAsync';
 import { getExamResults, getEssayAnswers, scoreEssay, getQuestionAnalyticsPage } from '../../api/results';
 import { getExamRegistrations, getExamSchedules, getExams } from '../../api/exams';
@@ -10,7 +10,7 @@ import { showToast } from '../../components/Toast';
 import Modal from '../../components/Modal';
 import { PageHeader, StatCard, Badge, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert } from '../../components/UI';
 import Icon from '../../components/Icons';
-import { formatDate, asArray } from '../../utils/helpers';
+import { formatDate, asArray, exportToCSV } from '../../utils/helpers';
 import type { ExamResult, EssayAnswer, ExamRegistration, ExamSchedule, Exam, User, AcademicYear, Semester } from '../../types';
 
 const RESULTS_PER_PAGE = 10;
@@ -36,6 +36,10 @@ interface EssayCardProps {
   question: string;
   status: 'pending' | 'scored';
   onScore?: () => void;
+}
+
+function essayDraftKey(essayId: number) {
+  return `gk_essay_draft_${essayId}`;
 }
 
 export default function EmployeeResults() {
@@ -135,6 +139,7 @@ export default function EmployeeResults() {
     setSaving(true);
     try {
       await scoreEssay(scoreModal.id, s, commentVal.trim() || undefined);
+      localStorage.removeItem(essayDraftKey(scoreModal.id));
       showToast('Essay scored!', 'success');
       setScoreModal(null);
       refetch();
@@ -143,6 +148,29 @@ export default function EmployeeResults() {
     } finally {
       setSaving(false);
     }
+  };
+
+  useEffect(() => {
+    if (!scoreModal) return;
+    localStorage.setItem(essayDraftKey(scoreModal.id), JSON.stringify({ scoreVal, commentVal }));
+  }, [scoreModal, scoreVal, commentVal]);
+
+  const openScoreModal = (essay: EssayAnswer, defaults?: { scoreVal?: string; commentVal?: string }) => {
+    setScoreModal(essay);
+    let nextScore = defaults?.scoreVal ?? '';
+    let nextComment = defaults?.commentVal ?? '';
+    try {
+      const draftRaw = localStorage.getItem(essayDraftKey(essay.id));
+      if (draftRaw) {
+        const draft = JSON.parse(draftRaw) as { scoreVal?: string; commentVal?: string };
+        nextScore = draft.scoreVal ?? nextScore;
+        nextComment = draft.commentVal ?? nextComment;
+      }
+    } catch {
+      // Ignore malformed localStorage draft
+    }
+    setScoreVal(nextScore);
+    setCommentVal(nextComment);
   };
 
   const handlePrintResult = (r: EnrichedResult) => {
@@ -221,7 +249,24 @@ export default function EmployeeResults() {
 
       {tab === 'results' && (
         <div>
-          <PageHeader title="Exam Results" subtitle="View all applicant exam scores and pass/fail status." />
+                    <PageHeader title="Exam Results" subtitle="View all applicant exam scores and pass/fail status.">
+            <button 
+              onClick={() => exportToCSV(filtered.map(r => ({
+                'First Name': r.student?.firstName || '',
+                'Last Name': r.student?.lastName || '',
+                'Exam': r.exam?.title || '',
+                'Total Score': r.totalScore,
+                'Max Possible': r.maxPossible,
+                'Percentage': r.percentage.toFixed(1) + '%',
+                'Pass/fail': r.passed ? 'Pass' : 'Fail',
+                'Date': formatDate(r.createdAt)
+              })), 'Results_Export.csv')}
+              className="bg-white text-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 flex items-center gap-2 border border-gray-300"
+              title="Download results as CSV"
+            >
+              <Icon name="download" className="w-5 h-5" /> Export
+            </button>
+          </PageHeader>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <StatCard icon="chartBar" value={results.length} label="Total Results" color="blue" />
             <StatCard icon="checkCircle" value={passed} label="Passed" color="emerald" />
@@ -257,7 +302,7 @@ export default function EmployeeResults() {
               <>
                 <div className="table-scroll">
                   <table className="w-full text-sm">
-                    <thead><tr className="border-b border-gray-200 text-left text-gray-400 uppercase text-xs">
+                    <thead><tr className="border-b border-gray-200 text-left text-gray-400 uppercase text-xs bg-gray-50/95 sticky top-0 z-10 backdrop-blur-sm">
                       <th scope="col" className="py-3 px-2">Student</th><th scope="col" className="py-3 px-2">Exam</th><th scope="col" className="py-3 px-2">Score</th>
                       <th scope="col" className="py-3 px-2">Percentage</th><th scope="col" className="py-3 px-2">Result</th><th scope="col" className="py-3 px-2">Essay</th><th scope="col" className="py-3 px-2">Date</th><th scope="col" className="py-3 px-2 text-right">Actions</th>
                     </tr></thead>
@@ -299,11 +344,11 @@ export default function EmployeeResults() {
             <div className="space-y-4">
               {pending.length > 0 && <h3 className="font-bold text-forest-500 text-lg flex items-center gap-1.5"><Icon name="clock" className="w-5 h-5" /> Pending Review ({pending.length})</h3>}
               {pending.map(e => (
-                <EssayCard key={e.id} essay={e} student={getStudentName(e.registrationId)} question={getQuestionText(e.questionId)} status="pending" onScore={() => { setScoreModal(e); setScoreVal(''); setCommentVal(''); }} />
+                <EssayCard key={e.id} essay={e} student={getStudentName(e.registrationId)} question={getQuestionText(e.questionId)} status="pending" onScore={() => openScoreModal(e)} />
               ))}
               {scored.length > 0 && <h3 className="font-bold text-forest-500 text-lg mt-6 flex items-center gap-1.5"><Icon name="checkCircle" className="w-5 h-5" /> Scored ({scored.length})</h3>}
               {scored.map(e => (
-                <EssayCard key={e.id} essay={e} student={getStudentName(e.registrationId)} question={getQuestionText(e.questionId)} status="scored" onScore={() => { setScoreModal(e); setScoreVal(String(e.pointsAwarded ?? '')); setCommentVal(e.comment || ''); }} />
+                <EssayCard key={e.id} essay={e} student={getStudentName(e.registrationId)} question={getQuestionText(e.questionId)} status="scored" onScore={() => openScoreModal(e, { scoreVal: String(e.pointsAwarded ?? ''), commentVal: e.comment || '' })} />
               ))}
             </div>
           )}
@@ -512,3 +557,4 @@ function EssayCard({ essay, student, question, status, onScore }: EssayCardProps
     </div>
   );
 }
+

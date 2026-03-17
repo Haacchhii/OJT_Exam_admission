@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useAsync } from '../../../hooks/useAsync';
 import { getAdmissions, getStats, bulkUpdateStatus, bulkDeleteAdmissions, VALID_TRANSITIONS } from '../../../api/admissions';
 import { getAcademicYears, getSemesters } from '../../../api/academicYears';
@@ -6,9 +6,10 @@ import { showToast } from '../../../components/Toast';
 import { useConfirm } from '../../../components/ConfirmDialog';
 import { PageHeader, Badge, EmptyState, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert } from '../../../components/UI';
 import Icon from '../../../components/Icons';
-import { formatDate, badgeClass, asArray } from '../../../utils/helpers';
-import { ADMISSION_STATUSES, ADMISSION_IN_PROGRESS } from '../../../utils/constants';
+import { formatDate, badgeClass, asArray, exportToCSV } from '../../../utils/helpers';
+import { ADMISSION_STATUSES, ADMISSION_IN_PROGRESS, GRADE_OPTIONS, ALL_GRADE_LEVELS } from '../../../utils/constants';
 import { useAuth } from '../../../context/AuthContext';
+import { useSocket } from '../../../context/SocketContext';
 import type { Admission, AdmissionStats, AcademicYear, Semester } from '../../../types';
 
 const PER_PAGE = 10;
@@ -36,6 +37,7 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState(directStatus || 'all');
   const [gradeFilter, setGradeFilter] = useState('all');
+  const [levelGroupFilter, setLevelGroupFilter] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
   const [yearFilter, setYearFilter] = useState('all');
   const [semesterFilter, setSemesterFilter] = useState('all');
@@ -45,12 +47,25 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
   const [saving, setSaving] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
 
+  const { socket, isConnected } = useSocket();
+
   const { data: rawData, loading, error, refetch } = useAsync<RawData>(async () => {
     const [stats, rawAdm] = await Promise.all([getStats(), getAdmissions()]);
     const admissions = asArray<Admission>(rawAdm);
     const grades = [...new Set(admissions.map((a: Admission) => a.gradeLevel).filter(Boolean))].sort() as string[];
     return { stats, admissions, grades };
   });
+
+
+  useEffect(() => {
+    if (!socket || !isConnected) return;
+    socket.on('admission_status_updated', () => {
+      refetch();
+    });
+    return () => {
+      socket.off('admission_status_updated');
+    };
+  }, [socket, isConnected, refetch]);
 
   const { data: academicYears } = useAsync<AcademicYear[]>(() => getAcademicYears());
   const { data: allSemesters } = useAsync<Semester[]>(() => getSemesters());
@@ -63,8 +78,7 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
 
   const admissions = useMemo(() => {
     let list = rawData?.admissions || [];
-    if (filter !== 'all') list = list.filter(a => a.status === filter);
-    if (gradeFilter !== 'all') list = list.filter(a => a.gradeLevel === gradeFilter);
+    if (filter !== 'all') list = list.filter(a => a.status === filter);      if (levelGroupFilter !== 'all') list = list.filter(a => a.levelGroup === levelGroupFilter);    if (gradeFilter !== 'all') list = list.filter(a => a.gradeLevel === gradeFilter);
     if (yearFilter !== 'all') list = list.filter(a => a.academicYear?.id === Number(yearFilter));
     if (semesterFilter !== 'all') list = list.filter(a => a.semester?.id === Number(semesterFilter));
     if (search) list = list.filter(a => `${a.firstName} ${a.lastName} ${a.email}`.toLowerCase().includes(search.toLowerCase()));
@@ -73,7 +87,7 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
     else if (sortBy === 'name') list = [...list].sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`));
     else if (sortBy === 'status') list = [...list].sort((a, b) => a.status.localeCompare(b.status));
     return list;
-  }, [rawData, search, filter, gradeFilter, yearFilter, semesterFilter, sortBy]);
+  }, [rawData, search, filter, levelGroupFilter, gradeFilter, yearFilter, semesterFilter, sortBy]);
 
   const { paginated, totalPages, safePage, totalItems } = usePaginationSlice(admissions, page, PER_PAGE);
 
@@ -164,7 +178,23 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
 
   return (
     <div>
-      <PageHeader title="All Admission Applications" />
+              <PageHeader title="All Admission Applications">
+          <button 
+            onClick={() => exportToCSV(admissions.map(a => ({
+              'System ID': a.id,
+              'First Name': a.firstName,
+              'Last Name': a.lastName,
+              'Email': a.email,
+              'Grade Level': a.gradeLevel,
+              'Status': a.status,
+              'Submitted At': formatDate(a.submittedAt)
+            })), 'Admissions_Export.csv')}
+            className="bg-white text-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 flex items-center gap-2 border border-gray-300"
+            title="Download full list as CSV"
+          >
+            <Icon name="download" className="w-5 h-5" /> Export
+          </button>
+        </PageHeader>
 
       {/* Filter bar */}
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
@@ -172,10 +202,12 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
         <select value={filter} onChange={e => { setFilter(e.target.value); resetPage(); }} aria-label="Filter by status" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white">
           <option value="all">All Status</option>
           {ADMISSION_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
-        <select value={gradeFilter} onChange={e => { setGradeFilter(e.target.value); resetPage(); }} aria-label="Filter by grade" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white">
-          <option value="all">All Grades</option>
-          {(rawData?.grades || []).map(g => <option key={g} value={g}>{g}</option>)}
+        </select>          <select value={levelGroupFilter} onChange={e => { setLevelGroupFilter(e.target.value); setGradeFilter('all'); resetPage(); }} aria-label="Filter by level group" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white">
+              <option value="all">All Level Groups</option>
+              {GRADE_OPTIONS.map(g => <option key={g.group} value={g.group}>{g.group}</option>)}
+            </select>        <select value={gradeFilter} onChange={e => { setGradeFilter(e.target.value); resetPage(); }} aria-label="Filter by grade" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white">
+            <option value="all">All Grades</option>
+            {(levelGroupFilter === 'all' ? ALL_GRADE_LEVELS : GRADE_OPTIONS.find(g => g.group === levelGroupFilter)?.items || []).map(g => <option key={g} value={g}>{g}</option>)}
         </select>
         <select value={yearFilter} onChange={e => { setYearFilter(e.target.value); setSemesterFilter('all'); resetPage(); }} aria-label="Filter by school year" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white">
           <option value="all">All Years</option>
@@ -262,3 +294,4 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
     </div>
   );
 }
+

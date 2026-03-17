@@ -38,6 +38,7 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
   const [cheatFlags, setCheatFlags] = useState(0);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [autoModal, setAutoModal] = useState<{ title: string; msg: string } | null>(null);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const submittedRef = useRef(false);
   const navigate = useNavigate();
@@ -110,6 +111,18 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
     return () => { document.removeEventListener('visibilitychange', handler); document.removeEventListener('contextmenu', preventContext); window.removeEventListener('beforeunload', beforeUnload); };
   }, []);
 
+  // Network connection listeners
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
   // Auto-save answers to server every 30 seconds
   useEffect(() => {
     const autoSaveInterval = setInterval(() => {
@@ -130,6 +143,11 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
     <div className="min-h-screen bg-gray-50">
       <a href="#exam-content" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:bg-white focus:p-2 focus:rounded focus:shadow focus:z-[100]">Skip to exam content</a>
       <div className="bg-white border-b border-gray-200 sticky top-0 z-50 px-4 py-3">
+        {!isOnline && (
+          <div className="bg-yellow-100 border-b border-yellow-300 text-yellow-800 text-sm px-4 py-2 font-semibold text-center mb-2 rounded-md">
+            ⚠️ You are Offline. Please do not submit the exam or refresh the page until your connection is restored.
+          </div>
+        )}
         <div className="flex items-center justify-between mb-2">
           <h3 className="font-bold text-forest-500 text-lg">{exam.title}</h3>
           <div className={`flex items-center gap-2 font-mono text-lg font-bold ${timerColor}`} role="timer" aria-live="polite" aria-label={`Time remaining: ${mins} minutes ${secs} seconds`}>

@@ -83,7 +83,7 @@ export default function StudentExam() {
           <p className="text-gray-500 mb-6 leading-relaxed">
             You are about to start the <strong>{currentExam.title}</strong>.<br />
             Duration: <strong>{currentExam.durationMinutes}</strong> minutes<br />
-            Total Questions: <strong>{currentExam.questions.length}</strong><br />
+            Total Questions: <strong>{currentExam.questionCount ?? currentExam.questions?.length ?? 0}</strong><br />
             Passing Score: <strong>{currentExam.passingScore}%</strong>
           </p>
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-left mb-4">
