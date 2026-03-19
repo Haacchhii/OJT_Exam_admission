@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+﻿import { Link } from 'react-router-dom';
 import { showToast } from '../../components/Toast';
 import { useAdmissionWizard } from './admission/useAdmissionWizard';
 import ExistingApplication from './admission/ExistingApplication';
@@ -25,7 +25,7 @@ export default function StudentAdmission() {
     return (
       <div>
         <PageHeader title="Admission Application" subtitle={`${SCHOOL_NAME} \u2014 Admission Form`} />
-        <div className="gk-card p-8 text-center">
+        <div className="gk-section-card p-8 text-center">
           <div className="w-16 h-16 rounded-2xl bg-forest-50 flex items-center justify-center mx-auto mb-4"><Icon name="lock" className="w-8 h-8 text-forest-500" /></div>
           <h3 className="text-xl font-bold text-forest-500 mb-2">Entrance Exam Required</h3>
           <p className="text-gray-500 mb-2">You must pass the entrance examination before you can submit an admission application.</p>
@@ -50,7 +50,7 @@ export default function StudentAdmission() {
         <h4 className="font-semibold text-forest-700 text-sm mb-2 flex items-center gap-1.5"><Icon name="clipboard" className="w-4 h-4" /> Admission Policy & Procedure</h4>
         <div className="text-xs text-forest-600 space-y-1">
           <p>Admission is open to all students regardless of race, religion, gender, or socioeconomic status.</p>
-          <p><strong>Procedure:</strong> ① Pass Entrance Exam → ② Submit Application & Documents → ③ Screening & Evaluation → ④ Admission Confirmation</p>
+          <p><strong>Procedure:</strong> 1) Pass Entrance Exam, then 2) Submit Application and Documents, then 3) Screening and Evaluation, then 4) Admission Confirmation</p>
           <p><strong>Age Requirement:</strong> Kindergarten applicants must be 5 years old by October 31 of the school year. Grade 1 requires proof of kindergarten completion.</p>
           <p><strong>Late Admission:</strong> Accepted up to 2 weeks after the first day of classes with School Head approval.</p>
           <p className="text-gray-400">New students may undergo an interview and/or diagnostic entrance test as required. All data handled per RA 10173 (Data Privacy Act).</p>
@@ -81,7 +81,7 @@ export default function StudentAdmission() {
         {STEPS.map((label, i) => (
           <div key={i} className="flex items-center gap-1">
             <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${i + 1 === w.step ? 'bg-forest-500 text-white' : i + 1 < w.step ? 'bg-forest-100 text-forest-700' : 'bg-gray-100 text-gray-400'}`}>
-              <span className="w-5 h-5 flex items-center justify-center rounded-full bg-white/30 text-xs font-bold">{i + 1 < w.step ? '✓' : i + 1}</span>
+              <span className="w-5 h-5 flex items-center justify-center rounded-full bg-white/30 text-xs font-bold">{i + 1 < w.step ? 'OK' : i + 1}</span>
               <span className="hidden sm:inline">{label}</span>
             </div>
             {i < STEPS.length - 1 && <div className={`w-8 h-0.5 ${i + 1 < w.step ? 'bg-forest-400' : 'bg-gray-200'}`} />}
@@ -120,8 +120,20 @@ export default function StudentAdmission() {
             </div>
           )}
           <p className="text-gray-500 mt-2">Your admission application has been received by <strong>{SCHOOL_NAME}</strong>.</p>
-          <p className="text-xs text-gray-400 mt-2">Next step: The school will screen your application and notify you of your admission status.</p>
-          <Link to="/student/dashboard" className="mt-4 inline-block bg-forest-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-forest-600">Go to Dashboard</Link>
+          <div className="mt-3 rounded-lg border border-gold-200 bg-gold-50 px-4 py-3 text-left">
+            <p className="text-xs font-semibold text-gold-800 mb-1">What happens next</p>
+            <ul className="text-xs text-gold-800 space-y-1 list-disc list-inside">
+              <li>Initial screening starts within 1-3 business days.</li>
+              <li>Status is usually finalized within 5-10 business days.</li>
+              <li>Use your tracking ID anytime to check progress.</li>
+            </ul>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+            <Link to="/student/track" className="inline-flex items-center gap-1.5 border border-forest-200 text-forest-700 px-5 py-2 rounded-lg font-semibold hover:bg-forest-50">
+              <Icon name="search" className="w-4 h-4" /> Track Application
+            </Link>
+            <Link to="/student/dashboard" className="inline-block bg-forest-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-forest-600">Go to Dashboard</Link>
+          </div>
         </div>
       </Modal>
     </div>

@@ -43,9 +43,9 @@ export function StatCard({ icon, value, label, color = 'blue', trend, trendLabel
   const trendUp = (trend ?? 0) > 0;
   const trendDown = (trend ?? 0) < 0;
   return (
-    <div className="gk-card p-5">
+    <div className="gk-card p-6 hover:-translate-y-0.5 hover:shadow-card-hover transition-all duration-250">
       <div className="flex items-start gap-4">
-        <div className={`w-10 h-10 rounded-lg ${iconColors[color] || iconColors.blue} flex items-center justify-center shrink-0`} aria-hidden="true">
+        <div className={`w-12 h-12 rounded-xl ${iconColors[color] || iconColors.blue} flex items-center justify-center shrink-0`} aria-hidden="true">
           {typeof icon === 'string' && !/[\u{1F000}-\u{1FFFF}]/u.test(icon) ? <Icon name={icon} className="w-5 h-5" /> : <span className="text-lg">{icon}</span>}
         </div>
         {trend !== undefined && trend !== null && (
@@ -57,8 +57,8 @@ export function StatCard({ icon, value, label, color = 'blue', trend, trendLabel
         )}
       </div>
       <div className="mt-3">
-        <div className="text-2xl stat-value">{value}</div>
-        <div className="text-xs text-gray-500 mt-1 font-medium">{label}</div>
+        <div className="text-3xl stat-value">{value}</div>
+        <div className="text-xs text-gray-500 mt-1 font-semibold uppercase tracking-wide">{label}</div>
       </div>
     </div>
   );
@@ -124,10 +124,10 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, subtitle, children }: PageHeaderProps) {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
+    <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5 mb-8">
       <div>
-        <h2 className="text-2xl text-gray-800 gk-heading">{title}</h2>
-        {subtitle && <p className="text-gray-500 text-sm mt-1.5">{subtitle}</p>}
+        <h2 className="text-2xl lg:text-3xl text-gray-800 gk-heading">{title}</h2>
+        {subtitle && <p className="text-gray-500 text-sm mt-2 max-w-3xl">{subtitle}</p>}
       </div>
       {children && <div className="flex items-center gap-2">{children}</div>}
     </div>
@@ -160,7 +160,8 @@ export function Pagination({ currentPage, totalPages, onPageChange, totalItems, 
   if (ep < totalPages) { if (ep < totalPages - 1) pages.push('…2'); pages.push(totalPages); }
 
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-6 pt-4 border-t border-gray-100/60">
+    <div className="p-4 lg:p-6 border-t border-gray-200 bg-gray-50 rounded-b-xl mt-6 -mx-5 -mb-5 sm:-mx-6 sm:-mb-6">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
       <span className="text-sm text-gray-500">
         Showing <strong>{start}</strong>–<strong>{end}</strong> of <strong>{totalItems}</strong>
       </span>
@@ -198,6 +199,7 @@ export function Pagination({ currentPage, totalPages, onPageChange, totalItems, 
         >
           <Icon name="chevronRight" className="w-4 h-4 text-gray-500" />
         </button>
+      </div>
       </div>
     </div>
   );

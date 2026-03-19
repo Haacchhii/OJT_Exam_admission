@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { authenticate } from '../middleware/auth.js';
 import { authorize } from '../middleware/rbac.js';
 import { validate, validateQuery } from '../middleware/validate.js';
-import { createExamSchema, updateExamSchema, createScheduleSchema, updateScheduleSchema, bulkDeleteSchema, examsQuerySchema, schedulesQuerySchema, registrationsQuerySchema } from '../utils/schemas.js';
+import { createExamSchema, updateExamSchema, createScheduleSchema, updateScheduleSchema, bulkDeleteSchema, examsQuerySchema, schedulesQuerySchema, registrationsQuerySchema, createRegistrationSchema } from '../utils/schemas.js';
 import * as ctrl from '../controllers/exams.js';
 import { ROLES } from '../utils/constants.js';
 
@@ -12,6 +12,7 @@ router.use(authenticate);
 // ─── Schedules (MUST be before /:id to avoid param capture) ───
 router.get('/schedules',           validateQuery(schedulesQuerySchema), ctrl.getSchedules);
 router.get('/schedules/available', ctrl.getAvailableSchedules);
+router.post('/schedules/notice',   authorize(ROLES.APPLICANT), ctrl.notifyNoSchedule);
 router.post('/schedules',          authorize(ROLES.ADMIN, ROLES.TEACHER), validate(createScheduleSchema), ctrl.createSchedule);
 router.put('/schedules/:id',       authorize(ROLES.ADMIN, ROLES.TEACHER), validate(updateScheduleSchema), ctrl.updateSchedule);
 router.delete('/schedules/:id',    authorize(ROLES.ADMIN, ROLES.TEACHER), ctrl.deleteSchedule);
@@ -19,7 +20,7 @@ router.delete('/schedules/:id',    authorize(ROLES.ADMIN, ROLES.TEACHER), ctrl.d
 // ─── Registrations (MUST be before /:id to avoid param capture) ───
 router.get('/registrations',       authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), validateQuery(registrationsQuerySchema), ctrl.getRegistrations);
 router.get('/registrations/mine',  authorize(ROLES.APPLICANT), ctrl.getMyRegistrations);
-router.post('/registrations',      authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.APPLICANT), ctrl.createRegistration);
+router.post('/registrations',      authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.APPLICANT), validate(createRegistrationSchema), ctrl.createRegistration);
 router.patch('/registrations/:id/start', authorize(ROLES.APPLICANT), ctrl.startExam);
 router.patch('/registrations/:id/save-draft', authorize(ROLES.APPLICANT), ctrl.saveDraftAnswers);
 

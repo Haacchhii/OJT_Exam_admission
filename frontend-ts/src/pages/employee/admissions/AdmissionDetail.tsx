@@ -1,4 +1,4 @@
-import { showToast } from '../../../components/Toast';
+﻿import { showToast } from '../../../components/Toast';
 import { useConfirm } from '../../../components/ConfirmDialog';
 import { getAdmissions, updateAdmissionStatus, VALID_TRANSITIONS } from '../../../api/admissions';
 import { useAsync } from '../../../hooks/useAsync';
@@ -51,11 +51,31 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
   if (loading && !adm) return <SkeletonPage />;
   if (!adm) return <p className="text-gray-500 p-4">Application not found.</p>;
 
+  const currentStatus = statusVal || adm.status;
+
+  const suggestedAction =
+    currentStatus === 'Submitted'
+      ? 'Check required documents and profile completeness, then move to Under Screening.'
+      : currentStatus === 'Under Screening'
+        ? 'Resolve missing requirements and reviewer notes, then move to Under Evaluation.'
+        : currentStatus === 'Under Evaluation'
+          ? 'Finalize decision (Accepted or Rejected) and write concise rationale for records.'
+          : currentStatus === 'Accepted'
+            ? 'Prepare enrollment follow-up instructions and confirm registrar handoff.'
+            : 'Provide clear rejection reason and guidance on possible re-application path.';
+
+  const addNoteTemplate = (template: string) => {
+    setNotes(prev => {
+      const trimmed = prev.trim();
+      return trimmed ? `${trimmed}\n\n${template}` : template;
+    });
+  };
+
   const handlePrint = () => {
     const esc = (s: unknown) => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     const printWin = window.open('', '_blank');
     if (!printWin || printWin.closed) {
-      showToast('Popup blocked — please allow popups for this site and try again.', 'error');
+      showToast('Popup blocked - please allow popups for this site and try again.', 'error');
       return;
     }
     printWin.document.write(`<!DOCTYPE html><html><head><title>Application - ${esc(adm.firstName)} ${esc(adm.lastName)}</title>
@@ -78,7 +98,7 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
         @media print { body { padding: 20px; } }
       </style>
     </head><body>
-      <div class="logo"><span>🔑</span><h1><span style="color:#fbbf24">${SCHOOL_BRAND}</span><br/><span style="color:#166534">${SCHOOL_SUBTITLE}</span></h1><p class="subtitle">${SCHOOL_ADDRESS} &bull; Tel: ${SCHOOL_PHONE}<br/>Admission Application Form</p></div>
+      <div class="logo"><span>GK</span><h1><span style="color:#fbbf24">${SCHOOL_BRAND}</span><br/><span style="color:#166534">${SCHOOL_SUBTITLE}</span></h1><p class="subtitle">${SCHOOL_ADDRESS} | Tel: ${SCHOOL_PHONE}<br/>Admission Application Form</p></div>
       <h2>Student Information</h2>
       <div class="grid">
         <div class="field"><label>Full Name</label><span>${esc(adm.firstName)} ${esc(adm.lastName)}</span></div>
@@ -100,11 +120,11 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
         <div class="field"><label>Guardian (if applicable)</label><span>${esc(adm.guardian) || 'N/A'}</span></div>
       </div>
       <h2>Submitted Documents</h2>
-      <ul class="docs">${adm.documents.map((d: string) => `<li>📄 ${esc(d)}</li>`).join('')}</ul>
+      <ul class="docs">${adm.documents.map((d: string) => `<li>File: ${esc(d)}</li>`).join('')}</ul>
       <h2>Application Status</h2>
       <p><span class="status ${esc(adm.status).replace(/\s+/g, '-')}">${esc(adm.status)}</span></p>
       ${adm.notes ? `<p style="margin-top:8px;font-size:13px;color:#666"><strong>Notes:</strong> ${esc(adm.notes)}</p>` : ''}
-      <p style="margin-top:30px;font-size:11px;color:#aaa;text-align:center">Printed on ${new Date().toLocaleDateString()} — ${SCHOOL_NAME} &copy; ${new Date().getFullYear()}</p>
+      <p style="margin-top:30px;font-size:11px;color:#aaa;text-align:center">Printed on ${new Date().toLocaleDateString()} - ${SCHOOL_NAME} &copy; ${new Date().getFullYear()}</p>
     </body></html>`);
     printWin.document.close();
     printWin.focus();
@@ -142,12 +162,12 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
   return (
     <div>
       <div className="flex items-center gap-2 mb-4">
-        <button onClick={onBack} className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 text-sm">← Back to List</button>
+        <button onClick={onBack} className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 text-sm">Back to List</button>
         <button onClick={handlePrint} className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 text-sm ml-auto inline-flex items-center gap-1.5"><Icon name="document" className="w-4 h-4" /> Print / Export PDF</button>
       </div>
       <PageHeader title="Application Details" />
 
-      <div className="gk-card p-6 mb-4">
+      <div className="gk-section-card p-6 mb-4">
         <h3 className="text-lg font-bold text-forest-500 mb-4">Student Information</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <D label="Full Name" value={`${adm.firstName} ${adm.lastName}`} />
@@ -171,7 +191,7 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
         </div>
       </div>
 
-      <div className="gk-card p-6 mb-4">
+      <div className="gk-section-card p-6 mb-4">
         <h3 className="text-lg font-bold text-forest-500 mb-4">Submitted Documents</h3>
         <DocumentReview
           admissionId={adm.id}
@@ -180,11 +200,39 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
         />
       </div>
 
-      <div className="gk-card p-6">
+      <div className="gk-section-card p-6">
         <h3 className="text-lg font-bold text-forest-500 mb-4">Application Status</h3>
         <div className="mb-4">Current Status: <Badge className={badgeClass(adm.status)}>{adm.status}</Badge></div>
         {canManage ? (
           <>
+            <div className="mb-4 rounded-lg border border-gold-200 bg-gold-50 px-4 py-3">
+              <p className="text-xs font-semibold text-gold-800 mb-1">Reviewer next action</p>
+              <p className="text-sm text-gold-800">{suggestedAction}</p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => addNoteTemplate('Document check completed. All required files are present and readable.')}
+                  className="px-2.5 py-1 rounded-md text-xs border border-gold-300 bg-white text-gold-800 hover:bg-gold-100"
+                >
+                  + Add Doc Check Note
+                </button>
+                <button
+                  type="button"
+                  onClick={() => addNoteTemplate('Missing requirement follow-up sent to applicant. Awaiting submission/compliance.')}
+                  className="px-2.5 py-1 rounded-md text-xs border border-gold-300 bg-white text-gold-800 hover:bg-gold-100"
+                >
+                  + Add Follow-up Note
+                </button>
+                <button
+                  type="button"
+                  onClick={() => addNoteTemplate('Decision rationale: Applicant meets evaluation criteria based on records and screening results.')}
+                  className="px-2.5 py-1 rounded-md text-xs border border-gold-300 bg-white text-gold-800 hover:bg-gold-100"
+                >
+                  + Add Decision Note
+                </button>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-xl mb-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Update Status</label>
@@ -202,7 +250,7 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
               </div>
             </div>
             <div className="flex gap-3">
-              <button onClick={saveStatus} disabled={saving} className="bg-forest-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-forest-600 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5">{saving ? <><Icon name="spinner" className="w-4 h-4 animate-spin" /> Saving…</> : <><Icon name="check" className="w-4 h-4" /> Save Changes</>}</button>
+              <button onClick={saveStatus} disabled={saving} className="bg-forest-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-forest-600 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5">{saving ? <><Icon name="spinner" className="w-4 h-4 animate-spin" /> Saving...</> : <><Icon name="check" className="w-4 h-4" /> Save Changes</>}</button>
               <button onClick={onBack} className="border border-gray-300 text-gray-700 px-5 py-2 rounded-lg hover:bg-gray-50">Cancel</button>
             </div>
           </>

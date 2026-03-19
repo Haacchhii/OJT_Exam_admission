@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+﻿import { Link } from 'react-router-dom';
 import { getMyRegistrations, getExamSchedules, getExamForReview } from '../../api/exams';
 import { getMyResult, getSubmittedAnswers } from '../../api/results';
 import { PageHeader, SkeletonPage, ErrorAlert } from '../../components/UI';
@@ -83,7 +83,7 @@ export default function StudentResults() {
     return (
       <div>
         <PageHeader title="Exam Results" subtitle="View your entrance examination score and results." />
-        <div className="gk-card p-8 text-center">
+        <div className="gk-section-card p-8 text-center">
           <div className="w-14 h-14 rounded-2xl bg-forest-50 flex items-center justify-center mx-auto mb-3"><Icon name="chartBar" className="w-7 h-7 text-forest-500" /></div>
           <h3 className="font-bold text-forest-500 mb-1">No Results Yet</h3>
           <p className="text-gray-500 text-sm mb-4">{!myReg ? "You haven't registered for an exam yet." : 'Your exam results are not yet available.'}</p>
@@ -99,7 +99,7 @@ export default function StudentResults() {
     const esc = (s: unknown) => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     const printWin = window.open('', '_blank');
     if (!printWin || printWin.closed) {
-      showToast('Popup blocked — please allow popups for this site and try again.', 'error');
+      showToast('Popup blocked - please allow popups for this site and try again.', 'error');
       return;
     }
     const studentName = user ? `${esc(user.firstName)} ${esc(user.lastName)}` : 'Student';
@@ -123,19 +123,19 @@ export default function StudentResults() {
         @media print { body { padding: 20px; } }
       </style>
     </head><body>
-      <div class="logo"><span>🔑</span><h1><span style="color:#fbbf24">${SCHOOL_BRAND}</span><br/><span style="color:#166534">${SCHOOL_SUBTITLE}</span></h1><p class="subtitle">${SCHOOL_ADDRESS} &bull; Tel: ${SCHOOL_PHONE}<br/>Entrance Examination Result</p></div>
+      <div class="logo"><span>GK</span><h1><span style="color:#fbbf24">${SCHOOL_BRAND}</span><br/><span style="color:#166534">${SCHOOL_SUBTITLE}</span></h1><p class="subtitle">${SCHOOL_ADDRESS} | Tel: ${SCHOOL_PHONE}<br/>Entrance Examination Result</p></div>
       <h2>Student: ${studentName}</h2>
       <h2>Exam Results</h2>
       <div class="score-circle"><div class="pct ${passed ? 'passed' : 'failed'}">${myResult.percentage.toFixed(1)}%</div><p style="color:#888;font-size:13px">Overall Score</p></div>
       <div class="grid">
         <div class="field"><label>Exam</label><span>${esc(exam?.title || 'Entrance Exam')}</span></div>
         <div class="field"><label>Total Score</label><span>${myResult.totalScore} / ${myResult.maxPossible}</span></div>
-        <div class="field"><label>Passing Score</label><span>${exam?.passingScore || '—'}%</span></div>
+        <div class="field"><label>Passing Score</label><span>${exam?.passingScore || '-'}%</span></div>
         <div class="field"><label>Result</label><span class="result-badge ${passed ? 'passed' : 'failed'}">${passed ? 'PASSED' : 'FAILED'}</span></div>
         <div class="field"><label>Essay Review</label><span>${myResult.essayReviewed ? 'Reviewed' : 'Pending'}</span></div>
         <div class="field"><label>Date Taken</label><span>${myResult.createdAt ? new Date(myResult.createdAt).toLocaleDateString() : 'N/A'}</span></div>
       </div>
-      <p style="margin-top:40px;font-size:11px;color:#aaa;text-align:center">Printed on ${new Date().toLocaleDateString()} — ${SCHOOL_NAME} &copy; ${new Date().getFullYear()}</p>
+      <p style="margin-top:40px;font-size:11px;color:#aaa;text-align:center">Printed on ${new Date().toLocaleDateString()} - ${SCHOOL_NAME} &copy; ${new Date().getFullYear()}</p>
     </body></html>`);
     printWin.document.close();
     printWin.focus();
@@ -163,7 +163,7 @@ export default function StudentResults() {
           </div>
           <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
             <span className="text-gray-500">Total Score</span><span className="font-semibold">{myResult.totalScore} / {myResult.maxPossible}</span>
-            <span className="text-gray-500">Passing Score</span><span className="font-semibold">{exam?.passingScore || '—'}%</span>
+            <span className="text-gray-500">Passing Score</span><span className="font-semibold">{exam?.passingScore || '-'}%</span>
             <span className="text-gray-500">Date Taken</span><span className="font-semibold">{formatDate(myResult.createdAt)}</span>
             <span className="text-gray-500">Essay Review</span>
             <span>{myResult.essayReviewed
@@ -172,10 +172,32 @@ export default function StudentResults() {
             </span>
           </div>
         </div>
+
+        {passed && !myResult.essayReviewed && (
+          <div className="mt-4 rounded-lg border border-gold-200 bg-gold-50 px-4 py-3 text-sm text-gold-800">
+            <p className="font-semibold">Essay review in progress</p>
+            <p>Final essay checking usually takes 1-3 business days. You can return to this page to see updates.</p>
+          </div>
+        )}
+
+        {passed && (
+          <div className="mt-4 rounded-lg border border-forest-200 bg-white px-4 py-3 text-sm">
+            <p className="font-semibold text-forest-700">Next admission step</p>
+            <p className="text-gray-600 mb-2">Since you passed, proceed to admission submission or track your existing application.</p>
+            <div className="flex flex-wrap gap-2">
+              <Link to="/student/admission" className="inline-flex items-center gap-1.5 rounded-lg border border-forest-200 px-3 py-1.5 text-forest-700 hover:bg-forest-50">
+                <Icon name="admissions" className="w-4 h-4" /> My Admission
+              </Link>
+              <Link to="/student/track" className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-gray-700 hover:bg-gray-50">
+                <Icon name="search" className="w-4 h-4" /> Track Status
+              </Link>
+            </div>
+          </div>
+        )}
       </div>
 
       {exam && (
-        <div className="gk-card p-6">
+        <div className="gk-section-card p-6">
           <h3 className="text-lg font-bold text-forest-500 mb-4">Question Breakdown</h3>
           <div className="space-y-4">
             {exam.questions.map((q, i) => {
@@ -201,7 +223,7 @@ export default function StudentResults() {
                         const isSel = c.id === selectedId;
                         return (
                           <div key={c.id} className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg ${c.isCorrect ? 'bg-forest-100 text-forest-700 font-medium' : isSel && !c.isCorrect ? 'bg-red-100 text-red-700' : 'text-gray-600'}`}>
-                            {c.isCorrect ? '✓' : isSel ? '✗' : '○'} {c.choiceText}
+                            {c.isCorrect ? '[Correct]' : isSel ? '[Your Answer]' : '[ ]'} {c.choiceText}
                           </div>
                         );
                       })}
@@ -217,7 +239,7 @@ export default function StudentResults() {
                       <span className="font-bold text-sm text-gray-400">Q{i + 1}</span>
                       <div className="flex items-center gap-3 text-sm">
                         <span>{essay?.scored ? <><Icon name="documentText" className="w-4 h-4 inline" /> Scored</> : <><Icon name="clock" className="w-4 h-4 inline" /> Pending Review</>}</span>
-                        <span className="text-gray-400">{essay?.scored ? essay.pointsAwarded : '—'} / {q.points} pts</span>
+                        <span className="text-gray-400">{essay?.scored ? essay.pointsAwarded : '-'} / {q.points} pts</span>
                       </div>
                     </div>
                     <p className="text-forest-500 font-medium mb-3">{q.questionText}</p>

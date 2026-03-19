@@ -90,6 +90,7 @@ export default function DocumentReview({ admissionId, documents, onReviewUpdate 
       <div className="space-y-2">
         {documents.map((doc, i) => {
           const previewType = isPreviewable(doc.name);
+          const canOpenFile = !!doc.filePath && doc.id > 0;
           return (
             <div key={i} className="flex items-center justify-between bg-gray-50 px-3 py-2.5 rounded-lg text-sm">
               <span className="flex items-center gap-2 min-w-0">
@@ -97,16 +98,26 @@ export default function DocumentReview({ admissionId, documents, onReviewUpdate 
                 <span className="truncate">{doc.name}</span>
               </span>
               <div className="flex items-center gap-2 shrink-0 ml-2">
-                {doc.filePath && doc.id > 0 && (
+                {canOpenFile ? (
                   <>
-                    {previewType && (
+                    {previewType ? (
                       <button
                         onClick={() => handlePreview(doc)}
                         className="inline-flex items-center gap-1 text-forest-600 hover:text-forest-800 text-xs font-medium hover:underline"
-                        title="Preview document"
+                        title="View document"
                       >
-                        <Icon name="eye" className="w-3.5 h-3.5" /> Preview
+                        <Icon name="eye" className="w-3.5 h-3.5" /> View
                       </button>
+                    ) : (
+                      <a
+                        href={getPreviewSrc(doc)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-forest-600 hover:text-forest-800 text-xs font-medium hover:underline"
+                        title="View document"
+                      >
+                        <Icon name="eye" className="w-3.5 h-3.5" /> View
+                      </a>
                     )}
                     <a
                       href={getDocumentDownloadUrl(admissionId, doc.id)}
@@ -118,6 +129,8 @@ export default function DocumentReview({ admissionId, documents, onReviewUpdate 
                       Download
                     </a>
                   </>
+                ) : (
+                  <span className="text-xs text-gray-400">No file available</span>
                 )}
                 <span className="gk-badge gk-badge-submitted">
                   {doc.reviewStatus === 'accepted' ? '✓ Accepted' : doc.reviewStatus === 'rejected' ? '✗ Rejected' : 'Pending'}

@@ -103,11 +103,12 @@ export async function login(req, res, next) {
 export async function register(req, res, next) {
   try {
     const { firstName, lastName, email, password, gradeLevel } = req.body;
+    const normalizedEmail = String(email || '').trim().toLowerCase();
     if (!firstName || !lastName || !email || !password || !gradeLevel) {
       return res.status(400).json({ error: 'All fields are required', code: 'VALIDATION_ERROR' });
     }
     // Email format validation
-    if (!/^\S+@\S+\.\S+$/.test(email)) {
+    if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
       return res.status(400).json({ error: 'Invalid email format', code: 'VALIDATION_ERROR' });
     }
     // Password strength
@@ -117,8 +118,24 @@ export async function register(req, res, next) {
     }
 
     // Check duplicate
-    const existing = await prisma.user.findUnique({ where: { email } });
+    const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
     if (existing) {
+      if (!existing.deletedAt && !existing.emailVerified) {
+        const verifyToken = crypto.randomBytes(32).toString('hex');
+        await prisma.user.update({
+          where: { id: existing.id },
+          data: {
+            emailVerifyToken: verifyToken,
+            emailVerifyExpires: new Date(Date.now() + EMAIL_VERIFY_EXPIRY_MS),
+          },
+        });
+        sendVerificationEmail({ to: existing.email, firstName: existing.firstName, verifyToken });
+        return res.status(200).json({
+          ok: true,
+          emailVerificationRequired: true,
+          msg: 'This email is already registered but not verified. A new verification email has been sent.',
+        });
+      }
       return res.status(409).json({ error: 'Email already registered', code: 'CONFLICT' });
     }
 
@@ -126,7 +143,7 @@ export async function register(req, res, next) {
     const verifyToken = crypto.randomBytes(32).toString('hex');
     const user = await prisma.user.create({
       data: {
-        firstName, lastName, email, passwordHash,
+        firstName, lastName, email: normalizedEmail, passwordHash,
         role: ROLES.APPLICANT, status: 'Active',
         emailVerified: false,
         emailVerifyToken: verifyToken,
@@ -190,11 +207,12 @@ export async function verifyEmail(req, res, next) {
 export async function resendVerification(req, res, next) {
   try {
     const { email } = req.body;
+    const normalizedEmail = String(email || '').trim().toLowerCase();
     if (!email) {
       return res.status(400).json({ error: 'Email is required', code: 'VALIDATION_ERROR' });
     }
 
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
     // Always return success to prevent email enumeration
     if (!user || user.deletedAt || user.emailVerified) {
       return res.json({ ok: true, message: 'If an unverified account exists with this email, a verification link has been sent.' });

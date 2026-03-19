@@ -7,7 +7,7 @@ import { cached } from '../utils/cache.js';
 
 
 // Re-export schedule and registration controllers so routes/exams.js keeps working
-export { getSchedules, getAvailableSchedules, createSchedule, updateSchedule, deleteSchedule } from './examSchedules.js';
+export { getSchedules, getAvailableSchedules, createSchedule, updateSchedule, deleteSchedule, notifyNoSchedule } from './examSchedules.js';
 export { getRegistrations, getMyRegistrations, createRegistration, startExam, saveDraftAnswers } from './examRegistrations.js';
 
 // ═══════════════════════════════════════════════════════
@@ -88,7 +88,12 @@ export async function getExams(req, res, next) {
       ];
     }
 
-    const cacheKey = `exams:list:${JSON.stringify({ where, page: pg?.page || 1, limit: pg?.limit || null })}`;
+    const cacheKey = `exams:list:${JSON.stringify({
+      where,
+      role: req.user.role,
+      page: pg?.page || 1,
+      limit: pg?.limit || null,
+    })}`;
     const { exams, total } = await cached(cacheKey, async () => {
       const [rows, count] = await Promise.all([
         prisma.exam.findMany({ where, ...(pg && { skip: pg.skip, take: pg.take }), orderBy: { createdAt: 'desc' }, include: examListInclude }),

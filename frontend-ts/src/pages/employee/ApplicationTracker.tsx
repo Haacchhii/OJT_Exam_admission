@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { trackApplication } from '../../api/admissions';
 import { Badge } from '../../components/UI';
 import Icon from '../../components/Icons';
@@ -42,7 +42,7 @@ export default function ApplicationTracker() {
 
   return (
     <div>
-      <div className="gk-card p-6 mb-6">
+      <div className="gk-section-card p-6 mb-6">
         <h3 className="text-lg font-bold text-forest-500 mb-2 flex items-center gap-1.5"><Icon name="search" className="w-5 h-5" /> Track Application</h3>
         <p className="text-gray-500 text-sm mb-4">
           Enter the tracking ID to look up the status of an admission application or exam registration.
@@ -61,13 +61,13 @@ export default function ApplicationTracker() {
             disabled={loading || !trackingId.trim()}
             className="bg-forest-500 text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-forest-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm inline-flex items-center gap-1.5"
           >
-            {loading ? <><Icon name="spinner" className="w-4 h-4 animate-spin" /> Searching…</> : <><Icon name="search" className="w-4 h-4" /> Search</>}
+            {loading ? <><Icon name="spinner" className="w-4 h-4 animate-spin" /> Searching...</> : <><Icon name="search" className="w-4 h-4" /> Search</>}
           </button>
         </form>
       </div>
 
       {error && (
-        <div className="gk-card p-6 text-center">
+        <div className="gk-section-card p-6 text-center">
           <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3"><Icon name="search" className="w-7 h-7 text-gray-400" /></div>
           <h3 className="font-bold text-red-500 mb-1">Not Found</h3>
           <p className="text-gray-500 text-sm">{error}</p>
@@ -84,7 +84,7 @@ function AdmissionResult({ data, trackingId }: { data: Record<string, any>; trac
   const statusOrder: Record<string, number> = { 'Submitted': 0, 'Under Screening': 1, 'Under Evaluation': 2, 'Accepted': 3, 'Rejected': -1 };
 
   return (
-    <div className="gk-card p-6">
+    <div className="gk-section-card p-6">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-lg font-bold text-forest-500">Admission Application</h3>
@@ -120,7 +120,7 @@ function AdmissionResult({ data, trackingId }: { data: Record<string, any>; trac
                 isRejected && step === data.status ? 'bg-red-100 text-red-700' :
                 isActive && !isRejected ? 'bg-forest-100 text-forest-700' : 'bg-gray-100 text-gray-400'
               }`}>
-                {isActive && !isRejected ? <Icon name="checkCircle" className="w-3.5 h-3.5 inline" /> : isRejected && i === 0 ? <Icon name="xCircle" className="w-3.5 h-3.5 inline" /> : '○'} {step}
+                {isActive && !isRejected ? <Icon name="checkCircle" className="w-3.5 h-3.5 inline" /> : isRejected && i === 0 ? <Icon name="xCircle" className="w-3.5 h-3.5 inline" /> : 'o'} {step}
               </div>
             </div>
           );
@@ -155,7 +155,7 @@ function ExamResult({ data, trackingId }: { data: Record<string, any>; trackingI
   const result = data.result;
 
   return (
-    <div className="gk-card p-6">
+    <div className="gk-section-card p-6">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-lg font-bold text-forest-500">Exam Registration</h3>

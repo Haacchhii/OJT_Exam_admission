@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useConfirm } from './ConfirmDialog';
@@ -17,6 +16,7 @@ const studentLinks: LinkItem[] = [
   { to: '/student', icon: 'dashboard', label: 'Dashboard', end: true },
   { to: '/student/exam', icon: 'exam', label: 'Online Exam' },
   { to: '/student/admission', icon: 'admissions', label: 'My Admission' },
+  { to: '/student/track', icon: 'search', label: 'Track Application' },
   { to: '/student/results', icon: 'trophy', label: 'My Results' },
 ];
 
@@ -52,12 +52,6 @@ export default function Sidebar({ open, onClose, role, collapsed, onToggleCollap
   const roleBadgeShort = isEmployee
     ? (roleLabel === 'Administrator' ? 'AD' : roleLabel === 'Registrar' ? 'RG' : roleLabel === 'Teacher' ? 'TC' : 'EM')
     : 'ST';
-
-  const [dark, setDark] = useState(() => document.documentElement.classList.contains('dark'));
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', dark);
-    try { localStorage.setItem('gk_dark', dark ? '1' : '0'); } catch { /* ignore */ }
-  }, [dark]);
 
   return (
     <>
@@ -133,15 +127,6 @@ export default function Sidebar({ open, onClose, role, collapsed, onToggleCollap
 
           {/* Footer */}
           <div className={`border-t border-forest-700/40 ${collapsed ? 'lg:flex lg:flex-col lg:items-center lg:p-3' : 'p-4'}`}>
-            <button
-              onClick={() => setDark(d => !d)}
-              className={`group flex items-center gap-2.5 text-sm w-full px-3 py-2 rounded-lg text-forest-300 hover:text-white hover:bg-forest-700/50 transition-colors duration-150 mb-1 ${collapsed ? 'lg:justify-center lg:px-0' : ''}`}
-              title={collapsed ? (dark ? 'Light mode' : 'Dark mode') : undefined}
-              aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
-            >
-              <Icon name={dark ? 'sun' : 'moon'} className="w-[18px] h-[18px] shrink-0" />
-              <span className={`font-medium ${collapsed ? 'lg:hidden' : ''}`}>{dark ? 'Light mode' : 'Dark mode'}</span>
-            </button>
             <button
               onClick={async () => {
                 const ok = await confirm({ title: 'Log Out', message: 'Are you sure you want to log out?', confirmLabel: 'Log Out', variant: 'warning' });

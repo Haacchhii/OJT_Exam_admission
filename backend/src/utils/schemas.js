@@ -178,6 +178,11 @@ export const registrationsQuerySchema = z.object({
   status: z.enum(['scheduled', 'started', 'done']).optional(),
 });
 
+export const createRegistrationSchema = z.object({
+  userEmail: z.string().email().optional(),
+  scheduleId: z.number().int().positive(),
+});
+
 export const resultsQuerySchema = z.object({
   ...paginationQuery,
   passed: z.enum(['true', 'false']).optional(),

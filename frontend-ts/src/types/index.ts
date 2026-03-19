@@ -37,8 +37,10 @@ export interface User {
 }
 
 export interface AuthResponse {
-  user: User;
-  token: string;
+  user?: User;
+  token?: string;
+  msg?: string;
+  emailVerificationRequired?: boolean;
 }
 
 // ─── Admissions ──────────────────────────────────────

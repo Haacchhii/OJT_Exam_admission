@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+﻿import { useState, useMemo } from 'react';
 import { useAsync } from '../../hooks/useAsync';
 import { getUsers, addUser, updateUser, deleteUser, getUserByEmail, bulkDeleteUsers } from '../../api/users';
 import { useAuth } from '../../context/AuthContext';
@@ -110,7 +110,7 @@ export default function EmployeeUsers() {
           successCount++;
         } catch (e) {}
       }
-      showToast(`Successfully imported  users!`, 'success');
+      showToast(`Successfully imported ${successCount} user(s)!`, successCount > 0 ? 'success' : 'warning');
       refetch();
     } finally {
       setSaving(false);
@@ -240,7 +240,7 @@ export default function EmployeeUsers() {
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
-        <input value={search} onChange={e => { setSearch(e.target.value); resetPage(); }} placeholder="Search users…" aria-label="Search users" className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-forest-500/20 outline-none" />
+        <input value={search} onChange={e => { setSearch(e.target.value); resetPage(); }} placeholder="Search users..." aria-label="Search users" className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-forest-500/20 outline-none" />
         <select value={roleFilter} onChange={e => { setRoleFilter(e.target.value); resetPage(); }} aria-label="Filter by role" className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-forest-500/20 outline-none">
           <option value="all">All Roles</option>
           {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
@@ -255,11 +255,11 @@ export default function EmployeeUsers() {
       {paginated.length > 0 ? (
         <>
         <BulkActionBar count={selectedCount} onDelete={handleBulkDelete} onClear={clearSelection} deleting={bulkDeleting} />
-        <div className="gk-card table-scroll">
+        <div className="gk-section-card table-scroll">
           <table className="w-full text-sm">
             <thead><tr className="border-b border-gray-200 text-left text-gray-400 uppercase text-xs bg-gray-50/95 sticky top-0 z-10 backdrop-blur-sm">
               <th scope="col" className="py-3 px-2 w-8"><input type="checkbox" checked={isAllSelected(paginated)} onChange={() => togglePage(paginated)} className="accent-forest-500 rounded" aria-label="Select all users" /></th>
-              <th scope="col" className="py-3 px-4">Name</th><th scope="col" className="py-3 px-4">Email</th><th scope="col" className="py-3 px-4">Role</th><th scope="col" className="py-3 px-4">Grade Level</th><th scope="col" className="py-3 px-4">Status</th><th scope="col" className="py-3 px-4 text-right">Actions</th>
+              <th scope="col" className="py-3 px-4">Name</th><th scope="col" className="py-3 px-4">Email</th><th scope="col" className="py-3 px-4">Role</th><th scope="col" className="py-3 px-4">Status</th><th scope="col" className="py-3 px-4 text-right">Actions</th>
             </tr></thead>
             <tbody>
               {paginated.map(u => (
@@ -268,7 +268,6 @@ export default function EmployeeUsers() {
                   <td className="py-3 px-4 font-medium text-forest-500">{u.firstName} {u.lastName}</td>
                   <td className="py-3 px-4 text-gray-500">{u.email}</td>
                   <td className="py-3 px-4"><Badge variant="info">{roleLabel(u.role)}</Badge></td>
-                  <td className="py-3 px-4 text-gray-500 text-xs">{u.applicantProfile?.gradeLevel || '—'}</td>
                   <td className="py-3 px-4"><Badge variant={u.status === 'Active' ? 'success' : 'danger'}>{u.status}</Badge></td>
                   <td className="py-3 px-4 text-right space-x-1">
                     <button onClick={() => openEdit(u)} className="text-forest-500 hover:bg-forest-50 px-2 py-1 rounded text-xs font-medium inline-flex items-center gap-0.5"><Icon name="edit" className="w-3.5 h-3.5" /> Edit</button>
@@ -329,7 +328,7 @@ export default function EmployeeUsers() {
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <button onClick={() => setShowModal(false)} className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>
-            <button onClick={handleSave} disabled={saving} className="px-4 py-2 text-sm bg-forest-500 text-white rounded-lg font-semibold hover:bg-forest-600 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5">{saving ? <><Icon name="spinner" className="w-4 h-4 animate-spin" /> Saving…</> : (editId ? 'Save Changes' : 'Add User')}</button>
+            <button onClick={handleSave} disabled={saving} className="px-4 py-2 text-sm bg-forest-500 text-white rounded-lg font-semibold hover:bg-forest-600 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5">{saving ? <><Icon name="spinner" className="w-4 h-4 animate-spin" /> Saving...</> : (editId ? 'Save Changes' : 'Add User')}</button>
           </div>
         </div>
       </Modal>

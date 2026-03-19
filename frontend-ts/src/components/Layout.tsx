@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Outlet, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useSocket } from '../context/SocketContext';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import Breadcrumbs from './Breadcrumbs';
 import { KeyboardShortcutsProvider } from './KeyboardShortcuts';
+import { showToast } from './Toast';
 
 const SIDEBAR_KEY = 'gk_sidebar_collapsed';
 function useSidebarCollapsed(): [boolean, React.Dispatch<React.SetStateAction<boolean>>] {
@@ -17,9 +19,23 @@ function useSidebarCollapsed(): [boolean, React.Dispatch<React.SetStateAction<bo
 
 export function StudentLayout() {
   const { user } = useAuth();
+  const { socket, isConnected } = useSocket();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useSidebarCollapsed();
+
+  useEffect(() => {
+    if (!socket || !isConnected) return;
+    const handleAdmissionStatus = (payload: { status?: string; trackingId?: string }) => {
+      const statusLabel = payload?.status || 'updated';
+      const trackingLabel = payload?.trackingId ? ` (${payload.trackingId})` : '';
+      showToast(`Admission status ${statusLabel}${trackingLabel}. Check Track Application for details.`, 'info');
+    };
+    socket.on('admission_status_updated', handleAdmissionStatus);
+    return () => {
+      socket.off('admission_status_updated', handleAdmissionStatus);
+    };
+  }, [socket, isConnected]);
 
   if (!user) return <Navigate to="/login" replace />;
   if (user.role !== 'applicant') return <Navigate to="/employee" replace />;
@@ -31,9 +47,11 @@ export function StudentLayout() {
         <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} role="student" collapsed={collapsed} onToggleCollapse={() => setCollapsed(c => !c)} />
         <div className={`transition-all duration-300 ${collapsed ? 'lg:ml-[72px]' : 'lg:ml-[270px]'}`}>
           <Topbar title="Student Portal" onMenuToggle={() => setSidebarOpen(o => !o)} userId={user.id} user={user} />
-          <main id="main-content" className="p-4 lg:p-8" role="main" aria-label="Student portal content">
+          <main id="main-content" className="pt-20 pb-10 px-4 sm:px-6 lg:px-8" role="main" aria-label="Student portal content">
             <Breadcrumbs />
-            <Outlet />
+            <div className="w-full mx-auto max-w-screen-2xl">
+              <Outlet />
+            </div>
           </main>
         </div>
       </div>
@@ -64,9 +82,11 @@ export function EmployeeLayout() {
         <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} role="employee" collapsed={collapsed} onToggleCollapse={() => setCollapsed(c => !c)} />
         <div className={`transition-all duration-300 ${collapsed ? 'lg:ml-[72px]' : 'lg:ml-[270px]'}`}>
           <Topbar title={portalTitle} onMenuToggle={() => setSidebarOpen(o => !o)} userId={user.id} user={user} />
-          <main id="main-content" className="p-4 lg:p-8" role="main" aria-label="Employee portal content">
+          <main id="main-content" className="pt-20 pb-10 px-4 sm:px-6 lg:px-8" role="main" aria-label="Employee portal content">
             <Breadcrumbs />
-            <Outlet />
+            <div className="w-full mx-auto max-w-screen-2xl">
+              <Outlet />
+            </div>
           </main>
         </div>
       </div>

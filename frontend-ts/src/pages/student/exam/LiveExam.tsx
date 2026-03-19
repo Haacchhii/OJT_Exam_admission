@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+﻿import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { submitExamAnswers } from '../../../api/results';
 import { saveDraftAnswers } from '../../../api/exams';
@@ -91,11 +91,11 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
         setCheatFlags(prev => {
           const next = prev + 1;
           if (next >= 5) {
-            doSubmitRef.current('⚠️ Exam Auto-Submitted', 'Your exam was automatically submitted due to multiple tab switches.');
+            doSubmitRef.current('Warning: Exam Auto-Submitted', 'Your exam was automatically submitted due to multiple tab switches.');
           } else if (next === 4) {
-            showToast('⚠️ Final warning! One more tab switch and your exam will be auto-submitted.', 'error');
+            showToast('Final warning! One more tab switch and your exam will be auto-submitted.', 'error');
           } else if (next === 3) {
-            showToast('⚠️ Warning: You have switched tabs 3 times. 2 more and your exam will be auto-submitted.', 'error');
+            showToast('Warning: You have switched tabs 3 times. 2 more and your exam will be auto-submitted.', 'error');
           } else {
             showToast(`Tab switch detected (${next}/5). Please stay on this page.`, 'error');
           }
@@ -145,7 +145,7 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
       <div className="bg-white border-b border-gray-200 sticky top-0 z-50 px-4 py-3">
         {!isOnline && (
           <div className="bg-yellow-100 border-b border-yellow-300 text-yellow-800 text-sm px-4 py-2 font-semibold text-center mb-2 rounded-md">
-            ⚠️ You are Offline. Please do not submit the exam or refresh the page until your connection is restored.
+            Warning: You are offline. Please do not submit the exam or refresh the page until your connection is restored.
           </div>
         )}
         <div className="flex items-center justify-between mb-2">
@@ -168,7 +168,7 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
       </div>
 
       <div id="exam-content" className="max-w-3xl mx-auto p-4">
-        <div className="gk-card p-6 mb-4">
+        <div className="gk-section-card p-6 mb-4">
           <div className="flex items-center gap-3 mb-4">
             <span className="text-sm font-bold text-gray-400">Question {currentQ + 1} of {questions.length}</span>
             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${q.questionType === 'mc' ? 'bg-forest-100 text-forest-700' : 'bg-gold-100 text-gold-700'}`}>

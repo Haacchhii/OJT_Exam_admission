@@ -1,4 +1,4 @@
-import DocumentReview from '../../../components/DocumentReview';
+﻿import DocumentReview from '../../../components/DocumentReview';
 import { PageHeader, Badge } from '../../../components/UI';
 import Icon from '../../../components/Icons';
 import { Detail } from './AdmissionFormFields';
@@ -30,7 +30,7 @@ export default function ExistingApplication({ existingApp, onNewApplication }: P
   return (
     <div>
       <PageHeader title="Admission Application" subtitle="Track your admission progress below." />
-      <div className="gk-card p-6">
+      <div className="gk-section-card p-6">
         <h3 className="text-lg font-bold text-forest-500 mb-4">Your Submitted Application</h3>
         {existingApp.status !== 'Rejected' && (
           <div className="mb-6">
@@ -39,7 +39,7 @@ export default function ExistingApplication({ existingApp, onNewApplication }: P
               {statusSteps.map((s, i) => (
                 <div key={s} className="flex items-center gap-1">
                   <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${i <= currentIdx ? 'bg-forest-100 text-forest-700' : 'bg-gray-100 text-gray-400'}`}>
-                    <span className="w-4 h-4 flex items-center justify-center rounded-full bg-white/50 text-[10px] font-bold">{i <= currentIdx ? '✓' : i + 1}</span>
+                    <span className="w-4 h-4 flex items-center justify-center rounded-full bg-white/50 text-[10px] font-bold">{i <= currentIdx ? 'OK' : i + 1}</span>
                     <span className="hidden sm:inline">{s}</span>
                   </div>
                   {i < statusSteps.length - 1 && <div className={`w-6 h-0.5 ${i < currentIdx ? 'bg-forest-400' : 'bg-gray-200'}`} />}
@@ -107,13 +107,13 @@ export default function ExistingApplication({ existingApp, onNewApplication }: P
             <h4 className="font-bold text-forest-700 mb-3 flex items-center gap-2"><Icon name="trophy" className="w-5 h-5 text-gold-500" /> Congratulations! Your application has been accepted.</h4>
             <p className="text-sm text-forest-600 mb-3">Here are the next steps to complete your enrollment:</p>
             <ol className="list-decimal list-inside space-y-2 text-sm text-forest-600">
-              <li><strong>Visit the Registrar's Office</strong> — Bring original documents for verification (Birth Certificate, Report Card, Good Moral Certificate).</li>
-              <li><strong>Pay the enrollment/reservation fee</strong> — Secure your slot by paying at the school cashier or through the designated payment channels.</li>
-              <li><strong>Attend the orientation</strong> — Check your email or the school bulletin for the scheduled orientation date for new students and parents.</li>
-              <li><strong>Complete enrollment forms</strong> — Fill out the official Student Enrollment Form, Medical Form, and Emergency Contact Form at the Registrar's Office.</li>
-              <li><strong>Receive your student ID and class schedule</strong> — These will be provided on or before the first day of classes.</li>
+              <li><strong>Visit the Registrar's Office</strong> - Bring original documents for verification (Birth Certificate, Report Card, Good Moral Certificate).</li>
+              <li><strong>Pay the enrollment/reservation fee</strong> - Secure your slot by paying at the school cashier or through the designated payment channels.</li>
+              <li><strong>Attend the orientation</strong> - Check your email or the school bulletin for the scheduled orientation date for new students and parents.</li>
+              <li><strong>Complete enrollment forms</strong> - Fill out the official Student Enrollment Form, Medical Form, and Emergency Contact Form at the Registrar's Office.</li>
+              <li><strong>Receive your student ID and class schedule</strong> - These will be provided on or before the first day of classes.</li>
             </ol>
-            <p className="text-xs text-gray-400 mt-3">For questions, contact the Registrar's Office at {SCHOOL_PHONE} or visit in person during office hours (Mon–Fri, 8AM–5PM).</p>
+            <p className="text-xs text-gray-400 mt-3">For questions, contact the Registrar's Office at {SCHOOL_PHONE} or visit in person during office hours (Mon-Fri, 8AM-5PM).</p>
           </div>
         ) : (
           <p className="mt-4 text-sm text-gray-400">You can only have one active application at a time.</p>

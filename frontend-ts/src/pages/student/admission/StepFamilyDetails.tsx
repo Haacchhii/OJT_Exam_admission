@@ -1,4 +1,4 @@
-import type { ChangeEvent } from 'react';
+﻿import type { ChangeEvent } from 'react';
 import Icon from '../../../components/Icons';
 import { Input } from './AdmissionFormFields';
 import type { AdmissionForm } from './useAdmissionWizard';
@@ -12,7 +12,7 @@ interface Props {
 
 export default function StepFamilyDetails({ form, set, goTo, errors = {} }: Props) {
   return (
-    <div className="gk-card p-6">
+    <div className="gk-section-card p-6">
       <h3 className="text-lg font-bold text-forest-500 mb-1">Step 3: Family Details</h3>
       <p className="text-gray-500 text-sm mb-6">Provide information about the student&apos;s parents or guardian.</p>
       <h4 className="font-semibold text-forest-500 mb-3 flex items-center gap-1.5"><Icon name="users" className="w-4 h-4" /> Parent Information</h4>
@@ -47,8 +47,8 @@ export default function StepFamilyDetails({ form, set, goTo, errors = {} }: Prop
         </div>
       </div>
       <div className="flex justify-between">
-        <button onClick={() => goTo(2)} className="border border-gray-300 text-gray-700 px-5 py-2.5 rounded-lg hover:bg-gray-50">← Back</button>
-        <button onClick={() => goTo(4)} className="bg-gradient-to-r from-forest-500 to-forest-400 text-white px-6 py-2.5 rounded-lg font-semibold hover:from-gold-500 hover:to-gold-600">Next: Documents →</button>
+        <button onClick={() => goTo(2)} className="border border-gray-300 text-gray-700 px-5 py-2.5 rounded-lg hover:bg-gray-50">Back</button>
+        <button onClick={() => goTo(4)} className="bg-gradient-to-r from-forest-500 to-forest-400 text-white px-6 py-2.5 rounded-lg font-semibold hover:from-gold-500 hover:to-gold-600">Next: Documents</button>
       </div>
     </div>
   );

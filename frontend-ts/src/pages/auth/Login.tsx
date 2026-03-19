@@ -124,22 +124,17 @@ export default function Login() {
             </Link>
           </div>
 
-          {/* Stats */}
-          <div className="flex gap-6 pt-1">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-gold-400">500+</div>
-              <div className="text-xs text-white/40">Students</div>
-            </div>
-            <div className="w-px bg-white/10" />
-            <div className="text-center">
-              <div className="text-2xl font-bold text-gold-400">50+</div>
-              <div className="text-xs text-white/40">Teachers</div>
-            </div>
-            <div className="w-px bg-white/10" />
-            <div className="text-center">
-              <div className="text-2xl font-bold text-gold-400">98%</div>
-              <div className="text-xs text-white/40">Pass Rate</div>
-            </div>
+          {/* Platform Highlights */}
+          <div className="flex flex-wrap gap-2 pt-1">
+            <span className="inline-flex items-center gap-1.5 text-xs text-gold-200 bg-white/10 border border-white/15 rounded-full px-3 py-1.5">
+              <Icon name="checkCircle" className="w-3.5 h-3.5" /> Online Application Tracking
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-xs text-gold-200 bg-white/10 border border-white/15 rounded-full px-3 py-1.5">
+              <Icon name="checkCircle" className="w-3.5 h-3.5" /> Entrance Exam Scheduling
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-xs text-gold-200 bg-white/10 border border-white/15 rounded-full px-3 py-1.5">
+              <Icon name="checkCircle" className="w-3.5 h-3.5" /> Real-time Status Updates
+            </span>
           </div>
         </div>
 

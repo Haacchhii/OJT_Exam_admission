@@ -1,5 +1,5 @@
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { lazy, Suspense, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, type ReactNode } from 'react';
 import { AuthProvider, ROLE_PERMISSIONS, type Permission } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 import { ToastContainer } from './components/Toast';
@@ -17,12 +17,14 @@ import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import ForgotPassword from './pages/auth/ForgotPassword';
 import ResetPassword from './pages/auth/ResetPassword';
+import VerifyEmail from './pages/auth/VerifyEmail';
 
 /* Student pages (lazy) */
 const StudentDashboard = lazy(() => import('./pages/student/Dashboard'));
 const StudentAdmission = lazy(() => import('./pages/student/Admission'));
 const StudentExam = lazy(() => import('./pages/student/Exam'));
 const StudentResults = lazy(() => import('./pages/student/Results'));
+const StudentApplicationTracker = lazy(() => import('./pages/student/ApplicationTracker'));
 
 /* Employee pages (lazy) */
 const EmployeeDashboard = lazy(() => import('./pages/employee/Dashboard'));
@@ -54,6 +56,16 @@ function StudentGuard({ children }: { children: ReactNode }) {
 }
 
 export default function App() {
+  useEffect(() => {
+    // Dark mode has been removed; clear any stale class or persisted flag.
+    try {
+      document.documentElement.classList.remove('dark');
+      localStorage.removeItem('gk_dark');
+    } catch {
+      // Ignore storage access issues
+    }
+  }, []);
+
   return (
     <ErrorBoundary>
     <AuthProvider>
@@ -68,12 +80,14 @@ export default function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="verify-email" element={<VerifyEmail />} />
 
           {/* Student routes */}
           <Route path="/student" element={<StudentGuard><StudentLayout /></StudentGuard>}>
             <Route index element={<PageErrorBoundary pageName="Dashboard"><StudentDashboard /></PageErrorBoundary>} />
             <Route path="dashboard" element={<PageErrorBoundary pageName="Dashboard"><StudentDashboard /></PageErrorBoundary>} />
             <Route path="admission" element={<PageErrorBoundary pageName="Admission"><StudentAdmission /></PageErrorBoundary>} />
+            <Route path="track" element={<PageErrorBoundary pageName="Track Application"><StudentApplicationTracker /></PageErrorBoundary>} />
             <Route path="exam" element={<PageErrorBoundary pageName="Exam"><StudentExam /></PageErrorBoundary>} />
             <Route path="results" element={<PageErrorBoundary pageName="Results"><StudentResults /></PageErrorBoundary>} />
             <Route path="profile" element={<PageErrorBoundary pageName="Profile"><Profile /></PageErrorBoundary>} />

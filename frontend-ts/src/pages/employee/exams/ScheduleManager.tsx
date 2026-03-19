@@ -1,4 +1,4 @@
-import { useState, useMemo, type ChangeEvent, type FormEvent } from 'react';
+﻿import { useState, useMemo, type ChangeEvent, type FormEvent } from 'react';
 import { useAsync } from '../../../hooks/useAsync';
 import { getExams, getExamSchedules, addExamSchedule, updateExamSchedule, deleteExamSchedule } from '../../../api/exams';
 import { showToast } from '../../../components/Toast';
@@ -10,6 +10,14 @@ import { FormInput } from './ExamComponents';
 import type { Exam, ExamSchedule } from '../../../types';
 
 const SCHED_PER_PAGE = 8;
+
+function getTodayLocalIso() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 export default function ScheduleManager() {
   const confirm = useConfirm();
@@ -60,7 +68,7 @@ export default function ScheduleManager() {
       return;
     }
     if (form.date) {
-      const today = new Date().toISOString().split('T')[0];
+      const today = getTodayLocalIso();
       if (form.date < today) {
         showToast('Schedule date cannot be in the past.', 'error');
         return;
@@ -83,12 +91,12 @@ export default function ScheduleManager() {
   const editSched = (s: ExamSchedule) => { setEditId(s.id); setForm({ examId: String(s.examId), date: s.scheduledDate, start: s.startTime, end: s.endTime, slots: String(s.maxSlots) }); };
 
   if (schedLoading) return <SkeletonPage />;
-  if (schedError) return <div className="gk-card p-8 text-center"><p className="text-red-600 font-medium">Failed to load schedules.</p><button onClick={schedRefetch} className="mt-2 text-forest-500 underline text-sm">Retry</button></div>;
+  if (schedError) return <div className="gk-section-card p-8 text-center"><p className="text-red-600 font-medium">Failed to load schedules.</p><button onClick={schedRefetch} className="mt-2 text-forest-500 underline text-sm">Retry</button></div>;
 
   return (
     <div>
       <PageHeader title="Exam Schedules" subtitle="Create and manage exam date/time slots." />
-      <div className="gk-card p-6 mb-6">
+      <div className="gk-section-card p-6 mb-6">
         <h3 className="text-lg font-bold text-forest-500 mb-4">{editId ? 'Edit Schedule' : 'Add New Schedule'}</h3>
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
@@ -104,16 +112,16 @@ export default function ScheduleManager() {
           <FormInput label="Max Applicants" type="number" value={form.slots} onChange={set('slots')} placeholder="30" required />
           <div className="flex items-end">
             <button type="submit" disabled={isSavingSched} className="bg-forest-500 text-white px-5 py-2.5 rounded-lg font-semibold hover:bg-forest-600 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-2">
-              {isSavingSched ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Saving…</> : (editId ? 'Update Schedule' : 'Add Schedule')}
+              {isSavingSched ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Saving...</> : (editId ? 'Update Schedule' : 'Add Schedule')}
             </button>
           </div>
         </form>
       </div>
 
-      <div className="gk-card p-6">
+      <div className="gk-section-card p-6">
         <h3 className="text-lg font-bold text-forest-500 mb-4">Current Schedules</h3>
         <div className="flex flex-col sm:flex-row gap-3 mb-4">
-          <input value={schedSearch} onChange={e => { setSchedSearch(e.target.value); resetSchedPage(); }} placeholder="Search by exam or date…" className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm" />
+          <input value={schedSearch} onChange={e => { setSchedSearch(e.target.value); resetSchedPage(); }} placeholder="Search by exam or date..." className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm" />
           <select value={schedExamFilter} onChange={e => { setSchedExamFilter(e.target.value); resetSchedPage(); }} className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
             <option value="all">All Exams</option>
             {exams.map(e => <option key={e.id} value={String(e.id)}>{e.title}</option>)}

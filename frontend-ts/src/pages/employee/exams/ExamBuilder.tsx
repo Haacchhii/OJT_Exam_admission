@@ -1,4 +1,4 @@
-import { useState, useEffect, type ChangeEvent, type DragEvent } from 'react';
+﻿import { useState, useEffect, type ChangeEvent, type DragEvent } from 'react';
 import { useAsync } from '../../../hooks/useAsync';
 import { addExam, updateExam, getExam } from '../../../api/exams';
 import { getAcademicYears, getSemesters } from '../../../api/academicYears';
@@ -221,7 +221,7 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
   return (
     <div>
       <PageHeader title={editExam ? 'Edit Exam' : 'Create New Exam'} subtitle="Set up exam details and add questions manually or upload a file." />
-      <div className="gk-card p-6 mb-4">
+      <div className="gk-section-card p-6 mb-4">
         <h3 className="text-lg font-bold text-forest-500 mb-4">Exam Details</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormInput label="Exam Title" value={title} onChange={(e: ChangeEvent<HTMLInputElement>) => setTitle(e.target.value)} placeholder="e.g. Entrance Exam - Grade 7" />
@@ -259,16 +259,16 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
       </div>
 
       {/* Upload Questionnaire Section */}
-      <div className="gk-card p-6 mb-4">
+      <div className="gk-section-card p-6 mb-4">
         <div className="flex items-center justify-between mb-3">
           <div>
             <h3 className="text-lg font-bold text-forest-500 flex items-center gap-1.5"><Icon name="upload" className="w-5 h-5" /> Upload Questionnaire</h3>
             <p className="text-gray-500 text-sm mt-0.5">Import questions from a CSV, Excel, or JSON file to quickly build your exam.</p>
           </div>
           <div className="flex gap-2">
-            <button onClick={() => downloadTemplate('csv')} className="text-xs border border-gray-300 text-gray-600 px-2.5 py-1.5 rounded-lg hover:bg-gray-50 flex items-center gap-1"><Icon name="document" className="w-3.5 h-3.5" /> CSV</button>
-            <button onClick={() => downloadTemplate('excel')} className="text-xs border border-forest-300 text-forest-700 bg-forest-50 px-2.5 py-1.5 rounded-lg hover:bg-forest-100 flex items-center gap-1"><Icon name="document" className="w-3.5 h-3.5" /> Excel</button>
-            <button onClick={() => downloadTemplate('json')} className="text-xs border border-gray-300 text-gray-600 px-2.5 py-1.5 rounded-lg hover:bg-gray-50 flex items-center gap-1"><Icon name="document" className="w-3.5 h-3.5" /> JSON</button>
+            <button onClick={() => downloadTemplate('csv')} className="text-xs border border-gray-300 text-gray-600 px-2.5 py-1.5 rounded-lg hover:bg-gray-50 flex items-center gap-1 font-medium" title="Download a sample CSV file to use as a template"><Icon name="document" className="w-3.5 h-3.5" /> CSV Sample</button>
+            <button onClick={() => downloadTemplate('excel')} className="text-xs border border-forest-300 text-forest-700 bg-forest-50 px-2.5 py-1.5 rounded-lg hover:bg-forest-100 flex items-center gap-1 font-medium" title="Download a sample Excel file to use as a template"><Icon name="document" className="w-3.5 h-3.5" /> Excel Sample</button>
+            <button onClick={() => downloadTemplate('json')} className="text-xs border border-gray-300 text-gray-600 px-2.5 py-1.5 rounded-lg hover:bg-gray-50 flex items-center gap-1 font-medium" title="Download a sample JSON file to use as a template"><Icon name="document" className="w-3.5 h-3.5" /> JSON Sample</button>
           </div>
         </div>
 
@@ -282,16 +282,18 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
           <div className="text-3xl mb-2"><Icon name="upload" className="w-8 h-8 text-gray-400 mx-auto" /></div>
           <p className="text-gray-600 font-medium">Drag & drop your questionnaire file here</p>
           <p className="text-gray-400 text-sm mt-1">or <span className="text-forest-500 font-medium underline">click to browse</span></p>
-          <p className="text-xs text-gray-400 mt-2">Supported: .xlsx (Excel) · .csv · .json</p>
+          <p className="text-xs text-gray-400 mt-2">Supported: .xlsx (Excel) | .csv | .json</p>
         </div>
         <input id="questionnaire-upload" type="file" accept=".csv,.json,.xlsx,.xls" className="hidden" onChange={e => { if (e.target.files?.[0]) handleUploadFile(e.target.files[0]); e.target.value = ''; }} />
 
-        <details className="mt-4 group">
-          <summary className="text-sm text-forest-500 font-medium cursor-pointer hover:underline select-none flex items-center gap-1"><Icon name="info" className="w-4 h-4" /> How to format your file</summary>
-          <div className="mt-3 grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <details className="mt-4 group border border-amber-200 rounded-lg p-4 bg-amber-50">
+          <summary className="text-sm text-amber-800 font-bold cursor-pointer select-none flex items-center gap-2"><Icon name="info" className="w-4 h-4" /> 📋 Format Guide & Template Samples</summary>
+          <div className="mt-4 pt-4 border-t border-amber-200">
+            <p className="text-xs text-amber-700 mb-3 font-medium">Download sample files below to see the expected format, then edit them with your questions:</p>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="bg-gray-50 rounded-lg p-4">
               <h4 className="font-bold text-forest-500 text-sm mb-1 flex items-center gap-1"><Icon name="document" className="w-4 h-4" /> CSV / Excel Format</h4>
-              <p className="text-xs text-gray-500 mb-2">8 columns — same structure for both .csv and .xlsx</p>
+              <p className="text-xs text-gray-500 mb-2">8 columns - same structure for both .csv and .xlsx</p>
               <div className="text-xs font-mono bg-white rounded p-2 border border-gray-200 overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead><tr className="bg-forest-50">
@@ -306,13 +308,13 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
                   </tr></thead>
                   <tbody>
                     <tr><td className="border border-gray-200 px-1.5 py-1 text-blue-600">mc</td><td className="border border-gray-200 px-1.5 py-1">What is 2+2?</td><td className="border border-gray-200 px-1.5 py-1">2</td><td className="border border-gray-200 px-1.5 py-1">3</td><td className="border border-gray-200 px-1.5 py-1">4</td><td className="border border-gray-200 px-1.5 py-1">5</td><td className="border border-gray-200 px-1.5 py-1">6</td><td className="border border-gray-200 px-1.5 py-1 text-green-600">B</td></tr>
-                    <tr><td className="border border-gray-200 px-1.5 py-1 text-purple-600">essay</td><td className="border border-gray-200 px-1.5 py-1">Explain photosynthesis.</td><td className="border border-gray-200 px-1.5 py-1">5</td><td className="border border-gray-200 px-1.5 py-1 text-gray-300">—</td><td className="border border-gray-200 px-1.5 py-1 text-gray-300">—</td><td className="border border-gray-200 px-1.5 py-1 text-gray-300">—</td><td className="border border-gray-200 px-1.5 py-1 text-gray-300">—</td><td className="border border-gray-200 px-1.5 py-1 text-gray-300">—</td></tr>
+                    <tr><td className="border border-gray-200 px-1.5 py-1 text-purple-600">essay</td><td className="border border-gray-200 px-1.5 py-1">Explain photosynthesis.</td><td className="border border-gray-200 px-1.5 py-1">5</td><td className="border border-gray-200 px-1.5 py-1 text-gray-300">-</td><td className="border border-gray-200 px-1.5 py-1 text-gray-300">-</td><td className="border border-gray-200 px-1.5 py-1 text-gray-300">-</td><td className="border border-gray-200 px-1.5 py-1 text-gray-300">-</td><td className="border border-gray-200 px-1.5 py-1 text-gray-300">-</td></tr>
                   </tbody>
                 </table>
               </div>
-              <p className="text-xs text-gray-400 mt-2">• <strong>type:</strong> <code>mc</code> or <code>essay</code></p>
-              <p className="text-xs text-gray-400">• <strong>correct:</strong> A / B / C / D (or 1 / 2 / 3 / 4)</p>
-              <p className="text-xs text-gray-400">• Leave choiceA–D & correct blank for essay rows</p>
+              <p className="text-xs text-gray-400 mt-2">- <strong>type:</strong> <code>mc</code> or <code>essay</code></p>
+              <p className="text-xs text-gray-400">- <strong>correct:</strong> A / B / C / D (or 1 / 2 / 3 / 4)</p>
+              <p className="text-xs text-gray-400">- Leave choiceA-D and correct blank for essay rows</p>
             </div>
             <div className="bg-gray-50 rounded-lg p-4">
               <h4 className="font-bold text-forest-500 text-sm mb-1 flex items-center gap-1"><Icon name="document" className="w-4 h-4" /> JSON Format</h4>
@@ -331,8 +333,8 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
     "points": 5
   }
 ]`}</pre>
-              <p className="text-xs text-gray-400 mt-2">• <strong>correct:</strong> 0-based index <em>or</em> letter A–D</p>
-              <p className="text-xs text-gray-400">• choices can be strings or <code>{'{text, isCorrect}'}</code> objects</p>
+              <p className="text-xs text-gray-400 mt-2">- <strong>correct:</strong> 0-based index <em>or</em> letter A-D</p>
+              <p className="text-xs text-gray-400">- choices can be strings or <code>{'{text, isCorrect}'}</code> objects</p>
             </div>
             <div className="bg-gold-50 rounded-lg p-4 border border-gold-200">
               <h4 className="font-bold text-gold-700 text-sm mb-1">Download Templates</h4>
@@ -351,6 +353,7 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
                   <span>JSON Template <span className="text-xs text-gray-400 font-normal">(.json)</span></span>
                 </button>
               </div>
+            </div>
             </div>
           </div>
         </details>
@@ -379,7 +382,7 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
             </div>
             <div className="text-sm text-gray-500 mb-2">Total points: <strong>{uploadPreview.parsed.reduce((s, q) => s + q.points, 0)}</strong></div>
             {uploadPreview.errs > 0 && (
-              <p className="text-sm text-red-500 mb-3">⚠️ {uploadPreview.errs} row(s) were skipped due to formatting errors.</p>
+              <p className="text-sm text-red-500 mb-3">Warning: {uploadPreview.errs} row(s) were skipped due to formatting errors.</p>
             )}
 
             <div className="max-h-60 overflow-y-auto space-y-2 mb-4 border border-gray-100 rounded-lg p-3 bg-gray-50">
@@ -426,12 +429,12 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
       </Modal>
 
       {/* Questions Section */}
-      <div className="gk-card p-6 mb-4">
+      <div className="gk-section-card p-6 mb-4">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-lg font-bold text-forest-500">Questions ({questions.length})</h3>
             {questions.length > 0 && (
-              <p className="text-xs text-gray-400 mt-0.5">{mcCount} MC · {essayCount} Essay · {totalPoints} total pts</p>
+              <p className="text-xs text-gray-400 mt-0.5">{mcCount} MC | {essayCount} Essay | {totalPoints} total pts</p>
             )}
           </div>
           <div className="flex gap-2">
@@ -452,9 +455,9 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
                 onDrop={(e) => { e.preventDefault(); if (dragIdx !== null && dragIdx !== i) moveQuestion(dragIdx, i); setDragIdx(null); }}
               >
                 <div className="flex flex-col items-center gap-0.5 pt-3">
-                  <button onClick={() => { if (i > 0) moveQuestion(i, i - 1); }} disabled={i === 0} className="text-gray-400 hover:text-forest-500 disabled:opacity-30 text-xs px-1" aria-label={`Move question ${i + 1} up`}>▲</button>
-                  <div className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-forest-500 px-1 select-none text-lg" title="Drag to reorder">⠗</div>
-                  <button onClick={() => { if (i < questions.length - 1) moveQuestion(i, i + 1); }} disabled={i === questions.length - 1} className="text-gray-400 hover:text-forest-500 disabled:opacity-30 text-xs px-1" aria-label={`Move question ${i + 1} down`}>▼</button>
+                  <button onClick={() => { if (i > 0) moveQuestion(i, i - 1); }} disabled={i === 0} className="text-gray-400 hover:text-forest-500 disabled:opacity-30 text-xs px-1" aria-label={`Move question ${i + 1} up`}>^</button>
+                  <div className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-forest-500 px-1 select-none text-lg" title="Drag to reorder">::</div>
+                  <button onClick={() => { if (i < questions.length - 1) moveQuestion(i, i + 1); }} disabled={i === questions.length - 1} className="text-gray-400 hover:text-forest-500 disabled:opacity-30 text-xs px-1" aria-label={`Move question ${i + 1} down`}>v</button>
                 </div>
                 <div className="flex-1">
                   <QuestionCard q={q} i={i} />
@@ -471,7 +474,7 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
 
       <div className="flex gap-3">
         <button onClick={saveExam} disabled={isSaving} className="bg-forest-500 text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-forest-600 shadow-md inline-flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed">
-          {isSaving ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Saving…</> : <><Icon name="check" className="w-4 h-4" /> Save Exam</>}
+          {isSaving ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Saving...</> : <><Icon name="check" className="w-4 h-4" /> Save Exam</>}
         </button>
         <button onClick={onDone} disabled={isSaving} className="border border-gray-300 text-gray-700 px-5 py-2.5 rounded-lg hover:bg-gray-50 disabled:opacity-50">Cancel</button>
       </div>
@@ -500,7 +503,7 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
                   <div key={i} className="flex items-center gap-2">
                     <input type="radio" name="correctChoice" checked={!!c.correct} onChange={() => setChoices(cs => cs.map((cc, j) => ({ ...cc, correct: j === i })))} className="accent-forest-500" />
                     <input type="text" value={c.text} onChange={e => setChoices(cs => cs.map((cc, j) => j === i ? { ...cc, text: e.target.value } : cc))} placeholder={`Choice ${i + 1}`} className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm" />
-                    {choices.length > 2 && <button onClick={() => setChoices(cs => cs.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600">✕</button>}
+                    {choices.length > 2 && <button onClick={() => setChoices(cs => cs.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600">X</button>}
                   </div>
                 ))}
               </div>

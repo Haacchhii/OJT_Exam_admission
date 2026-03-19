@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { useAsync } from '../../hooks/useAsync';
 import { getExamResults, getEssayAnswers, scoreEssay, getQuestionAnalyticsPage } from '../../api/results';
 import { getExamRegistrations, getExamSchedules, getExams } from '../../api/exams';
@@ -42,6 +42,11 @@ function essayDraftKey(essayId: number) {
   return `gk_essay_draft_${essayId}`;
 }
 
+function getRegUserId(reg: ExamRegistration): number | null {
+  const maybe = (reg as ExamRegistration & { userId?: unknown }).userId;
+  return typeof maybe === 'number' ? maybe : null;
+}
+
 export default function EmployeeResults() {
   const { user: authUser } = useAuth();
   const canScoreEssays = authUser?.role === 'administrator' || authUser?.role === 'teacher';
@@ -61,6 +66,7 @@ export default function EmployeeResults() {
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsPage, setAnalyticsPage] = useState(1);
   const [resultsPage, setResultsPage] = useState(1);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   const { data: rawData, loading, error, refetch } = useAsync<RawData>(async () => {
     const [rawRes, rawRegs, rawUsers, rawSched, rawExm, rawEssays] = await Promise.all([
@@ -87,32 +93,44 @@ export default function EmployeeResults() {
   const exams = rawData?.exams || [];
   const essays = rawData?.essays || [];
 
-  const enriched: EnrichedResult[] = results.map(r => {
-    const reg = regs.find(rg => rg.id === r.registrationId);
-    const student = reg ? users.find(u => u.email === reg.userEmail) : null;
-    const sched = reg ? schedules.find(s => s.id === reg.scheduleId) : null;
-    const exam = sched ? exams.find(e => e.id === sched.examId) : null;
-    return { ...r, student, exam: exam as EnrichedResult['exam'] };
-  });
+  const regsById = useMemo(() => new Map(regs.map(r => [r.id, r])), [regs]);
+  const usersById = useMemo(() => new Map(users.map(u => [u.id, u])), [users]);
+  const usersByEmail = useMemo(() => new Map(users.map(u => [u.email, u])), [users]);
+  const schedulesById = useMemo(() => new Map(schedules.map(s => [s.id, s])), [schedules]);
+  const examsById = useMemo(() => new Map(exams.map(e => [e.id, e])), [exams]);
 
-  let filtered = enriched;
-  if (search) filtered = filtered.filter(r => {
-    const name = r.student ? `${r.student.firstName} ${r.student.lastName}`.toLowerCase() : '';
-    return name.includes(search.toLowerCase()) || (r.exam?.title || '').toLowerCase().includes(search.toLowerCase());
-  });
-  if (filter === 'passed') filtered = filtered.filter(r => r.passed);
-  if (filter === 'failed') filtered = filtered.filter(r => !r.passed);
-  if (examFilter !== 'all') filtered = filtered.filter(r => r.exam && String(r.exam.id) === examFilter);
-  if (yearFilter !== 'all') filtered = filtered.filter(r => r.exam?.academicYear?.id === Number(yearFilter));
-  if (semesterFilter !== 'all') filtered = filtered.filter(r => r.exam?.semester?.id === Number(semesterFilter));
-  if (essayStatusFilter === 'reviewed') filtered = filtered.filter(r => r.essayReviewed);
-  if (essayStatusFilter === 'pending') filtered = filtered.filter(r => !r.essayReviewed);
+  const enriched: EnrichedResult[] = useMemo(() => results.map(r => {
+    const reg = regsById.get(r.registrationId);
+    const regUserId = reg ? getRegUserId(reg) : null;
+    const student = reg
+      ? (regUserId !== null ? usersById.get(regUserId) : usersByEmail.get(reg.userEmail))
+      : null;
+    const sched = reg ? schedulesById.get(reg.scheduleId) : null;
+    const exam = sched ? examsById.get(sched.examId) : null;
+    return { ...r, student, exam: exam as EnrichedResult['exam'] };
+  }), [results, regsById, usersById, usersByEmail, schedulesById, examsById]);
+
+  const filtered = useMemo(() => {
+    let list = enriched;
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter(r => {
+        const name = r.student ? `${r.student.firstName} ${r.student.lastName}`.toLowerCase() : '';
+        return name.includes(q) || (r.exam?.title || '').toLowerCase().includes(q);
+      });
+    }
+    if (filter === 'passed') list = list.filter(r => r.passed);
+    if (filter === 'failed') list = list.filter(r => !r.passed);
+    if (examFilter !== 'all') list = list.filter(r => r.exam && String(r.exam.id) === examFilter);
+    if (yearFilter !== 'all') list = list.filter(r => r.exam?.academicYear?.id === Number(yearFilter));
+    if (semesterFilter !== 'all') list = list.filter(r => r.exam?.semester?.id === Number(semesterFilter));
+    if (essayStatusFilter === 'reviewed') list = list.filter(r => r.essayReviewed);
+    if (essayStatusFilter === 'pending') list = list.filter(r => !r.essayReviewed);
+    return list;
+  }, [enriched, search, filter, examFilter, yearFilter, semesterFilter, essayStatusFilter]);
 
   const { paginated: paginatedResults, totalPages: resultsTotalPages, safePage: resultsSafePage, totalItems: resultsTotal } = usePaginationSlice(filtered, resultsPage, RESULTS_PER_PAGE);
   const resetResultsPage = () => setResultsPage(1);
-
-  if (loading && !rawData) return <SkeletonPage />;
-  if (error) return <ErrorAlert error={error} onRetry={refetch} />;
 
   const passed = results.filter(r => r.passed).length;
   const failed = results.filter(r => !r.passed).length;
@@ -121,8 +139,11 @@ export default function EmployeeResults() {
   const scored = essays.filter(e => e.scored);
 
   const getStudentName = (regId: number): string => {
-    const reg = regs.find(r => r.id === regId);
-    const student = reg ? users.find(u => u.email === reg.userEmail) : null;
+    const reg = regsById.get(regId);
+    const regUserId = reg ? getRegUserId(reg) : null;
+    const student = reg
+      ? (regUserId !== null ? usersById.get(regUserId) : usersByEmail.get(reg.userEmail))
+      : null;
     return student ? `${student.firstName} ${student.lastName}` : 'Unknown';
   };
 
@@ -179,7 +200,7 @@ export default function EmployeeResults() {
     const examTitle = r.exam ? esc(r.exam.title) : 'N/A';
     const printWin = window.open('', '_blank');
     if (!printWin || printWin.closed) {
-      showToast('Popup blocked — please allow popups for this site and try again.', 'error');
+      showToast('Popup blocked - please allow popups for this site and try again.', 'error');
       return;
     }
     printWin.document.write(`<!DOCTYPE html><html><head><title>Exam Result - ${studentName}</title>
@@ -202,7 +223,7 @@ export default function EmployeeResults() {
         @media print { body { padding: 20px; } }
       </style>
     </head><body>
-      <div class="logo"><span>🔑</span><h1><span style="color:#fbbf24">${SCHOOL_BRAND}</span><br/><span style="color:#166534">${SCHOOL_SUBTITLE}</span></h1><p class="subtitle">${SCHOOL_ADDRESS} &bull; Tel: ${SCHOOL_PHONE}<br/>Entrance Examination Result</p></div>
+      <div class="logo"><span>GK</span><h1><span style="color:#fbbf24">${SCHOOL_BRAND}</span><br/><span style="color:#166534">${SCHOOL_SUBTITLE}</span></h1><p class="subtitle">${SCHOOL_ADDRESS} | Tel: ${SCHOOL_PHONE}<br/>Entrance Examination Result</p></div>
       <h2>Student Information</h2>
       <div class="grid">
         <div class="field"><label>Student Name</label><span>${studentName}</span></div>
@@ -214,12 +235,12 @@ export default function EmployeeResults() {
       <div class="score-circle"><div class="pct ${r.passed ? 'passed' : 'failed'}">${r.percentage.toFixed(1)}%</div><p style="color:#888;font-size:13px">Overall Score</p></div>
       <div class="grid">
         <div class="field"><label>Total Score</label><span>${r.totalScore} / ${r.maxPossible}</span></div>
-        <div class="field"><label>Passing Score</label><span>${r.exam?.passingScore || '—'}%</span></div>
+        <div class="field"><label>Passing Score</label><span>${r.exam?.passingScore || '-'}%</span></div>
         <div class="field"><label>Result</label><span class="result-badge ${r.passed ? 'passed' : 'failed'}">${r.passed ? 'PASSED' : 'FAILED'}</span></div>
         <div class="field"><label>Essay Review</label><span>${r.essayReviewed ? 'Reviewed' : 'Pending'}</span></div>
         <div class="field"><label>Date Taken</label><span>${r.createdAt ? new Date(r.createdAt).toLocaleDateString() : 'N/A'}</span></div>
       </div>
-      <p style="margin-top:40px;font-size:11px;color:#aaa;text-align:center">Printed on ${new Date().toLocaleDateString()} — ${SCHOOL_NAME} &copy; ${new Date().getFullYear()}</p>
+      <p style="margin-top:40px;font-size:11px;color:#aaa;text-align:center">Printed on ${new Date().toLocaleDateString()} - ${SCHOOL_NAME} &copy; ${new Date().getFullYear()}</p>
     </body></html>`);
     printWin.document.close();
     printWin.focus();
@@ -236,6 +257,9 @@ export default function EmployeeResults() {
     } catch { showToast('Failed to load analytics', 'error'); }
     finally { setAnalyticsLoading(false); }
   };
+
+  if (loading && !rawData) return <SkeletonPage />;
+  if (error) return <ErrorAlert error={error} onRetry={refetch} />;
 
   return (
     <div>
@@ -274,30 +298,55 @@ export default function EmployeeResults() {
             <StatCard icon="arrowTrendUp" value={`${avg}%`} label="Average Score" color="amber" />
           </div>
 
-          <div className="gk-card p-4">
-            <div className="flex flex-col sm:flex-row gap-3 mb-4">
+          <div className="gk-section-card p-4">
+            <div className="flex flex-col lg:flex-row gap-3 mb-3">
               <input value={search} onChange={e => { setSearch(e.target.value); resetResultsPage(); }} placeholder="Search by student or exam name…" aria-label="Search results" className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm" />
-              <select value={filter} onChange={e => { setFilter(e.target.value); resetResultsPage(); }} aria-label="Filter by result" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
-                <option value="all">All Results</option><option value="passed">Passed</option><option value="failed">Failed</option>
+              <select value={filter} onChange={e => { setFilter(e.target.value); resetResultsPage(); }} aria-label="Filter by result" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm min-w-[160px]">
+                <option value="all">All Results</option>
+                <option value="passed">Passed</option>
+                <option value="failed">Failed</option>
               </select>
-              <select value={examFilter} onChange={e => { setExamFilter(e.target.value); resetResultsPage(); }} aria-label="Filter by exam" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
+              <select value={examFilter} onChange={e => { setExamFilter(e.target.value); resetResultsPage(); }} aria-label="Filter by exam" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm min-w-[200px]">
                 <option value="all">All Exams</option>
                 {exams.map(ex => <option key={ex.id} value={String(ex.id)}>{ex.title}</option>)}
               </select>
-              <select value={yearFilter} onChange={e => { setYearFilter(e.target.value); setSemesterFilter('all'); resetResultsPage(); }} aria-label="Filter by school year" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
-                <option value="all">All Years</option>
-                {(academicYears || []).map(y => <option key={y.id} value={y.id}>{y.year}</option>)}
-              </select>
-              <select value={semesterFilter} onChange={e => { setSemesterFilter(e.target.value); resetResultsPage(); }} aria-label="Filter by semester" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
-                <option value="all">All Semesters</option>
-                {semesterOptions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-              <select value={essayStatusFilter} onChange={e => { setEssayStatusFilter(e.target.value); resetResultsPage(); }} aria-label="Filter by essay status" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
-                <option value="all">All Essay Status</option>
-                <option value="reviewed">Essay Reviewed</option>
-                <option value="pending">Essay Pending</option>
-              </select>
+              <button
+                onClick={() => setShowAdvancedFilters(v => !v)}
+                className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 inline-flex items-center gap-1.5"
+              >
+                <Icon name="filter" className="w-4 h-4" />
+                {showAdvancedFilters ? 'Hide Advanced' : 'More Filters'}
+              </button>
             </div>
+
+            {showAdvancedFilters && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
+                <select value={yearFilter} onChange={e => { setYearFilter(e.target.value); setSemesterFilter('all'); resetResultsPage(); }} aria-label="Filter by school year" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
+                  <option value="all">All Years</option>
+                  {(academicYears || []).map(y => <option key={y.id} value={y.id}>{y.year}</option>)}
+                </select>
+                <select value={semesterFilter} onChange={e => { setSemesterFilter(e.target.value); resetResultsPage(); }} aria-label="Filter by semester" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
+                  <option value="all">All Semesters</option>
+                  {semesterOptions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+                <select value={essayStatusFilter} onChange={e => { setEssayStatusFilter(e.target.value); resetResultsPage(); }} aria-label="Filter by essay status" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
+                  <option value="all">All Essay Status</option>
+                  <option value="reviewed">Essay Reviewed</option>
+                  <option value="pending">Essay Pending</option>
+                </select>
+              </div>
+            )}
+
+            {(filter !== 'all' || examFilter !== 'all' || yearFilter !== 'all' || semesterFilter !== 'all' || essayStatusFilter !== 'all') && (
+              <div className="mb-4">
+                <button
+                  onClick={() => { setFilter('all'); setExamFilter('all'); setYearFilter('all'); setSemesterFilter('all'); setEssayStatusFilter('all'); resetResultsPage(); }}
+                  className="text-xs text-gray-600 hover:text-gray-800 underline"
+                >
+                  Reset all filters
+                </button>
+              </div>
+            )}
             {paginatedResults.length > 0 ? (
               <>
                 <div className="table-scroll">
@@ -335,7 +384,7 @@ export default function EmployeeResults() {
         <div>
           <PageHeader title="Essay Review" subtitle="Score pending essay responses from applicants." />
           {pending.length === 0 && scored.length === 0 ? (
-            <div className="gk-card p-8 text-center">
+            <div className="gk-section-card p-8 text-center">
               <div className="w-14 h-14 rounded-2xl bg-forest-50 flex items-center justify-center mx-auto mb-3"><Icon name="documentText" className="w-7 h-7 text-forest-500" /></div>
               <h3 className="font-bold text-forest-500 mb-1">No Essay Answers</h3>
               <p className="text-gray-500 text-sm">There are no essay answers to review at this time.</p>
@@ -358,7 +407,7 @@ export default function EmployeeResults() {
       {tab === 'analytics' && (
         <div>
           <PageHeader title="Per-Question Analytics" subtitle="See how applicants performed on each question." />
-          <div className="gk-card p-4 mb-6">
+          <div className="gk-section-card p-4 mb-6">
             <label className="text-sm font-medium text-gray-700 mr-2">Select Exam</label>
             <select
               value={analyticsExamId ?? ''}
@@ -369,7 +418,7 @@ export default function EmployeeResults() {
               }}
               className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm"
             >
-              <option value="">— Choose an exam —</option>
+              <option value="">- Choose an exam -</option>
               {exams.map(ex => <option key={ex.id} value={ex.id}>{ex.title}</option>)}
             </select>
           </div>
@@ -379,7 +428,7 @@ export default function EmployeeResults() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
                 <StatCard icon="users" value={analyticsData.totalTakers} label="Total Takers" color="blue" />
                 <StatCard icon="chartBar" value={`${analyticsData.analytics.length} / ${analyticsData.pagination.total}`} label="Questions (Page/Total)" color="amber" />
-                <StatCard icon="checkCircle" value={analyticsData.analytics.filter(q => q.questionType === 'mc' && (q.correctRate ?? 0) >= 70).length} label="Easy Questions (≥70%)" color="emerald" />
+                <StatCard icon="checkCircle" value={analyticsData.analytics.filter(q => q.questionType === 'mc' && (q.correctRate ?? 0) >= 70).length} label="Easy Questions (>=70%)" color="emerald" />
               </div>
 
               {(() => {
@@ -389,7 +438,7 @@ export default function EmployeeResults() {
                   : 0;
 
                 return (
-                  <div className="gk-card p-5 mb-6">
+                  <div className="gk-section-card p-5 mb-6">
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="font-semibold text-forest-500">Question Percentage Summary</h3>
                       <span className="text-sm text-gray-500">Page {analyticsData.pagination.page} of {analyticsData.pagination.totalPages}</span>
@@ -428,14 +477,14 @@ export default function EmployeeResults() {
 
               <div className="space-y-4">
                 {analyticsData.analytics.map((q, idx) => (
-                  <div key={q.questionId} className="gk-card p-5">
+                  <div key={q.questionId} className="gk-section-card p-5">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
                         <span className="text-xs font-semibold text-gray-400">Q{((analyticsData.pagination.page - 1) * analyticsData.pagination.limit) + idx + 1}</span>
                         <p className="font-medium text-forest-500">{q.questionText}</p>
                       </div>
                       <Badge className={`gk-badge ml-2 ${q.questionType === 'mc' ? 'gk-badge-reviewed' : 'gk-badge-pending'}`}>
-                        {q.questionType === 'mc' ? 'Multiple Choice' : 'Essay'} · {q.points} pts
+                        {q.questionType === 'mc' ? 'Multiple Choice' : 'Essay'} | {q.points} pts
                       </Badge>
                     </div>
                     {q.questionType === 'mc' && (
@@ -487,7 +536,7 @@ export default function EmployeeResults() {
             </div>
           )}
           {!analyticsLoading && !analyticsData && analyticsExamId && (
-            <div className="gk-card p-8 text-center">
+            <div className="gk-section-card p-8 text-center">
               <p className="text-gray-500">No analytics data available for this exam.</p>
             </div>
           )}
@@ -507,10 +556,10 @@ export default function EmployeeResults() {
             </div>
             <div className="mb-4">
               <label className="text-sm font-medium text-gray-700 block mb-1">Feedback / Comment <span className="text-gray-400 font-normal">(optional)</span></label>
-              <textarea value={commentVal} onChange={e => setCommentVal(e.target.value)} rows={3} placeholder="Add feedback for the student…" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm resize-none" />
+              <textarea value={commentVal} onChange={e => setCommentVal(e.target.value)} rows={3} placeholder="Add feedback for the student..." className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm resize-none" />
             </div>
             <div className="flex gap-3">
-              <button onClick={handleScore} disabled={saving} className="bg-forest-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-forest-600 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5">{saving ? <><Icon name="spinner" className="w-4 h-4 animate-spin" /> Saving…</> : 'Save Score'}</button>
+              <button onClick={handleScore} disabled={saving} className="bg-forest-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-forest-600 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5">{saving ? <><Icon name="spinner" className="w-4 h-4 animate-spin" /> Saving...</> : 'Save Score'}</button>
               <button onClick={() => setScoreModal(null)} className="border border-gray-300 text-gray-700 px-5 py-2 rounded-lg hover:bg-gray-50">Cancel</button>
             </div>
           </>
@@ -522,7 +571,7 @@ export default function EmployeeResults() {
 
 function EssayCard({ essay, student, question, status, onScore }: EssayCardProps) {
   return (
-    <div className="gk-card p-5">
+    <div className="gk-section-card p-5">
       <div className="flex justify-between items-start mb-3">
         <div>
           <strong className="text-forest-500">{student}</strong>

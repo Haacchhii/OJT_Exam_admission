@@ -261,7 +261,11 @@ export async function updateStatus(req, res, next) {
       notes: notes || null,
     });
 
-    try { getIo().to('role_administrator').to('role_registrar').emit('admission_status_updated', { id, status, prevStatus: admission.status }); } catch (_) {}
+    try {
+      const io = getIo();
+      io.to('role_administrator').to('role_registrar').emit('admission_status_updated', { id, status, prevStatus: admission.status });
+      io.to(`user_${admission.userId}`).emit('admission_status_updated', { id, status, prevStatus: admission.status, trackingId: admission.trackingId });
+    } catch (_) {}
 
     res.json(shapeAdmission(updated));
   } catch (err) { next(err); }
@@ -299,7 +303,13 @@ export async function bulkUpdateStatus(req, res, next) {
 
     invalidatePrefix('admStats:');
 
-    try { getIo().to('role_administrator').to('role_registrar').emit('admission_bulk_status_updated', { ids, status, count: result.count }); } catch (_) {}
+    try {
+      const io = getIo();
+      io.to('role_administrator').to('role_registrar').emit('admission_bulk_status_updated', { ids, status, count: result.count });
+      for (const adm of admissions) {
+        io.to(`user_${adm.userId}`).emit('admission_status_updated', { id: adm.id, status, prevStatus: adm.status, trackingId: adm.trackingId, bulk: true });
+      }
+    } catch (_) {}
 
     res.json({ updated: result.count });
   } catch (err) { next(err); }

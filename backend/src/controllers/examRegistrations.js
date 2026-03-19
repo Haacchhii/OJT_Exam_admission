@@ -92,9 +92,8 @@ export async function createRegistration(req, res, next) {
     const trackingId = await generateTrackingId('EXM');
     const registration = await prisma.$transaction(async (tx) => {
       // Re-read schedule with row-level lock (SELECT ... FOR UPDATE) inside the transaction
-      const [freshSchedule] = await tx.$queryRawUnsafe(
-        `SELECT * FROM exam_schedules WHERE id = $1 FOR UPDATE`, scheduleId
-      );
+      const rows = await tx.$queryRaw`SELECT * FROM exam_schedules WHERE id = ${scheduleId} FOR UPDATE`;
+      const [freshSchedule] = rows;
       // Map snake_case DB columns to camelCase
       if (freshSchedule) {
         freshSchedule.maxSlots = freshSchedule.max_slots ?? freshSchedule.maxSlots;
@@ -123,10 +122,20 @@ export async function createRegistration(req, res, next) {
           include: { exam: { select: { title: true } } },
         });
         if (!student || !sched) return;
-        const dateStr = sched.scheduledDate
-          ? new Date(sched.scheduledDate + 'T00:00:00').toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })
-          : 'TBD';
-        const timeStr = sched.startTime && sched.endTime ? `${sched.startTime} – ${sched.endTime}` : 'See portal for details';
+        let dateStr = 'TBD';
+        if (sched.scheduledDate) {
+          const [year, month, day] = String(sched.scheduledDate).split('-').map(Number);
+          if (year && month && day) {
+            const scheduleDate = new Date(Date.UTC(year, month - 1, day));
+            dateStr = scheduleDate.toLocaleDateString('en-PH', {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+              timeZone: 'UTC',
+            });
+          }
+        }
+        const timeStr = sched.startTime && sched.endTime ? `${sched.startTime} - ${sched.endTime}` : 'See portal for details';
         sendExamBookingEmail({
           to: student.email,
           firstName: student.firstName,

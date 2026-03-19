@@ -37,7 +37,9 @@ interface DashboardData {
 export default function EmployeeDashboard() {
   const { user, canAccess, roleLabel } = useAuth();
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');    const [levelGroupFilter, setLevelGroupFilter] = useState('all');  const [gradeFilter, setGradeFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [levelGroupFilter, setLevelGroupFilter] = useState('all');
+  const [gradeFilter, setGradeFilter] = useState('all');
   const [page, setPage] = useState(1);
 
   const { socket, isConnected } = useSocket();
@@ -67,9 +69,8 @@ export default function EmployeeDashboard() {
     const avgScore = results.length > 0 ? (results.reduce((s: number, r: ExamResultType) => s + r.percentage, 0) / results.length).toFixed(0) : 0;
     const grades = [...new Set(admissions.map((a: Admission) => a.gradeLevel).filter(Boolean))].sort();
 
-    const now = new Date();
-    const weekAgo = new Date(now.getTime() - 7 * 86400000);
-    const twoWeeksAgo = new Date(now.getTime() - 14 * 86400000);
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
     const thisWeek = admissions.filter((a: Admission) => new Date(a.submittedAt) >= weekAgo);
     const lastWeek = admissions.filter((a: Admission) => { const d = new Date(a.submittedAt); return d >= twoWeeksAgo && d < weekAgo; });
     const pct = (curr: number, prev: number) => prev === 0 ? (curr > 0 ? 100 : 0) : Math.round(((curr - prev) / prev) * 100);
@@ -89,7 +90,6 @@ export default function EmployeeDashboard() {
   useEffect(() => {
     if (!socket || !isConnected) return;
     const handleUpdate = () => {
-      console.log('Update received, refetching dashboard...');
       refetch();
     };
     socket.on('admission_status_updated', handleUpdate);
@@ -100,7 +100,9 @@ export default function EmployeeDashboard() {
 
   const filtered = useMemo(() => {
     let list = rawData?.admissions || [];
-    if (statusFilter !== 'all') list = list.filter(a => a.status === statusFilter);      if (levelGroupFilter !== 'all') list = list.filter(a => a.levelGroup === levelGroupFilter);    if (gradeFilter !== 'all') list = list.filter(a => a.gradeLevel === gradeFilter);
+    if (statusFilter !== 'all') list = list.filter(a => a.status === statusFilter);
+    if (levelGroupFilter !== 'all') list = list.filter(a => a.levelGroup === levelGroupFilter);
+    if (gradeFilter !== 'all') list = list.filter(a => a.gradeLevel === gradeFilter);
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(a => `${a.firstName} ${a.lastName} ${a.email}`.toLowerCase().includes(q));
@@ -112,7 +114,7 @@ export default function EmployeeDashboard() {
 
   const handleSearch = (v: string) => { setSearch(v); setPage(1); };
   const handleStatus = (v: string) => { setStatusFilter(v); setPage(1); };
-    const handleLevelGroup = (v: string) => { setLevelGroupFilter(v); setGradeFilter('all'); setPage(1); };
+  const handleLevelGroup = (v: string) => { setLevelGroupFilter(v); setGradeFilter('all'); setPage(1); };
   const handleGrade = (v: string) => { setGradeFilter(v); setPage(1); };
   if (loading && !rawData) return <SkeletonPage />;
   if (error) return <ErrorAlert error={error} onRetry={refetch} />;
@@ -128,7 +130,7 @@ export default function EmployeeDashboard() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8 animate-stagger">
         {canAccess('admissions') && <>
-          <Link to="/employee/admissions" className="sm:col-span-2 lg:col-span-1"><StatCard icon="graduationCap" value={rawData?.stats?.total || 0} label="Total Applicants" color="blue" trend={rawData?.trends?.total} trendLabel="vs last week" /></Link>
+          <Link to="/employee/admissions"><StatCard icon="graduationCap" value={rawData?.stats?.total || 0} label="Total Applicants" color="blue" trend={rawData?.trends?.total} trendLabel="vs last week" /></Link>
           <Link to="/employee/admissions?status=Accepted"><StatCard icon="checkCircle" value={rawData?.stats?.accepted || 0} label="Accepted" color="emerald" trend={rawData?.trends?.accepted} trendLabel="vs last week" /></Link>
           <Link to="/employee/admissions"><StatCard icon="clock" value={(rawData?.stats?.submitted || 0) + (rawData?.stats?.underScreening || 0) + (rawData?.stats?.underEvaluation || 0)} label="In Progress" color="amber" trend={rawData?.trends?.inProgress} trendLabel="vs last week" /></Link>
           <Link to="/employee/admissions?status=Rejected"><StatCard icon="xCircle" value={rawData?.stats?.rejected || 0} label="Rejected" color="red" trend={rawData?.trends?.rejected} trendLabel="vs last week" /></Link>
@@ -145,7 +147,7 @@ export default function EmployeeDashboard() {
       </div>
 
       {canAccess('admissions') && (
-      <div className="gk-card p-6 mb-8">
+      <div className="gk-section-card mb-8">
         <h3 className="gk-heading-sm mb-5 flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-forest-50 flex items-center justify-center">
             <Icon name="admissions" className="w-4 h-4 text-forest-500" />
@@ -218,7 +220,7 @@ export default function EmployeeDashboard() {
       )}
 
       {canAccess('exams') && (
-      <div className="gk-card p-6">
+      <div className="gk-section-card">
         <h3 className="gk-heading-sm mb-5 flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-forest-50 flex items-center justify-center">
             <Icon name="exam" className="w-4 h-4 text-forest-500" />

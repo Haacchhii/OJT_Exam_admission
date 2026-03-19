@@ -28,13 +28,14 @@ export default function Topbar({ title, onMenuToggle, userId, user }: TopbarProp
   const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
 
   return (
-    <header className="sticky top-0 z-30 bg-white border-b border-gray-200 px-4 lg:px-8 h-[60px] flex items-center justify-between" role="banner">
-      <div className="flex items-center gap-3">
+    <header className="fixed top-0 left-0 right-0 z-30 bg-white border-b border-gray-200 h-16" role="banner">
+      <div className="h-full px-4 lg:px-8 flex items-center justify-between">
+      <div className="flex items-center gap-3 min-w-0">
         <button onClick={onMenuToggle} className="lg:hidden p-2 rounded-xl hover:bg-forest-50 transition-colors" aria-label="Toggle navigation menu">
           <Icon name="menu" className="w-5 h-5 text-forest-600" />
         </button>
-        <div>
-          <h1 className="text-lg font-semibold text-gray-800 tracking-tight">{title}</h1>
+        <div className="min-w-0">
+          <h1 className="text-lg font-bold text-gray-800 tracking-tight truncate">{title}</h1>
         </div>
       </div>
       <div className="flex items-center gap-3">
@@ -51,6 +52,7 @@ export default function Topbar({ title, onMenuToggle, userId, user }: TopbarProp
           </div>
           <Icon name="chevronDown" className="w-3.5 h-3.5 text-gray-400 hidden sm:block" />
         </div>
+      </div>
       </div>
 
     </header>

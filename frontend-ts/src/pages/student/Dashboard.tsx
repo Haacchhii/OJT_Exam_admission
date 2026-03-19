@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+﻿import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useAsync } from '../../hooks/useAsync';
 import { getMyAdmission } from '../../api/admissions';
@@ -52,7 +52,7 @@ export default function StudentDashboard() {
       <PageHeader title={`Welcome, ${user?.firstName || 'Student'}`} subtitle="Here is an overview of your exam and admission status." />
 
       {!myReg && !myApp && !loading && (
-        <div className="gk-card p-6 mb-6 border-l-4 border-gold-400 bg-gradient-to-r from-gold-50 to-white">
+        <div className="gk-section-card p-6 mb-6 border-l-4 border-gold-400 bg-gradient-to-r from-gold-50 to-white">
           <div className="flex items-start gap-4">
             <div className="w-10 h-10 rounded-xl bg-gold-100 flex items-center justify-center flex-shrink-0 mt-0.5">
               <Icon name="key" className="w-5 h-5 text-gold-600" />
@@ -84,7 +84,7 @@ export default function StudentDashboard() {
       )}
 
       {/* Step-by-step journey tracker */}
-      <div className="gk-card p-6 mb-6">
+      <div className="gk-section-card p-6 mb-6">
         <h3 className="gk-heading-sm text-gray-800 mb-5 flex items-center gap-2">
           <span className="p-1.5 bg-gold-50 rounded-lg"><Icon name="star" className="w-5 h-5 text-gold-500" /></span>
           Your Application Journey
@@ -118,7 +118,7 @@ export default function StudentDashboard() {
         const days = Math.floor(diffMs / 86400000);
         const hours = Math.floor((diffMs % 86400000) / 3600000);
         return (
-          <div className="gk-card p-5 mb-6 border-l-4 border-amber-400 bg-gradient-to-r from-amber-50 to-white">
+          <div className="gk-section-card p-5 mb-6 border-l-4 border-amber-400 bg-gradient-to-r from-amber-50 to-white">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
                 <Icon name="clock" className="w-6 h-6 text-amber-600" />
@@ -148,7 +148,7 @@ export default function StudentDashboard() {
         <StatCard icon="document" value={myApp?.documents?.length || 0} label="Documents Uploaded" color="amber" />
       </div>
 
-      <div className="gk-card p-6 mb-8">
+      <div className="gk-section-card p-6 mb-8">
         <h3 className="gk-heading-sm text-gray-800 mb-5 flex items-center gap-2">
           <span className="p-1.5 bg-forest-50 rounded-lg"><Icon name="admissions" className="w-5 h-5 text-forest-500" /></span>
           Admission Progress
@@ -204,7 +204,7 @@ export default function StudentDashboard() {
         )}
       </div>
 
-      <div className="gk-card p-6">
+      <div className="gk-section-card p-6">
         <h3 className="gk-heading-sm text-gray-800 mb-5 flex items-center gap-2">
           <span className="p-1.5 bg-forest-50 rounded-lg"><Icon name="arrowRight" className="w-5 h-5 text-forest-500" /></span>
           Quick Actions
@@ -214,13 +214,17 @@ export default function StudentDashboard() {
             <Icon name="exam" className="w-4 h-4" />
             Go to Exam
           </Link>
-          <Link to="/student/admission" className={`gk-btn-secondary inline-flex items-center gap-2 px-5 py-2.5 text-sm ${!admissionUnlocked ? 'opacity-40 cursor-not-allowed pointer-events-none' : ''}`}>
-            <Icon name="admissions" className="w-4 h-4" />
-            {admissionUnlocked ? 'Go to Admission' : 'Admission (Locked)'}
+          <Link to={admissionUnlocked ? '/student/admission' : '/student/exam'} className="gk-btn-secondary inline-flex items-center gap-2 px-5 py-2.5 text-sm">
+            <Icon name={admissionUnlocked ? 'admissions' : 'lock'} className="w-4 h-4" />
+            {admissionUnlocked ? 'Go to Admission' : 'Take Exam to Unlock Admission'}
           </Link>
           <Link to="/student/results" className="gk-btn-secondary inline-flex items-center gap-2 px-5 py-2.5 text-sm">
             <Icon name="results" className="w-4 h-4" />
             View Results
+          </Link>
+          <Link to="/student/track" className="gk-btn-secondary inline-flex items-center gap-2 px-5 py-2.5 text-sm">
+            <Icon name="search" className="w-4 h-4" />
+            Track Application
           </Link>
         </div>
       </div>

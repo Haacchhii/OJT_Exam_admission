@@ -1,4 +1,4 @@
-import type { ChangeEvent } from 'react';
+﻿import type { ChangeEvent } from 'react';
 import Icon from '../../../components/Icons';
 import { Input, Select, TextArea } from './AdmissionFormFields';
 import { checkAgeRequirement } from './admissionValidation';
@@ -20,7 +20,7 @@ interface Props {
 
 export default function StepSchoolInfo({ form, set, setForm, goTo, requiredDocs, slotFiles, user, errors = {}, clearError }: Props) {
   return (
-    <div className="gk-card p-6">
+    <div className="gk-section-card p-6">
       <h3 className="text-lg font-bold text-forest-500 mb-1">Step 2: School Information</h3>
       <p className="text-gray-500 text-sm mb-6">Tell us about the academic background.</p>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -58,7 +58,7 @@ export default function StepSchoolInfo({ form, set, setForm, goTo, requiredDocs,
             {user?.applicantProfile?.studentNumber ? (
               <div className="flex items-center gap-2">
                 <input type="text" value={form.studentNumber || user.applicantProfile.studentNumber} readOnly className="gk-input bg-gray-50 font-mono" />
-                <span className="text-xs text-forest-500 font-medium whitespace-nowrap">✓ Auto-detected</span>
+                <span className="text-xs text-forest-500 font-medium whitespace-nowrap">Auto-detected</span>
               </div>
             ) : (
               <input type="text" value={form.studentNumber} onChange={(e) => setForm(f => ({ ...f, studentNumber: e.target.value }))} placeholder="Enter your student number" className="gk-input font-mono" required />
@@ -68,7 +68,7 @@ export default function StepSchoolInfo({ form, set, setForm, goTo, requiredDocs,
       </div>
       {checkAgeRequirement(form.gradeLevel, form.dob, form.schoolYear) && (
         <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 mb-4 text-sm">
-          ⚠️ {checkAgeRequirement(form.gradeLevel, form.dob, form.schoolYear)}
+          Warning: {checkAgeRequirement(form.gradeLevel, form.dob, form.schoolYear)}
         </div>
       )}
       {form.gradeLevel && (
@@ -77,7 +77,7 @@ export default function StepSchoolInfo({ form, set, setForm, goTo, requiredDocs,
           <ul className="text-xs text-gold-600 space-y-1">
             {requiredDocs.map(docKey => (
               <li key={docKey} className="flex items-center gap-1.5">
-                {slotFiles[docKey] ? <span className="text-forest-500"><Icon name="checkCircle" className="w-3.5 h-3.5 inline" /></span> : <span className="text-gray-400">○</span>}
+                {slotFiles[docKey] ? <span className="text-forest-500"><Icon name="checkCircle" className="w-3.5 h-3.5 inline" /></span> : <span className="text-gray-400">o</span>}
                 {(DOC_SLOT_LABELS as Record<string, string>)[docKey]}
               </li>
             ))}
@@ -87,17 +87,17 @@ export default function StepSchoolInfo({ form, set, setForm, goTo, requiredDocs,
       )}
       {form.applicantType === 'Returning' && (
         <div className="bg-forest-50 border border-forest-200 text-forest-700 rounded-lg px-4 py-3 mb-4 text-sm">
-          ℹ️ Returning students must settle previous accounts and complete clearance before re-admission.
+          Note: Returning students must settle previous accounts and complete clearance before re-admission.
         </div>
       )}
       {form.applicantType === 'Continuing' && (
         <div className="bg-forest-50 border border-forest-200 text-forest-700 rounded-lg px-4 py-3 mb-4 text-sm">
-          ℹ️ As a continuing student of {SCHOOL_NAME}, your student number {user?.applicantProfile?.studentNumber ? 'has been auto-detected' : 'should be entered above'}. This application is for re-enrollment in the next school year.
+          Note: As a continuing student of {SCHOOL_NAME}, your student number {user?.applicantProfile?.studentNumber ? 'has been auto-detected' : 'should be entered above'}. This application is for re-enrollment in the next school year.
         </div>
       )}
       <div className="flex justify-between">
-        <button onClick={() => goTo(1)} className="border border-gray-300 text-gray-700 px-5 py-2.5 rounded-lg hover:bg-gray-50">← Back</button>
-        <button onClick={() => goTo(3)} className="bg-gradient-to-r from-forest-500 to-forest-400 text-white px-6 py-2.5 rounded-lg font-semibold hover:from-gold-500 hover:to-gold-600">Next: Family Details →</button>
+        <button onClick={() => goTo(1)} className="border border-gray-300 text-gray-700 px-5 py-2.5 rounded-lg hover:bg-gray-50">Back</button>
+        <button onClick={() => goTo(3)} className="bg-gradient-to-r from-forest-500 to-forest-400 text-white px-6 py-2.5 rounded-lg font-semibold hover:from-gold-500 hover:to-gold-600">Next: Family Details</button>
       </div>
     </div>
   );

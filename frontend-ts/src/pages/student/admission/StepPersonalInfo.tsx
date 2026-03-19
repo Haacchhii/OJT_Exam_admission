@@ -1,4 +1,4 @@
-import type { ChangeEvent } from 'react';
+﻿import type { ChangeEvent } from 'react';
 import Icon from '../../../components/Icons';
 import { Input, Select, TextArea } from './AdmissionFormFields';
 import { GENDER_OPTIONS } from '../../../utils/constants';
@@ -15,7 +15,7 @@ interface Props {
 
 export default function StepPersonalInfo({ form, set, setForm, goTo, errors = {}, clearError }: Props) {
   return (
-    <div className="gk-card p-6">
+    <div className="gk-section-card p-6">
       <h3 className="text-lg font-bold text-forest-500 mb-1">Step 1: Personal Information</h3>
       <p className="text-gray-500 text-sm mb-6">Provide basic personal details of the student.</p>
       <h4 className="font-semibold text-forest-500 mb-3 flex items-center gap-1.5"><Icon name="userCircle" className="w-4 h-4" /> Student Details</h4>
@@ -33,7 +33,7 @@ export default function StepPersonalInfo({ form, set, setForm, goTo, errors = {}
         <TextArea label="Complete Address" value={form.address} onChange={set('address')} required placeholder="Street, Barangay, Municipality/City, Province, ZIP Code" rows={3} maxLength={500} error={errors.address} />
       </div>
       <div className="flex justify-end">
-        <button onClick={() => goTo(2)} className="bg-gradient-to-r from-forest-500 to-forest-400 text-white px-6 py-2.5 rounded-lg font-semibold hover:from-gold-500 hover:to-gold-600">Next: School Info →</button>
+        <button onClick={() => goTo(2)} className="bg-gradient-to-r from-forest-500 to-forest-400 text-white px-6 py-2.5 rounded-lg font-semibold hover:from-gold-500 hover:to-gold-600">Next: School Info</button>
       </div>
     </div>
   );

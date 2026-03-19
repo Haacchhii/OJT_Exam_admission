@@ -37,6 +37,10 @@ export default function Register() {
         registerPayload: { firstName: form.firstName, lastName: form.lastName, email: form.email, password: form.password, gradeLevel: form.gradeLevel },
       });
       if (!result.ok) {
+        if (result.emailVerificationRequired) {
+          showToast(result.msg || 'Verification email sent. Please check your inbox and spam folder.', 'info');
+          return;
+        }
         showToast(result.msg || 'Registration failed. Please try again.', 'error');
         return;
       }

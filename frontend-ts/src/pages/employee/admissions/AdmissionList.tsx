@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+﻿import { useState, useMemo, useEffect } from 'react';
 import { useAsync } from '../../../hooks/useAsync';
 import { getAdmissions, getStats, bulkUpdateStatus, bulkDeleteAdmissions, VALID_TRANSITIONS } from '../../../api/admissions';
 import { getAcademicYears, getSemesters } from '../../../api/academicYears';
@@ -41,6 +41,7 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
   const [sortBy, setSortBy] = useState('newest');
   const [yearFilter, setYearFilter] = useState('all');
   const [semesterFilter, setSemesterFilter] = useState('all');
+  const [staleOnly, setStaleOnly] = useState(false);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [bulkStatus, setBulkStatus] = useState<string>('Submitted');
@@ -78,16 +79,34 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
 
   const admissions = useMemo(() => {
     let list = rawData?.admissions || [];
-    if (filter !== 'all') list = list.filter(a => a.status === filter);      if (levelGroupFilter !== 'all') list = list.filter(a => a.levelGroup === levelGroupFilter);    if (gradeFilter !== 'all') list = list.filter(a => a.gradeLevel === gradeFilter);
+    if (filter !== 'all') list = list.filter(a => a.status === filter);
+    if (levelGroupFilter !== 'all') list = list.filter(a => a.levelGroup === levelGroupFilter);
+    if (gradeFilter !== 'all') list = list.filter(a => a.gradeLevel === gradeFilter);
     if (yearFilter !== 'all') list = list.filter(a => a.academicYear?.id === Number(yearFilter));
     if (semesterFilter !== 'all') list = list.filter(a => a.semester?.id === Number(semesterFilter));
+    if (staleOnly) {
+      list = list.filter(
+        a =>
+          (ADMISSION_IN_PROGRESS as readonly string[]).includes(a.status) &&
+          daysPending(a.submittedAt) > SLA_DAYS,
+      );
+    }
     if (search) list = list.filter(a => `${a.firstName} ${a.lastName} ${a.email}`.toLowerCase().includes(search.toLowerCase()));
     if (sortBy === 'newest') list = [...list].sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
     else if (sortBy === 'oldest') list = [...list].sort((a, b) => new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime());
     else if (sortBy === 'name') list = [...list].sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`));
     else if (sortBy === 'status') list = [...list].sort((a, b) => a.status.localeCompare(b.status));
     return list;
-  }, [rawData, search, filter, levelGroupFilter, gradeFilter, yearFilter, semesterFilter, sortBy]);
+  }, [rawData, search, filter, levelGroupFilter, gradeFilter, yearFilter, semesterFilter, sortBy, staleOnly]);
+
+  const staleAdmissions = useMemo(
+    () => (rawData?.admissions || []).filter(
+      a =>
+        (ADMISSION_IN_PROGRESS as readonly string[]).includes(a.status) &&
+        daysPending(a.submittedAt) > SLA_DAYS,
+    ),
+    [rawData],
+  );
 
   const { paginated, totalPages, safePage, totalItems } = usePaginationSlice(admissions, page, PER_PAGE);
 
@@ -164,6 +183,26 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
     }
   };
 
+  const copyEscalationDraft = async () => {
+    if (staleAdmissions.length === 0) return;
+    const lines = [
+      'Admissions Escalation Draft',
+      `Date: ${new Date().toLocaleDateString()}`,
+      `Over-SLA applications: ${staleAdmissions.length}`,
+      '',
+      ...staleAdmissions.slice(0, 20).map(a => {
+        const name = `${a.firstName} ${a.lastName}`;
+        return `#${a.id} | ${name} | ${a.status} | ${daysPending(a.submittedAt)}d pending`;
+      }),
+    ];
+    try {
+      await navigator.clipboard.writeText(lines.join('\n'));
+      showToast('Escalation draft copied to clipboard.', 'success');
+    } catch {
+      showToast('Could not copy escalation draft. Please try again.', 'error');
+    }
+  };
+
   if (loading && !rawData) return <SkeletonPage />;
   if (error) return <ErrorAlert error={error} onRetry={refetch} />;
 
@@ -220,17 +259,72 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
         <select value={sortBy} onChange={e => { setSortBy(e.target.value); resetPage(); }} aria-label="Sort by" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white">
           <option value="newest">Newest First</option>
           <option value="oldest">Oldest First</option>
-          <option value="name">Name A–Z</option>
+          <option value="name">Name A-Z</option>
           <option value="status">Status</option>
         </select>
       </div>
 
-      <div className="flex gap-2 mb-4 flex-wrap" role="tablist">
+      <div className="inline-flex gap-2 mb-4 flex-wrap p-1.5 rounded-2xl border border-gray-200 bg-white/80 shadow-sm" role="tablist" aria-label="Admission status tabs">
         {tabs.map(t => (
-          <button key={t.key} role="tab" aria-selected={filter === t.key} onClick={() => { setFilter(t.key); resetPage(); }} className={`px-4 py-2 rounded-lg text-sm font-medium transition ${filter === t.key ? 'bg-forest-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+          <button key={t.key} role="tab" aria-selected={filter === t.key} onClick={() => { setFilter(t.key); resetPage(); }} className={`relative px-4 sm:px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 border ${filter === t.key ? 'bg-gradient-to-r from-forest-600 to-forest-500 text-white border-forest-600 shadow-[0_8px_20px_rgba(21,128,61,0.28)]' : 'bg-white text-gray-600 border-gray-200 hover:border-forest-200 hover:text-forest-700 hover:bg-forest-50'}`}>
             {t.label} ({t.count})
+            {filter === t.key && <span className="absolute inset-x-2 -bottom-0.5 h-0.5 rounded-full bg-gold-300" />}
           </button>
         ))}
+      </div>
+
+      {canManage && (
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => { setStaleOnly(v => !v); resetPage(); }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${staleOnly ? 'bg-red-50 text-red-700 border-red-200' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+          >
+            {staleOnly ? 'Showing Over-SLA Only' : `Show Over-SLA Only (${staleAdmissions.length})`}
+          </button>
+          <button
+            onClick={copyEscalationDraft}
+            disabled={staleAdmissions.length === 0}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+          >
+            <Icon name="clipboard" className="w-3.5 h-3.5" /> Copy Escalation Draft
+          </button>
+        </div>
+      )}
+
+      {canManage && staleAdmissions.length > 0 && !staleOnly && (
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex flex-wrap items-center gap-2">
+          <Icon name="exclamation" className="w-4 h-4" />
+          <span>{staleAdmissions.length} application(s) are over SLA ({SLA_DAYS}+ days in progress).</span>
+          <button
+            onClick={() => { setStaleOnly(true); resetPage(); }}
+            className="ml-auto text-xs font-semibold underline hover:no-underline"
+          >
+            Review Now
+          </button>
+        </div>
+      )}
+
+      <div className="gk-section-card p-4 mb-4">
+        <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
+          <Icon name="clock" className="w-4 h-4 text-forest-500" /> Queue Process Guide
+        </h4>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+          <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+            <p className="font-semibold text-gray-700">Submitted</p>
+            <p className="text-gray-500">Target: move to screening within 1-3 business days.</p>
+            <p className="text-xs text-gray-400 mt-1">Action: verify required documents and applicant profile fields.</p>
+          </div>
+          <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+            <p className="font-semibold text-gray-700">Under Screening</p>
+            <p className="text-gray-500">Target: resolve checks within 2-5 business days.</p>
+            <p className="text-xs text-gray-400 mt-1">Action: request missing items and add clear notes for the next reviewer.</p>
+          </div>
+          <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+            <p className="font-semibold text-gray-700">Under Evaluation</p>
+            <p className="text-gray-500">Target: finalize decision within 5-10 business days from submission.</p>
+            <p className="text-xs text-gray-400 mt-1">Action: set Accepted/Rejected with concise decision rationale.</p>
+          </div>
+        </div>
       </div>
 
       {/* Bulk action bar */}
@@ -240,8 +334,8 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
           <select value={bulkStatus} onChange={e => setBulkStatus(e.target.value)} className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-forest-500/20 outline-none">
             {ADMISSION_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
-          <button onClick={handleBulkAction} disabled={saving} className="bg-forest-500 text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-forest-600 transition disabled:opacity-50 disabled:cursor-not-allowed">{saving ? 'Applying…' : 'Apply Status'}</button>
-          <button onClick={handleBulkDelete} disabled={bulkDeleting} className="bg-red-600 text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"><Icon name="trash" className="w-3.5 h-3.5" />{bulkDeleting ? 'Deleting…' : 'Delete Selected'}</button>
+          <button onClick={handleBulkAction} disabled={saving} className="bg-forest-500 text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-forest-600 transition disabled:opacity-50 disabled:cursor-not-allowed">{saving ? 'Applying...' : 'Apply Status'}</button>
+          <button onClick={handleBulkDelete} disabled={bulkDeleting} className="bg-red-600 text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"><Icon name="trash" className="w-3.5 h-3.5" />{bulkDeleting ? 'Deleting...' : 'Delete Selected'}</button>
           <button onClick={() => setSelected(new Set())} className="text-gray-500 text-sm hover:underline ml-auto">Clear selection</button>
         </div>
       ) : canManage ? (
@@ -251,7 +345,7 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
         </div>
       ) : null}
 
-      <div className="gk-card p-4">
+      <div className="gk-section-card p-4">
         {paginated.length > 0 ? (
           <>
             <div className="table-scroll">
@@ -278,7 +372,7 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
                       <td className="py-3 px-2 text-gray-500">{formatDate(a.submittedAt)}</td>
                       <td className="py-3 px-2">{(ADMISSION_IN_PROGRESS as readonly string[]).includes(a.status) ? (
                         <span className={`text-xs font-semibold ${daysPending(a.submittedAt) > SLA_DAYS ? 'text-red-600' : daysPending(a.submittedAt) > 5 ? 'text-amber-600' : 'text-gray-500'}`}>{daysPending(a.submittedAt)}d</span>
-                      ) : <span className="text-gray-400">—</span>}</td>
+                      ) : <span className="text-gray-400">-</span>}</td>
                       <td className="py-3 px-2"><button onClick={(e) => { e.stopPropagation(); onShowDetail(a.id); }} className="text-forest-500 hover:underline text-xs font-medium">View</button></td>
                     </tr>
                   ))}

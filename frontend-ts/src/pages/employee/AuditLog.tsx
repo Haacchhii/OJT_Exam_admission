@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+﻿import { useState, useCallback } from 'react';
 import { useAsync } from '../../hooks/useAsync';
 import { auditApi } from '../../api/auditLog';
 import { PageHeader, SkeletonPage, ErrorAlert } from '../../components/UI';
@@ -35,11 +35,11 @@ function formatDateLocal(date: string): string {
 }
 
 function formatDetails(details: unknown): string {
-  if (!details) return '—';
+  if (!details) return '-';
   if (typeof details === 'string') return details;
   return Object.entries(details as Record<string, unknown>)
     .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
-    .join(' · ');
+    .join(' | ');
 }
 
 export default function AuditLog() {
@@ -75,7 +75,7 @@ export default function AuditLog() {
       </PageHeader>
 
       {/* Filters */}
-      <div className="gk-card p-4">
+      <div className="gk-section-card p-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="relative">
             <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -115,7 +115,7 @@ export default function AuditLog() {
       </div>
 
       {/* Logs Table */}
-      <div className="gk-card overflow-hidden">
+      <div className="gk-section-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="gk-table">
             <thead>
@@ -159,11 +159,11 @@ export default function AuditLog() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-gray-600 text-xs capitalize">{log.entity}</td>
-                  <td className="px-4 py-3 text-gray-400 text-xs font-mono">{log.entityId ?? '—'}</td>
+                  <td className="px-4 py-3 text-gray-400 text-xs font-mono">{log.entityId ?? '-'}</td>
                   <td className="px-4 py-3 text-gray-400 text-xs max-w-[300px] truncate" title={formatDetails(log.details)}>
                     {formatDetails(log.details)}
                   </td>
-                  <td className="px-4 py-3 text-gray-500 text-xs font-mono">{log.ipAddress || '—'}</td>
+                  <td className="px-4 py-3 text-gray-500 text-xs font-mono">{log.ipAddress || '-'}</td>
                 </tr>
               ))}
             </tbody>

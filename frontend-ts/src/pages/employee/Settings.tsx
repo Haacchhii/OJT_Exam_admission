@@ -198,13 +198,13 @@ export default function EmployeeSettings() {
                 <div className="flex items-center gap-3">
                   <span className="font-medium text-gray-800">{y.year}</span>
                   {y.isActive && <Badge className="bg-emerald-100 text-emerald-700">Active</Badge>}
-                  <button onClick={() => setSelectedYearId(y.id)} className="text-xs text-forest-600 hover:text-forest-800 px-2 py-1 rounded hover:bg-forest-50 transition-colors" title="View semesters">
+                  <button onClick={(e) => { e.stopPropagation(); setSelectedYearId(y.id); }} className="text-xs text-forest-600 hover:text-forest-800 px-2 py-1 rounded hover:bg-forest-50 transition-colors" title="View semesters">
                     <Icon name="eye" className="w-4 h-4" />
                   </button>
-                  <button onClick={() => openEditYear(y)} className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50 transition-colors" title="Edit">
+                  <button onClick={(e) => { e.stopPropagation(); openEditYear(y); }} className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50 transition-colors" title="Edit">
                     <Icon name="edit" className="w-4 h-4" />
                   </button>
-                  <button onClick={() => handleDeleteYear(y)} className="text-xs text-red-600 hover:text-red-800 px-2 py-1 rounded hover:bg-red-50 transition-colors" title="Delete">
+                  <button onClick={(e) => { e.stopPropagation(); handleDeleteYear(y); }} className="text-xs text-red-600 hover:text-red-800 px-2 py-1 rounded hover:bg-red-50 transition-colors" title="Delete">
                     <Icon name="trash" className="w-4 h-4" />
                   </button>
                 </div>

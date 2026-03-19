@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAsync } from '../../../hooks/useAsync';
-import { getExams, getExamSchedules, registerForExam, getAvailableSchedules } from '../../../api/exams';
+import { getExams, getExamSchedules, registerForExam, getAvailableSchedules, notifyNoExamSchedule } from '../../../api/exams';
 import { showToast } from '../../../components/Toast';
 import { useConfirm } from '../../../components/ConfirmDialog';
 import { PageHeader } from '../../../components/UI';
@@ -26,6 +26,9 @@ interface ScheduleViewProps {
 export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, user }: ScheduleViewProps) {
   const confirm = useConfirm();
   const [bookingSlotId, setBookingSlotId] = useState<number | null>(null);
+  const [noticeMessage, setNoticeMessage] = useState('');
+  const [sendingNotice, setSendingNotice] = useState(false);
+  const [noticeSent, setNoticeSent] = useState(false);
 
   const { data: schedData } = useAsync<ScheduleData>(async () => {
     const [rawSched, rawExm, rawAvail] = await Promise.all([getExamSchedules(), getExams(), getAvailableSchedules()]);
@@ -39,7 +42,7 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, user
     return (
       <div>
         <PageHeader title="Entrance Examination" subtitle="Select an available exam slot and confirm your booking." />
-        <div className="gk-card p-8 text-center">
+        <div className="gk-section-card p-8 text-center">
           <div className="w-14 h-14 rounded-2xl bg-forest-50 flex items-center justify-center mx-auto mb-3"><Icon name="checkCircle" className="w-7 h-7 text-forest-500" /></div>
           <h3 className="font-bold text-forest-500 mb-1">Exam Completed</h3>
           <p className="text-gray-500 text-sm mb-4">You have already taken the exam. View your results below.</p>
@@ -81,10 +84,25 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, user
     }
   };
 
+  const sendNoScheduleNotice = async () => {
+    if (sendingNotice || noticeSent) return;
+    setSendingNotice(true);
+    try {
+      const res = await notifyNoExamSchedule(noticeMessage.trim());
+      showToast(res?.message || 'Notice sent to staff.', 'success');
+      setNoticeSent(true);
+      setNoticeMessage('');
+    } catch (err: unknown) {
+      showToast((err as Error).message || 'Failed to send notice. Please try again.', 'error');
+    } finally {
+      setSendingNotice(false);
+    }
+  };
+
   return (
     <div>
       <PageHeader title="Entrance Examination" subtitle="Select an available exam slot and confirm your booking." />
-      <div className="gk-card p-4 mb-6">
+      <div className="gk-section-card p-4 mb-6">
         <div className="flex items-center gap-3 text-forest-600">
           <Icon name="clipboard" className="w-6 h-6 text-forest-500" />
           <div>
@@ -96,8 +114,16 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, user
             </p>
           </div>
         </div>
+        <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+          <p className="text-xs font-semibold text-gray-700 mb-1">Before you book</p>
+          <ul className="text-xs text-gray-600 list-disc list-inside space-y-0.5">
+            <li>Pick a slot where you can be online at least 15 minutes early.</li>
+            <li>Prepare a stable internet connection and charged device.</li>
+            <li>Keep your tracking ID after booking for support follow-up.</li>
+          </ul>
+        </div>
       </div>
-      <div className="gk-card p-6">
+      <div className="gk-section-card p-6">
         <h3 className="text-lg font-bold text-forest-500 mb-4">Available Exam Slots</h3>
         {available.length > 0 ? (
           <div className="space-y-3">
@@ -113,7 +139,7 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, user
                   </div>
                   <div className="flex-1">
                     <h4 className="font-semibold text-forest-500">{exam?.title || 'Exam'}</h4>
-                    <p className="text-gray-500 text-sm">{formatTime(s.startTime)} - {formatTime(s.endTime)} · {remaining} slots left</p>
+                    <p className="text-gray-500 text-sm">{formatTime(s.startTime)} - {formatTime(s.endTime)} | {remaining} slots left</p>
                     {(exam as any)?.gradeLevel && <span className="inline-block mt-1 text-xs bg-gold-100 text-gold-700 px-2 py-0.5 rounded-full font-medium">{(exam as any).gradeLevel}</span>}
                   </div>
                   <button
@@ -121,14 +147,39 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, user
                     disabled={bookingSlotId === s.id}
                     className="bg-forest-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-forest-600 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
                   >
-                    {bookingSlotId === s.id ? <><span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Booking…</> : 'Book This Slot'}
+                    {bookingSlotId === s.id ? <><span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Booking...</> : 'Book This Slot'}
                   </button>
                 </div>
               );
             })}
           </div>
         ) : (
-          <p className="text-gray-400 text-center py-6">No available exam slots at this time.</p>
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-5">
+            <p className="text-gray-500 text-sm text-center mb-3">
+              No available exam slots for your grade level at this time.
+            </p>
+            <div className="max-w-xl mx-auto">
+              <label className="block text-xs font-semibold text-gray-700 mb-1.5">Optional note to staff</label>
+              <textarea
+                value={noticeMessage}
+                onChange={e => setNoticeMessage(e.target.value)}
+                placeholder="Example: Please open a Grade 12 STEM exam schedule this week."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-forest-500/20 outline-none min-h-[84px]"
+                maxLength={500}
+              />
+              <div className="mt-2 flex flex-wrap items-center gap-2 justify-between">
+                <span className="text-xs text-gray-400">{noticeMessage.length}/500</span>
+                <button
+                  type="button"
+                  onClick={sendNoScheduleNotice}
+                  disabled={sendingNotice || noticeSent}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold bg-forest-500 text-white hover:bg-forest-600 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {sendingNotice ? <><span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Sending...</> : <><Icon name="mail" className="w-4 h-4" /> {noticeSent ? 'Notice Sent' : 'Notify Teachers / Staff'}</>}
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>
@@ -159,7 +210,7 @@ function ScheduledView({ myReg, schedules, exams, onLobby }: ScheduledViewProps)
   return (
     <div>
       <PageHeader title="Entrance Examination" subtitle="Select an available exam slot and confirm your booking." />
-      <div className="gk-card p-8 text-center">
+      <div className="gk-section-card p-8 text-center">
         <div className="w-14 h-14 rounded-2xl bg-forest-50 flex items-center justify-center mx-auto mb-3"><Icon name="calendar" className="w-7 h-7 text-forest-500" /></div>
         <h3 className="font-bold text-forest-500 mb-2">Exam Scheduled</h3>
         {myReg.trackingId && (
@@ -173,6 +224,14 @@ function ScheduledView({ myReg, schedules, exams, onLobby }: ScheduledViewProps)
           <span className="text-xs text-gray-400">Date</span><span className="text-sm font-medium">{schedule?.scheduledDate || 'N/A'}</span>
           <span className="text-xs text-gray-400">Time</span><span className="text-sm font-medium">{schedule ? `${formatTime(schedule.startTime)} - ${formatTime(schedule.endTime)}` : 'N/A'}</span>
           <span className="text-xs text-gray-400">Duration</span><span className="text-sm font-medium">{exam ? `${exam.durationMinutes} minutes` : 'N/A'}</span>
+        </div>
+        <div className="max-w-xl mx-auto text-left rounded-lg border border-gold-200 bg-gold-50 px-4 py-3 mb-5">
+          <p className="text-xs font-semibold text-gold-800 mb-1">Exam-day checklist</p>
+          <ul className="text-xs text-gold-800 list-disc list-inside space-y-0.5">
+            <li>Open this page 10-15 minutes before your scheduled start.</li>
+            <li>Use a quiet place and avoid refreshing during the exam.</li>
+            <li>If you encounter issues, share tracking ID <strong>{myReg.trackingId || 'N/A'}</strong> with support.</li>
+          </ul>
         </div>
         {canStart && exam ? (
           <button onClick={() => onLobby(exam)} className="bg-gradient-to-r from-forest-500 to-forest-400 text-white px-8 py-3 rounded-lg font-semibold hover:from-gold-500 hover:to-gold-600 shadow-md">Take Exam Now</button>

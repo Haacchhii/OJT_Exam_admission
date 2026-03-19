@@ -1,6 +1,48 @@
 import prisma from '../config/db.js';
 import { paginate, paginatedResponse } from '../utils/pagination.js';
-import { GRADE_TO_EXAM_LEVEL, GRADE_TO_LEGACY_EXAM_LEVEL } from '../utils/constants.js';
+import { GRADE_TO_EXAM_LEVEL, GRADE_TO_LEGACY_EXAM_LEVEL, ROLES } from '../utils/constants.js';
+import { getIo } from '../utils/socket.js';
+import { logAudit } from '../utils/auditLog.js';
+
+function getTodayLocalIso() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function validateScheduleFields({ scheduledDate, startTime, endTime }, { checkPastDate = false } = {}) {
+  if (startTime && endTime && startTime >= endTime) {
+    return 'endTime must be after startTime';
+  }
+  if (checkPastDate && scheduledDate) {
+    const today = getTodayLocalIso();
+    if (scheduledDate < today) {
+      return 'scheduledDate cannot be in the past';
+    }
+  }
+  return null;
+}
+
+function normalizeGradeLabel(value = '') {
+  return String(value).toLowerCase().replace(/[\u2013\u2014]/g, '-').replace(/\s+/g, ' ').trim();
+}
+
+function resolveGradeKey(gradeLevel = '') {
+  const keys = Object.keys(GRADE_TO_EXAM_LEVEL);
+  const normalizedInput = normalizeGradeLabel(gradeLevel);
+  return keys.find(k => normalizeGradeLabel(k) === normalizedInput) || null;
+}
+
+function inferLegacyGradeBucket(gradeLevel = '') {
+  const g = normalizeGradeLabel(gradeLevel);
+  if (g.includes('nursery') || g.includes('kinder')) return 'Preschool';
+  if (/grade\s*[1-6](\b|\D)/.test(g)) return 'Grade 1-6';
+  if (/grade\s*(7|8|9|10)(\b|\D)/.test(g)) return 'Grade 7-10';
+  if (/grade\s*(11|12)(\b|\D)/.test(g)) return 'Grade 11-12';
+  return null;
+}
 
 // GET /api/exams/schedules?examId=&search=&page=&limit=
 export async function getSchedules(req, res, next) {
@@ -32,19 +74,23 @@ export async function getSchedules(req, res, next) {
 // GET /api/exams/schedules/available
 export async function getAvailableSchedules(req, res, next) {
   try {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayLocalIso();
 
     // If the requester is an applicant, filter schedules to their grade level
     let gradeFilter = {};
-    if (req.user) {
+    if (req.user?.role === ROLES.APPLICANT) {
       const profile = await prisma.applicantProfile.findUnique({ where: { userId: req.user.id } });
-      if (profile?.gradeLevel) {
-        const examLevel = GRADE_TO_EXAM_LEVEL[profile.gradeLevel];
-        const legacyLevel = GRADE_TO_LEGACY_EXAM_LEVEL[profile.gradeLevel];
-        const allowedLevels = [examLevel, legacyLevel, 'All Levels'].filter(Boolean);
-        if (allowedLevels.length > 0) {
-          gradeFilter = { gradeLevel: { in: allowedLevels } };
-        }
+      if (!profile?.gradeLevel) {
+        return res.json([]);
+      }
+
+      const resolvedKey = resolveGradeKey(profile.gradeLevel);
+      const examLevel = resolvedKey ? GRADE_TO_EXAM_LEVEL[resolvedKey] : null;
+      const legacyLevel = resolvedKey ? GRADE_TO_LEGACY_EXAM_LEVEL[resolvedKey] : null;
+      const inferredLegacy = inferLegacyGradeBucket(profile.gradeLevel);
+      const allowedLevels = [...new Set([examLevel, legacyLevel, inferredLegacy, 'All Levels'].filter(Boolean))];
+      if (allowedLevels.length > 0) {
+        gradeFilter = { gradeLevel: { in: allowedLevels } };
       }
     }
 
@@ -71,6 +117,11 @@ export async function createSchedule(req, res, next) {
       return res.status(400).json({ error: 'examId, scheduledDate, startTime, endTime, maxSlots required', code: 'VALIDATION_ERROR' });
     }
 
+    const validationError = validateScheduleFields({ scheduledDate, startTime, endTime }, { checkPastDate: true });
+    if (validationError) {
+      return res.status(400).json({ error: validationError, code: 'VALIDATION_ERROR' });
+    }
+
     const schedule = await prisma.examSchedule.create({
       data: { examId, scheduledDate, startTime, endTime, maxSlots, venue: venue || null, slotsTaken: 0 },
     });
@@ -82,7 +133,25 @@ export async function createSchedule(req, res, next) {
 // PUT /api/exams/schedules/:id
 export async function updateSchedule(req, res, next) {
   try {
+    const id = Number(req.params.id);
     const { scheduledDate, startTime, endTime, maxSlots, venue } = req.body;
+    const existing = await prisma.examSchedule.findUnique({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ error: 'Schedule not found', code: 'NOT_FOUND' });
+    }
+
+    const nextScheduledDate = scheduledDate !== undefined ? scheduledDate : existing.scheduledDate;
+    const nextStartTime = startTime !== undefined ? startTime : existing.startTime;
+    const nextEndTime = endTime !== undefined ? endTime : existing.endTime;
+
+    const validationError = validateScheduleFields(
+      { scheduledDate: nextScheduledDate, startTime: nextStartTime, endTime: nextEndTime },
+      { checkPastDate: scheduledDate !== undefined }
+    );
+    if (validationError) {
+      return res.status(400).json({ error: validationError, code: 'VALIDATION_ERROR' });
+    }
+
     const data = {};
     if (scheduledDate !== undefined) data.scheduledDate = scheduledDate;
     if (startTime !== undefined)     data.startTime = startTime;
@@ -91,7 +160,7 @@ export async function updateSchedule(req, res, next) {
     if (venue !== undefined)         data.venue = venue;
 
     const schedule = await prisma.examSchedule.update({
-      where: { id: Number(req.params.id) },
+      where: { id },
       data,
     });
 
@@ -107,5 +176,46 @@ export async function deleteSchedule(req, res, next) {
     await prisma.examRegistration.deleteMany({ where: { scheduleId: id } });
     await prisma.examSchedule.delete({ where: { id } });
     res.status(204).end();
+  } catch (err) { next(err); }
+}
+
+// POST /api/exams/schedules/notice
+export async function notifyNoSchedule(req, res, next) {
+  try {
+    if (req.user?.role !== ROLES.APPLICANT) {
+      return res.status(403).json({ error: 'Only applicants can send schedule notices', code: 'FORBIDDEN' });
+    }
+
+    const profile = await prisma.applicantProfile.findUnique({ where: { userId: req.user.id } });
+    const gradeLevel = profile?.gradeLevel;
+    if (!gradeLevel) {
+      return res.status(400).json({ error: 'Applicant grade level is required before sending a notice', code: 'VALIDATION_ERROR' });
+    }
+
+    const message = typeof req.body?.message === 'string' ? req.body.message.trim().slice(0, 500) : '';
+    const payload = {
+      userId: req.user.id,
+      studentName: `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || req.user.email,
+      email: req.user.email,
+      gradeLevel,
+      message,
+      createdAt: new Date().toISOString(),
+    };
+
+    try {
+      getIo().to('role_teacher').to('role_registrar').to('role_administrator').emit('exam_schedule_notice', payload);
+    } catch (_) {
+      // Non-fatal: request should still succeed even if socket emit fails.
+    }
+
+    logAudit({
+      userId: req.user.id,
+      action: 'exam.schedule_notice',
+      entity: 'exam_schedule',
+      details: { gradeLevel, message: message || null },
+      ipAddress: req.ip,
+    });
+
+    res.json({ ok: true, message: 'Your notice has been sent to the staff.' });
   } catch (err) { next(err); }
 }

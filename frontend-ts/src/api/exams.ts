@@ -60,6 +60,12 @@ export async function getAvailableSchedules() {
   return client.get<ExamSchedule[]>('/exams/schedules/available');
 }
 
+export async function notifyNoExamSchedule(message?: string) {
+  return client.post<{ ok: boolean; message: string }>('/exams/schedules/notice', {
+    message: message || '',
+  });
+}
+
 export async function addExamSchedule(schedule: Record<string, unknown>) {
   return client.post<ExamSchedule>('/exams/schedules', schedule);
 }

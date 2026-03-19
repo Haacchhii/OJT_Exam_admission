@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { showToast } from '../../components/Toast';
 import Icon from '../../components/Icons';
@@ -73,7 +73,7 @@ export default function Profile() {
 
       <div className="max-w-2xl space-y-6">
         {/* Profile Card */}
-        <div className="gk-card p-6">
+        <div className="gk-section-card p-6">
           <div className="flex items-center gap-4 mb-6">
             <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-xl font-bold shadow-sm ${isEmployee ? 'bg-forest-500 text-gold-300' : 'bg-gold-400 text-forest-700'}`}>
               {initials}
@@ -90,7 +90,7 @@ export default function Profile() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
             <div>
               <span className="text-gray-400 text-xs uppercase font-semibold">Account Created</span>
-              <p className="text-gray-700 mt-0.5">{user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : '—'}</p>
+              <p className="text-gray-700 mt-0.5">{user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : '-'}</p>
             </div>
             <div>
               <span className="text-gray-400 text-xs uppercase font-semibold">Status</span>
@@ -112,7 +112,7 @@ export default function Profile() {
         </div>
 
         {/* Edit Profile */}
-        <div className="gk-card p-6">
+        <div className="gk-section-card p-6">
           <h3 className="text-md font-bold text-forest-500 mb-4 flex items-center gap-2">
             <Icon name="userCircle" className="w-5 h-5" />
             Edit Profile
@@ -141,12 +141,12 @@ export default function Profile() {
             </div>
           </div>
           <button onClick={handleSaveProfile} disabled={saving} className="bg-forest-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-forest-600 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5 text-sm">
-            {saving ? <><Icon name="spinner" className="w-4 h-4 animate-spin" /> Saving…</> : 'Save Changes'}
+            {saving ? <><Icon name="spinner" className="w-4 h-4 animate-spin" /> Saving...</> : 'Save Changes'}
           </button>
         </div>
 
         {/* Change Password */}
-        <div className="gk-card p-6">
+        <div className="gk-section-card p-6">
           <h3 className="text-md font-bold text-forest-500 mb-4 flex items-center gap-2">
             <Icon name="shieldCheck" className="w-5 h-5" />
             Change Password
@@ -166,7 +166,7 @@ export default function Profile() {
             </div>
           </div>
           <button onClick={handleChangePassword} disabled={changingPassword} className="bg-forest-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-forest-600 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5 text-sm">
-            {changingPassword ? <><Icon name="spinner" className="w-4 h-4 animate-spin" /> Changing…</> : 'Change Password'}
+            {changingPassword ? <><Icon name="spinner" className="w-4 h-4 animate-spin" /> Changing...</> : 'Change Password'}
           </button>
         </div>
       </div>

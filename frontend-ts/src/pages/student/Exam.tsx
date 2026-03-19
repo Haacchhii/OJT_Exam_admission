@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useAsync } from '../../hooks/useAsync';
 import { getExamSchedules, getMyRegistrations, startExam as apiStartExam, getExamForStudent } from '../../api/exams';
@@ -77,7 +77,7 @@ export default function StudentExam() {
   if (view === 'lobby' && currentExam) {
     return (
       <div className="max-w-2xl mx-auto">
-        <div className="gk-card p-8 text-center">
+        <div className="gk-section-card p-8 text-center">
           <div className="w-16 h-16 rounded-2xl bg-forest-50 flex items-center justify-center mx-auto mb-4"><Icon name="documentText" className="w-8 h-8 text-forest-500" /></div>
           <h2 className="text-2xl font-bold text-forest-500 mb-2">Ready to Begin</h2>
           <p className="text-gray-500 mb-6 leading-relaxed">
@@ -87,7 +87,7 @@ export default function StudentExam() {
             Passing Score: <strong>{currentExam.passingScore}%</strong>
           </p>
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-left mb-4">
-            <h4 className="font-bold text-red-600 mb-2 flex items-center gap-2"><Icon name="exclamation" className="w-5 h-5" /> Critical Rules — Read Before Starting</h4>
+            <h4 className="font-bold text-red-600 mb-2 flex items-center gap-2"><Icon name="exclamation" className="w-5 h-5" /> Critical Rules - Read Before Starting</h4>
             <ul className="text-red-700 text-sm space-y-1.5 list-disc pl-5">
               <li><strong>After 3 tab switches, the exam will be automatically submitted.</strong> Do not switch tabs or apps.</li>
               <li><strong>The exam will auto-submit when the timer reaches zero.</strong> Monitor your time.</li>
@@ -103,7 +103,7 @@ export default function StudentExam() {
             </ul>
           </div>
           <button onClick={handleStartExam} disabled={startingExam} className="bg-gradient-to-r from-forest-500 to-forest-400 text-white px-8 py-3 rounded-lg font-semibold text-lg hover:from-gold-500 hover:to-gold-600 shadow-md inline-flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed">
-            {startingExam ? <><span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Starting…</> : <><Icon name="exam" className="w-5 h-5" /> Start Exam</>}
+            {startingExam ? <><span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Starting...</> : <><Icon name="exam" className="w-5 h-5" /> Start Exam</>}
           </button>
         </div>
       </div>

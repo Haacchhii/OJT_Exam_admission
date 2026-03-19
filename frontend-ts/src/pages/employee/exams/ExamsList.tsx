@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+﻿import { useState, useMemo } from 'react';
 import { useAsync } from '../../../hooks/useAsync';
 import { getExams, getExam, updateExam, deleteExam, bulkDeleteExams, cloneExam, getExamSchedules, getExamRegistrations } from '../../../api/exams';
 import { getAcademicYears, getSemesters } from '../../../api/academicYears';
@@ -211,8 +211,8 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
 
     return (
       <div>
-        <button onClick={() => setDetailId(null)} className="mb-4 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 text-sm">← Back to Exam List</button>
-        <div className="gk-card p-6 mb-4">
+        <button onClick={() => setDetailId(null)} className="mb-4 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 text-sm">Back to Exam List</button>
+        <div className="gk-section-card p-6 mb-4">
           <div className="flex justify-between items-start mb-4">
             <div>
               <h2 className="text-xl font-bold text-forest-500">{exam.title}</h2>
@@ -232,10 +232,10 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
             <DetailField label="Schedules" v={eSched.length} /><DetailField label="Registrations" v={`${eRegs.length} (${completed} completed)`} />
           </div>
         </div>
-        <div className="gk-card p-6">
+        <div className="gk-section-card p-6">
           <h3 className="text-lg font-bold text-forest-500 mb-4">Questions ({detailQuestions.length})</h3>
           {examDetailLoading && !fullExam ? (
-            <p className="text-gray-400 text-center py-6">Loading questions…</p>
+            <p className="text-gray-400 text-center py-6">Loading questions...</p>
           ) : (
           <div className="space-y-3">
             {paginatedQuestions.map((q, i) => (
@@ -246,7 +246,7 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
           )}
           {detailQuestions.length > 0 && <div className="mt-4"><Pagination currentPage={qSafePage} totalPages={qTotalPages} onPageChange={setQuestionPage} totalItems={qTotal} itemsPerPage={QUESTIONS_PER_PAGE} /></div>}
         </div>
-        <div className="gk-card p-6 mt-4">
+        <div className="gk-section-card p-6 mt-4">
           <h3 className="text-lg font-bold text-forest-500 mb-4">Registered Students ({eRegs.length})</h3>
           {eRegs.length > 0 ? (
             <div className="table-scroll">
@@ -296,7 +296,7 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
             Export
           </button>          <CSVUploader title="Bulk Import Exams" isOpen={showBulkImport} onClose={() => setShowBulkImport(false)} onImport={handleBulkImportExams} templateHeaders={['title', 'gradeLevel', 'durationMinutes', 'passingScore', 'isActive']} />
           <button onClick={() => setShowBulkImport(true)} className="bg-white text-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 flex items-center gap-2 border border-gray-300">
-            <span>?</span> Import Exams
+            <Icon name="upload" className="w-4 h-4" /> Import Exams
           </button>
         </div>
       </PageHeader>
@@ -308,7 +308,7 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
-        <input value={searchExam} onChange={e => { setSearchExam(e.target.value); resetExamPage(); }} placeholder="Search exams…" className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm" />          <select value={levelGroupFilterExam} onChange={e => { setLevelGroupFilterExam(e.target.value); setGradeFilterExam('all'); resetExamPage(); }} className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
+        <input value={searchExam} onChange={e => { setSearchExam(e.target.value); resetExamPage(); }} placeholder="Search exams..." className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm" />          <select value={levelGroupFilterExam} onChange={e => { setLevelGroupFilterExam(e.target.value); setGradeFilterExam('all'); resetExamPage(); }} className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
             <option value="all">All Level Groups</option>
             {GRADE_OPTIONS.map(g => <option key={g.group} value={g.group}>{g.group}</option>)}
           </select>        <select value={gradeFilterExam} onChange={e => { setGradeFilterExam(e.target.value); resetExamPage(); }} className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
@@ -332,7 +332,7 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
 
       {canManageExams && <BulkActionBar count={selectedCount} onDelete={handleBulkDelete} onClear={clearSelection} deleting={bulkDeleting} />}
 
-      <div className="gk-card p-4 mb-6">
+      <div className="gk-section-card p-4 mb-6">
         {paginatedExams.length > 0 ? (
           <>
             <div className="table-scroll">
@@ -377,10 +377,10 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
         )}
       </div>
 
-      <div className="gk-card p-6">
+      <div className="gk-section-card p-6">
         <h3 className="text-lg font-bold text-forest-500 mb-4">Exam Registrations & Results</h3>
         <div className="flex flex-col sm:flex-row gap-3 mb-4">
-          <input value={readSearch} onChange={e => { setReadSearch(e.target.value); resetReadPage(); }} placeholder="Search student…" className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm" />
+          <input value={readSearch} onChange={e => { setReadSearch(e.target.value); resetReadPage(); }} placeholder="Search student..." className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm" />
           <select value={readStatusFilter} onChange={e => { setReadStatusFilter(e.target.value); resetReadPage(); }} className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
             <option value="all">All</option>
             <option value="pending">Scheduled / In Progress</option>
@@ -402,7 +402,7 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
                       <td className="py-3 px-2 font-medium">{r.user ? `${r.user.firstName} ${r.user.lastName}` : r.userEmail}</td>
                       <td className="py-3 px-2">{r.exam?.title || 'N/A'}</td>
                       <td className="py-3 px-2"><Badge className={badgeClass(r.status)}>{r.status}</Badge></td>
-                      <td className="py-3 px-2">{r.result ? `${r.result.totalScore}/${r.result.maxPossible} (${r.result.percentage.toFixed(1)}%)` : '—'}</td>
+                      <td className="py-3 px-2">{r.result ? `${r.result.totalScore}/${r.result.maxPossible} (${r.result.percentage.toFixed(1)}%)` : '-'}</td>
                       <td className="py-3 px-2">{r.result ? <Badge className={r.result.passed ? 'gk-badge gk-badge-passed' : 'gk-badge gk-badge-failed'}>{r.result.passed ? 'Passed' : (r.result.essayReviewed ? 'Failed' : 'Pending Review')}</Badge> : <Badge className="gk-badge gk-badge-neutral">Awaiting</Badge>}</td>
                     </tr>
                   ))}

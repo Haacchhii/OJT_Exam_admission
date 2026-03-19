@@ -22,32 +22,41 @@ export default function EmployeeAdmissions() {
     setSearchParams({});
   };
 
-  // Track view
-  if (viewMode === 'track') {
-    return (
-      <div>
-        <div className="flex gap-2 mb-6">
-          <button onClick={() => setViewMode('applications')} className="px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition inline-flex items-center gap-1.5"><Icon name="clipboard" className="w-4 h-4" /> Applications</button>
-          <button className="px-4 py-2 rounded-lg text-sm font-medium bg-forest-500 text-white inline-flex items-center gap-1.5"><Icon name="search" className="w-4 h-4" /> Track Application</button>
-        </div>
-        <ApplicationTracker />
+  const viewTabs = (
+    <div className="mb-6">
+      <p className="text-xs text-gray-500 mb-2">Switch between admissions queue management and direct tracking lookup.</p>
+      <div className="inline-flex gap-2 p-1.5 rounded-2xl border border-gray-200 bg-white/80 shadow-sm" role="tablist" aria-label="Admissions workspace tabs">
+      <button
+        role="tab"
+        aria-selected={viewMode === 'applications'}
+        onClick={() => setViewMode('applications')}
+        className={`relative px-4 sm:px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 inline-flex items-center gap-2 border ${viewMode === 'applications' ? 'bg-gradient-to-r from-forest-600 to-forest-500 text-white border-forest-600 shadow-[0_8px_20px_rgba(21,128,61,0.28)]' : 'bg-white text-gray-600 border-gray-200 hover:border-forest-200 hover:text-forest-700 hover:bg-forest-50'}`}
+      >
+        <Icon name="clipboard" className="w-4 h-4" /> Applications
+        {viewMode === 'applications' && <span className="absolute inset-x-2 -bottom-0.5 h-0.5 rounded-full bg-gold-300" />}
+      </button>
+      <button
+        role="tab"
+        aria-selected={viewMode === 'track'}
+        onClick={() => setViewMode('track')}
+        className={`relative px-4 sm:px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 inline-flex items-center gap-2 border ${viewMode === 'track' ? 'bg-gradient-to-r from-forest-600 to-forest-500 text-white border-forest-600 shadow-[0_8px_20px_rgba(21,128,61,0.28)]' : 'bg-white text-gray-600 border-gray-200 hover:border-forest-200 hover:text-forest-700 hover:bg-forest-50'}`}
+      >
+        <Icon name="search" className="w-4 h-4" /> Track Application
+        {viewMode === 'track' && <span className="absolute inset-x-2 -bottom-0.5 h-0.5 rounded-full bg-gold-300" />}
+      </button>
       </div>
-    );
-  }
+    </div>
+  );
 
   // Detail view
   if (detailId) {
     return <AdmissionDetail admissionId={detailId} onBack={backToList} />;
   }
 
-  // List view
   return (
     <div>
-      <div className="flex gap-2 mb-6">
-        <button className="px-4 py-2 rounded-lg text-sm font-medium bg-forest-500 text-white inline-flex items-center gap-1.5"><Icon name="clipboard" className="w-4 h-4" /> Applications</button>
-        <button onClick={() => setViewMode('track')} className="px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition inline-flex items-center gap-1.5"><Icon name="search" className="w-4 h-4" /> Track Application</button>
-      </div>
-      <AdmissionList onShowDetail={showDetail} directStatus={directStatus} />
+      {viewTabs}
+      {viewMode === 'track' ? <ApplicationTracker /> : <AdmissionList onShowDetail={showDetail} directStatus={directStatus} />}
     </div>
   );
 }

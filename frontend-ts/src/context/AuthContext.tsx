@@ -23,8 +23,10 @@ type Permission =
 
 const ROLE_PERMISSIONS: Record<string, Permission[]> = {
   administrator: ['dashboard', 'admissions', 'exams', 'results', 'reports', 'users', 'audit', 'settings'],
-  registrar: ['dashboard', 'admissions', 'exams', 'results', 'reports'],
-  teacher: ['dashboard', 'admissions', 'exams', 'results', 'reports'],
+  // Registrar: admission operations and reporting
+  registrar: ['dashboard', 'admissions', 'reports'],
+  // Teacher: exam operations, scoring, and reporting
+  teacher: ['dashboard', 'exams', 'results', 'reports'],
 };
 
 const ROLE_LABELS: Record<string, string> = {
@@ -103,9 +105,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = opts.registerPayload
         ? await client.post<AuthResponse>('/auth/register', opts.registerPayload)
         : await client.post<AuthResponse>('/auth/login', { email, password });
-      if (!res?.user || !res?.token) {
-        throw new Error(`API misconfiguration: expected {user,token} but got ${typeof res === 'string' ? 'HTML page' : JSON.stringify(res)?.slice(0, 80)}. Check VITE_API_URL.`);
-      }
       if (res.emailVerificationRequired) {
         setToken(null);
         localStorage.removeItem('gk_current_user');
@@ -114,8 +113,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return {
           ok: false,
           emailVerificationRequired: true,
-          msg: 'Please verify your email before signing in.',
+          msg: res.msg || 'Please verify your email before signing in.',
         };
+      }
+      if (!res?.user || !res?.token) {
+        throw new Error(`API misconfiguration: expected {user,token} but got ${typeof res === 'string' ? 'HTML page' : JSON.stringify(res)?.slice(0, 80)}. Check VITE_API_URL.`);
       }
 
       setToken(res.token);
