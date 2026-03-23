@@ -16,7 +16,7 @@ export { getRegistrations, getMyRegistrations, createRegistration, startExam, sa
 
 // Helper: include questions + choices + creator (for detail views)
 const examDetailInclude = {
-  createdBy: { select: { firstName: true, lastName: true } },
+  createdBy: { select: { firstName: true, middleName: true, lastName: true } },
   academicYear: { select: { id: true, year: true } },
   semester: { select: { id: true, name: true } },
   questions: {
@@ -27,7 +27,7 @@ const examDetailInclude = {
 
 // Lightweight include for list views (no nested questions/choices)
 const examListInclude = {
-  createdBy: { select: { firstName: true, lastName: true } },
+  createdBy: { select: { firstName: true, middleName: true, lastName: true } },
   academicYear: { select: { id: true, year: true } },
   semester: { select: { id: true, name: true } },
   _count: { select: { questions: true, schedules: true } },
@@ -38,7 +38,7 @@ function shapeExam(exam) {
   const { createdBy: creator, createdById, academicYear, semester, _count, ...rest } = exam;
   const shaped = {
     ...rest,
-    createdBy: creator ? `${creator.firstName} ${creator.lastName}`.trim() : 'Unknown',
+    createdBy: creator ? [creator.firstName, creator.middleName, creator.lastName].filter(Boolean).join(' ').trim() : 'Unknown',
     academicYear: academicYear || null,
     semester: semester || null,
   };

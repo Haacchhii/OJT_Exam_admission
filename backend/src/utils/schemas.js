@@ -34,6 +34,7 @@ export const loginSchema = z.object({
 
 export const registerSchema = z.object({
   firstName: z.string().min(1, 'First name is required').max(100),
+  middleName: z.string().min(1, 'Middle name is required').max(100),
   lastName: z.string().min(1, 'Last name is required').max(100),
   email: z.string().email('Invalid email format'),
   password: passwordSchema,
@@ -52,6 +53,7 @@ export const resetPasswordSchema = z.object({
 // ─── Admission Schemas ────────────────────────────────
 export const createAdmissionSchema = z.object({
   firstName: z.string().min(1).max(100),
+  middleName: z.string().min(1).max(100),
   lastName: z.string().min(1).max(100),
   email: z.string().email(),
   phone: z.string().max(20).optional().nullable(),
@@ -118,6 +120,8 @@ export const createScheduleSchema = z.object({
   scheduledDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD format'),
   startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Must be HH:mm format'),
   endTime: z.string().regex(/^\d{2}:\d{2}$/, 'Must be HH:mm format'),
+  registrationOpenDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD format').optional().nullable(),
+  registrationCloseDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD format').optional().nullable(),
   maxSlots: z.number().int().positive(),
   venue: z.string().max(200).optional().nullable(),
 });
@@ -125,6 +129,7 @@ export const createScheduleSchema = z.object({
 // ─── User Schemas ─────────────────────────────────────
 export const createUserSchema = z.object({
   firstName: z.string().min(1).max(100),
+  middleName: z.string().min(1).max(100),
   lastName: z.string().min(1).max(100),
   email: z.string().email(),
   password: passwordSchema,
@@ -133,6 +138,7 @@ export const createUserSchema = z.object({
 
 export const updateUserSchema = z.object({
   firstName: z.string().min(1).max(100).optional(),
+  middleName: z.string().min(1).max(100).optional(),
   lastName: z.string().min(1).max(100).optional(),
   email: z.string().email().optional(),
   role: z.enum(ROLE_VALUES).optional(),
@@ -223,6 +229,8 @@ export const updateScheduleSchema = z.object({
   scheduledDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD format').optional(),
   startTime:     z.string().regex(/^\d{2}:\d{2}$/, 'Must be HH:mm format').optional(),
   endTime:       z.string().regex(/^\d{2}:\d{2}$/, 'Must be HH:mm format').optional(),
+  registrationOpenDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD format').optional().nullable(),
+  registrationCloseDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD format').optional().nullable(),
   maxSlots:      z.number().int().positive().optional(),
   venue:         z.string().max(200).optional().nullable(),
 });

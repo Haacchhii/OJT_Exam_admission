@@ -6,6 +6,7 @@ import Icon from '../../components/Icons';
 import { DEFAULT_PAGE_SIZE } from '../../utils/constants';
 import type { AuditLog as AuditLogType } from '../../types';
 import type { PaginatedAuditResponse } from '../../api/auditLog';
+import { formatPersonName } from '../../utils/helpers';
 
 const ENTITY_OPTIONS = ['', 'admission', 'user', 'exam', 'result'];
 const ENTITY_LABELS: Record<string, string> = { admission: 'Admission', user: 'User', exam: 'Exam', result: 'Result' };
@@ -146,7 +147,7 @@ export default function AuditLog() {
                   <td className="px-4 py-3">
                     {log.user ? (
                       <div>
-                        <p className="text-gray-700 text-xs font-medium">{log.user.firstName} {log.user.lastName}</p>
+                        <p className="text-gray-700 text-xs font-medium">{formatPersonName(log.user)}</p>
                         <p className="text-gray-500 text-xs">{log.user.email}</p>
                       </div>
                     ) : (

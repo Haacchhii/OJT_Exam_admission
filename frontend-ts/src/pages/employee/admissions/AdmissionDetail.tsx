@@ -2,7 +2,7 @@
 import { useConfirm } from '../../../components/ConfirmDialog';
 import { getAdmissions, updateAdmissionStatus, VALID_TRANSITIONS } from '../../../api/admissions';
 import { useAsync } from '../../../hooks/useAsync';
-import { asArray } from '../../../utils/helpers';
+import { asArray, formatPersonName } from '../../../utils/helpers';
 import DocumentReview from '../../../components/DocumentReview';
 import { PageHeader, Badge, SkeletonPage } from '../../../components/UI';
 import Icon from '../../../components/Icons';
@@ -78,7 +78,8 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
       showToast('Popup blocked - please allow popups for this site and try again.', 'error');
       return;
     }
-    printWin.document.write(`<!DOCTYPE html><html><head><title>Application - ${esc(adm.firstName)} ${esc(adm.lastName)}</title>
+    const fullName = formatPersonName(adm);
+    printWin.document.write(`<!DOCTYPE html><html><head><title>Application - ${esc(fullName)}</title>
       <style>
         body { font-family: 'Segoe UI', system-ui, sans-serif; padding: 40px; color: #1a1a1a; max-width: 800px; margin: 0 auto; }
         h1 { color: #166534; font-size: 24px; margin-bottom: 4px; }
@@ -101,7 +102,7 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
       <div class="logo"><span>GK</span><h1><span style="color:#fbbf24">${SCHOOL_BRAND}</span><br/><span style="color:#166534">${SCHOOL_SUBTITLE}</span></h1><p class="subtitle">${SCHOOL_ADDRESS} | Tel: ${SCHOOL_PHONE}<br/>Admission Application Form</p></div>
       <h2>Student Information</h2>
       <div class="grid">
-        <div class="field"><label>Full Name</label><span>${esc(adm.firstName)} ${esc(adm.lastName)}</span></div>
+        <div class="field"><label>Full Name</label><span>${esc(fullName)}</span></div>
         <div class="field"><label>Email</label><span>${esc(adm.email)}</span></div>
         <div class="field"><label>Phone</label><span>${esc(adm.phone) || 'N/A'}</span></div>
         <div class="field"><label>Date of Birth</label><span>${esc(adm.dob)}</span></div>
@@ -141,7 +142,7 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
     if (statusVal !== adm.status) {
       const ok = await confirm({
         title: `Update Status to "${statusVal}"`,
-        message: `Are you sure you want to change ${adm.firstName} ${adm.lastName}'s application from "${adm.status}" to "${statusVal}"?`,
+        message: `Are you sure you want to change ${formatPersonName(adm)}'s application from "${adm.status}" to "${statusVal}"?`,
         confirmLabel: statusVal,
         variant: statusVal === 'Rejected' ? 'danger' : 'info',
       });
@@ -170,7 +171,7 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
       <div className="gk-section-card p-6 mb-4">
         <h3 className="text-lg font-bold text-forest-500 mb-4">Student Information</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <D label="Full Name" value={`${adm.firstName} ${adm.lastName}`} />
+          <D label="Full Name" value={formatPersonName(adm)} />
           <D label="Email" value={adm.email} />
           <D label="Phone" value={adm.phone || 'N/A'} />
           <D label="Date of Birth" value={adm.dob} />
@@ -182,6 +183,7 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
           <D label="Applicant Type" value={adm.applicantType || 'New'} />
           <D label="Student Number" value={adm.studentNumber || (adm.applicantType === 'New' || adm.applicantType === 'Transferee' ? 'Will be assigned on acceptance' : 'N/A')} />
           <D label="LRN" value={adm.lrn || 'N/A'} />
+          <D label="Application Period" value={adm.academicYear?.year && adm.semester?.name ? `${adm.academicYear.year} - ${adm.semester.name}` : adm.academicYear?.year || adm.semester?.name || 'N/A'} />
           <D label="Last School Attended" value={adm.prevSchool || 'N/A'} />
           <div className="md:col-span-2"><D label="School Address" value={adm.schoolAddress || 'N/A'} /></div>
           <D label="Father's Name & Occupation" value={adm.fatherNameOccupation || 'N/A'} />

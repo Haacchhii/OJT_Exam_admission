@@ -222,32 +222,6 @@ export default function Login() {
               </button>
             </form>
 
-            {import.meta.env.DEV && (
-            <div className="mt-6 p-4 bg-gray-50/80 rounded-2xl border border-gray-200/60 text-xs">
-              <div className="flex items-center gap-1.5 mb-3">
-                <Icon name="info" className="w-3.5 h-3.5 text-forest-500" />
-                <strong className="text-forest-600 text-xs">Test Accounts</strong>
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <span className="text-gray-400 uppercase text-[10px] font-semibold tracking-wider">Student</span>
-                  <p className="text-gray-600 truncate mt-0.5">maria.santos@email.com</p>
-                  <p className="text-gray-400 mt-0.5">pw: <code className="bg-gray-200/80 px-1.5 py-0.5 rounded text-gray-600">student123</code></p>
-                </div>
-                <div>
-                  <span className="text-gray-400 uppercase text-[10px] font-semibold tracking-wider">Admin</span>
-                  <p className="text-gray-600 truncate mt-0.5">admin@goldenkey.edu</p>
-                  <p className="text-gray-400 mt-0.5">pw: <code className="bg-gray-200/80 px-1.5 py-0.5 rounded text-gray-600">admin123</code></p>
-                </div>
-                <div>
-                  <span className="text-gray-400 uppercase text-[10px] font-semibold tracking-wider">Teacher</span>
-                  <p className="text-gray-600 truncate mt-0.5">teacher@goldenkey.edu</p>
-                  <p className="text-gray-400 mt-0.5">pw: <code className="bg-gray-200/80 px-1.5 py-0.5 rounded text-gray-600">admin123</code></p>
-                </div>
-              </div>
-            </div>
-            )}
-
             <div className="mt-6 rounded-2xl border-2 border-forest-100 bg-forest-50/60 p-5 text-center space-y-3">
               <p className="text-base font-bold text-gray-800">New to {SCHOOL_BRAND}?</p>
               <p className="text-xs text-gray-500 leading-relaxed">

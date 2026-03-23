@@ -3,7 +3,7 @@ import { getMyRegistrations, getExamSchedules, getExamForReview } from '../../ap
 import { getMyResult, getSubmittedAnswers } from '../../api/results';
 import { PageHeader, SkeletonPage, ErrorAlert } from '../../components/UI';
 import Icon from '../../components/Icons';
-import { formatDate, asArray } from '../../utils/helpers';
+import { formatDate, asArray, formatPersonName } from '../../utils/helpers';
 import { SCHOOL_NAME, SCHOOL_BRAND, SCHOOL_SUBTITLE, SCHOOL_ADDRESS, SCHOOL_PHONE } from '../../utils/constants';
 import { useAuth } from '../../context/AuthContext';
 import { showToast } from '../../components/Toast';
@@ -102,7 +102,7 @@ export default function StudentResults() {
       showToast('Popup blocked - please allow popups for this site and try again.', 'error');
       return;
     }
-    const studentName = user ? `${esc(user.firstName)} ${esc(user.lastName)}` : 'Student';
+    const studentName = user ? esc(formatPersonName(user)) : 'Student';
     printWin.document.write(`<!DOCTYPE html><html><head><title>My Exam Result</title>
       <style>
         body { font-family: 'Segoe UI', system-ui, sans-serif; padding: 40px; color: #1a1a1a; max-width: 800px; margin: 0 auto; }

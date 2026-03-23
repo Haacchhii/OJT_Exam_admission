@@ -32,7 +32,7 @@ export async function getAuditLogs(req, res, next) {
         ...(pg && { skip: pg.skip, take: pg.take }),
         orderBy: { createdAt: 'desc' },
         include: {
-          user: { select: { id: true, firstName: true, lastName: true, email: true, role: true } },
+          user: { select: { id: true, firstName: true, middleName: true, lastName: true, email: true, role: true } },
         },
       }),
       prisma.auditLog.count({ where }),

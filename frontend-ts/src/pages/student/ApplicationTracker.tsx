@@ -6,7 +6,7 @@ import { PageHeader, SkeletonPage, ErrorAlert, Badge } from '../../components/UI
 import Icon from '../../components/Icons';
 import { showToast } from '../../components/Toast';
 import { ADMISSION_PROGRESS_STEPS, SCHOOL_PHONE } from '../../utils/constants';
-import { badgeClass, formatDate } from '../../utils/helpers';
+import { badgeClass, formatDate, formatPersonName } from '../../utils/helpers';
 
 interface TrackResult {
   type: 'admission' | 'exam';
@@ -235,9 +235,10 @@ function AdmissionStatusResult({ data, trackingId }: { data: Record<string, any>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        <Field label="Applicant" value={`${data.firstName || ''} ${data.lastName || ''}`.trim() || 'N/A'} />
+        <Field label="Applicant" value={formatPersonName(data) || 'N/A'} />
         <Field label="Grade Level" value={data.gradeLevel || 'N/A'} />
         <Field label="School Year" value={data.schoolYear || 'N/A'} />
+        <Field label="Application Period" value={data.academicYear?.year && data.semester?.name ? `${data.academicYear.year} - ${data.semester.name}` : data.academicYear?.year || data.semester?.name || 'N/A'} />
         <Field label="Submitted" value={data.submittedAt ? formatDate(data.submittedAt) : 'N/A'} />
       </div>
 
@@ -298,6 +299,10 @@ function ExamStatusResult({ data, trackingId }: { data: Record<string, any>; tra
         <Field
           label="Schedule"
           value={schedule ? `${schedule.scheduledDate} ${schedule.startTime} - ${schedule.endTime}` : 'N/A'}
+        />
+        <Field
+          label="Registration Window"
+          value={schedule ? `${schedule.registrationOpenDate || 'Anytime'} to ${schedule.registrationCloseDate || 'Until exam date'}` : 'N/A'}
         />
         <Field label="Registration Status" value={data.status || 'N/A'} />
       </div>

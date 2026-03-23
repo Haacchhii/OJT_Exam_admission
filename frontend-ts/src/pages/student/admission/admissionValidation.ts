@@ -41,6 +41,10 @@ export function validateStep1(form: AdmissionForm): AdmissionErrors {
   else if (form.firstName.trim().length < 2) e.firstName = 'At least 2 characters';
   else if (!NAME_REGEX.test(form.firstName.trim())) e.firstName = 'Use only letters, spaces, hyphens, or apostrophes';
 
+  if (!form.middleName?.trim()) e.middleName = 'Required';
+  else if (form.middleName.trim().length < 2) e.middleName = 'At least 2 characters';
+  else if (!NAME_REGEX.test(form.middleName.trim())) e.middleName = 'Use only letters, spaces, hyphens, or apostrophes';
+
   if (!form.lastName?.trim()) e.lastName = 'Required';
   else if (form.lastName.trim().length < 2) e.lastName = 'At least 2 characters';
   else if (!NAME_REGEX.test(form.lastName.trim())) e.lastName = 'Use only letters, spaces, hyphens, or apostrophes';

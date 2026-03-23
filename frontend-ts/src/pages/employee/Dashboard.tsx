@@ -7,7 +7,7 @@ import { getAdmissions, getStats } from '../../api/admissions';
 import { getExams, getExamSchedules, getExamRegistrations } from '../../api/exams';
 import { getExamResults, getEssayAnswers } from '../../api/results';
 import { StatCard, PageHeader, Badge, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert } from '../../components/UI';
-import { formatDate, badgeClass, asArray } from '../../utils/helpers';
+import { formatDate, badgeClass, asArray, formatPersonName } from '../../utils/helpers';
 import { ADMISSION_IN_PROGRESS, GRADE_OPTIONS, ALL_GRADE_LEVELS } from '../../utils/constants';
 import Icon from '../../components/Icons';
 import type { Admission, AdmissionStats, Exam, ExamSchedule, ExamRegistration, ExamResult as ExamResultType, EssayAnswer } from '../../types';
@@ -28,7 +28,6 @@ interface DashboardData {
   results: ExamResultType[];
   pendingEssays: number;
   completed: number;
-  avgScore: number | string;
   grades: string[];
   trends: { total: number; accepted: number; inProgress: number; rejected: number };
   overdue: number;
@@ -66,7 +65,6 @@ export default function EmployeeDashboard() {
     const essayAnswers = asArray<EssayAnswer>(rawEssay);
     const pendingEssays = essayAnswers.filter((e: EssayAnswer) => !e.scored).length;
     const completed = regs.filter((r: ExamRegistration) => r.status === 'done').length;
-    const avgScore = results.length > 0 ? (results.reduce((s: number, r: ExamResultType) => s + r.percentage, 0) / results.length).toFixed(0) : 0;
     const grades = [...new Set(admissions.map((a: Admission) => a.gradeLevel).filter(Boolean))].sort();
 
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -83,7 +81,7 @@ export default function EmployeeDashboard() {
 
     const overdue = admissions.filter((a: Admission) => (ADMISSION_IN_PROGRESS as readonly string[]).includes(a.status) && daysPending(a.submittedAt) > SLA_DAYS).length;
 
-    return { stats, admissions, exams, schedules, regs, results, pendingEssays, completed, avgScore, grades, trends, overdue };
+    return { stats, admissions, exams, schedules, regs, results, pendingEssays, completed, grades, trends, overdue };
   });
 
 
@@ -105,7 +103,7 @@ export default function EmployeeDashboard() {
     if (gradeFilter !== 'all') list = list.filter(a => a.gradeLevel === gradeFilter);
     if (search.trim()) {
       const q = search.toLowerCase();
-      list = list.filter(a => `${a.firstName} ${a.lastName} ${a.email}`.toLowerCase().includes(q));
+      list = list.filter(a => `${formatPersonName(a)} ${a.email}`.toLowerCase().includes(q));
     }
     return list;
   }, [rawData, statusFilter, levelGroupFilter, gradeFilter, search]);
@@ -141,7 +139,6 @@ export default function EmployeeDashboard() {
           <Link to="/employee/exams"><StatCard icon="chartBar" value={rawData?.completed || 0} label="Exams Taken" color="amber" /></Link>
         </>}
         {canAccess('results') && <>
-          <Link to="/employee/reports"><StatCard icon="arrowTrendUp" value={`${rawData?.avgScore || 0}%`} label="Avg Score" color="emerald" /></Link>
           <Link to="/employee/results"><StatCard icon="documentText" value={rawData?.pendingEssays || 0} label="Pending Essays" color={(rawData?.pendingEssays || 0) > 0 ? 'amber' : 'emerald'} /></Link>
         </>}
       </div>
@@ -201,7 +198,7 @@ export default function EmployeeDashboard() {
               {paginated.map((a, i) => (
                 <tr key={a.id}>
                   <td className="text-gray-400">{(safePage - 1) * PER_PAGE + i + 1}</td>
-                  <td className="font-medium text-gray-800">{a.firstName} {a.lastName}</td>
+                  <td className="font-medium text-gray-800">{formatPersonName(a)}</td>
                   <td>{a.gradeLevel}</td>
                   <td><Badge className={badgeClass(a.status)}>{a.status}</Badge></td>
                   <td className="text-gray-500">{formatDate(a.submittedAt)}</td>

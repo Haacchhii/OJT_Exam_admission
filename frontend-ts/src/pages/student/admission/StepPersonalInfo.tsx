@@ -19,9 +19,10 @@ export default function StepPersonalInfo({ form, set, setForm, goTo, errors = {}
       <h3 className="text-lg font-bold text-forest-500 mb-1">Step 1: Personal Information</h3>
       <p className="text-gray-500 text-sm mb-6">Provide basic personal details of the student.</p>
       <h4 className="font-semibold text-forest-500 mb-3 flex items-center gap-1.5"><Icon name="userCircle" className="w-4 h-4" /> Student Details</h4>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <Input label="Student First Name" value={form.firstName} onChange={set('firstName')} required placeholder="Juan" maxLength={100} error={errors.firstName} />
-        <Input label="Student Last Name" value={form.lastName} onChange={set('lastName')} required placeholder="Dela Cruz" maxLength={100} error={errors.lastName} />
+        <Input label="Student Middle Name" value={form.middleName} onChange={set('middleName')} required placeholder="Santos" maxLength={100} error={errors.middleName} />
+        <Input label="Student Surname" value={form.lastName} onChange={set('lastName')} required placeholder="Dela Cruz" maxLength={100} error={errors.lastName} />
         <Input label="Email Address" type="email" value={form.email} onChange={set('email')} required placeholder="example@email.com" maxLength={255} error={errors.email} />
         <Select label="Sex" value={form.gender} onChange={set('gender')} required options={GENDER_OPTIONS} />
         <Input label="Date of Birth" type="date" value={form.dob} onChange={set('dob')} required error={errors.dob} />

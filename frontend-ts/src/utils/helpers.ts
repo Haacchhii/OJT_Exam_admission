@@ -70,3 +70,11 @@ export function exportToCSV(data: any[], filename: string) {
     document.body.removeChild(link);
   }
 }
+
+export function formatPersonName(person: { firstName?: string | null; middleName?: string | null; lastName?: string | null }): string {
+  return [person.firstName, person.middleName, person.lastName].filter(Boolean).join(' ').trim();
+}
+
+export function personInitials(person: { firstName?: string | null; lastName?: string | null }): string {
+  return `${(person.firstName || '')[0] || ''}${(person.lastName || '')[0] || ''}`.toUpperCase();
+}

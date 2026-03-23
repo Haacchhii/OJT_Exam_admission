@@ -102,9 +102,9 @@ export async function login(req, res, next) {
 // POST /api/auth/register
 export async function register(req, res, next) {
   try {
-    const { firstName, lastName, email, password, gradeLevel } = req.body;
+    const { firstName, middleName, lastName, email, password, gradeLevel } = req.body;
     const normalizedEmail = String(email || '').trim().toLowerCase();
-    if (!firstName || !lastName || !email || !password || !gradeLevel) {
+    if (!firstName || !middleName || !lastName || !email || !password || !gradeLevel) {
       return res.status(400).json({ error: 'All fields are required', code: 'VALIDATION_ERROR' });
     }
     // Email format validation
@@ -143,7 +143,7 @@ export async function register(req, res, next) {
     const verifyToken = crypto.randomBytes(32).toString('hex');
     const user = await prisma.user.create({
       data: {
-        firstName, lastName, email: normalizedEmail, passwordHash,
+        firstName, middleName, lastName, email: normalizedEmail, passwordHash,
         role: ROLES.APPLICANT, status: 'Active',
         emailVerified: false,
         emailVerifyToken: verifyToken,
@@ -285,7 +285,7 @@ export async function resetPassword(req, res, next) {
 // PATCH /api/auth/profile — update authenticated user's profile
 export async function updateProfile(req, res, next) {
   try {
-    const { firstName, lastName, currentPassword, newPassword, phone, address } = req.body;
+    const { firstName, middleName, lastName, currentPassword, newPassword, phone, address } = req.body;
     const userId = req.user.id;
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
@@ -293,6 +293,7 @@ export async function updateProfile(req, res, next) {
 
     const data = {};
     if (firstName !== undefined) data.firstName = firstName.trim();
+    if (middleName !== undefined) data.middleName = middleName.trim();
     if (lastName !== undefined) data.lastName = lastName.trim();
     if (phone !== undefined) data.phone = phone.trim();
     if (address !== undefined) data.address = address.trim();

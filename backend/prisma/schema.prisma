@@ -12,6 +12,7 @@ datasource db {
 model User {
   id            Int      @id @default(autoincrement())
   firstName     String   @map("first_name")
+  middleName    String?  @map("middle_name")
   lastName      String   @map("last_name")
   email         String   @unique
   passwordHash  String   @map("password_hash")
@@ -46,6 +47,7 @@ model Admission {
   trackingId      String   @unique @map("tracking_id") // e.g. GK-ADM-2026-00001
   userId          Int      @map("user_id")
   firstName       String   @map("first_name")
+  middleName      String?  @map("middle_name")
   lastName        String   @map("last_name")
   email           String
   phone           String?
@@ -175,6 +177,8 @@ model ExamSchedule {
   scheduledDate String   @map("scheduled_date") // YYYY-MM-DD
   startTime     String   @map("start_time")     // HH:mm
   endTime       String   @map("end_time")       // HH:mm
+  registrationOpenDate  String?  @map("registration_open_date")  // YYYY-MM-DD
+  registrationCloseDate String?  @map("registration_close_date") // YYYY-MM-DD
   maxSlots      Int      @map("max_slots")
   slotsTaken    Int      @default(0) @map("slots_taken")
   venue         String?

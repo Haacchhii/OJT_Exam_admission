@@ -12,7 +12,7 @@ import { validateStep1, validateStep2, validateStep3, checkAgeRequirement } from
 
 export { checkAgeRequirement };
 export interface AdmissionForm {
-  firstName: string; lastName: string; email: string; phone: string; dob: string; gender: string;
+  firstName: string; middleName: string; lastName: string; email: string; phone: string; dob: string; gender: string;
   placeOfBirth: string; religion: string; address: string;
   prevSchool: string; schoolAddress: string; gradeLevel: string; schoolYear: string; lrn: string; applicantType: string;
   studentNumber: string;
@@ -46,7 +46,7 @@ export function useAdmissionWizard() {
   const [privacyConsent, setPrivacyConsent] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [form, setForm] = useState<AdmissionForm>({
-    firstName: '', lastName: '', email: '', phone: '', dob: '', gender: '', placeOfBirth: '', religion: '', address: '',
+    firstName: '', middleName: '', lastName: '', email: '', phone: '', dob: '', gender: '', placeOfBirth: '', religion: '', address: '',
     prevSchool: '', schoolAddress: '', gradeLevel: '', schoolYear: getCurrentSchoolYear(), lrn: '', applicantType: 'New',
     studentNumber: '',
     fatherNameOccupation: '', motherNameOccupation: '', guardian: '',
@@ -67,7 +67,7 @@ export function useAdmissionWizard() {
   const existingApp = gateData?.existingApp || null;
   const examPassed = gateData?.examPassed || false;
 
-  const isDirty = !!(form.firstName || form.lastName || form.email);
+  const isDirty = !!(form.firstName || form.middleName || form.lastName || form.email);
   const { restore, clear } = useUnsavedChanges(isDirty, 'gk_admission_draft', form);
 
   useEffect(() => {
@@ -76,6 +76,7 @@ export function useAdmissionWizard() {
         const updated: AdmissionForm = {
           ...f,
           firstName: f.firstName || user.firstName || '',
+          middleName: f.middleName || user.middleName || '',
           lastName: f.lastName || user.lastName || '',
           email: f.email || user.email || '',
           studentNumber: f.studentNumber || user.applicantProfile?.studentNumber || '',

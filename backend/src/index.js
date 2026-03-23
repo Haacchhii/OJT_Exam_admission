@@ -5,6 +5,7 @@ import { initIo } from './utils/socket.js';
 
 const server = app.listen(env.PORT, () => {
   console.log(`Golden Key API running on port ${env.PORT} [${env.NODE_ENV}]`);
+  console.log(`[cors] allowed origins from env: ${env.CORS_ORIGIN}`);
 });
 
 // Initialize Socket.io attached to the HTTP server

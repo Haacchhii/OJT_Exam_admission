@@ -22,6 +22,7 @@ export async function getUsers(req, res, next) {
     if (search) {
       where.OR = [
         { firstName: { contains: search, mode: 'insensitive' } },
+        { middleName: { contains: search, mode: 'insensitive' } },
         { lastName:  { contains: search, mode: 'insensitive' } },
         { email:     { contains: search, mode: 'insensitive' } },
       ];
@@ -57,14 +58,14 @@ export async function getUserByEmail(req, res, next) {
 // POST /api/users
 export async function createUser(req, res, next) {
   try {
-    const { firstName, lastName, email, role, status, password } = req.body;
-    if (!firstName || !lastName || !email || !password) {
-      return res.status(400).json({ error: 'firstName, lastName, email, and password are required', code: 'VALIDATION_ERROR' });
+    const { firstName, middleName, lastName, email, role, status, password } = req.body;
+    if (!firstName || !middleName || !lastName || !email || !password) {
+      return res.status(400).json({ error: 'firstName, middleName, lastName, email, and password are required', code: 'VALIDATION_ERROR' });
     }
 
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
     const user = await prisma.user.create({
-      data: { firstName, lastName, email, passwordHash, role: role || ROLES.APPLICANT, status: status || 'Active' },
+      data: { firstName, middleName, lastName, email, passwordHash, role: role || ROLES.APPLICANT, status: status || 'Active' },
     });
 
     res.status(201).json(safifyUser(user));
@@ -76,7 +77,7 @@ export async function createUser(req, res, next) {
 // PUT /api/users/:id
 export async function updateUser(req, res, next) {
   try {
-    const { firstName, lastName, email, role, status, password } = req.body;
+    const { firstName, middleName, lastName, email, role, status, password } = req.body;
     const id = Number(req.params.id);
 
     // Only administrators can assign the administrator role
@@ -86,6 +87,7 @@ export async function updateUser(req, res, next) {
 
     const data = {};
     if (firstName !== undefined) data.firstName = firstName;
+    if (middleName !== undefined) data.middleName = middleName;
     if (lastName  !== undefined) data.lastName  = lastName;
     if (email     !== undefined) data.email     = email;
     if (role      !== undefined) data.role      = role;

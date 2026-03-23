@@ -10,7 +10,7 @@ import { useSelection } from '../../../hooks/useSelection';
 import BulkActionBar from '../../../components/BulkActionBar';
 import { PageHeader, StatCard, Badge, EmptyState, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert } from '../../../components/UI';
 import Icon from '../../../components/Icons';
-import { formatTime, badgeClass, asArray, exportToCSV } from '../../../utils/helpers';
+import { formatTime, badgeClass, asArray, exportToCSV, formatPersonName } from '../../../utils/helpers';
 import { DetailField, QuestionCard } from './ExamComponents';
 import ExamPreviewModal from './ExamPreviewModal';
 import { CSVUploader } from '../../../components/CSVUploader';
@@ -181,7 +181,7 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
     let list = readinessRows;
     if (readSearch.trim()) {
       const q = readSearch.toLowerCase();
-      list = list.filter(r => r.user && `${r.user.firstName} ${r.user.lastName}`.toLowerCase().includes(q));
+      list = list.filter(r => r.user && formatPersonName(r.user).toLowerCase().includes(q));
     }
     if (readStatusFilter !== 'all') {
       if (readStatusFilter === 'passed') list = list.filter(r => r.result?.passed === true);
@@ -260,7 +260,7 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
                     const sc = eSched.find(s => s.id === r.scheduleId);
                     return (
                       <tr key={r.id} className="border-b border-gray-50">
-                        <td className="py-3 px-2 font-medium">{student ? `${student.firstName} ${student.lastName}` : 'Unknown'}</td>
+                        <td className="py-3 px-2 font-medium">{student ? formatPersonName(student) : 'Unknown'}</td>
                         <td className="py-3 px-2 text-gray-500">{r.userEmail}</td>
                         <td className="py-3 px-2"><Badge className={badgeClass(r.status)}>{r.status}</Badge></td>
                         <td className="py-3 px-2 text-gray-500">{sc ? `${sc.scheduledDate} ${formatTime(sc.startTime)}` : 'N/A'}</td>
@@ -399,7 +399,7 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
                 <tbody>
                   {paginatedReadiness.map(r => (
                     <tr key={r.id} className="border-b border-gray-50">
-                      <td className="py-3 px-2 font-medium">{r.user ? `${r.user.firstName} ${r.user.lastName}` : r.userEmail}</td>
+                      <td className="py-3 px-2 font-medium">{r.user ? formatPersonName(r.user) : r.userEmail}</td>
                       <td className="py-3 px-2">{r.exam?.title || 'N/A'}</td>
                       <td className="py-3 px-2"><Badge className={badgeClass(r.status)}>{r.status}</Badge></td>
                       <td className="py-3 px-2">{r.result ? `${r.result.totalScore}/${r.result.maxPossible} (${r.result.percentage.toFixed(1)}%)` : '-'}</td>

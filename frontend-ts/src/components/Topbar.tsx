@@ -4,6 +4,7 @@ import { SCHOOL_NAME } from '../utils/constants';
 import Icon from './Icons';
 import { GlobalSearch } from './GlobalSearch';
 import type { User } from '../types';
+import { formatPersonName, personInitials } from '../utils/helpers';
 
 interface TopbarProps {
   title: string;
@@ -22,10 +23,10 @@ export default function Topbar({ title, onMenuToggle, userId, user }: TopbarProp
     document.title = titleValue;
     return () => { document.title = titleValue; };
   }, []);
-  const initials = `${(user.firstName || '')[0] || ''}${(user.lastName || '')[0] || ''}`.toUpperCase();
+  const initials = personInitials(user);
   const isEmployee = user.role !== 'applicant';
   const avatarCls = isEmployee ? 'bg-forest-500 text-gold-300' : 'bg-gold-400 text-forest-700';
-  const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
+  const fullName = formatPersonName(user);
 
   return (
     <header className="fixed top-0 left-0 right-0 z-30 bg-white border-b border-gray-200 h-16" role="banner">

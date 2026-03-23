@@ -2,7 +2,7 @@
 import { trackApplication } from '../../api/admissions';
 import { Badge } from '../../components/UI';
 import Icon from '../../components/Icons';
-import { formatDate, badgeClass } from '../../utils/helpers';
+import { formatDate, badgeClass, formatPersonName } from '../../utils/helpers';
 import { ADMISSION_PROGRESS_STEPS } from '../../utils/constants';
 
 interface TrackResult {
@@ -94,7 +94,7 @@ function AdmissionResult({ data, trackingId }: { data: Record<string, any>; trac
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        <Field label="Full Name" value={`${data.firstName} ${data.lastName}`} />
+        <Field label="Full Name" value={formatPersonName(data) || 'N/A'} />
         <Field label="Email" value={data.email} />
         <Field label="Grade Level" value={data.gradeLevel} />
         <Field label="School Year" value={data.schoolYear} />

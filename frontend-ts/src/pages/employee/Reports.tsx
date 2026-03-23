@@ -3,7 +3,7 @@ import { useAsync } from '../../hooks/useAsync';
 import { getAdmissions } from '../../api/admissions';
 import { getExams, getExamSchedules, getExamRegistrations } from '../../api/exams';
 import { getExamResults, getEssayAnswers } from '../../api/results';
-import { asArray } from '../../utils/helpers';
+import { asArray, formatPersonName } from '../../utils/helpers';
 import { getUsers } from '../../api/users';
 import { getAcademicYears, getSemesters } from '../../api/academicYears';
 import { showToast } from '../../components/Toast';
@@ -11,19 +11,8 @@ import { PageHeader, SkeletonPage, ErrorAlert } from '../../components/UI';
 import Icon from '../../components/Icons';
 import { ADMISSION_STATUSES, SCHOOL_NAME, GRADE_OPTIONS, ALL_GRADE_LEVELS } from '../../utils/constants';
 import type { Admission, ExamResult, Exam, ExamSchedule, ExamRegistration, EssayAnswer, User, AcademicYear, Semester } from '../../types';
-import {
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  LabelList,
-} from 'recharts';
+import ReportsCharts from './reports/ReportsCharts';
+import { buildActiveFilters, downloadCSV, getChartSvgMarkup, printPdfReport } from './reports/reportExport';
 
 const STATUS_COLORS: Record<string, string> = {
   Submitted: '#8b5cf6',
@@ -46,37 +35,6 @@ function toLocalDateIso(value: string | Date) {
 function getRegUserId(reg: ExamRegistration): number | null {
   const maybe = (reg as ExamRegistration & { userId?: unknown }).userId;
   return typeof maybe === 'number' ? maybe : null;
-}
-
-const renderPieLabelInside = ({ cx, cy, midAngle, innerRadius, outerRadius, value }: any) => {
-  const r = innerRadius + (outerRadius - innerRadius) * 0.5;
-  const x = cx + r * Math.cos(-midAngle * (Math.PI / 180));
-  const y = cy + r * Math.sin(-midAngle * (Math.PI / 180));
-  return (
-    <text x={x} y={y} fill="#ffffff" textAnchor="middle" dominantBaseline="central" fontSize={12} fontWeight={700}>
-      {value}
-    </text>
-  );
-};
-
-function downloadCSV(filename: string, rows: (string | number)[][]) {
-  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = filename; a.click();
-  URL.revokeObjectURL(url);
-}
-
-function printPDF(title: string, headers: string[], rows: (string | number)[][]) {
-  const w = window.open('', '_blank');
-  if (!w) { showToast('Please allow popups to export PDF', 'error'); return; }
-  const ths = headers.map(h => `<th style="border:1px solid #ccc;padding:6px 10px;background:#f5f5f0;font-size:12px;text-align:left">${h}</th>`).join('');
-  const trs = rows.map(r => `<tr>${r.map(c => `<td style="border:1px solid #ddd;padding:5px 10px;font-size:11px">${c}</td>`).join('')}</tr>`).join('');
-  w.document.write(`<!DOCTYPE html><html><head><title>${title}</title><style>@page{size:landscape;margin:1cm}body{font-family:system-ui,sans-serif;padding:20px}h1{font-size:18px;color:#1a3c2a}table{width:100%;border-collapse:collapse;margin-top:12px}p.meta{color:#888;font-size:11px}</style></head><body><h1>${SCHOOL_NAME} - ${title}</h1><p class="meta">Generated on ${new Date().toLocaleString()} | ${rows.length} records</p><table><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></body></html>`);
-  w.document.close();
-  w.onafterprint = () => w.close();
-  setTimeout(() => w.print(), 400);
 }
 
 interface ReportData {
@@ -181,9 +139,38 @@ export default function EmployeeReports() {
   const thisMonth = admissions.filter(a => { const d = new Date(a.submittedAt); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); }).length;
 
   const exportApplicants = (format: 'csv' | 'pdf' = 'csv') => {
-    const headers = ['ID', 'First Name', 'Last Name', 'Email', 'Grade Level', 'Status', 'Submitted'];
-    const rows: (string | number)[][] = admissions.map(a => [a.id, a.firstName, a.lastName, a.email, a.gradeLevel, a.status, a.submittedAt]);
-    if (format === 'pdf') { printPDF('Applicant List', headers, rows); }
+    const headers = ['ID', 'First Name', 'Middle Name', 'Last Name', 'Email', 'Grade Level', 'Application Period', 'Status', 'Submitted'];
+    const rows: (string | number)[][] = admissions.map(a => [
+      a.id,
+      a.firstName,
+      a.middleName || '',
+      a.lastName,
+      a.email,
+      a.gradeLevel,
+      a.academicYear?.year && a.semester?.name ? `${a.academicYear.year} - ${a.semester.name}` : a.academicYear?.year || a.semester?.name || '',
+      a.status,
+      a.submittedAt,
+    ]);
+    const activeFilters = buildActiveFilters({
+      statusFilter,
+      levelGroupFilter,
+      gradeFilter,
+      yearFilter,
+      semesterFilter,
+      dateFrom,
+      dateTo,
+    });
+
+    if (format === 'pdf') {
+      printPdfReport('Applicant List', [
+        {
+          subtitle: 'Admission Status Mix and Applicant Table',
+          chartSvg: getChartSvgMarkup('chart-admission-status-mix') || getChartSvgMarkup('chart-applicant-volume'),
+          headers,
+          rows,
+        },
+      ], activeFilters, () => showToast('Please allow popups to export PDF', 'error'));
+    }
     else { downloadCSV('applicants.csv', [headers, ...rows]); }
     showToast(`Applicant list ${format === 'pdf' ? 'exported' : 'downloaded'}!`, 'success');
   };
@@ -196,17 +183,67 @@ export default function EmployeeReports() {
       const student = reg ? (regUserId !== null ? usersById.get(regUserId) : usersByEmail.get(reg.userEmail)) : null;
       const sched = reg ? schedulesById.get(reg.scheduleId) : null;
       const exam = sched ? examsById.get(sched.examId) : null;
-      return [student ? `${student.firstName} ${student.lastName}` : 'Unknown', exam?.title || 'N/A', r.totalScore, r.maxPossible, r.percentage.toFixed(1) + '%', r.passed ? 'Yes' : 'No', r.essayReviewed ? 'Yes' : 'No', r.createdAt || ''];
+      return [student ? formatPersonName(student) : 'Unknown', exam?.title || 'N/A', r.totalScore, r.maxPossible, r.percentage.toFixed(1) + '%', r.passed ? 'Yes' : 'No', r.essayReviewed ? 'Yes' : 'No', r.createdAt || ''];
     });
-    if (format === 'pdf') { printPDF('Exam Results', headers, rows); }
+    const activeFilters = buildActiveFilters({
+      statusFilter,
+      levelGroupFilter,
+      gradeFilter,
+      yearFilter,
+      semesterFilter,
+      dateFrom,
+      dateTo,
+    });
+
+    if (format === 'pdf') {
+      printPdfReport('Exam Results', [
+        {
+          subtitle: 'Pass Rate by Exam and Detailed Results Table',
+          chartSvg: getChartSvgMarkup('chart-pass-rate-by-exam') || getChartSvgMarkup('chart-results-breakdown-pass-fail'),
+          headers,
+          rows,
+        },
+      ], activeFilters, () => showToast('Please allow popups to export PDF', 'error'));
+    }
     else { downloadCSV('exam_results.csv', [headers, ...rows]); }
     showToast(`Results ${format === 'pdf' ? 'exported' : 'downloaded'}!`, 'success');
   };
 
   const exportSchedules = (format: 'csv' | 'pdf' = 'csv') => {
-    const headers = ['Exam', 'Date', 'Start Time', 'End Time', 'Max Slots', 'Booked'];
-    const rows: (string | number)[][] = schedules.map(s => { const exam = exams.find(e => e.id === s.examId); return [exam?.title || 'N/A', s.scheduledDate, s.startTime, s.endTime, s.maxSlots, s.slotsTaken]; });
-    if (format === 'pdf') { printPDF('Exam Schedules', headers, rows); }
+    const headers = ['Exam', 'Date', 'Start Time', 'End Time', 'Registration Open', 'Registration Close', 'Max Slots', 'Booked'];
+    const rows: (string | number)[][] = schedules.map(s => {
+      const exam = exams.find(e => e.id === s.examId);
+      return [
+        exam?.title || 'N/A',
+        s.scheduledDate,
+        s.startTime,
+        s.endTime,
+        s.registrationOpenDate || '',
+        s.registrationCloseDate || '',
+        s.maxSlots,
+        s.slotsTaken,
+      ];
+    });
+    const activeFilters = buildActiveFilters({
+      statusFilter,
+      levelGroupFilter,
+      gradeFilter,
+      yearFilter,
+      semesterFilter,
+      dateFrom,
+      dateTo,
+    });
+
+    if (format === 'pdf') {
+      printPdfReport('Exam Schedules', [
+        {
+          subtitle: 'Schedule Utilization and Schedules Table',
+          chartSvg: getChartSvgMarkup('chart-schedule-utilization'),
+          headers,
+          rows,
+        },
+      ], activeFilters, () => showToast('Please allow popups to export PDF', 'error'));
+    }
     else { downloadCSV('exam_schedules.csv', [headers, ...rows]); }
     showToast(`Schedules ${format === 'pdf' ? 'exported' : 'downloaded'}!`, 'success');
   };
@@ -385,161 +422,16 @@ export default function EmployeeReports() {
         })}
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 gap-6 mb-6 items-start">
-        <div className="gk-section-card p-6">
-          <h3 className="gk-heading-sm text-forest-500 mb-4 flex items-center gap-1.5"><span className="p-1.5 bg-forest-50 rounded-lg"><Icon name="chartBar" className="w-5 h-5" /></span> Pass Rate by Exam</h3>
-          {examStats.length > 0 && examStats.some(e => e.total > 0) ? (
-            <div className="h-96 overflow-x-auto">
-              <ResponsiveContainer width="100%" height="100%" minWidth={Math.max(800, sortedStats.length * 80)}>
-                <BarChart data={sortedStats} margin={{ top: 20, right: 8, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                  <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
-                  <Tooltip formatter={(value) => [`${Number(value ?? 0)}%`, 'Pass Rate']} />
-                  <Bar dataKey="rate" fill="#16a34a" radius={[6, 6, 0, 0]}>
-                    <LabelList dataKey="rate" position="insideTop" fill="#ffffff" fontSize={11} fontWeight={700} formatter={(value) => `${Number(value ?? 0)}%`} />
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <p className="text-gray-400 text-center py-8">No exam result data available.</p>
-          )}
-        </div>
-
-        <div className="gk-section-card p-6">
-          <h3 className="gk-heading-sm text-forest-500 mb-4 flex items-center gap-1.5"><span className="p-1.5 bg-forest-50 rounded-lg"><Icon name="arrowTrendUp" className="w-5 h-5" /></span> Applicant Volume (Monthly)</h3>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={monthData} margin={{ top: 20, right: 8, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(value) => [Number(value ?? 0), 'Applicants']} />
-                <Bar dataKey="count" fill="#f59e0b" radius={[6, 6, 0, 0]}>
-                  <LabelList dataKey="count" position="insideTop" fill="#ffffff" fontSize={11} fontWeight={700} />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div className="gk-section-card p-6">
-          <h3 className="gk-heading-sm text-forest-500 mb-4 flex items-center gap-1.5"><span className="p-1.5 bg-forest-50 rounded-lg"><Icon name="users" className="w-5 h-5" /></span> Admission Status Mix</h3>
-          {admissionStatusData.length > 0 ? (
-            <>
-              <div className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={admissionStatusData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} paddingAngle={2} label={{ position: 'outside', fill: '#374151', fontSize: 11, fontWeight: 600, formatter: (v) => `${v}` }}>
-                      {admissionStatusData.map((entry, idx) => (
-                        <Cell key={`status-${idx}`} fill={entry.color || CHART_FALLBACK_COLORS[idx % CHART_FALLBACK_COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value) => [Number(value ?? 0), 'Applicants']} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="mt-3 flex items-center justify-center gap-3 flex-wrap">
-                {admissionStatusData
-                  .slice()
-                  .sort((a, b) => b.value - a.value)
-                  .map((item) => (
-                    <div key={item.name} className="inline-flex items-center gap-2 rounded-full border border-gray-200 px-3 py-1.5 bg-gray-50">
-                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-                      <span className="text-xs text-gray-600 font-medium">{item.name}</span>
-                      <span className="text-xs font-bold text-gray-800">{item.value}</span>
-                      <span className="text-[11px] text-gray-500">({admissionStatusTotal > 0 ? Math.round((item.value / admissionStatusTotal) * 100) : 0}%)</span>
-                    </div>
-                  ))}
-              </div>
-            </>
-          ) : (
-            <p className="text-gray-400 text-center py-8">No admissions data available.</p>
-          )}
-        </div>
-
-        <div className="gk-section-card p-6">
-          <h3 className="gk-heading-sm text-forest-500 mb-4 flex items-center gap-1.5"><span className="p-1.5 bg-forest-50 rounded-lg"><Icon name="chartPie" className="w-5 h-5" /></span> Results Breakdown</h3>
-          {results.length > 0 ? (
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-              <div className="bg-white border border-gray-100 rounded-xl p-3">
-                <h4 className="text-sm font-semibold text-gray-600 mb-2">Pass vs Fail</h4>
-                <div className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={passFailData}
-                        dataKey="value"
-                        nameKey="name"
-                        innerRadius={55}
-                        outerRadius={95}
-                        label={renderPieLabelInside}
-                        labelLine={false}
-                      >
-                        {passFailData.map((entry, idx) => (
-                          <Cell key={`pf-${idx}`} fill={entry.color || CHART_FALLBACK_COLORS[idx % CHART_FALLBACK_COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(value) => [Number(value ?? 0), 'Results']} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="mt-3 flex items-center justify-center gap-3 flex-wrap">
-                  {passFailData.map((item) => (
-                    <div key={item.name} className="inline-flex items-center gap-2 rounded-full border border-gray-200 px-3 py-1.5 bg-gray-50">
-                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-                      <span className="text-xs text-gray-600 font-medium">{item.name}</span>
-                      <span className="text-xs font-bold text-gray-800">{item.value}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="bg-white border border-gray-100 rounded-xl p-3">
-                <h4 className="text-sm font-semibold text-gray-600 mb-2">Score Bands</h4>
-                <div className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={scoreBandData} margin={{ top: 20, right: 8, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="band" tick={{ fontSize: 11 }} />
-                      <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                      <Tooltip formatter={(value) => [Number(value ?? 0), 'Students']} />
-                      <Bar dataKey="count" fill="#0ea5e9" radius={[6, 6, 0, 0]}>
-                        <LabelList dataKey="count" position="insideTop" fill="#ffffff" fontSize={11} fontWeight={700} />
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <p className="text-gray-400 text-center py-8">No result data available.</p>
-          )}
-        </div>
-      </div>
-
-      <div className="gk-section-card p-6 mb-6">
-        <h3 className="gk-heading-sm text-forest-500 mb-4 flex items-center gap-1.5"><span className="p-1.5 bg-forest-50 rounded-lg"><Icon name="calendar" className="w-5 h-5" /></span> Top Schedule Utilization</h3>
-        {scheduleUtilizationData.length > 0 ? (
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={scheduleUtilizationData} margin={{ top: 20, right: 8, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="schedule" tick={{ fontSize: 11 }} />
-                <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(value, _name, item: any) => [`${Number(value ?? 0)}% (${item?.payload?.used ?? 0}/${item?.payload?.total ?? 0})`, 'Utilization']} />
-                <Bar dataKey="utilization" fill="#8b5cf6" radius={[6, 6, 0, 0]}>
-                  <LabelList dataKey="utilization" position="insideTop" fill="#ffffff" fontSize={11} fontWeight={700} formatter={(value) => `${Number(value ?? 0)}%`} />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        ) : (
-          <p className="text-gray-400 text-center py-8">No schedule data available.</p>
-        )}
-      </div>
+      <ReportsCharts
+        sortedStats={sortedStats}
+        monthData={monthData}
+        admissionStatusData={admissionStatusData}
+        admissionStatusTotal={admissionStatusTotal}
+        resultsCount={results.length}
+        passFailData={passFailData}
+        scoreBandData={scoreBandData}
+        scheduleUtilizationData={scheduleUtilizationData}
+      />
       
       {/* Key Metrics Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

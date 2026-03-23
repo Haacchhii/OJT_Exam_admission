@@ -140,6 +140,11 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, user
                   <div className="flex-1">
                     <h4 className="font-semibold text-forest-500">{exam?.title || 'Exam'}</h4>
                     <p className="text-gray-500 text-sm">{formatTime(s.startTime)} - {formatTime(s.endTime)} | {remaining} slots left</p>
+                    {(s.registrationOpenDate || s.registrationCloseDate) && (
+                      <p className="text-gray-500 text-xs">
+                        Registration window: {s.registrationOpenDate || 'Anytime'} to {s.registrationCloseDate || 'Until exam date'}
+                      </p>
+                    )}
                     {(exam as any)?.gradeLevel && <span className="inline-block mt-1 text-xs bg-gold-100 text-gold-700 px-2 py-0.5 rounded-full font-medium">{(exam as any).gradeLevel}</span>}
                   </div>
                   <button

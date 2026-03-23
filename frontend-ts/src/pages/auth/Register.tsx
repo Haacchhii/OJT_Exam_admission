@@ -12,7 +12,7 @@ export default function Register() {
 
   const { user, login } = useAuth();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', password: '', confirmPassword: '', gradeLevel: '' });
+  const [form, setForm] = useState({ firstName: '', middleName: '', lastName: '', email: '', password: '', confirmPassword: '', gradeLevel: '' });
   const [gradeStage, setGradeStage] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [showConfirmPw, setShowConfirmPw] = useState(false);
@@ -34,7 +34,7 @@ export default function Register() {
     setLoading(true);
     try {
       const result = await login(form.email, form.password, {
-        registerPayload: { firstName: form.firstName, lastName: form.lastName, email: form.email, password: form.password, gradeLevel: form.gradeLevel },
+        registerPayload: { firstName: form.firstName, middleName: form.middleName, lastName: form.lastName, email: form.email, password: form.password, gradeLevel: form.gradeLevel },
       });
       if (!result.ok) {
         if (result.emailVerificationRequired) {
@@ -117,13 +117,17 @@ export default function Register() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">First Name</label>
                   <input type="text" value={form.firstName} onChange={set('firstName')} required className="gk-input" placeholder="Juan" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Last Name</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Middle Name</label>
+                  <input type="text" value={form.middleName} onChange={set('middleName')} required className="gk-input" placeholder="Santos" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Surname</label>
                   <input type="text" value={form.lastName} onChange={set('lastName')} required className="gk-input" placeholder="Dela Cruz" />
                 </div>
               </div>

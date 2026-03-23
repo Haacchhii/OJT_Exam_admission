@@ -10,7 +10,7 @@ import { showToast } from '../../components/Toast';
 import Modal from '../../components/Modal';
 import { PageHeader, StatCard, Badge, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert } from '../../components/UI';
 import Icon from '../../components/Icons';
-import { formatDate, asArray, exportToCSV } from '../../utils/helpers';
+import { formatDate, asArray, exportToCSV, formatPersonName } from '../../utils/helpers';
 import type { ExamResult, EssayAnswer, ExamRegistration, ExamSchedule, Exam, User, AcademicYear, Semester } from '../../types';
 
 const RESULTS_PER_PAGE = 10;
@@ -115,7 +115,7 @@ export default function EmployeeResults() {
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(r => {
-        const name = r.student ? `${r.student.firstName} ${r.student.lastName}`.toLowerCase() : '';
+        const name = r.student ? formatPersonName(r.student).toLowerCase() : '';
         return name.includes(q) || (r.exam?.title || '').toLowerCase().includes(q);
       });
     }
@@ -144,7 +144,7 @@ export default function EmployeeResults() {
     const student = reg
       ? (regUserId !== null ? usersById.get(regUserId) : usersByEmail.get(reg.userEmail))
       : null;
-    return student ? `${student.firstName} ${student.lastName}` : 'Unknown';
+    return student ? formatPersonName(student) : 'Unknown';
   };
 
   const getQuestionText = (qId: number): string => {
@@ -196,7 +196,7 @@ export default function EmployeeResults() {
 
   const handlePrintResult = (r: EnrichedResult) => {
     const esc = (s: unknown) => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    const studentName = r.student ? `${esc(r.student.firstName)} ${esc(r.student.lastName)}` : 'Unknown';
+    const studentName = r.student ? esc(formatPersonName(r.student)) : 'Unknown';
     const examTitle = r.exam ? esc(r.exam.title) : 'N/A';
     const printWin = window.open('', '_blank');
     if (!printWin || printWin.closed) {
@@ -277,6 +277,7 @@ export default function EmployeeResults() {
             <button 
               onClick={() => exportToCSV(filtered.map(r => ({
                 'First Name': r.student?.firstName || '',
+                'Middle Name': r.student?.middleName || '',
                 'Last Name': r.student?.lastName || '',
                 'Exam': r.exam?.title || '',
                 'Total Score': r.totalScore,
@@ -358,7 +359,7 @@ export default function EmployeeResults() {
                     <tbody>
                       {paginatedResults.map(r => (
                         <tr key={r.registrationId} className="border-b border-gray-50 hover:bg-gray-50">
-                          <td className="py-3 px-2 font-medium text-forest-500">{r.student ? `${r.student.firstName} ${r.student.lastName}` : 'Unknown'}</td>
+                          <td className="py-3 px-2 font-medium text-forest-500">{r.student ? formatPersonName(r.student) : 'Unknown'}</td>
                           <td className="py-3 px-2">{r.exam?.title || 'N/A'}</td>
                           <td className="py-3 px-2">{r.totalScore} / {r.maxPossible}</td>
                           <td className="py-3 px-2">{r.percentage.toFixed(1)}%</td>

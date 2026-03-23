@@ -25,6 +25,16 @@ function validateScheduleFields({ scheduledDate, startTime, endTime }, { checkPa
   return null;
 }
 
+function validateRegistrationPeriod({ scheduledDate, registrationOpenDate, registrationCloseDate }) {
+  if (registrationOpenDate && registrationCloseDate && registrationOpenDate > registrationCloseDate) {
+    return 'registrationCloseDate must be on or after registrationOpenDate';
+  }
+  if (registrationCloseDate && scheduledDate && registrationCloseDate > scheduledDate) {
+    return 'registrationCloseDate cannot be after scheduledDate';
+  }
+  return null;
+}
+
 function normalizeGradeLabel(value = '') {
   return String(value).toLowerCase().replace(/[\u2013\u2014]/g, '-').replace(/\s+/g, ' ').trim();
 }
@@ -103,8 +113,13 @@ export async function getAvailableSchedules(req, res, next) {
       orderBy: { scheduledDate: 'asc' },
     });
 
-    // Filter: remaining slots > 0
-    const available = schedules.filter(s => s.slotsTaken < s.maxSlots);
+    // Filter: remaining slots > 0 and registration window is open (if configured)
+    const available = schedules.filter(s => {
+      if (s.slotsTaken >= s.maxSlots) return false;
+      if (s.registrationOpenDate && today < s.registrationOpenDate) return false;
+      if (s.registrationCloseDate && today > s.registrationCloseDate) return false;
+      return true;
+    });
     res.json(available);
   } catch (err) { next(err); }
 }
@@ -112,7 +127,7 @@ export async function getAvailableSchedules(req, res, next) {
 // POST /api/exams/schedules
 export async function createSchedule(req, res, next) {
   try {
-    const { examId, scheduledDate, startTime, endTime, maxSlots, venue } = req.body;
+    const { examId, scheduledDate, startTime, endTime, registrationOpenDate, registrationCloseDate, maxSlots, venue } = req.body;
     if (!examId || !scheduledDate || !startTime || !endTime || !maxSlots) {
       return res.status(400).json({ error: 'examId, scheduledDate, startTime, endTime, maxSlots required', code: 'VALIDATION_ERROR' });
     }
@@ -122,8 +137,23 @@ export async function createSchedule(req, res, next) {
       return res.status(400).json({ error: validationError, code: 'VALIDATION_ERROR' });
     }
 
+    const periodError = validateRegistrationPeriod({ scheduledDate, registrationOpenDate, registrationCloseDate });
+    if (periodError) {
+      return res.status(400).json({ error: periodError, code: 'VALIDATION_ERROR' });
+    }
+
     const schedule = await prisma.examSchedule.create({
-      data: { examId, scheduledDate, startTime, endTime, maxSlots, venue: venue || null, slotsTaken: 0 },
+      data: {
+        examId,
+        scheduledDate,
+        startTime,
+        endTime,
+        registrationOpenDate: registrationOpenDate || null,
+        registrationCloseDate: registrationCloseDate || null,
+        maxSlots,
+        venue: venue || null,
+        slotsTaken: 0,
+      },
     });
 
     res.status(201).json(schedule);
@@ -134,7 +164,7 @@ export async function createSchedule(req, res, next) {
 export async function updateSchedule(req, res, next) {
   try {
     const id = Number(req.params.id);
-    const { scheduledDate, startTime, endTime, maxSlots, venue } = req.body;
+    const { scheduledDate, startTime, endTime, registrationOpenDate, registrationCloseDate, maxSlots, venue } = req.body;
     const existing = await prisma.examSchedule.findUnique({ where: { id } });
     if (!existing) {
       return res.status(404).json({ error: 'Schedule not found', code: 'NOT_FOUND' });
@@ -143,6 +173,8 @@ export async function updateSchedule(req, res, next) {
     const nextScheduledDate = scheduledDate !== undefined ? scheduledDate : existing.scheduledDate;
     const nextStartTime = startTime !== undefined ? startTime : existing.startTime;
     const nextEndTime = endTime !== undefined ? endTime : existing.endTime;
+    const nextRegistrationOpenDate = registrationOpenDate !== undefined ? registrationOpenDate : existing.registrationOpenDate;
+    const nextRegistrationCloseDate = registrationCloseDate !== undefined ? registrationCloseDate : existing.registrationCloseDate;
 
     const validationError = validateScheduleFields(
       { scheduledDate: nextScheduledDate, startTime: nextStartTime, endTime: nextEndTime },
@@ -152,10 +184,21 @@ export async function updateSchedule(req, res, next) {
       return res.status(400).json({ error: validationError, code: 'VALIDATION_ERROR' });
     }
 
+    const periodError = validateRegistrationPeriod({
+      scheduledDate: nextScheduledDate,
+      registrationOpenDate: nextRegistrationOpenDate,
+      registrationCloseDate: nextRegistrationCloseDate,
+    });
+    if (periodError) {
+      return res.status(400).json({ error: periodError, code: 'VALIDATION_ERROR' });
+    }
+
     const data = {};
     if (scheduledDate !== undefined) data.scheduledDate = scheduledDate;
     if (startTime !== undefined)     data.startTime = startTime;
     if (endTime !== undefined)       data.endTime = endTime;
+    if (registrationOpenDate !== undefined) data.registrationOpenDate = registrationOpenDate || null;
+    if (registrationCloseDate !== undefined) data.registrationCloseDate = registrationCloseDate || null;
     if (maxSlots !== undefined)      data.maxSlots = maxSlots;
     if (venue !== undefined)         data.venue = venue;
 
@@ -195,7 +238,7 @@ export async function notifyNoSchedule(req, res, next) {
     const message = typeof req.body?.message === 'string' ? req.body.message.trim().slice(0, 500) : '';
     const payload = {
       userId: req.user.id,
-      studentName: `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || req.user.email,
+      studentName: `${req.user.firstName || ''} ${req.user.middleName || ''} ${req.user.lastName || ''}`.replace(/\s+/g, ' ').trim() || req.user.email,
       email: req.user.email,
       gradeLevel,
       message,

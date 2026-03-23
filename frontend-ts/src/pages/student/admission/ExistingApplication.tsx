@@ -85,7 +85,7 @@ export default function ExistingApplication({ existingApp, onNewApplication }: P
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Detail label="Full Name" value={`${existingApp.firstName} ${existingApp.lastName}`} />
+          <Detail label="Full Name" value={`${existingApp.firstName} ${existingApp.middleName || ''} ${existingApp.lastName}`.replace(/\s+/g, ' ').trim()} />
           <Detail label="Email" value={existingApp.email} />
           <Detail label="Grade Level" value={existingApp.gradeLevel} />
           <Detail label="Applicant Type" value={existingApp.applicantType || 'New'} />

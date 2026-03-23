@@ -24,6 +24,7 @@ export interface StaffProfile {
 export interface User {
   id: number;
   firstName: string;
+  middleName?: string | null;
   lastName: string;
   email: string;
   role: UserRole;
@@ -58,6 +59,7 @@ export interface Admission {
   trackingId: string;
   userId: number;
   firstName: string;
+  middleName?: string | null;
   lastName: string;
   email: string;
   phone: string | null;
@@ -145,6 +147,8 @@ export interface ExamSchedule {
   scheduledDate: string;
   startTime: string;
   endTime: string;
+  registrationOpenDate?: string | null;
+  registrationCloseDate?: string | null;
   maxSlots: number;
   slotsTaken: number;
   venue: string | null;
@@ -215,7 +219,7 @@ export interface AuditLog {
   details: string | null;
   ipAddress: string | null;
   createdAt: string;
-  user?: { firstName: string; lastName: string; email: string } | null;
+  user?: { firstName: string; middleName?: string | null; lastName: string; email: string } | null;
 }
 
 // ─── Academic ──────────────────────────────────────

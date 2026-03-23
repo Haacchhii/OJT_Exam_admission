@@ -11,7 +11,7 @@ import BulkActionBar from '../../components/BulkActionBar';
 import { useSelection } from '../../hooks/useSelection';
 import { CSVUploader } from '../../components/CSVUploader';
 import { USER_ROLE_OPTIONS } from '../../utils/constants';
-import { asArray, exportToCSV } from '../../utils/helpers';
+import { asArray, exportToCSV, formatPersonName } from '../../utils/helpers';
 import type { User } from '../../types';
 
 const USERS_PER_PAGE = 10;
@@ -19,6 +19,7 @@ const ROLES = USER_ROLE_OPTIONS;
 
 interface UserForm {
   firstName: string;
+  middleName: string;
   lastName: string;
   email: string;
   role: string;
@@ -26,7 +27,7 @@ interface UserForm {
   password: string;
 }
 
-const emptyForm: UserForm = { firstName: '', lastName: '', email: '', role: 'applicant', status: 'Active', password: '' };
+const emptyForm: UserForm = { firstName: '', middleName: '', lastName: '', email: '', role: 'applicant', status: 'Active', password: '' };
 
 export default function EmployeeUsers() {
   const { user: authUser } = useAuth();
@@ -51,7 +52,7 @@ export default function EmployeeUsers() {
     if (statusFilter !== 'all') list = list.filter(u => u.status === statusFilter);
     if (search.trim()) {
       const q = search.toLowerCase();
-      list = list.filter(u => `${u.firstName} ${u.lastName} ${u.email}`.toLowerCase().includes(q));
+      list = list.filter(u => `${formatPersonName(u)} ${u.email}`.toLowerCase().includes(q));
     }
     return list;
   }, [users, roleFilter, statusFilter, search]);
@@ -71,11 +72,12 @@ export default function EmployeeUsers() {
   }, [users]);
 
   const openAdd = () => { setForm({ ...emptyForm }); setEditId(null); setErrors({}); setShowModal(true); };
-  const openEdit = (u: User) => { setForm({ firstName: u.firstName, lastName: u.lastName, email: u.email, role: u.role, status: u.status, password: '' }); setEditId(u.id); setErrors({}); setShowModal(true); };
+  const openEdit = (u: User) => { setForm({ firstName: u.firstName, middleName: u.middleName || '', lastName: u.lastName, email: u.email, role: u.role, status: u.status, password: '' }); setEditId(u.id); setErrors({}); setShowModal(true); };
 
   const validate = async (): Promise<boolean> => {
     const e: Record<string, string> = {};
     if (!form.firstName.trim()) e.firstName = 'Required';
+    if (!form.middleName.trim()) e.middleName = 'Required';
     if (!form.lastName.trim()) e.lastName = 'Required';
     if (!form.email.trim()) e.email = 'Required';
     else if (!/\S+@\S+\.\S+/.test(form.email)) e.email = 'Invalid email';
@@ -101,6 +103,7 @@ export default function EmployeeUsers() {
         try {
           await addUser({
             firstName: row.firstName || '',
+            middleName: row.middleName || '',
             lastName: row.lastName || '',
             email: row.email,
             role: row.role || 'applicant',
@@ -122,7 +125,7 @@ export default function EmployeeUsers() {
     setSaving(true);
     try {
       if (editId) {
-        const upd: Record<string, string> = { firstName: form.firstName, lastName: form.lastName, email: form.email, role: form.role, status: form.status };
+        const upd: Record<string, string> = { firstName: form.firstName, middleName: form.middleName, lastName: form.lastName, email: form.email, role: form.role, status: form.status };
         if (form.password) upd.password = form.password;
         await updateUser(editId, upd);
         showToast('User updated!', 'success');
@@ -212,6 +215,7 @@ export default function EmployeeUsers() {
             <button 
               onClick={() => exportToCSV(filtered.map(u => ({
                 'First Name': u.firstName,
+                'Middle Name': u.middleName || '',
                 'Last Name': u.lastName,
                 'Email': u.email,
                 'Role': u.role,
@@ -222,7 +226,7 @@ export default function EmployeeUsers() {
             >
               <Icon name="download" className="w-5 h-5" /> Export
             </button>
-            <CSVUploader title="Bulk Import Users" isOpen={showBulkImport} onClose={() => setShowBulkImport(false)} onImport={handleBulkImportUsers} templateHeaders={['firstName', 'lastName', 'email', 'role', 'status', 'password']} />
+            <CSVUploader title="Bulk Import Users" isOpen={showBulkImport} onClose={() => setShowBulkImport(false)} onImport={handleBulkImportUsers} templateHeaders={['firstName', 'middleName', 'lastName', 'email', 'role', 'status', 'password']} />
             <button onClick={() => setShowBulkImport(true)} className="bg-white text-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 flex items-center gap-2 border border-gray-300">
               <span>&#8690;</span> Import Users
             </button>
@@ -264,8 +268,8 @@ export default function EmployeeUsers() {
             <tbody>
               {paginated.map(u => (
                 <tr key={u.id} className={`border-b border-gray-50 hover:bg-gray-50/50 ${selected.has(u.id) ? 'bg-gold-50/50' : ''}`}>
-                  <td className="py-3 px-2"><input type="checkbox" checked={selected.has(u.id)} onChange={() => toggle(u.id)} className="accent-forest-500 rounded" aria-label={`Select ${u.firstName} ${u.lastName}`} /></td>
-                  <td className="py-3 px-4 font-medium text-forest-500">{u.firstName} {u.lastName}</td>
+                  <td className="py-3 px-2"><input type="checkbox" checked={selected.has(u.id)} onChange={() => toggle(u.id)} className="accent-forest-500 rounded" aria-label={`Select ${formatPersonName(u)}`} /></td>
+                  <td className="py-3 px-4 font-medium text-forest-500">{formatPersonName(u)}</td>
                   <td className="py-3 px-4 text-gray-500">{u.email}</td>
                   <td className="py-3 px-4"><Badge variant="info">{roleLabel(u.role)}</Badge></td>
                   <td className="py-3 px-4"><Badge variant={u.status === 'Active' ? 'success' : 'danger'}>{u.status}</Badge></td>
@@ -289,14 +293,19 @@ export default function EmployeeUsers() {
       {/* Add / Edit Modal */}
       <Modal open={showModal} onClose={() => setShowModal(false)} title={editId ? 'Edit User' : 'Add New User'}>
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
               <input value={form.firstName} onChange={e => set('firstName', e.target.value)} aria-describedby={errors.firstName ? 'firstName-error' : undefined} className={`w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-forest-500/20 ${errors.firstName ? 'border-red-400' : 'border-gray-200'}`} />
               {errors.firstName && <p id="firstName-error" className="text-red-500 text-xs mt-1" role="alert">{errors.firstName}</p>}
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Middle Name</label>
+              <input value={form.middleName} onChange={e => set('middleName', e.target.value)} aria-describedby={errors.middleName ? 'middleName-error' : undefined} className={`w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-forest-500/20 ${errors.middleName ? 'border-red-400' : 'border-gray-200'}`} />
+              {errors.middleName && <p id="middleName-error" className="text-red-500 text-xs mt-1" role="alert">{errors.middleName}</p>}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Surname</label>
               <input value={form.lastName} onChange={e => set('lastName', e.target.value)} aria-describedby={errors.lastName ? 'lastName-error' : undefined} className={`w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-forest-500/20 ${errors.lastName ? 'border-red-400' : 'border-gray-200'}`} />
               {errors.lastName && <p id="lastName-error" className="text-red-500 text-xs mt-1" role="alert">{errors.lastName}</p>}
             </div>

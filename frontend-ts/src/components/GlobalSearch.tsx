@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getAdmissions } from '../api/admissions';
 import Icon from './Icons';
 import type { Admission } from '../types';
-import { asArray } from '../utils/helpers';
+import { asArray, formatPersonName } from '../utils/helpers';
 
 export function GlobalSearch() {
   const [isOpen, setIsOpen] = useState(false);
@@ -76,7 +76,7 @@ export function GlobalSearch() {
                 <li key={r.id} onClick={() => handleSelect(r.id)} className="px-4 py-2.5 hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0 transition-colors">
                   <div className="flex justify-between items-start">
                     <div>
-                      <p className="text-sm font-medium text-gray-900">{r.firstName} {r.lastName}</p>
+                      <p className="text-sm font-medium text-gray-900">{formatPersonName(r)}</p>
                       <p className="text-xs text-gray-500">{r.email}</p>
                     </div>
                     <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{r.gradeLevel}</span>

@@ -22,7 +22,7 @@ function getTodayLocalIso() {
 export default function ScheduleManager() {
   const confirm = useConfirm();
   const [editId, setEditId] = useState<number | null>(null);
-  const [form, setForm] = useState({ examId: '', date: '', start: '', end: '', slots: '' });
+  const [form, setForm] = useState({ examId: '', date: '', start: '', end: '', openDate: '', closeDate: '', slots: '' });
   const [schedSearch, setSchedSearch] = useState('');
   const [schedExamFilter, setSchedExamFilter] = useState('all');
   const [schedPage, setSchedPage] = useState(1);
@@ -67,14 +67,30 @@ export default function ScheduleManager() {
       showToast('End time must be after start time.', 'error');
       return;
     }
+    if (form.openDate && form.closeDate && form.openDate > form.closeDate) {
+      showToast('Registration close date must be on or after open date.', 'error');
+      return;
+    }
     if (form.date) {
       const today = getTodayLocalIso();
       if (form.date < today) {
         showToast('Schedule date cannot be in the past.', 'error');
         return;
       }
+      if (form.closeDate && form.closeDate > form.date) {
+        showToast('Registration close date cannot be after schedule date.', 'error');
+        return;
+      }
     }
-    const data = { examId: parseInt(form.examId), scheduledDate: form.date, startTime: form.start, endTime: form.end, maxSlots: parseInt(form.slots) };
+    const data = {
+      examId: parseInt(form.examId),
+      scheduledDate: form.date,
+      startTime: form.start,
+      endTime: form.end,
+      registrationOpenDate: form.openDate || null,
+      registrationCloseDate: form.closeDate || null,
+      maxSlots: parseInt(form.slots),
+    };
     setIsSavingSched(true);
     try {
       if (editId) { await updateExamSchedule(editId, data); showToast('Schedule updated!', 'success'); setEditId(null); }
@@ -84,11 +100,22 @@ export default function ScheduleManager() {
     } finally {
       setIsSavingSched(false);
     }
-    setForm({ examId: '', date: '', start: '', end: '', slots: '' });
+    setForm({ examId: '', date: '', start: '', end: '', openDate: '', closeDate: '', slots: '' });
     schedRefetch();
   };
 
-  const editSched = (s: ExamSchedule) => { setEditId(s.id); setForm({ examId: String(s.examId), date: s.scheduledDate, start: s.startTime, end: s.endTime, slots: String(s.maxSlots) }); };
+  const editSched = (s: ExamSchedule) => {
+    setEditId(s.id);
+    setForm({
+      examId: String(s.examId),
+      date: s.scheduledDate,
+      start: s.startTime,
+      end: s.endTime,
+      openDate: s.registrationOpenDate || '',
+      closeDate: s.registrationCloseDate || '',
+      slots: String(s.maxSlots),
+    });
+  };
 
   if (schedLoading) return <SkeletonPage />;
   if (schedError) return <div className="gk-section-card p-8 text-center"><p className="text-red-600 font-medium">Failed to load schedules.</p><button onClick={schedRefetch} className="mt-2 text-forest-500 underline text-sm">Retry</button></div>;
@@ -109,6 +136,8 @@ export default function ScheduleManager() {
           <FormInput label="Date" type="date" value={form.date} onChange={set('date')} required />
           <FormInput label="Start Time" type="time" value={form.start} onChange={set('start')} required />
           <FormInput label="End Time" type="time" value={form.end} onChange={set('end')} required />
+          <FormInput label="Registration Opens" type="date" value={form.openDate} onChange={set('openDate')} />
+          <FormInput label="Registration Closes" type="date" value={form.closeDate} onChange={set('closeDate')} />
           <FormInput label="Max Applicants" type="number" value={form.slots} onChange={set('slots')} placeholder="30" required />
           <div className="flex items-end">
             <button type="submit" disabled={isSavingSched} className="bg-forest-500 text-white px-5 py-2.5 rounded-lg font-semibold hover:bg-forest-600 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-2">
@@ -141,6 +170,11 @@ export default function ScheduleManager() {
                 <div className="flex-1">
                   <h4 className="font-semibold text-forest-500">{exam?.title || 'Unknown Exam'}</h4>
                   <p className="text-gray-500 text-sm">{formatTime(s.startTime)} - {formatTime(s.endTime)}</p>
+                  {(s.registrationOpenDate || s.registrationCloseDate) && (
+                    <p className="text-gray-500 text-xs">
+                      Registration window: {s.registrationOpenDate || 'Anytime'} to {s.registrationCloseDate || 'Until exam date'}
+                    </p>
+                  )}
                   <div className="flex gap-2 mt-1">
                     <Badge className="gk-badge gk-badge-info">{s.slotsTaken} / {s.maxSlots} booked</Badge>
                     <Badge className={remaining > 0 ? 'gk-badge gk-badge-active' : 'gk-badge gk-badge-danger'}>{remaining > 0 ? `${remaining} slots left` : 'Full'}</Badge>

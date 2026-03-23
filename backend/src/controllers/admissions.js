@@ -9,6 +9,22 @@ import { sendAdmissionSubmittedEmail, sendAdmissionStatusEmail } from '../utils/
 import { cached, invalidatePrefix } from '../utils/cache.js';
 import env from '../config/env.js';
 
+function toIsoDay(d) {
+  if (!d) return null;
+  const dt = new Date(d);
+  if (Number.isNaN(dt.getTime())) return null;
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, '0');
+  const day = String(dt.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function isWithinPeriod(day, start, end) {
+  if (start && day < start) return false;
+  if (end && day > end) return false;
+  return true;
+}
+
 // Helper: shape admission for API response (include document names and file paths)
 function shapeAdmission(adm) {
   if (!adm) return null;
@@ -36,6 +52,7 @@ export async function getAdmissions(req, res, next) {
     if (search) {
       where.OR = [
         { firstName: { contains: search, mode: 'insensitive' } },
+        { middleName: { contains: search, mode: 'insensitive' } },
         { lastName:  { contains: search, mode: 'insensitive' } },
         { email:     { contains: search, mode: 'insensitive' } },
       ];
@@ -122,7 +139,7 @@ export async function getStats(req, res, next) {
 export async function createAdmission(req, res, next) {
   try {
     const {
-      firstName, lastName, email, phone, dob, gender, address,
+      firstName, middleName, lastName, email, phone, dob, gender, address,
       gradeLevel, prevSchool, schoolYear, lrn, applicantType,
       guardian, guardianRelation, guardianPhone, guardianEmail,
       academicYearId, semesterId, studentNumber,
@@ -130,27 +147,46 @@ export async function createAdmission(req, res, next) {
     } = req.body;
 
     // Validate required fields
-    if (!firstName || !lastName || !email || !dob || !gender || !address || !gradeLevel || !schoolYear || !guardian || !guardianRelation) {
+    if (!firstName || !middleName || !lastName || !email || !dob || !gender || !address || !gradeLevel || !schoolYear || !guardian || !guardianRelation) {
       return res.status(400).json({ error: 'Missing required fields', code: 'VALIDATION_ERROR' });
     }
 
     const trackingId = await generateTrackingId('ADM');
 
-    // Auto-link to active academic year/semester when not provided by client
-    const resolvedYearId = academicYearId
-      ? Number(academicYearId)
-      : (await prisma.academicYear.findFirst({ where: { isActive: true } }))?.id || null;
-    const resolvedSemesterId = semesterId
-      ? Number(semesterId)
-      : resolvedYearId
-        ? (await prisma.semester.findFirst({ where: { academicYearId: resolvedYearId, isActive: true }, orderBy: { id: 'asc' } }))?.id || null
-        : null;
+    // Auto-link to active academic year/semester when not provided by client.
+    // Also enforce that admissions can only be submitted during the active period window.
+    const activeYear = await prisma.academicYear.findFirst({ where: { isActive: true } });
+    if (!activeYear) {
+      return res.status(400).json({ error: 'No active academic year. Admissions are currently closed.', code: 'VALIDATION_ERROR' });
+    }
+
+    const activeSemester = await prisma.semester.findFirst({
+      where: { academicYearId: activeYear.id, isActive: true },
+      orderBy: { id: 'asc' },
+    });
+    if (!activeSemester) {
+      return res.status(400).json({ error: 'No active application period. Admissions are currently closed.', code: 'VALIDATION_ERROR' });
+    }
+
+    const today = toIsoDay(new Date());
+    const semStart = toIsoDay(activeSemester.startDate);
+    const semEnd = toIsoDay(activeSemester.endDate);
+
+    if (!today || !isWithinPeriod(today, semStart, semEnd)) {
+      return res.status(400).json({
+        error: 'Admissions are outside the active application period.',
+        code: 'VALIDATION_ERROR',
+      });
+    }
+
+    const resolvedYearId = activeYear.id;
+    const resolvedSemesterId = activeSemester.id;
 
     const admission = await prisma.admission.create({
       data: {
         trackingId,
         userId: req.user.id,
-        firstName, lastName, email, phone, dob, gender, address,
+        firstName, middleName, lastName, email, phone, dob, gender, address,
         gradeLevel, levelGroup: getLevelGroup(gradeLevel), prevSchool: prevSchool || null, schoolYear,
         lrn: lrn || null, applicantType: applicantType || 'New',
         studentNumber: studentNumber || null,

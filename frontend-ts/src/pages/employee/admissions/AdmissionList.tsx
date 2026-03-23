@@ -6,7 +6,7 @@ import { showToast } from '../../../components/Toast';
 import { useConfirm } from '../../../components/ConfirmDialog';
 import { PageHeader, Badge, EmptyState, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert } from '../../../components/UI';
 import Icon from '../../../components/Icons';
-import { formatDate, badgeClass, asArray, exportToCSV } from '../../../utils/helpers';
+import { formatDate, badgeClass, asArray, exportToCSV, formatPersonName } from '../../../utils/helpers';
 import { ADMISSION_STATUSES, ADMISSION_IN_PROGRESS, GRADE_OPTIONS, ALL_GRADE_LEVELS } from '../../../utils/constants';
 import { useAuth } from '../../../context/AuthContext';
 import { useSocket } from '../../../context/SocketContext';
@@ -91,10 +91,10 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
           daysPending(a.submittedAt) > SLA_DAYS,
       );
     }
-    if (search) list = list.filter(a => `${a.firstName} ${a.lastName} ${a.email}`.toLowerCase().includes(search.toLowerCase()));
+    if (search) list = list.filter(a => `${formatPersonName(a)} ${a.email}`.toLowerCase().includes(search.toLowerCase()));
     if (sortBy === 'newest') list = [...list].sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
     else if (sortBy === 'oldest') list = [...list].sort((a, b) => new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime());
-    else if (sortBy === 'name') list = [...list].sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`));
+    else if (sortBy === 'name') list = [...list].sort((a, b) => formatPersonName(a).localeCompare(formatPersonName(b)));
     else if (sortBy === 'status') list = [...list].sort((a, b) => a.status.localeCompare(b.status));
     return list;
   }, [rawData, search, filter, levelGroupFilter, gradeFilter, yearFilter, semesterFilter, sortBy, staleOnly]);
@@ -191,7 +191,7 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
       `Over-SLA applications: ${staleAdmissions.length}`,
       '',
       ...staleAdmissions.slice(0, 20).map(a => {
-        const name = `${a.firstName} ${a.lastName}`;
+        const name = formatPersonName(a);
         return `#${a.id} | ${name} | ${a.status} | ${daysPending(a.submittedAt)}d pending`;
       }),
     ];
@@ -222,6 +222,7 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
             onClick={() => exportToCSV(admissions.map(a => ({
               'System ID': a.id,
               'First Name': a.firstName,
+              'Middle Name': a.middleName || '',
               'Last Name': a.lastName,
               'Email': a.email,
               'Grade Level': a.gradeLevel,
@@ -363,7 +364,7 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
                     <tr key={a.id} onClick={() => onShowDetail(a.id)} className={`border-b border-gray-50 hover:bg-gray-50 cursor-pointer ${selected.has(a.id) ? 'bg-gold-50/50' : ''}`}>
                       {canManage && <td className="py-3 px-2" onClick={e => e.stopPropagation()}><input type="checkbox" checked={selected.has(a.id)} onChange={() => toggleSelect(a.id)} className="accent-forest-500 rounded" /></td>}
                       <td className="py-3 px-2 text-gray-400">{a.id}</td>
-                      <td className="py-3 px-2 font-medium text-forest-500">{a.firstName} {a.lastName}</td>
+                      <td className="py-3 px-2 font-medium text-forest-500">{formatPersonName(a)}</td>
                       <td className="py-3 px-2 text-gray-500">{a.email}</td>
                       <td className="py-3 px-2">{a.gradeLevel}</td>
                       <td className="py-3 px-2"><Badge variant="info">{a.applicantType || 'New'}</Badge></td>

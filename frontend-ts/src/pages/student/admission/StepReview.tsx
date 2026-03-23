@@ -21,7 +21,7 @@ export default function StepReview({ form, slotFiles, extraFiles, requiredDocs, 
       <h3 className="text-lg font-bold text-forest-500 mb-1">Step 5: Review & Submit</h3>
       <p className="text-gray-500 text-sm mb-6">Please review all information before submitting.</p>
       <ReviewSection title={<><Icon name="userCircle" className="w-4 h-4 inline" /> Personal Information</>}>
-        <Detail label="Student Name" value={`${form.firstName} ${form.lastName}`.trim()} />
+        <Detail label="Student Name" value={`${form.firstName} ${form.middleName} ${form.lastName}`.trim()} />
         <Detail label="Email" value={form.email} />
         <Detail label="Sex" value={form.gender} />
         <Detail label="Date of Birth" value={form.dob} />

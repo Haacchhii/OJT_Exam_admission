@@ -4,11 +4,13 @@ import { showToast } from '../../components/Toast';
 import Icon from '../../components/Icons';
 import { PageHeader } from '../../components/UI';
 import { client } from '../../api/client';
+import { formatPersonName, personInitials } from '../../utils/helpers';
 
 export default function Profile() {
   const { user, refreshUser } = useAuth();
 
   const [firstName, setFirstName] = useState(user?.firstName || '');
+  const [middleName, setMiddleName] = useState(user?.middleName || '');
   const [lastName, setLastName] = useState(user?.lastName || '');
   const [phone, setPhone] = useState(user?.phone || '');
   const [address, setAddress] = useState(user?.address || '');
@@ -21,16 +23,22 @@ export default function Profile() {
   if (!user) return null;
 
   const isEmployee = user.role !== 'applicant';
-  const initials = `${(user.firstName || '')[0] || ''}${(user.lastName || '')[0] || ''}`.toUpperCase();
+  const initials = personInitials(user);
 
   const handleSaveProfile = async () => {
-    if (!firstName.trim() || !lastName.trim()) {
-      showToast('First name and last name are required.', 'error');
+    if (!firstName.trim() || !middleName.trim() || !lastName.trim()) {
+      showToast('First name, middle name, and surname are required.', 'error');
       return;
     }
     setSaving(true);
     try {
-      await client.patch('/auth/profile', { firstName: firstName.trim(), lastName: lastName.trim(), phone: phone.trim(), address: address.trim() });
+      await client.patch('/auth/profile', {
+        firstName: firstName.trim(),
+        middleName: middleName.trim(),
+        lastName: lastName.trim(),
+        phone: phone.trim(),
+        address: address.trim(),
+      });
       await refreshUser();
       showToast('Profile updated successfully!', 'success');
     } catch (err) {
@@ -79,7 +87,7 @@ export default function Profile() {
               {initials}
             </div>
             <div>
-              <h2 className="text-lg font-bold text-gray-800">{user.firstName} {user.lastName}</h2>
+              <h2 className="text-lg font-bold text-gray-800">{formatPersonName(user)}</h2>
               <p className="text-sm text-gray-500">{user.email}</p>
               <span className="gk-badge gk-badge-active mt-1 capitalize">
                 {user.role === 'applicant' ? 'Student' : user.role}
@@ -123,7 +131,11 @@ export default function Profile() {
               <input type="text" value={firstName} onChange={e => setFirstName(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Middle Name</label>
+              <input type="text" value={middleName} onChange={e => setMiddleName(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Surname</label>
               <input type="text" value={lastName} onChange={e => setLastName(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm" />
             </div>
             <div>
