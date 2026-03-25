@@ -7,44 +7,74 @@ export function CSVUploader({
   isOpen,
   onClose,
   onImport,
-  templateHeaders
+  templateHeaders,
+  allowMultiple = false,
 }: {
   title: string;
   isOpen: boolean;
   onClose: () => void;
   onImport: (data: any[]) => void;
   templateHeaders: string[];
+  allowMultiple?: boolean;
 }) {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const parseCsvFile = (file: File) => new Promise<{ rows: any[]; error?: string }>((resolve) => {
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
       complete: (results) => {
         if (results.errors.length > 0) {
-          setError("Error parsing CSV. Please check formatting.");
-          return;
-        }
-        
-        const firstRow = results.data[0] as any;
-        const missingHeaders = templateHeaders.filter(h => !Object.keys(firstRow || {}).includes(h));
-        
-        if (missingHeaders.length > 0) {
-          setError(`Missing required headers: ${missingHeaders.join(", ")}`);
+          resolve({ rows: [], error: `${file.name}: parsing failed` });
           return;
         }
 
-        onImport(results.data);
-        onClose();
-      }
+        const rows = (results.data || []) as any[];
+        const firstRow = rows[0] as any;
+        const missingHeaders = templateHeaders.filter(h => !Object.keys(firstRow || {}).includes(h));
+
+        if (missingHeaders.length > 0) {
+          resolve({ rows: [], error: `${file.name}: missing ${missingHeaders.join(", ")}` });
+          return;
+        }
+
+        resolve({ rows });
+      },
+      error: () => resolve({ rows: [], error: `${file.name}: parsing failed` }),
     });
+  });
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    setError(null);
+    const mergedRows: any[] = [];
+    const issues: string[] = [];
+
+    for (const file of files) {
+      const parsed = await parseCsvFile(file);
+      if (parsed.error) {
+        issues.push(parsed.error);
+        continue;
+      }
+      mergedRows.push(...parsed.rows);
+    }
+
+    if (issues.length > 0 && mergedRows.length === 0) {
+      setError(issues.join(' | '));
+      return;
+    }
+
+    if (issues.length > 0) {
+      setError(`Some files were skipped: ${issues.join(' | ')}`);
+    }
+
+    onImport(mergedRows);
+    onClose();
   };
 
   const downloadTemplate = () => {
@@ -73,6 +103,7 @@ export function CSVUploader({
           <input
             type="file"
             accept=".csv"
+            multiple={allowMultiple}
             className="hidden"
             ref={fileInputRef}
             onChange={handleFileUpload}
@@ -81,7 +112,7 @@ export function CSVUploader({
             onClick={() => fileInputRef.current?.click()}
             className="bg-forest-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-forest-600 transition-colors"
           >
-            Select File
+            {allowMultiple ? 'Select Files' : 'Select File'}
           </button>
         </div>
 

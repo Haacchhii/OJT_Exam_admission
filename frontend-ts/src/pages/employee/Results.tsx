@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+﻿import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useAsync } from '../../hooks/useAsync';
 import { getExamResults, getEssayAnswers, scoreEssay, getQuestionAnalyticsPage } from '../../api/results';
 import { getExamRegistrations, getExamSchedules, getExams } from '../../api/exams';
@@ -30,12 +30,22 @@ interface EnrichedResult extends ExamResult {
   exam: Exam | null | undefined;
 }
 
-interface EssayCardProps {
-  essay: EssayAnswer;
-  student: string;
-  question: string;
-  status: 'pending' | 'scored';
-  onScore?: () => void;
+interface EnrichedEssay extends EssayAnswer {
+  studentName: string;
+  examTitle: string;
+  examGradeLevel: string;
+  questionText: string;
+}
+
+interface ExamEssaySummary {
+  examId: number;
+  examTitle: string;
+  gradeLevel: string;
+  studentCount: number;
+  totalAnswered: number;
+  scoredCount: number;
+  pendingCount: number;
+  completionRate: number;
 }
 
 function essayDraftKey(essayId: number) {
@@ -67,6 +77,7 @@ export default function EmployeeResults() {
   const [analyticsPage, setAnalyticsPage] = useState(1);
   const [resultsPage, setResultsPage] = useState(1);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [selectedEssayExamId, setSelectedEssayExamId] = useState<number | null>(null);
 
   const { data: rawData, loading, error, refetch } = useAsync<RawData>(async () => {
     const [rawRes, rawRegs, rawUsers, rawSched, rawExm, rawEssays] = await Promise.all([
@@ -138,19 +149,91 @@ export default function EmployeeResults() {
   const pending = essays.filter(e => !e.scored);
   const scored = essays.filter(e => e.scored);
 
-  const getStudentName = (regId: number): string => {
+  const enrichedEssays: EnrichedEssay[] = useMemo(() => essays.map(e => {
+    const reg = regsById.get(e.registrationId);
+    const sched = reg ? schedulesById.get(reg.scheduleId) : null;
+    const exam = sched ? examsById.get(sched.examId) : null;
+    return {
+      ...e,
+      studentName: reg ? getStudentName(e.registrationId) : 'Unknown',
+      examTitle: exam?.title || 'N/A',
+      examGradeLevel: exam?.gradeLevel || 'N/A',
+      questionText: e.question?.questionText || getQuestionText(e.questionId),
+    };
+  }), [essays, regsById, schedulesById, examsById, usersById, usersByEmail]);
+
+  const examEssaySummary = useMemo<ExamEssaySummary[]>(() => {
+    const map = new Map<number, ExamEssaySummary>();
+    const examStudentSets = new Map<number, Set<number>>();
+    for (const e of enrichedEssays) {
+      const reg = regsById.get(e.registrationId);
+      const sched = reg ? schedulesById.get(reg.scheduleId) : null;
+      const exam = sched ? examsById.get(sched.examId) : null;
+      if (!exam) continue;
+
+      if (!map.has(exam.id)) {
+        map.set(exam.id, {
+          examId: exam.id,
+          examTitle: exam.title,
+          gradeLevel: exam.gradeLevel || 'N/A',
+          studentCount: 0,
+          totalAnswered: 0,
+          scoredCount: 0,
+          pendingCount: 0,
+          completionRate: 0,
+        });
+        examStudentSets.set(exam.id, new Set<number>());
+      }
+
+      const row = map.get(exam.id)!;
+      row.totalAnswered += 1;
+      if (e.scored) row.scoredCount += 1;
+      else row.pendingCount += 1;
+
+      examStudentSets.get(exam.id)?.add(e.registrationId);
+    }
+
+    const summaries = Array.from(map.values()).map(s => ({
+      ...s,
+      studentCount: examStudentSets.get(s.examId)?.size || 0,
+      completionRate: s.totalAnswered > 0
+        ? Math.round((s.scoredCount / s.totalAnswered) * 100)
+        : 0,
+    }));
+
+    return summaries.sort((a, b) => b.pendingCount - a.pendingCount || a.examTitle.localeCompare(b.examTitle));
+  }, [enrichedEssays, regsById, schedulesById, examsById]);
+
+
+  const essaysByExamId = useMemo(() => {
+    const grouped = new Map<number, EnrichedEssay[]>();
+    for (const e of enrichedEssays) {
+      const reg = regsById.get(e.registrationId);
+      const sched = reg ? schedulesById.get(reg.scheduleId) : null;
+      const exam = sched ? examsById.get(sched.examId) : null;
+      if (!exam) continue;
+      if (!grouped.has(exam.id)) grouped.set(exam.id, []);
+      grouped.get(exam.id)!.push(e);
+    }
+    for (const [examId, rows] of grouped.entries()) {
+      grouped.set(examId, [...rows].sort((a, b) => Number(a.scored) - Number(b.scored)));
+    }
+    return grouped;
+  }, [enrichedEssays, regsById, schedulesById, examsById]);
+
+  function getStudentName(regId: number): string {
     const reg = regsById.get(regId);
     const regUserId = reg ? getRegUserId(reg) : null;
     const student = reg
       ? (regUserId !== null ? usersById.get(regUserId) : usersByEmail.get(reg.userEmail))
       : null;
     return student ? formatPersonName(student) : 'Unknown';
-  };
+  }
 
-  const getQuestionText = (qId: number): string => {
+  function getQuestionText(qId: number): string {
     for (const exam of exams) { const q = exam.questions?.find(q => q.id === qId); if (q) return q.questionText; }
     return 'Unknown question';
-  };
+  }
 
   const handleScore = async () => {
     if (saving || !scoreModal) return;
@@ -391,15 +474,118 @@ export default function EmployeeResults() {
               <p className="text-gray-500 text-sm">There are no essay answers to review at this time.</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {pending.length > 0 && <h3 className="font-bold text-forest-500 text-lg flex items-center gap-1.5"><Icon name="clock" className="w-5 h-5" /> Pending Review ({pending.length})</h3>}
-              {pending.map(e => (
-                <EssayCard key={e.id} essay={e} student={getStudentName(e.registrationId)} question={getQuestionText(e.questionId)} status="pending" onScore={() => openScoreModal(e)} />
-              ))}
-              {scored.length > 0 && <h3 className="font-bold text-forest-500 text-lg mt-6 flex items-center gap-1.5"><Icon name="checkCircle" className="w-5 h-5" /> Scored ({scored.length})</h3>}
-              {scored.map(e => (
-                <EssayCard key={e.id} essay={e} student={getStudentName(e.registrationId)} question={getQuestionText(e.questionId)} status="scored" onScore={() => openScoreModal(e, { scoreVal: String(e.pointsAwarded ?? ''), commentVal: e.comment || '' })} />
-              ))}
+            <div className="gk-section-card p-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                <StatCard icon="clock" value={pending.length} label="Pending" color="amber" />
+                <StatCard icon="checkCircle" value={scored.length} label="Scored" color="emerald" />
+                <StatCard icon="documentText" value={essays.length} label="Total Essays" color="blue" />
+              </div>
+
+              {examEssaySummary.length > 0 && (
+                <div className="mb-5">
+                  <h3 className="font-semibold text-forest-500 mb-2 flex items-center gap-1.5"><Icon name="list" className="w-4 h-4" /> Exams Essay Overview</h3>
+                  <div className="table-scroll">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-200 text-left text-gray-400 uppercase text-xs bg-gray-50/95 sticky top-0 z-10 backdrop-blur-sm">
+                          <th scope="col" className="py-3 px-2">Exam</th>
+                          <th scope="col" className="py-3 px-2">Grade</th>
+                          <th scope="col" className="py-3 px-2">Students</th>
+                          <th scope="col" className="py-3 px-2">Graded / Essays</th>
+                          <th scope="col" className="py-3 px-2">Pending</th>
+                          <th scope="col" className="py-3 px-2">Progress</th>
+                          <th scope="col" className="py-3 px-2 text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {examEssaySummary.map(row => {
+                          const active = selectedEssayExamId === row.examId;
+                          const examRows = essaysByExamId.get(row.examId) || [];
+                          return (
+                            <Fragment key={row.examId}>
+                              <tr key={row.examId} className={`border-b border-gray-50 hover:bg-gray-50 ${active ? 'bg-forest-50/50' : ''}`}>
+                                <td className="py-3 px-2 font-medium text-forest-600">{row.examTitle}</td>
+                                <td className="py-3 px-2">{row.gradeLevel}</td>
+                                <td className="py-3 px-2">{row.studentCount}</td>
+                                <td className="py-3 px-2"><span className="font-semibold text-forest-700">{row.scoredCount}</span> / {row.totalAnswered}</td>
+                                <td className="py-3 px-2">{row.pendingCount}</td>
+                                <td className="py-3 px-2 min-w-[180px]">
+                                  <div className="w-full h-2 bg-white border border-gray-200 rounded-full overflow-hidden">
+                                    <div className="h-full bg-forest-500" style={{ width: `${row.completionRate}%` }} />
+                                  </div>
+                                  <span className="text-[11px] text-gray-500">{row.completionRate}%</span>
+                                </td>
+                                <td className="py-3 px-2 text-right">
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedEssayExamId(active ? null : row.examId)}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${active ? 'border border-gray-300 text-gray-700 hover:bg-gray-50' : 'bg-forest-500 text-white hover:bg-forest-600'}`}
+                                  >
+                                    {active ? 'Hide Students' : 'View Students'}
+                                  </button>
+                                </td>
+                              </tr>
+                              {active && (
+                                <tr className="bg-white border-b border-gray-100">
+                                  <td colSpan={7} className="px-2 py-3">
+                                    {examRows.length > 0 ? (
+                                      <div className="rounded-lg border border-gray-200 overflow-hidden">
+                                        <table className="w-full text-sm">
+                                          <thead>
+                                            <tr className="bg-gray-50 text-left text-gray-400 uppercase text-xs">
+                                              <th className="py-2 px-2">Student</th>
+                                              <th className="py-2 px-2">Question</th>
+                                              <th className="py-2 px-2">Status</th>
+                                              <th className="py-2 px-2">Score</th>
+                                              <th className="py-2 px-2">Feedback</th>
+                                              <th className="py-2 px-2 text-right">Action</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {examRows.map(e => (
+                                              <tr key={e.id} className="border-t border-gray-100 hover:bg-gray-50 align-top">
+                                                <td className="py-2 px-2 font-medium text-forest-500">{e.studentName}</td>
+                                                <td className="py-2 px-2 max-w-[420px]">
+                                                  <div className="font-medium text-gray-700 mb-1 truncate" title={e.questionText}>{e.questionText}</div>
+                                                  <div className="text-xs text-gray-500 line-clamp-2" title={e.essayResponse}>{e.essayResponse}</div>
+                                                </td>
+                                                <td className="py-2 px-2">
+                                                  <Badge className={e.scored ? 'gk-badge gk-badge-reviewed' : 'gk-badge gk-badge-pending'}>
+                                                    {e.scored ? 'Scored' : 'Pending'}
+                                                  </Badge>
+                                                </td>
+                                                <td className="py-2 px-2">{e.scored ? `${e.pointsAwarded ?? 0} / ${e.maxPoints}` : `- / ${e.maxPoints}`}</td>
+                                                <td className="py-2 px-2 max-w-[220px] truncate" title={e.comment || ''}>{e.comment || '-'}</td>
+                                                <td className="py-2 px-2 text-right">
+                                                  <button
+                                                    onClick={() => e.scored
+                                                      ? openScoreModal(e, { scoreVal: String(e.pointsAwarded ?? ''), commentVal: e.comment || '' })
+                                                      : openScoreModal(e)}
+                                                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 ${e.scored ? 'border border-forest-300 text-forest-700 hover:bg-forest-50' : 'bg-forest-500 text-white hover:bg-forest-600'}`}
+                                                  >
+                                                    <Icon name={e.scored ? 'edit' : 'check'} className="w-3.5 h-3.5" />
+                                                    {e.scored ? 'Edit' : 'Score'}
+                                                  </button>
+                                                </td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    ) : (
+                                      <p className="text-sm text-gray-500">No essay answers found for this exam.</p>
+                                    )}
+                                  </td>
+                                </tr>
+                              )}
+                            </Fragment>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -566,44 +752,6 @@ export default function EmployeeResults() {
           </>
         )}
       </Modal>
-    </div>
-  );
-}
-
-function EssayCard({ essay, student, question, status, onScore }: EssayCardProps) {
-  return (
-    <div className="gk-section-card p-5">
-      <div className="flex justify-between items-start mb-3">
-        <div>
-          <strong className="text-forest-500">{student}</strong>
-          <Badge className={status === 'pending' ? 'gk-badge gk-badge-pending ml-2' : 'gk-badge gk-badge-reviewed ml-2'}>{status === 'pending' ? 'Pending' : `${essay.pointsAwarded} / ${essay.maxPoints} pts`}</Badge>
-        </div>
-        {status === 'pending' && <span className="text-gray-400 text-xs">Max: {essay.maxPoints} pts</span>}
-      </div>
-      <div className="mb-3">
-        <span className="text-xs text-gray-400 uppercase font-semibold">Question</span>
-        <p className="text-forest-500 font-medium text-sm">{question}</p>
-      </div>
-      <div className="mb-3">
-        <span className="text-xs text-gray-400 uppercase font-semibold">Response</span>
-        <div className="bg-gray-50 rounded-lg p-3 text-sm text-gray-700 leading-relaxed mt-1">{essay.essayResponse}</div>
-      </div>
-      {status === 'pending' && onScore && (
-        <button onClick={onScore} className="bg-forest-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-forest-600">Score This Answer</button>
-      )}
-      {status === 'scored' && (
-        <div className="flex items-center gap-3 mt-2">
-          {essay.comment && (
-            <div className="flex-1">
-              <span className="text-xs text-gray-400 uppercase font-semibold">Feedback</span>
-              <div className="bg-gold-50 border border-gold-200 rounded-lg p-3 text-sm text-gray-700 leading-relaxed mt-1">{essay.comment}</div>
-            </div>
-          )}
-          {onScore && (
-            <button onClick={onScore} className="border border-forest-300 text-forest-600 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-forest-50 inline-flex items-center gap-1 shrink-0"><Icon name="edit" className="w-3.5 h-3.5" /> Edit Score</button>
-          )}
-        </div>
-      )}
     </div>
   );
 }

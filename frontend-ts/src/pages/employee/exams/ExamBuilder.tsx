@@ -32,6 +32,10 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
   const [qPts, setQPts] = useState('');
   const [choices, setChoices] = useState<ChoiceState[]>([{ text: '', correct: true }, { text: '' }, { text: '' }, { text: '' }]);
   const [uploadPreview, setUploadPreview] = useState<UploadPreview | null>(null);
+  const [uploadQueue, setUploadQueue] = useState<UploadPreview[]>([]);
+  const [uploadQueueIndex, setUploadQueueIndex] = useState(0);
+  const [queuedExamTitle, setQueuedExamTitle] = useState('');
+  const [lastAutoTitle, setLastAutoTitle] = useState('');
   const [dragOver, setDragOver] = useState(false);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -126,11 +130,28 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
     setEditIdx(null);
   };
 
-  const handleUploadFile = (file: File) => {
+  const suggestTitleFromFileName = (fileName: string) => {
+    const noExt = fileName.replace(/\.[^/.]+$/, '');
+    return noExt
+      .replace(/[_-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
+  const maybeAutoFillTitle = (fileName: string) => {
+    const suggested = suggestTitleFromFileName(fileName);
+    if (!suggested) return;
+    if (!title.trim() || title === lastAutoTitle) {
+      setTitle(suggested);
+      setLastAutoTitle(suggested);
+    }
+  };
+
+  const parseQuestionFile = (file: File) => new Promise<{ parsed: ParsedQuestion[]; errs: number; fileName: string }>((resolve, reject) => {
     if (!file) return;
     const ext = file.name.split('.').pop()?.toLowerCase() || '';
     if (!['json', 'csv', 'xlsx', 'xls'].includes(ext)) {
-      showToast('Unsupported file type. Please upload a .csv, .xlsx, or .json file.', 'error');
+      reject(new Error(`Unsupported file type in ${file.name}.`));
       return;
     }
     if (ext === 'xlsx' || ext === 'xls') {
@@ -138,12 +159,16 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
       reader.onload = (e) => {
         try {
           const { parsed, errs } = parseExcelQuestions(e.target?.result as ArrayBuffer);
-          if (parsed.length === 0) { showToast('No valid questions found in file. Check the format.', 'error'); return; }
-          setUploadPreview({ parsed, errs, fileName: file.name });
+          if (parsed.length === 0) {
+            reject(new Error(`No valid questions found in ${file.name}.`));
+            return;
+          }
+          resolve({ parsed, errs, fileName: file.name });
         } catch (err: any) {
-          showToast(`Failed to parse Excel file: ${err.message}`, 'error');
+          reject(new Error(`Failed to parse ${file.name}: ${err.message}`));
         }
       };
+      reader.onerror = () => reject(new Error(`Failed to read ${file.name}.`));
       reader.readAsArrayBuffer(file);
       return;
     }
@@ -153,15 +178,44 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
         const text = e.target?.result as string;
         const { parsed, errs } = ext === 'json' ? parseJSONQuestions(text) : parseCSVQuestions(text);
         if (parsed.length === 0) {
-          showToast('No valid questions found in file. Check the format.', 'error');
+          reject(new Error(`No valid questions found in ${file.name}.`));
           return;
         }
-        setUploadPreview({ parsed, errs, fileName: file.name });
+        resolve({ parsed, errs, fileName: file.name });
       } catch (err: any) {
-        showToast(`Failed to parse file: ${err.message}`, 'error');
+        reject(new Error(`Failed to parse ${file.name}: ${err.message}`));
       }
     };
+    reader.onerror = () => reject(new Error(`Failed to read ${file.name}.`));
     reader.readAsText(file);
+  });
+
+  const handleUploadFiles = async (files: File[]) => {
+    if (files.length === 0) return;
+    const queue: UploadPreview[] = [];
+
+    for (const file of files) {
+      try {
+        const parsed = await parseQuestionFile(file);
+        queue.push(parsed);
+      } catch (err: any) {
+        showToast(err.message || `Failed to import ${file.name}.`, 'error');
+      }
+    }
+
+    if (queue.length === 0) {
+      return;
+    }
+
+    setUploadQueue(queue);
+    setUploadQueueIndex(0);
+    setUploadPreview(queue[0]);
+    setQueuedExamTitle(suggestTitleFromFileName(queue[0].fileName));
+    maybeAutoFillTitle(queue[0].fileName);
+
+    if (queue.length > 1) {
+      showToast(`${queue.length} files queued. Review and import each exam individually.`, 'info');
+    }
   };
 
   const confirmUpload = (mode: 'replace' | 'append') => {
@@ -174,8 +228,80 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
         return merged;
       });
     }
-    showToast(`${uploadPreview.parsed.length} question(s) imported successfully!`, 'success');
+    showToast(`${uploadPreview.parsed.length} question(s) imported from ${uploadPreview.fileName}.`, 'success');
+
+    const nextIdx = uploadQueueIndex + 1;
+    if (uploadQueue.length > nextIdx) {
+      const nextPreview = uploadQueue[nextIdx];
+      setUploadQueueIndex(nextIdx);
+      setUploadPreview(nextPreview);
+      setQueuedExamTitle(suggestTitleFromFileName(nextPreview.fileName));
+      maybeAutoFillTitle(nextPreview.fileName);
+      return;
+    }
+
     setUploadPreview(null);
+    setUploadQueue([]);
+    setUploadQueueIndex(0);
+    setQueuedExamTitle('');
+  };
+
+  const skipCurrentQueuedUpload = () => {
+    const nextIdx = uploadQueueIndex + 1;
+    if (uploadQueue.length > nextIdx) {
+      const nextPreview = uploadQueue[nextIdx];
+      setUploadQueueIndex(nextIdx);
+      setUploadPreview(nextPreview);
+      setQueuedExamTitle(suggestTitleFromFileName(nextPreview.fileName));
+      maybeAutoFillTitle(nextPreview.fileName);
+      return;
+    }
+    setUploadPreview(null);
+    setUploadQueue([]);
+    setUploadQueueIndex(0);
+    setQueuedExamTitle('');
+  };
+
+  const createSeparateExamFromCurrentFile = async () => {
+    if (!uploadPreview) return;
+    if (editExam) {
+      showToast('Separate exam creation from multi-file upload is disabled while editing an existing exam.', 'error');
+      return;
+    }
+    if (!queuedExamTitle.trim()) {
+      showToast('Exam title is required for this file.', 'error');
+      return;
+    }
+    if (!grade || !duration || !passing) {
+      showToast('Please set Grade Level, Duration, and Passing Score before creating separate exams.', 'error');
+      return;
+    }
+
+    const dur = parseInt(String(duration));
+    const pass = parseFloat(String(passing));
+    if (isNaN(dur) || dur <= 0) { showToast('Duration must be a positive number of minutes.', 'error'); return; }
+    if (isNaN(pass) || pass < 0 || pass > 100) { showToast('Passing score must be between 0 and 100.', 'error'); return; }
+
+    try {
+      await addExam({
+        title: queuedExamTitle.trim(),
+        gradeLevel: grade,
+        durationMinutes: dur,
+        passingScore: pass,
+        ...(yearId && { academicYearId: Number(yearId) }),
+        ...(semId && { semesterId: Number(semId) }),
+        questions: uploadPreview.parsed.map((q, i) => ({
+          ...q,
+          id: uid(),
+          orderNum: i + 1,
+          choices: (q.choices || []).map(c => ({ ...c, id: uid() })),
+        })),
+      });
+      showToast(`Created exam "${queuedExamTitle.trim()}" from ${uploadPreview.fileName}.`, 'success');
+      skipCurrentQueuedUpload();
+    } catch (err: any) {
+      showToast('Failed to create exam: ' + (err.message || 'Unknown error'), 'error');
+    }
   };
 
   const saveExam = async () => {
@@ -277,14 +403,14 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
           onClick={() => document.getElementById('questionnaire-upload')?.click()}
           onDragOver={(e: DragEvent) => { e.preventDefault(); setDragOver(true); }}
           onDragLeave={() => setDragOver(false)}
-          onDrop={(e: DragEvent) => { e.preventDefault(); setDragOver(false); if (e.dataTransfer.files[0]) handleUploadFile(e.dataTransfer.files[0]); }}
+          onDrop={(e: DragEvent) => { e.preventDefault(); setDragOver(false); const files = Array.from(e.dataTransfer.files || []); if (files.length) handleUploadFiles(files); }}
         >
           <div className="text-3xl mb-2"><Icon name="upload" className="w-8 h-8 text-gray-400 mx-auto" /></div>
           <p className="text-gray-600 font-medium">Drag & drop your questionnaire file here</p>
           <p className="text-gray-400 text-sm mt-1">or <span className="text-forest-500 font-medium underline">click to browse</span></p>
-          <p className="text-xs text-gray-400 mt-2">Supported: .xlsx (Excel) | .csv | .json</p>
+          <p className="text-xs text-gray-400 mt-2">Supported: .xlsx (Excel) | .csv | .json | Multiple files allowed (processed individually)</p>
         </div>
-        <input id="questionnaire-upload" type="file" accept=".csv,.json,.xlsx,.xls" className="hidden" onChange={e => { if (e.target.files?.[0]) handleUploadFile(e.target.files[0]); e.target.value = ''; }} />
+        <input id="questionnaire-upload" type="file" accept=".csv,.json,.xlsx,.xls" multiple className="hidden" onChange={e => { const files = Array.from(e.target.files || []); if (files.length) handleUploadFiles(files); e.target.value = ''; }} />
 
         <details className="mt-4 group border border-amber-200 rounded-lg p-4 bg-amber-50">
           <summary className="text-sm text-amber-800 font-bold cursor-pointer select-none flex items-center gap-2"><Icon name="info" className="w-4 h-4" /> 📋 Format Guide & Template Samples</summary>
@@ -360,11 +486,26 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
       </div>
 
       {/* Upload Preview Modal */}
-      <Modal open={!!uploadPreview} onClose={() => setUploadPreview(null)}>
+      <Modal open={!!uploadPreview} onClose={() => { setUploadPreview(null); setUploadQueue([]); setUploadQueueIndex(0); setQueuedExamTitle(''); }}>
         {uploadPreview && (
           <div>
             <h3 className="text-lg font-bold text-forest-500 mb-2 flex items-center gap-1.5"><Icon name="clipboard" className="w-5 h-5" /> Import Preview</h3>
             <p className="text-gray-500 text-sm mb-4">File: <span className="font-medium text-forest-500">{uploadPreview.fileName}</span></p>
+            {uploadQueue.length > 1 && (
+              <p className="text-xs text-gray-500 mb-3">Queued file {uploadQueueIndex + 1} of {uploadQueue.length}. Each file is handled as an individual exam import.</p>
+            )}
+
+            {uploadQueue.length > 1 && !editExam && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Exam title for this file</label>
+                <input
+                  value={queuedExamTitle}
+                  onChange={e => setQueuedExamTitle(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none"
+                  placeholder="Exam title"
+                />
+              </div>
+            )}
 
             <div className="grid grid-cols-3 gap-3 mb-4">
               <div className="bg-forest-50 rounded-lg p-3 text-center">
@@ -409,19 +550,28 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
               ))}
             </div>
 
-            {questions.length > 0 ? (
+            {uploadQueue.length > 1 ? (
+              <div>
+                <p className="text-sm text-gray-500 mb-3">Create each queued file as its own exam entity.</p>
+                <div className="flex gap-2 flex-wrap">
+                  <button onClick={createSeparateExamFromCurrentFile} className="bg-forest-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-forest-600 inline-flex items-center gap-1"><Icon name="check" className="w-4 h-4" /> Create Separate Exam</button>
+                  <button onClick={skipCurrentQueuedUpload} className="border border-amber-300 text-amber-700 px-4 py-2 rounded-lg text-sm hover:bg-amber-50">Skip This File</button>
+                  <button onClick={() => { setUploadPreview(null); setUploadQueue([]); setUploadQueueIndex(0); setQueuedExamTitle(''); }} className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-50">Cancel</button>
+                </div>
+              </div>
+            ) : questions.length > 0 ? (
               <div>
                 <p className="text-sm text-gray-500 mb-3">You already have <strong>{questions.length}</strong> question(s). How would you like to import?</p>
                 <div className="flex gap-2 flex-wrap">
                   <button onClick={() => confirmUpload('append')} className="bg-forest-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-forest-600 inline-flex items-center gap-1"><Icon name="plus" className="w-4 h-4" /> Add to Existing</button>
                   <button onClick={() => confirmUpload('replace')} className="bg-forest-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-forest-600 inline-flex items-center gap-1"><Icon name="refresh" className="w-4 h-4" /> Replace All</button>
-                  <button onClick={() => setUploadPreview(null)} className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-50">Cancel</button>
+                  <button onClick={() => { setUploadPreview(null); setUploadQueue([]); setUploadQueueIndex(0); setQueuedExamTitle(''); }} className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-50">Cancel</button>
                 </div>
               </div>
             ) : (
               <div className="flex gap-2">
                 <button onClick={() => confirmUpload('replace')} className="bg-forest-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-forest-600 inline-flex items-center gap-1.5"><Icon name="check" className="w-4 h-4" /> Import Questions</button>
-                <button onClick={() => setUploadPreview(null)} className="border border-gray-300 text-gray-700 px-5 py-2 rounded-lg hover:bg-gray-50">Cancel</button>
+                <button onClick={() => { setUploadPreview(null); setUploadQueue([]); setUploadQueueIndex(0); setQueuedExamTitle(''); }} className="border border-gray-300 text-gray-700 px-5 py-2 rounded-lg hover:bg-gray-50">Cancel</button>
               </div>
             )}
           </div>

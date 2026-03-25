@@ -89,7 +89,20 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
   const resetExamPage = () => setExamPage(1);
 
   const handleBulkImportExams = async (data: any[]) => {
+    if (!data.length) {
+      showToast('No exam rows found to import.', 'error');
+      return;
+    }
+    const ok = await confirm({
+      title: 'Bulk Import Exams',
+      message: `Import ${data.length} exam row(s)? Existing exams will remain unchanged.`,
+      confirmLabel: 'Import Exams',
+      variant: 'info',
+    });
+    if (!ok) return;
+
     let successCount = 0;
+    let failedCount = 0;
     setSaving(true);
     try {
       for (const row of data) {
@@ -135,9 +148,15 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
             questions
           });
           successCount++;
-        } catch (e) {}
+        } catch (e) {
+          failedCount++;
+        }
       }
-      showToast(`Successfully imported ${successCount} exams!`, 'success');
+      if (successCount > 0) {
+        showToast(`Successfully imported ${successCount} exam(s).${failedCount ? ` ${failedCount} failed.` : ''}`, failedCount ? 'info' : 'success');
+      } else {
+        showToast('Import failed. No exams were created.', 'error');
+      }
       refetch();
     } finally {
       setSaving(false);
@@ -294,7 +313,7 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
             exportToCSV(exportData, 'exams_export.csv');
           }} className="bg-white text-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 flex items-center gap-2 border border-gray-300">
             Export
-          </button>          <CSVUploader title="Bulk Import Exams" isOpen={showBulkImport} onClose={() => setShowBulkImport(false)} onImport={handleBulkImportExams} templateHeaders={['title', 'gradeLevel', 'durationMinutes', 'passingScore', 'isActive']} />
+          </button>          <CSVUploader title="Bulk Import Exams" isOpen={showBulkImport} onClose={() => setShowBulkImport(false)} onImport={handleBulkImportExams} templateHeaders={['title', 'gradeLevel', 'durationMinutes', 'passingScore', 'isActive']} allowMultiple />
           <button onClick={() => setShowBulkImport(true)} className="bg-white text-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 flex items-center gap-2 border border-gray-300">
             <Icon name="upload" className="w-4 h-4" /> Import Exams
           </button>
@@ -359,7 +378,7 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
                         <div className="flex gap-1">
                           <button onClick={() => setDetailId(e.id)} className="text-forest-500 hover:underline text-xs">View</button>
                           {canManageExams && <>
-                            <button onClick={async () => { try { await cloneExam(e.id); showToast('Exam cloned successfully!', 'success'); refetch(); } catch { showToast('Failed to clone exam.', 'error'); } }} className="text-gold-600 hover:underline text-xs">Clone</button>
+                            <button onClick={async () => { const ok = await confirm({ title: 'Clone Exam', message: `Create a duplicate copy of "${e.title}"?`, confirmLabel: 'Clone', variant: 'info' }); if (!ok) return; try { await cloneExam(e.id); showToast('Exam cloned successfully!', 'success'); refetch(); } catch { showToast('Failed to clone exam.', 'error'); } }} className="text-gold-600 hover:underline text-xs">Clone</button>
                             <button onClick={async () => { const action = e.isActive ? 'Deactivate' : 'Activate'; const ok = await confirm({ title: `${action} Exam`, message: `Are you sure you want to ${action.toLowerCase()} "${e.title}"?`, confirmLabel: action, variant: e.isActive ? 'danger' : 'info' }); if (!ok) return; try { await updateExam(e.id, { isActive: !e.isActive }); showToast(`Exam ${action.toLowerCase()}d!`, 'success'); refetch(); } catch { showToast('Failed to update exam.', 'error'); } }} className="text-gray-500 hover:underline text-xs">{e.isActive ? 'Deactivate' : 'Activate'}</button>
                             <button onClick={async () => { if (await confirm({ title: 'Delete Exam', message: 'Are you sure you want to delete this exam? This cannot be undone.', confirmLabel: 'Delete', variant: 'danger' })) { try { await deleteExam(e.id); refetch(); } catch { showToast('Failed to delete exam.', 'error'); } } }} className="text-red-500 hover:underline text-xs">Delete</button>
                           </>}
