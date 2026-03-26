@@ -133,7 +133,10 @@ const bulkOpLimiter = rateLimit({
 });
 
 // Serve uploaded files — require authentication
-app.use('/uploads', authenticate, express.static(path.resolve(env.UPLOAD_DIR)));
+const uploadStaticDir = env.NODE_ENV === 'production' && !path.isAbsolute(env.UPLOAD_DIR)
+  ? path.posix.join('/tmp', env.UPLOAD_DIR)
+  : path.resolve(env.UPLOAD_DIR);
+app.use('/uploads', authenticate, express.static(uploadStaticDir));
 
 // Apply specific rate limiters to sensitive operations (must be mounted before routes)
 app.use('/api/admissions/bulk-status', bulkOpLimiter);
