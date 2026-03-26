@@ -1,6 +1,7 @@
 import prisma from '../config/db.js';
 import { logAudit } from '../utils/auditLog.js';
 import { cached, invalidatePrefix } from '../utils/cache.js';
+import { syncAllApplicantStatuses } from '../utils/applicantStatusSync.js';
 
 function validateDateWindow(startDate, endDate, label) {
   if (startDate && endDate && new Date(startDate) > new Date(endDate)) {
@@ -72,6 +73,14 @@ export async function createAcademicYear(req, res, next) {
     });
 
     await logAudit(req, 'academic_year.create', 'academic_year', created.id, { year });
+    const createSync = await syncAllApplicantStatuses();
+    if (createSync.changedCount > 0) {
+      await logAudit(req, 'user.status.period_sync', 'user', null, {
+        reason: 'academic_year.create',
+        status: createSync.status,
+        changedCount: createSync.changedCount,
+      });
+    }
     invalidatePrefix('ay:');
     res.status(201).json(created);
   } catch (err) {
@@ -110,6 +119,14 @@ export async function updateAcademicYear(req, res, next) {
     });
 
     await logAudit(req, 'academic_year.update', 'academic_year', id, { year });
+    const updateSync = await syncAllApplicantStatuses();
+    if (updateSync.changedCount > 0) {
+      await logAudit(req, 'user.status.period_sync', 'user', null, {
+        reason: 'academic_year.update',
+        status: updateSync.status,
+        changedCount: updateSync.changedCount,
+      });
+    }
     invalidatePrefix('ay:');
     res.json(updated);
   } catch (err) {
@@ -124,6 +141,14 @@ export async function deleteAcademicYear(req, res, next) {
     const id = Number(req.params.id);
     await prisma.academicYear.delete({ where: { id } });
     await logAudit(req, 'academic_year.delete', 'academic_year', id);
+    const deleteSync = await syncAllApplicantStatuses();
+    if (deleteSync.changedCount > 0) {
+      await logAudit(req, 'user.status.period_sync', 'user', null, {
+        reason: 'academic_year.delete',
+        status: deleteSync.status,
+        changedCount: deleteSync.changedCount,
+      });
+    }
     invalidatePrefix('ay:');
     res.json({ message: 'Academic year deleted' });
   } catch (err) {
@@ -179,6 +204,14 @@ export async function createSemester(req, res, next) {
     });
 
     await logAudit(req, 'semester.create', 'semester', created.id, { name, academicYearId });
+    const createSemesterSync = await syncAllApplicantStatuses();
+    if (createSemesterSync.changedCount > 0) {
+      await logAudit(req, 'user.status.period_sync', 'user', null, {
+        reason: 'semester.create',
+        status: createSemesterSync.status,
+        changedCount: createSemesterSync.changedCount,
+      });
+    }
     res.status(201).json(created);
   } catch (err) {
     if (err.code === 'P2002') return res.status(409).json({ error: 'A semester with that name already exists for this school year', code: 'CONFLICT' });
@@ -215,6 +248,14 @@ export async function updateSemester(req, res, next) {
     });
 
     await logAudit(req, 'semester.update', 'semester', id, { name });
+    const updateSemesterSync = await syncAllApplicantStatuses();
+    if (updateSemesterSync.changedCount > 0) {
+      await logAudit(req, 'user.status.period_sync', 'user', null, {
+        reason: 'semester.update',
+        status: updateSemesterSync.status,
+        changedCount: updateSemesterSync.changedCount,
+      });
+    }
     res.json(updated);
   } catch (err) {
     if (err.code === 'P2025') return res.status(404).json({ error: 'Semester not found', code: 'NOT_FOUND' });
@@ -228,6 +269,14 @@ export async function deleteSemester(req, res, next) {
     const id = Number(req.params.id);
     await prisma.semester.delete({ where: { id } });
     await logAudit(req, 'semester.delete', 'semester', id);
+    const deleteSemesterSync = await syncAllApplicantStatuses();
+    if (deleteSemesterSync.changedCount > 0) {
+      await logAudit(req, 'user.status.period_sync', 'user', null, {
+        reason: 'semester.delete',
+        status: deleteSemesterSync.status,
+        changedCount: deleteSemesterSync.changedCount,
+      });
+    }
     res.json({ message: 'Semester deleted' });
   } catch (err) {
     if (err.code === 'P2025') return res.status(404).json({ error: 'Semester not found', code: 'NOT_FOUND' });

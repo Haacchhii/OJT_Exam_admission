@@ -7,6 +7,7 @@ import { sendWelcomeEmail, sendVerificationEmail } from '../utils/email.js';
 import { passwordSchema } from '../utils/schemas.js';
 import { logAudit } from '../utils/auditLog.js';
 import { ROLES, BCRYPT_ROUNDS, RESET_TOKEN_EXPIRY, EMAIL_VERIFY_EXPIRY_MS, getLevelGroup } from '../utils/constants.js';
+import { isApplicantPeriodOpen, syncApplicantUserStatusById } from '../utils/applicantStatusSync.js';
 
 // ─── Password complexity (single source of truth: passwordSchema in schemas.js) ──
 function validatePassword(password) {
@@ -84,6 +85,11 @@ export async function login(req, res, next) {
       return res.status(401).json({ error: 'Invalid email or password', code: 'UNAUTHORIZED' });
     }
 
+    if (user.role === ROLES.APPLICANT) {
+      const syncResult = await syncApplicantUserStatusById(user.id);
+      user.status = syncResult.status || user.status;
+    }
+
     if (user.status !== 'Active') {
       logAudit({ userId: user.id, action: 'auth.login_failed', entity: 'user', entityId: user.id, details: { reason: 'inactive_account' }, ipAddress: req.ip });
       return res.status(403).json({ error: 'Account is inactive', code: 'FORBIDDEN' });
@@ -141,10 +147,12 @@ export async function register(req, res, next) {
 
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
     const verifyToken = crypto.randomBytes(32).toString('hex');
+    const applicantPeriodOpen = await isApplicantPeriodOpen();
     const user = await prisma.user.create({
       data: {
         firstName, middleName, lastName, email: normalizedEmail, passwordHash,
-        role: ROLES.APPLICANT, status: 'Active',
+        role: ROLES.APPLICANT,
+        status: applicantPeriodOpen ? 'Active' : 'Inactive',
         emailVerified: false,
         emailVerifyToken: verifyToken,
         emailVerifyExpires: new Date(Date.now() + EMAIL_VERIFY_EXPIRY_MS),

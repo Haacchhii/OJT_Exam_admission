@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import env from '../config/env.js';
 import prisma from '../config/db.js';
 import { ROLES } from '../utils/constants.js';
+import { syncApplicantUserStatusById } from '../utils/applicantStatusSync.js';
 
 const userCache = new Map();
 
@@ -52,6 +53,11 @@ export async function authenticate(req, res, next) {
       if (user && (req.method === 'GET' || req.method === 'HEAD')) {
         setCachedUser(cacheKey, user);
       }
+    }
+
+    if (user?.role === ROLES.APPLICANT) {
+      const syncResult = await syncApplicantUserStatusById(user.id);
+      user.status = syncResult.status || user.status;
     }
 
     if (!user || user.deletedAt || user.status !== 'Active') {
