@@ -4,6 +4,20 @@ import { generateTrackingId } from '../utils/tracking.js';
 import { sendExamBookingEmail } from '../utils/email.js';
 import { ROLES } from '../utils/constants.js';
 
+function getTodayLocalIso() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function isWithinRegistrationWindow(schedule, todayIso) {
+  const opens = !schedule.registrationOpenDate || todayIso >= schedule.registrationOpenDate;
+  const closes = !schedule.registrationCloseDate || todayIso <= schedule.registrationCloseDate;
+  return opens && closes;
+}
+
 // GET /api/exams/registrations/list?search=&status=&page=&limit=
 export async function getRegistrations(req, res, next) {
   try {
@@ -72,8 +86,22 @@ export async function createRegistration(req, res, next) {
       },
     });
     if (!schedule) return res.status(404).json({ error: 'Schedule not found', code: 'NOT_FOUND' });
-    if (!schedule.exam?.academicYear?.isActive) {
+    if (schedule.exam?.academicYear && !schedule.exam.academicYear.isActive) {
       return res.status(400).json({ error: 'Registration is only allowed for exams in the active academic year', code: 'VALIDATION_ERROR' });
+    }
+
+    const today = getTodayLocalIso();
+    if (schedule.scheduledDate < today) {
+      return res.status(400).json({ error: 'This schedule is no longer available', code: 'VALIDATION_ERROR' });
+    }
+    if (schedule.visibilityStartDate && today < schedule.visibilityStartDate) {
+      return res.status(400).json({ error: 'This schedule is not yet visible', code: 'VALIDATION_ERROR' });
+    }
+    if (schedule.visibilityEndDate && today > schedule.visibilityEndDate) {
+      return res.status(400).json({ error: 'This schedule is no longer visible', code: 'VALIDATION_ERROR' });
+    }
+    if (!isWithinRegistrationWindow(schedule, today)) {
+      return res.status(400).json({ error: 'Registration for this schedule is currently closed', code: 'VALIDATION_ERROR' });
     }
 
     const existing = await prisma.examRegistration.findFirst({
@@ -195,5 +223,32 @@ export async function saveDraftAnswers(req, res, next) {
     });
 
     res.json({ ok: true });
+  } catch (err) { next(err); }
+}
+
+// DELETE /api/exams/registrations/:id
+export async function cancelRegistration(req, res, next) {
+  try {
+    const id = Number(req.params.id);
+    const reg = await prisma.examRegistration.findUnique({ where: { id } });
+    if (!reg) return res.status(404).json({ error: 'Registration not found', code: 'NOT_FOUND' });
+
+    if (reg.userEmail !== req.user.email) {
+      return res.status(403).json({ error: 'You can only cancel your own registration', code: 'FORBIDDEN' });
+    }
+
+    if (reg.status !== 'scheduled') {
+      return res.status(400).json({ error: 'Only scheduled exams can be cancelled', code: 'VALIDATION_ERROR' });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.examRegistration.delete({ where: { id } });
+      await tx.examSchedule.update({
+        where: { id: reg.scheduleId },
+        data: { slotsTaken: { decrement: 1 } },
+      });
+    });
+
+    res.status(204).end();
   } catch (err) { next(err); }
 }

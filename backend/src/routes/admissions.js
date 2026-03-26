@@ -12,7 +12,7 @@ import { ROLES } from '../utils/constants.js';
 
 const router = Router();
 
-// Document preview handles its own auth (supports ?token= for iframe/img src)
+// Document preview handles its own auth (Authorization header)
 router.get('/:id/documents/:docId/preview', previewDocument);
 
 router.use(authenticate);

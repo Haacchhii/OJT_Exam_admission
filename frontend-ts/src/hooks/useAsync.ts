@@ -10,7 +10,7 @@ interface UseAsyncResult<T> {
 export function useAsync<T>(
   asyncFn: () => Promise<T>, 
   deps: unknown[] = [],
-  pollInterval: number = 15000 // default 15s auto-refresh polling
+  pollInterval: number = 60000 // default 60s auto-refresh polling
 ): UseAsyncResult<T> {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
@@ -64,6 +64,12 @@ export function useAsync<T>(
       return () => clearInterval(timer);
     }
   }, [pollInterval]);
+
+  useEffect(() => {
+    const onDataChanged = () => setRefreshCount(c => c + 1);
+    window.addEventListener('gk:data-changed', onDataChanged);
+    return () => window.removeEventListener('gk:data-changed', onDataChanged);
+  }, []);
 
   return { data, loading, error, refetch };
 }

@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  output   = "../generated/prisma-client"
 }
 
 datasource db {
@@ -177,6 +178,8 @@ model ExamSchedule {
   scheduledDate String   @map("scheduled_date") // YYYY-MM-DD
   startTime     String   @map("start_time")     // HH:mm
   endTime       String   @map("end_time")       // HH:mm
+  visibilityStartDate String?  @map("visibility_start_date")  // YYYY-MM-DD (when exam becomes visible to students)
+  visibilityEndDate   String?  @map("visibility_end_date")    // YYYY-MM-DD (when exam stops being visible, typically 10 days from start)
   registrationOpenDate  String?  @map("registration_open_date")  // YYYY-MM-DD
   registrationCloseDate String?  @map("registration_close_date") // YYYY-MM-DD
   maxSlots      Int      @map("max_slots")

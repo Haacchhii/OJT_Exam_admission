@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../generated/prisma-client/index.js';
 
 const prisma = new PrismaClient();
 

@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import Papa from "papaparse";
 import Icon from './Icons';
+import Modal from './Modal';
 
 export function CSVUploader({
   title,
@@ -73,8 +74,12 @@ export function CSVUploader({
       setError(`Some files were skipped: ${issues.join(' | ')}`);
     }
 
-    onImport(mergedRows);
-    onClose();
+    try {
+      await Promise.resolve(onImport(mergedRows));
+      onClose();
+    } catch (err: any) {
+      setError(err?.message || 'Import failed. Please try again.');
+    }
   };
 
   const downloadTemplate = () => {
@@ -89,50 +94,48 @@ export function CSVUploader({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 relative">
-        <button onClick={onClose} className="absolute right-4 top-4 text-gray-500 hover:text-gray-700">
-          <Icon name="x" className="w-6 h-6" />
+    <Modal open={isOpen} onClose={onClose} title={title} maxWidth="max-w-md">
+      <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center bg-gray-50 mb-6">
+        <Icon name="documentDownload" className="w-12 h-12 text-forest-500 mx-auto mb-3" />
+        <p className="text-gray-600 mb-4">Upload a .CSV file to bulk import</p>
+        <input
+          type="file"
+          accept=".csv"
+          multiple={allowMultiple}
+          className="hidden"
+          ref={fileInputRef}
+          onChange={handleFileUpload}
+        />
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="bg-forest-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-forest-600 transition-colors"
+        >
+          {allowMultiple ? 'Select Files' : 'Select File'}
         </button>
-        
-        <h2 className="text-xl font-bold text-gray-900 mb-4">{title}</h2>
-        
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center bg-gray-50 mb-6">
-          <Icon name="documentDownload" className="w-12 h-12 text-forest-500 mx-auto mb-3" />
-          <p className="text-gray-600 mb-4">Upload a .CSV file to bulk import</p>
-          <input
-            type="file"
-            accept=".csv"
-            multiple={allowMultiple}
-            className="hidden"
-            ref={fileInputRef}
-            onChange={handleFileUpload}
-          />
-          <button 
-            onClick={() => fileInputRef.current?.click()}
-            className="bg-forest-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-forest-600 transition-colors"
-          >
-            {allowMultiple ? 'Select Files' : 'Select File'}
-          </button>
-        </div>
-
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm">
-            {error}
-          </div>
-        )}
-
-        <div className="text-sm text-gray-500">
-          <p className="font-semibold text-gray-700 mb-1">Required Format:</p>
-          <p className="mb-3">Your CSV must include the following headers exact matches:</p>
-          <code className="bg-gray-100 px-2 py-1 rounded block text-xs break-all mb-4">
-            {templateHeaders.join(", ")}
-          </code>
-          <button onClick={downloadTemplate} className="text-forest-600 hover:underline">
-            Download Template File
-          </button>
-        </div>
       </div>
-    </div>
+
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm">
+          {error}
+        </div>
+      )}
+
+      <div className="text-sm text-gray-500 mb-4">
+        <p className="font-semibold text-gray-700 mb-1">Required Format:</p>
+        <p className="mb-3">Your CSV must include the following headers exact matches:</p>
+        <code className="bg-gray-100 px-2 py-1 rounded block text-xs break-all mb-4">
+          {templateHeaders.join(", ")}
+        </code>
+        <button onClick={downloadTemplate} className="text-forest-600 hover:underline">
+          Download Template File
+        </button>
+      </div>
+
+      <div className="flex justify-end gap-2">
+        <button onClick={onClose} className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-50">
+          Cancel
+        </button>
+      </div>
+    </Modal>
   );
 }

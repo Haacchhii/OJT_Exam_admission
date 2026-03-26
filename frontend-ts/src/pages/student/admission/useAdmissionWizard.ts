@@ -2,35 +2,52 @@ import { useState, useMemo, useCallback, useEffect, type ChangeEvent } from 'rea
 import { useAuth } from '../../../context/AuthContext';
 import { useAsync } from '../../../hooks/useAsync';
 import { getMyAdmission, addAdmission, uploadAdmissionDocuments } from '../../../api/admissions';
-import { getMyResult } from '../../../api/results';
+import { getMyRegistrations } from '../../../api/exams';
 import { showToast } from '../../../components/Toast';
 import { useConfirm } from '../../../components/ConfirmDialog';
 import { useUnsavedChanges } from '../../../hooks/useUnsavedChanges';
-import { DOC_REQUIREMENTS, DOC_SLOT_LABELS, ALLOWED_FILE_TYPES, MAX_FILE_SIZE, getCurrentSchoolYear } from '../../../utils/constants';
-import type { Admission } from '../../../types';
+import { DOC_REQUIREMENTS, DOC_OPTIONAL_REQUIREMENTS, DOC_SLOT_LABELS, ALLOWED_FILE_TYPES, MAX_FILE_SIZE, getCurrentSchoolYear } from '../../../utils/constants';
+import type { Admission, ExamRegistration } from '../../../types';
 import { validateStep1, validateStep2, validateStep3, checkAgeRequirement } from './admissionValidation';
 
 export { checkAgeRequirement };
 export interface AdmissionForm {
   firstName: string; middleName: string; lastName: string; email: string; phone: string; dob: string; gender: string;
-  placeOfBirth: string; religion: string; address: string;
+  noMiddleName: boolean;
+  placeOfBirth: string; religion: string;
+  addressStreet: string; addressBarangay: string; addressCityMunicipality: string; addressProvince: string; addressZipCode: string;
   prevSchool: string; schoolAddress: string; gradeLevel: string; schoolYear: string; lrn: string; applicantType: string;
   studentNumber: string;
-  fatherNameOccupation: string; motherNameOccupation: string; guardian: string;
+  fatherName: string; fatherOccupation: string; motherNameOccupation: string; guardian: string;
   guardianRelation: string; guardianPhone: string; guardianEmail: string;
-  [key: string]: string;
+  [key: string]: string | boolean;
+}
+
+function composeHomeAddress(form: AdmissionForm): string {
+  return [
+    form.addressStreet,
+    form.addressBarangay ? `Brgy. ${form.addressBarangay}` : '',
+    form.addressCityMunicipality,
+    form.addressProvince,
+    form.addressZipCode,
+  ].filter(Boolean).join(', ');
 }
 
 export type SlotFiles = Record<string, File | null>;
 
 interface GateData {
   existingApp: Admission | null;
-  examPassed: boolean;
+  examCompleted: boolean;
 }
 
 export function getRequiredDocs(gradeLevel: string): string[] {
   const reqs = (DOC_REQUIREMENTS as Record<string, Record<string, boolean>>)[gradeLevel] || (DOC_REQUIREMENTS as Record<string, Record<string, boolean>>)['Grade 2'];
   return Object.keys(reqs).filter(k => reqs[k]);
+}
+
+export function getOptionalDocs(gradeLevel: string): string[] {
+  const optionalReqs = (DOC_OPTIONAL_REQUIREMENTS as Record<string, Record<string, boolean>>)[gradeLevel] || {};
+  return Object.keys(optionalReqs).filter(k => optionalReqs[k]);
 }
 
 export function useAdmissionWizard() {
@@ -46,10 +63,11 @@ export function useAdmissionWizard() {
   const [privacyConsent, setPrivacyConsent] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [form, setForm] = useState<AdmissionForm>({
-    firstName: '', middleName: '', lastName: '', email: '', phone: '', dob: '', gender: '', placeOfBirth: '', religion: '', address: '',
+    firstName: '', middleName: '', lastName: '', email: '', phone: '', dob: '', gender: '', noMiddleName: false, placeOfBirth: '', religion: '',
+    addressStreet: '', addressBarangay: '', addressCityMunicipality: '', addressProvince: '', addressZipCode: '',
     prevSchool: '', schoolAddress: '', gradeLevel: '', schoolYear: getCurrentSchoolYear(), lrn: '', applicantType: 'New',
     studentNumber: '',
-    fatherNameOccupation: '', motherNameOccupation: '', guardian: '',
+    fatherName: '', fatherOccupation: '', motherNameOccupation: '', guardian: '',
     guardianRelation: '', guardianPhone: '', guardianEmail: '',
   });
 
@@ -57,15 +75,16 @@ export function useAdmissionWizard() {
   const confirmDialog = useConfirm();
 
   const { data: gateData, loading: gateLoading, error: gateError, refetch } = useAsync<GateData>(async () => {
-    const [existingApp, myResult] = await Promise.all([
-      getMyAdmission(), getMyResult()
+    const [existingApp, myRegs] = await Promise.all([
+      getMyAdmission(), getMyRegistrations()
     ]);
-    const examPassed = myResult?.passed === true;
-    return { existingApp, examPassed };
+    const registrations = Array.isArray(myRegs) ? myRegs : [];
+    const examCompleted = registrations.some((reg: ExamRegistration) => reg.status === 'done');
+    return { existingApp, examCompleted };
   }, [user]);
 
   const existingApp = gateData?.existingApp || null;
-  const examPassed = gateData?.examPassed || false;
+  const examCompleted = gateData?.examCompleted || false;
 
   const isDirty = !!(form.firstName || form.middleName || form.lastName || form.email);
   const { restore, clear } = useUnsavedChanges(isDirty, 'gk_admission_draft', form);
@@ -102,6 +121,7 @@ export function useAdmissionWizard() {
   }, [clearError]);
 
   const requiredDocs = useMemo(() => getRequiredDocs(form.gradeLevel), [form.gradeLevel]);
+  const optionalDocs = useMemo(() => getOptionalDocs(form.gradeLevel), [form.gradeLevel]);
 
   const goTo = (n: number) => {
     if (n > step) {
@@ -145,7 +165,12 @@ export function useAdmissionWizard() {
 
     setSaving(true);
     try {
-      const result = await addAdmission({ ...form, documents: docs.length ? docs : ['(No documents uploaded)'] });
+      const result = await addAdmission({
+        ...form,
+        address: composeHomeAddress(form),
+        fatherNameOccupation: [form.fatherName.trim(), form.fatherOccupation.trim()].filter(Boolean).join(', '),
+        documents: docs.length ? docs : ['(No documents uploaded)'],
+      });
       if ((result as any)?.error) { showToast((result as any).error, 'error'); return; }
       const allFiles = [...Object.values(slotFiles).filter(Boolean) as File[], ...extraFiles];
       if (allFiles.length > 0 && result?.id) {
@@ -190,7 +215,7 @@ export function useAdmissionWizard() {
 
   return {
     step, form, setForm, set, slotFiles, extraFiles, saving, privacyConsent, setPrivacyConsent,
-    requiredDocs, isDirty, existingApp, examPassed, showWizard, setShowWizard,
+    requiredDocs, optionalDocs, isDirty, existingApp, examCompleted, showWizard, setShowWizard,
     successOpen, setSuccessOpen, submittedTrackingId,
     gateLoading, gateError, gateData, refetch, user,
     errors, setErrors, clearError,

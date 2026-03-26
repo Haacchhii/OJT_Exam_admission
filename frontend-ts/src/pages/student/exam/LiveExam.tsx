@@ -43,7 +43,16 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
   const submittedRef = useRef(false);
   const navigate = useNavigate();
 
-  const questions = exam.questions;
+  const questions = Array.isArray(exam.questions) ? exam.questions : [];
+
+  useEffect(() => {
+    if (questions.length === 0) {
+      if (currentQ !== 0) setCurrentQ(0);
+      return;
+    }
+    if (currentQ < 0) setCurrentQ(0);
+    if (currentQ > questions.length - 1) setCurrentQ(questions.length - 1);
+  }, [questions.length, currentQ]);
 
   useEffect(() => {
     try { sessionStorage.setItem(`gk_exam_answers_${registration.id}`, JSON.stringify(answers)); } catch { /* ignore */ }
@@ -133,11 +142,35 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
     return () => clearInterval(autoSaveInterval);
   }, [registration.id]);
 
-  const q = questions[currentQ];
+  const q = questions[currentQ] || null;
   const answered = Object.keys(answers).filter(k => answers[Number(k)] !== undefined && answers[Number(k)] !== '').length;
+  const progressPct = questions.length > 0 ? (answered / questions.length) * 100 : 0;
   const mins = Math.floor(timeLeft / 60);
   const secs = timeLeft % 60;
   const timerColor = timeLeft <= 60 ? 'text-red-500' : timeLeft <= 300 ? 'text-gold-500' : 'text-forest-500';
+
+  if (!q) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-4">
+        <div className="max-w-3xl mx-auto gk-section-card p-8 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-gold-50 flex items-center justify-center mx-auto mb-3">
+            <Icon name="exclamation" className="w-7 h-7 text-gold-600" />
+          </div>
+          <h3 className="text-xl font-bold text-forest-500">Exam Not Ready</h3>
+          <p className="text-gray-500 mt-2">
+            This exam currently has no questions available. Please contact support and try again.
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="mt-4 border border-gray-300 text-gray-700 px-5 py-2 rounded-lg hover:bg-gray-50"
+          >
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -156,7 +189,7 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
         </div>
         <div className="flex items-center gap-3">
           <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-            <div className="h-full bg-gold-400 transition-all" style={{ width: `${(answered / questions.length) * 100}%` }} />
+            <div className="h-full bg-gold-400 transition-all" style={{ width: `${progressPct}%` }} />
           </div>
           <span className="text-sm text-gray-500">{answered} / {questions.length} answered</span>
         </div>

@@ -53,7 +53,7 @@ export const resetPasswordSchema = z.object({
 // ─── Admission Schemas ────────────────────────────────
 export const createAdmissionSchema = z.object({
   firstName: z.string().min(1).max(100),
-  middleName: z.string().min(1).max(100),
+  middleName: z.string().max(100).optional().nullable().or(z.literal('')),
   lastName: z.string().min(1).max(100),
   email: z.string().email(),
   phone: z.string().max(20).optional().nullable(),
@@ -120,6 +120,8 @@ export const createScheduleSchema = z.object({
   scheduledDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD format'),
   startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Must be HH:mm format'),
   endTime: z.string().regex(/^\d{2}:\d{2}$/, 'Must be HH:mm format'),
+  visibilityStartDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD format').optional().nullable(),
+  visibilityEndDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD format').optional().nullable(),
   registrationOpenDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD format').optional().nullable(),
   registrationCloseDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD format').optional().nullable(),
   maxSlots: z.number().int().positive(),
@@ -229,6 +231,8 @@ export const updateScheduleSchema = z.object({
   scheduledDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD format').optional(),
   startTime:     z.string().regex(/^\d{2}:\d{2}$/, 'Must be HH:mm format').optional(),
   endTime:       z.string().regex(/^\d{2}:\d{2}$/, 'Must be HH:mm format').optional(),
+  visibilityStartDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD format').optional().nullable(),
+  visibilityEndDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD format').optional().nullable(),
   registrationOpenDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD format').optional().nullable(),
   registrationCloseDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD format').optional().nullable(),
   maxSlots:      z.number().int().positive().optional(),

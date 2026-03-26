@@ -31,17 +31,13 @@ const EXT_MIME = {
   '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 };
 
-// ── Auth helper for preview (supports query param token for iframes) ──
+// ── Auth helper for preview (Authorization header only) ──
 async function authenticatePreview(req) {
   // Try Authorization header first
   let token = null;
   const header = req.headers.authorization;
   if (header?.startsWith('Bearer ')) {
     token = header.split(' ')[1];
-  }
-  // Fall back to query param (for iframe/img src)
-  if (!token && req.query.token) {
-    token = req.query.token;
   }
   if (!token) return null;
 
@@ -68,7 +64,7 @@ async function verifyAccess(user, admissionId) {
 
 // GET /api/admissions/:id/documents/:docId/preview
 // Serves the file inline so the browser can render it (PDF, images)
-// Supports auth via Authorization header OR ?token= query param (for iframes)
+// Supports auth via Authorization header
 export async function previewDocument(req, res, next) {
   try {
     // Authenticate via header or query param

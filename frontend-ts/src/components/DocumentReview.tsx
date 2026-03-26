@@ -5,6 +5,7 @@ import { getDocumentPreviewUrl, getDocumentDownloadUrl, extractDocumentData, rev
 import { getToken } from '../api/client';
 import { showToast } from './Toast';
 import { useAuth } from '../context/AuthContext';
+import { useConfirm } from './ConfirmDialog';
 
 interface DocumentFile {
   id: number;
@@ -32,6 +33,7 @@ function isPreviewable(name: string): 'pdf' | 'image' | null {
 
 export default function DocumentReview({ admissionId, documents, onReviewUpdate }: Props) {
   const { user } = useAuth();
+  const confirm = useConfirm();
   const canReview = user?.role === 'administrator' || user?.role === 'registrar';
   const [previewDoc, setPreviewDoc] = useState<DocumentFile | null>(null);
   const [extraction, setExtraction] = useState<ExtractedResult | null>(null);
@@ -39,15 +41,45 @@ export default function DocumentReview({ admissionId, documents, onReviewUpdate 
   const [extractError, setExtractError] = useState('');
   const [activeTab, setActiveTab] = useState<'preview' | 'extracted'>('preview');
   const [reviewing, setReviewing] = useState<number | null>(null);
+  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewLoadError, setPreviewLoadError] = useState('');
 
   const token = getToken();
+
+  const loadPreviewBlob = useCallback(async (doc: DocumentFile) => {
+    const previewUrl = getDocumentPreviewUrl(admissionId, doc.id);
+    if (!token) {
+      setPreviewLoadError('Session expired. Please log in again.');
+      return;
+    }
+    setPreviewLoading(true);
+    setPreviewLoadError('');
+    try {
+      const res = await fetch(previewUrl, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) {
+        throw new Error('Failed to load document preview');
+      }
+      const blob = await res.blob();
+      setPreviewBlobUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return URL.createObjectURL(blob);
+      });
+    } catch (err: any) {
+      setPreviewLoadError(err.message || 'Failed to load document preview');
+    } finally {
+      setPreviewLoading(false);
+    }
+  }, [admissionId, token]);
 
   const handlePreview = useCallback((doc: DocumentFile) => {
     setPreviewDoc(doc);
     setExtraction(null);
     setExtractError('');
+    setPreviewLoadError('');
     setActiveTab('preview');
-  }, []);
+    void loadPreviewBlob(doc);
+  }, [loadPreviewBlob]);
 
   const handleExtract = useCallback(async (doc: DocumentFile) => {
     setExtracting(true);
@@ -67,9 +99,23 @@ export default function DocumentReview({ admissionId, documents, onReviewUpdate 
     setPreviewDoc(null);
     setExtraction(null);
     setExtractError('');
+    setPreviewLoadError('');
+    setPreviewLoading(false);
+    setPreviewBlobUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
   }, []);
 
   const handleReview = useCallback(async (doc: DocumentFile, status: 'accepted' | 'rejected') => {
+    const ok = await confirm({
+      title: `${status === 'accepted' ? 'Accept' : 'Reject'} Document`,
+      message: `Are you sure you want to mark "${doc.name}" as ${status}?`,
+      confirmLabel: status === 'accepted' ? 'Accept' : 'Reject',
+      variant: status === 'accepted' ? 'info' : 'warning',
+    });
+    if (!ok) return;
+
     setReviewing(doc.id);
     try {
       await reviewDocument(admissionId, doc.id, status);
@@ -77,13 +123,7 @@ export default function DocumentReview({ admissionId, documents, onReviewUpdate 
       onReviewUpdate?.();
     } catch { showToast('Failed to update review', 'error'); }
     finally { setReviewing(null); }
-  }, [admissionId, onReviewUpdate]);
-
-  // Build preview URL with auth token as query param for iframe/img
-  const getPreviewSrc = (doc: DocumentFile) => {
-    const url = getDocumentPreviewUrl(admissionId, doc.id);
-    return token ? `${url}?token=${encodeURIComponent(token)}` : url;
-  };
+  }, [admissionId, onReviewUpdate, confirm]);
 
   return (
     <>
@@ -109,15 +149,7 @@ export default function DocumentReview({ admissionId, documents, onReviewUpdate 
                         <Icon name="eye" className="w-3.5 h-3.5" /> View
                       </button>
                     ) : (
-                      <a
-                        href={getPreviewSrc(doc)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-forest-600 hover:text-forest-800 text-xs font-medium hover:underline"
-                        title="View document"
-                      >
-                        <Icon name="eye" className="w-3.5 h-3.5" /> View
-                      </a>
+                      <span className="text-xs text-gray-400">Preview unavailable</span>
                     )}
                     <a
                       href={getDocumentDownloadUrl(admissionId, doc.id)}
@@ -188,22 +220,38 @@ export default function DocumentReview({ admissionId, documents, onReviewUpdate 
             {/* Tab Content */}
             {activeTab === 'preview' && (
               <div className="bg-gray-100 rounded-xl overflow-hidden" style={{ minHeight: '500px' }}>
-                {isPreviewable(previewDoc.name) === 'pdf' ? (
+                {previewLoading && (
+                  <div className="flex flex-col items-center justify-center py-16 text-gray-500" style={{ minHeight: '500px' }}>
+                    <div className="w-8 h-8 border-2 border-forest-500 border-t-transparent rounded-full animate-spin mb-4" />
+                    <p className="text-sm font-medium">Loading preview...</p>
+                  </div>
+                )}
+
+                {!previewLoading && previewLoadError && (
+                  <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700 m-4">
+                    <Icon name="exclamation" className="w-5 h-5 inline mr-2" />
+                    {previewLoadError}
+                  </div>
+                )}
+
+                {!previewLoading && !previewLoadError && previewBlobUrl && isPreviewable(previewDoc.name) === 'pdf' ? (
                   <iframe
-                    src={getPreviewSrc(previewDoc)}
+                    src={previewBlobUrl}
                     className="w-full border-0 rounded-xl"
                     style={{ height: '70vh' }}
                     title={`Preview: ${previewDoc.name}`}
                   />
-                ) : (
+                ) : null}
+
+                {!previewLoading && !previewLoadError && previewBlobUrl && isPreviewable(previewDoc.name) !== 'pdf' ? (
                   <div className="flex items-center justify-center p-4" style={{ minHeight: '500px' }}>
                     <img
-                      src={getPreviewSrc(previewDoc)}
+                      src={previewBlobUrl}
                       alt={previewDoc.name}
                       className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-sm"
                     />
                   </div>
-                )}
+                ) : null}
               </div>
             )}
 

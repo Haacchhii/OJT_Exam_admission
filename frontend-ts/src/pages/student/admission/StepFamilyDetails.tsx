@@ -18,13 +18,22 @@ export default function StepFamilyDetails({ form, set, goTo, errors = {} }: Prop
       <h4 className="font-semibold text-forest-500 mb-3 flex items-center gap-1.5"><Icon name="users" className="w-4 h-4" /> Parent Information</h4>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <Input
-          label="Father's Name & Occupation"
-          value={form.fatherNameOccupation}
-          onChange={set('fatherNameOccupation')}
+          label="Father's Full Name"
+          value={form.fatherName}
+          onChange={set('fatherName')}
           required
-          placeholder="e.g. Juan Dela Cruz, Engineer"
+          placeholder="e.g. Juan Dela Cruz"
           maxLength={200}
-          error={errors.fatherNameOccupation}
+          error={errors.fatherName}
+        />
+        <Input
+          label="Father's Occupation"
+          value={form.fatherOccupation}
+          onChange={set('fatherOccupation')}
+          required
+          placeholder="e.g. Engineer"
+          maxLength={120}
+          error={errors.fatherOccupation}
         />
         <Input
           label="Mother's Name & Occupation"
@@ -37,7 +46,7 @@ export default function StepFamilyDetails({ form, set, goTo, errors = {} }: Prop
         />
         <div className="md:col-span-2">
           <Input
-            label="Guardian Name (if applicable)"
+            label="Guardian Name (Optional, if applicable)"
             value={form.guardian}
             onChange={set('guardian')}
             placeholder="Leave blank if parents are the guardians"

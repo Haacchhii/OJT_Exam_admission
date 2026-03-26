@@ -79,6 +79,9 @@ interface DocRequirement {
   reportCard?: boolean;
   goodMoral?: boolean;
   incomeTax?: boolean;
+}
+
+interface OptionalDocRequirement {
   escCert?: boolean;
 }
 
@@ -92,15 +95,27 @@ export const DOC_REQUIREMENTS: Record<string, DocRequirement> = {
   'Grade 5':    { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true },
   'Grade 6':    { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true },
   'Grade 7':    { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true, incomeTax: true },
-  'Grade 8':    { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true, escCert: true },
-  'Grade 9':    { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true, escCert: true },
-  'Grade 10':   { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true, escCert: true },
-  'Grade 11 — ABM':  { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true, escCert: true },
-  'Grade 11 — STEM': { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true, escCert: true },
-  'Grade 11 — HUMSS':{ idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true, escCert: true },
-  'Grade 12 — ABM':  { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true, escCert: true },
-  'Grade 12 — STEM': { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true, escCert: true },
-  'Grade 12 — HUMSS':{ idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true, escCert: true },
+  'Grade 8':    { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true },
+  'Grade 9':    { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true },
+  'Grade 10':   { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true },
+  'Grade 11 — ABM':  { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true },
+  'Grade 11 — STEM': { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true },
+  'Grade 11 — HUMSS':{ idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true },
+  'Grade 12 — ABM':  { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true },
+  'Grade 12 — STEM': { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true },
+  'Grade 12 — HUMSS':{ idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true },
+};
+
+export const DOC_OPTIONAL_REQUIREMENTS: Record<string, OptionalDocRequirement> = {
+  'Grade 8':    { escCert: true },
+  'Grade 9':    { escCert: true },
+  'Grade 10':   { escCert: true },
+  'Grade 11 — ABM':  { escCert: true },
+  'Grade 11 — STEM': { escCert: true },
+  'Grade 11 — HUMSS':{ escCert: true },
+  'Grade 12 — ABM':  { escCert: true },
+  'Grade 12 — STEM': { escCert: true },
+  'Grade 12 — HUMSS':{ escCert: true },
 };
 
 export const DOC_SLOT_LABELS: Record<string, string> = {

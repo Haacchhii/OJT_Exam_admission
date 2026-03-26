@@ -41,9 +41,12 @@ export function validateStep1(form: AdmissionForm): AdmissionErrors {
   else if (form.firstName.trim().length < 2) e.firstName = 'At least 2 characters';
   else if (!NAME_REGEX.test(form.firstName.trim())) e.firstName = 'Use only letters, spaces, hyphens, or apostrophes';
 
-  if (!form.middleName?.trim()) e.middleName = 'Required';
-  else if (form.middleName.trim().length < 2) e.middleName = 'At least 2 characters';
-  else if (!NAME_REGEX.test(form.middleName.trim())) e.middleName = 'Use only letters, spaces, hyphens, or apostrophes';
+  if (!form.noMiddleName && !form.middleName?.trim()) {
+    e.middleName = 'Provide middle name or check "No middle name"';
+  } else if (form.middleName?.trim()) {
+    if (form.middleName.trim().length < 2) e.middleName = 'At least 2 characters';
+    else if (!NAME_REGEX.test(form.middleName.trim())) e.middleName = 'Use only letters, spaces, hyphens, or apostrophes';
+  }
 
   if (!form.lastName?.trim()) e.lastName = 'Required';
   else if (form.lastName.trim().length < 2) e.lastName = 'At least 2 characters';
@@ -66,9 +69,23 @@ export function validateStep1(form: AdmissionForm): AdmissionErrors {
   else if (!PHONE_REGEX.test(form.phone.trim())) e.phone = 'Invalid format (e.g. +63 9XX XXX XXXX)';
   else if (form.phone.replace(/\D/g, '').length < 10) e.phone = 'At least 10 digits';
 
-  if (!form.address?.trim()) e.address = 'Required';
-  else if (form.address.trim().length < 10) e.address = 'Please provide a complete address (min 10 characters)';
-  else if (form.address.length > 500) e.address = 'Max 500 characters';
+  if (!form.addressStreet?.trim()) e.addressStreet = 'Required';
+  else if (form.addressStreet.trim().length < 3) e.addressStreet = 'At least 3 characters';
+  else if (!ADDRESS_REGEX.test(form.addressStreet.trim())) e.addressStreet = 'Invalid characters';
+
+  if (!form.addressBarangay?.trim()) e.addressBarangay = 'Required';
+  else if (form.addressBarangay.trim().length < 2) e.addressBarangay = 'At least 2 characters';
+  else if (!ADDRESS_REGEX.test(form.addressBarangay.trim())) e.addressBarangay = 'Invalid characters';
+
+  if (!form.addressCityMunicipality?.trim()) e.addressCityMunicipality = 'Required';
+  else if (form.addressCityMunicipality.trim().length < 2) e.addressCityMunicipality = 'At least 2 characters';
+  else if (!ADDRESS_REGEX.test(form.addressCityMunicipality.trim())) e.addressCityMunicipality = 'Invalid characters';
+
+  if (!form.addressProvince?.trim()) e.addressProvince = 'Required';
+  else if (form.addressProvince.trim().length < 2) e.addressProvince = 'At least 2 characters';
+  else if (!ADDRESS_REGEX.test(form.addressProvince.trim())) e.addressProvince = 'Invalid characters';
+
+  if (form.addressZipCode?.trim() && !/^\d{4,10}$/.test(form.addressZipCode.trim())) e.addressZipCode = 'Use numbers only (4-10 digits)';
 
   return e;
 }
@@ -109,10 +126,15 @@ export function validateStep2(form: AdmissionForm): AdmissionErrors {
 export function validateStep3(form: AdmissionForm): AdmissionErrors {
   const e: AdmissionErrors = {};
 
-  if (!form.fatherNameOccupation?.trim()) e.fatherNameOccupation = 'Required';
-  else if (form.fatherNameOccupation.trim().length < 3) e.fatherNameOccupation = 'At least 3 characters (e.g. Name, Occupation)';
-  else if (!NAME_OCCUPATION_REGEX.test(form.fatherNameOccupation.trim())) e.fatherNameOccupation = 'Use only letters, numbers, spaces, commas, hyphens';
-  else if (form.fatherNameOccupation.length > 200) e.fatherNameOccupation = 'Max 200 characters';
+  if (!form.fatherName?.trim()) e.fatherName = 'Required';
+  else if (form.fatherName.trim().length < 3) e.fatherName = 'At least 3 characters';
+  else if (!NAME_REGEX.test(form.fatherName.trim())) e.fatherName = 'Use only letters, spaces, hyphens, or apostrophes';
+  else if (form.fatherName.length > 200) e.fatherName = 'Max 200 characters';
+
+  if (!form.fatherOccupation?.trim()) e.fatherOccupation = 'Required';
+  else if (form.fatherOccupation.trim().length < 2) e.fatherOccupation = 'At least 2 characters';
+  else if (!NAME_OCCUPATION_REGEX.test(form.fatherOccupation.trim())) e.fatherOccupation = 'Use only letters, numbers, spaces, commas, hyphens';
+  else if (form.fatherOccupation.length > 120) e.fatherOccupation = 'Max 120 characters';
 
   if (!form.motherNameOccupation?.trim()) e.motherNameOccupation = 'Required';
   else if (form.motherNameOccupation.trim().length < 3) e.motherNameOccupation = 'At least 3 characters (e.g. Name, Occupation)';

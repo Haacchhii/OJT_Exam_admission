@@ -15,34 +15,53 @@ interface DashboardData {
   myApp: Admission | null;
   myReg: ExamRegistration | null;
   myResult: ExamResult | null;
+  hasCompletedExam: boolean;
   examStatus: { text: string; icon: string; color: string };
 }
 
 export default function StudentDashboard() {
   const { user } = useAuth();
+  const [draftStep, setDraftStep] = useState(1);
+  const [hasAdmissionDraft, setHasAdmissionDraft] = useState(false);
 
   const { data: rawData, loading, error, refetch } = useAsync<DashboardData>(async () => {
     const [myApp, myRegs, myResult] = await Promise.all([
       getMyAdmission(), getMyRegistrations(), getMyResult()
     ]);
-    const myReg = myRegs?.[0] || null;
+    const registrations = Array.isArray(myRegs) ? myRegs : [];
+    const myReg = registrations[0] || null;
+    const hasCompletedExam = registrations.some((reg: ExamRegistration) => reg.status === 'done');
 
     let examText = 'Not Started', examIcon = 'clipboard', examColor = 'blue';
     if (myResult) { examText = myResult.passed ? 'Passed' : 'Failed'; examIcon = myResult.passed ? 'checkCircle' : 'xCircle'; examColor = myResult.passed ? 'emerald' : 'red'; }
     else if (myReg?.status === 'started') { examText = 'In Progress'; examIcon = 'exam'; examColor = 'amber'; }
     else if (myReg) { examText = 'Scheduled'; examIcon = 'calendar'; examColor = 'amber'; }
 
-    return { myApp, myReg, myResult, examStatus: { text: examText, icon: examIcon, color: examColor } };
+    return { myApp, myReg, myResult, hasCompletedExam, examStatus: { text: examText, icon: examIcon, color: examColor } };
   }, [user]);
 
   const myApp = rawData?.myApp || null;
   const myReg = rawData?.myReg || null;
   const myResult = rawData?.myResult || null;
+  const hasCompletedExam = rawData?.hasCompletedExam || false;
   const examStatus = rawData?.examStatus || { text: 'Not Started', icon: 'clipboard', color: 'blue' };
 
   const statusText = myApp ? myApp.status : 'Not Submitted';
   const statusColor = statusText === 'Accepted' ? 'emerald' : statusText === 'Rejected' ? 'red' : 'amber';
-  const admissionUnlocked = myResult?.passed === true;
+  const admissionUnlocked = hasCompletedExam;
+
+  useEffect(() => {
+    try {
+      const rawStep = localStorage.getItem('gk_admission_step');
+      const parsedStep = rawStep ? Number.parseInt(rawStep, 10) : 1;
+      const safeStep = Number.isFinite(parsedStep) ? Math.min(Math.max(parsedStep, 1), 5) : 1;
+      setDraftStep(safeStep);
+      setHasAdmissionDraft(!!localStorage.getItem('gk_admission_draft'));
+    } catch {
+      setDraftStep(1);
+      setHasAdmissionDraft(false);
+    }
+  }, [myApp]);
 
   if (loading && !rawData) return <SkeletonPage />;
   if (error) return <ErrorAlert error={error} onRetry={refetch} />;
@@ -93,7 +112,7 @@ export default function StudentDashboard() {
           {[
             { step: 1, label: 'Register', desc: 'Create your account', icon: 'check', done: true },
             { step: 2, label: 'Book Exam', desc: 'Schedule entrance exam', icon: 'calendar', done: !!myReg },
-            { step: 3, label: 'Pass Exam', desc: 'Complete & pass the exam', icon: 'trophy', done: !!myResult?.passed },
+            { step: 3, label: 'Complete Exam', desc: 'Finish the entrance exam', icon: 'trophy', done: admissionUnlocked },
             { step: 4, label: 'Apply', desc: 'Submit admission form', icon: 'admissions', done: !!myApp },
             { step: 5, label: 'Accepted', desc: 'Admission confirmed', icon: 'graduationCap', done: myApp?.status === 'Accepted' },
           ].map(({ step, label, desc, icon, done }) => (
@@ -185,15 +204,31 @@ export default function StudentDashboard() {
             <h4 className="font-bold text-gray-800 mb-1.5">No Application Yet</h4>
             {admissionUnlocked ? (
               <>
-                <p className="text-gray-500 text-sm mb-5 max-w-sm mx-auto">You passed the entrance exam! You can now submit your admission application.</p>
+                <p className="text-gray-500 text-sm mb-4 max-w-lg mx-auto">You completed the entrance exam. Track your admission form progress below and continue where you left off.</p>
+
+                <div className="max-w-xl mx-auto text-left rounded-xl border border-forest-200 bg-forest-50/60 p-4 mb-5">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-semibold text-forest-700">Admission Form Progress</span>
+                    <span className="text-xs font-semibold text-forest-700">{Math.round(((draftStep - 1) / 4) * 100)}%</span>
+                  </div>
+                  <div className="w-full h-2 bg-white rounded-full overflow-hidden border border-forest-100">
+                    <div className="h-full bg-forest-500 rounded-full transition-all" style={{ width: `${((draftStep - 1) / 4) * 100}%` }} />
+                  </div>
+                  <p className="text-xs text-gray-600 mt-2">
+                    {hasAdmissionDraft
+                      ? `Draft found. You are on Step ${draftStep} of 5.`
+                      : 'No saved draft yet. Start your application to begin tracking progress.'}
+                  </p>
+                </div>
+
                 <Link to="/student/admission" className="gk-btn-primary inline-flex items-center gap-2 px-6 py-2.5 text-sm">
-                  <Icon name="plus" className="w-4 h-4" />
-                  Apply Now
+                  <Icon name={hasAdmissionDraft ? 'arrowRight' : 'plus'} className="w-4 h-4" />
+                  {hasAdmissionDraft ? `Continue Application (Step ${draftStep})` : 'Start Application'}
                 </Link>
               </>
             ) : (
               <>
-                <p className="text-gray-500 text-sm mb-5 max-w-sm mx-auto">You need to pass the entrance exam first before applying for admission.</p>
+                <p className="text-gray-500 text-sm mb-5 max-w-sm mx-auto">You need to complete the entrance exam first before applying for admission.</p>
                 <Link to="/student/exam" className="gk-btn-primary inline-flex items-center gap-2 px-6 py-2.5 text-sm">
                   <Icon name="exam" className="w-4 h-4" />
                   Take Entrance Exam
@@ -216,7 +251,7 @@ export default function StudentDashboard() {
           </Link>
           <Link to={admissionUnlocked ? '/student/admission' : '/student/exam'} className="gk-btn-secondary inline-flex items-center gap-2 px-5 py-2.5 text-sm">
             <Icon name={admissionUnlocked ? 'admissions' : 'lock'} className="w-4 h-4" />
-            {admissionUnlocked ? 'Go to Admission' : 'Take Exam to Unlock Admission'}
+            {admissionUnlocked ? 'Go to Admission' : 'Complete Exam to Unlock Admission'}
           </Link>
           <Link to="/student/results" className="gk-btn-secondary inline-flex items-center gap-2 px-5 py-2.5 text-sm">
             <Icon name="results" className="w-4 h-4" />

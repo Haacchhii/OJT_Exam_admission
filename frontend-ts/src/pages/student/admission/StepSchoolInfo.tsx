@@ -24,9 +24,9 @@ export default function StepSchoolInfo({ form, set, setForm, goTo, requiredDocs,
       <h3 className="text-lg font-bold text-forest-500 mb-1">Step 2: School Information</h3>
       <p className="text-gray-500 text-sm mb-6">Tell us about the academic background.</p>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        <Input label="Last School Attended" value={form.prevSchool} onChange={set('prevSchool')} required placeholder="Name of previous school" maxLength={200} error={errors.prevSchool} />
+        <Input label="Student's Last School Attended" value={form.prevSchool} onChange={set('prevSchool')} required placeholder="Name of previous school" maxLength={200} error={errors.prevSchool} />
         <div className="md:col-span-2">
-          <TextArea label="School Address" value={form.schoolAddress} onChange={set('schoolAddress')} required placeholder="Street, Barangay, Municipality, Province" rows={2} maxLength={500} error={errors.schoolAddress} />
+          <TextArea label="Previous School Address" value={form.schoolAddress} onChange={set('schoolAddress')} required placeholder="Street, Barangay, Municipality, Province" rows={2} maxLength={500} error={errors.schoolAddress} />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Grade Level to Enroll <span className="text-red-500">*</span></label>

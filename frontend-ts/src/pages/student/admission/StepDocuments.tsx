@@ -6,6 +6,7 @@ import type { SlotFiles } from './useAdmissionWizard';
 interface Props {
   form: { gradeLevel: string };
   requiredDocs: string[];
+  optionalDocs: string[];
   slotFiles: SlotFiles;
   extraFiles: File[];
   goTo: (n: number) => void;
@@ -15,7 +16,7 @@ interface Props {
   removeExtra: (index: number) => void;
 }
 
-export default function StepDocuments({ form, requiredDocs, slotFiles, extraFiles, goTo, handleSlotFile, handleExtraFiles, removeSlot, removeExtra }: Props) {
+export default function StepDocuments({ form, requiredDocs, optionalDocs, slotFiles, extraFiles, goTo, handleSlotFile, handleExtraFiles, removeSlot, removeExtra }: Props) {
   return (
     <div className="gk-section-card p-6">
       <h3 className="text-lg font-bold text-forest-500 mb-1">Step 4: Required Documents</h3>
@@ -27,6 +28,17 @@ export default function StepDocuments({ form, requiredDocs, slotFiles, extraFile
           <UploadSlot key={docKey} label={`File: ${(DOC_SLOT_LABELS as Record<string, string>)[docKey]}`} required slot={docKey} file={slotFiles[docKey]} onFile={handleSlotFile} onRemove={removeSlot} />
         ))}
       </div>
+
+      {optionalDocs.length > 0 && (
+        <>
+          <h4 className="font-semibold text-forest-500 mb-3 flex items-center gap-1.5"><Icon name="info" className="w-4 h-4" /> Optional (If Applicable)</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            {optionalDocs.map(docKey => (
+              <UploadSlot key={docKey} label={`Optional: ${(DOC_SLOT_LABELS as Record<string, string>)[docKey]}`} slot={docKey} file={slotFiles[docKey]} onFile={handleSlotFile} onRemove={removeSlot} />
+            ))}
+          </div>
+        </>
+      )}
       <h4 className="font-semibold text-forest-500 mb-3 flex items-center gap-1.5"><Icon name="checkCircle" className="w-4 h-4" /> Document Checklist</h4>
       <div className="space-y-2 mb-6">
         {requiredDocs.map(docKey => (

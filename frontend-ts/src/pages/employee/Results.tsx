@@ -7,6 +7,7 @@ import { getUsers } from '../../api/users';
 import { SCHOOL_NAME, SCHOOL_BRAND, SCHOOL_SUBTITLE, SCHOOL_ADDRESS, SCHOOL_PHONE } from '../../utils/constants';
 import { useAuth } from '../../context/AuthContext';
 import { showToast } from '../../components/Toast';
+import { useConfirm } from '../../components/ConfirmDialog';
 import Modal from '../../components/Modal';
 import { PageHeader, StatCard, Badge, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert } from '../../components/UI';
 import Icon from '../../components/Icons';
@@ -59,6 +60,7 @@ function getRegUserId(reg: ExamRegistration): number | null {
 
 export default function EmployeeResults() {
   const { user: authUser } = useAuth();
+  const confirm = useConfirm();
   const canScoreEssays = authUser?.role === 'administrator' || authUser?.role === 'teacher';
   const [tab, setTab] = useState<'results' | 'essays' | 'analytics'>('results');
   const [search, setSearch] = useState('');
@@ -240,6 +242,15 @@ export default function EmployeeResults() {
     const s = Math.round(Number(scoreVal));
     if (isNaN(s) || s < 0) { showToast('Enter a valid score.', 'error'); return; }
     if (s > scoreModal.maxPoints) { showToast(`Score cannot exceed ${scoreModal.maxPoints} points.`, 'error'); return; }
+
+    const ok = await confirm({
+      title: scoreModal.scored ? 'Update Essay Score' : 'Save Essay Score',
+      message: `Save ${s}/${scoreModal.maxPoints} points${commentVal.trim() ? ' with feedback comment' : ''}?`,
+      confirmLabel: scoreModal.scored ? 'Update Score' : 'Save Score',
+      variant: 'info',
+    });
+    if (!ok) return;
+
     setSaving(true);
     try {
       await scoreEssay(scoreModal.id, s, commentVal.trim() || undefined);

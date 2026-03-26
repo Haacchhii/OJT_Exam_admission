@@ -74,6 +74,13 @@ export function ConfirmDialog({
         className="relative bg-white/95 backdrop-blur-xl rounded-3xl shadow-elevated max-w-sm w-full p-8 animate-[scaleIn_0.2s_ease-out] border border-white/60"
         onClick={e => e.stopPropagation()}
       >
+        <button
+          onClick={onCancel}
+          className="absolute top-3 right-3 p-1.5 rounded-xl hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"
+          aria-label="Close confirmation"
+        >
+          <Icon name="close" className="w-4 h-4" />
+        </button>
         <div className="flex flex-col items-center text-center">
           <div className={`w-14 h-14 rounded-2xl ${v.ring} flex items-center justify-center mb-5`}>
             <Icon name={v.icon} className={`w-7 h-7 ${v.iconCls}`} />

@@ -1,12 +1,18 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../generated/prisma-client/index.js';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
-async function main() {
-  console.log('🌱 Seeding database...');
+function isoDatePlus(days) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 
-  // Clear all data
+async function clearAll() {
   await prisma.$transaction([
     prisma.essayAnswer.deleteMany(),
     prisma.submittedAnswer.deleteMany(),
@@ -20,217 +26,311 @@ async function main() {
     prisma.admission.deleteMany(),
     prisma.staffProfile.deleteMany(),
     prisma.applicantProfile.deleteMany(),
+    prisma.auditLog.deleteMany(),
     prisma.semester.deleteMany(),
     prisma.academicYear.deleteMany(),
     prisma.user.deleteMany(),
   ]);
+}
 
-  // ─── Academic Years ───────────────────────────────
-  const academicYears = await Promise.all([
-    prisma.academicYear.create({ data: { id: 1, year: '2025-2026', isActive: false } }),
-    prisma.academicYear.create({ data: { id: 2, year: '2026-2027', isActive: true } }),
-  ]);
-  console.log(`  ✅ ${academicYears.length} academic years`);
-
-  // ─── Semesters ────────────────────────────────────
-  const semesters = await Promise.all([
-    prisma.semester.create({ data: { id: 1, name: 'First Semester',  academicYearId: 2, isActive: true } }),
-    prisma.semester.create({ data: { id: 2, name: 'Second Semester', academicYearId: 2, isActive: false } }),
-    prisma.semester.create({ data: { id: 3, name: 'Summer',          academicYearId: 2, isActive: false } }),
-  ]);
-  console.log(`  ✅ ${semesters.length} semesters`);
-
-  // ─── Users ────────────────────────────────────────
-  const adminHash = await bcrypt.hash('admin123', 12);
-  const studentHash = await bcrypt.hash('student123', 12);
-
-  const userRecords = [
-    { id: 1, firstName: 'Admin',     lastName: 'Staff',    email: 'admin@goldenkey.edu',       passwordHash: adminHash,   role: 'administrator', status: 'Active' },
-    { id: 2, firstName: 'Registrar', lastName: 'Office',   email: 'registrar@goldenkey.edu',   passwordHash: adminHash,   role: 'registrar',     status: 'Active' },
-    { id: 9, firstName: 'Teacher',   lastName: 'Examiner', email: 'teacher@goldenkey.edu',     passwordHash: adminHash,   role: 'teacher',       status: 'Active' },
-    { id: 3, firstName: 'Maria',     lastName: 'Santos',   email: 'maria.santos@email.com',    passwordHash: studentHash, role: 'applicant',     status: 'Active' },
-    { id: 4, firstName: 'Juan',      lastName: 'Dela Cruz', email: 'juan.dc@email.com',        passwordHash: studentHash, role: 'applicant',     status: 'Active' },
-    { id: 5, firstName: 'Ana',       lastName: 'Reyes',    email: 'ana.reyes@email.com',       passwordHash: studentHash, role: 'applicant',     status: 'Active' },
-    { id: 6, firstName: 'Carlos',    lastName: 'Garcia',   email: 'c.garcia@email.com',        passwordHash: studentHash, role: 'applicant',     status: 'Active' },
-    { id: 7, firstName: 'Isabella',  lastName: 'Torres',   email: 'bella.t@email.com',         passwordHash: studentHash, role: 'applicant',     status: 'Active' },
-    { id: 8, firstName: 'Miguel',    lastName: 'Ramos',    email: 'm.ramos@email.com',         passwordHash: studentHash, role: 'applicant',     status: 'Active' },
-  ];
-  for (const u of userRecords) { await prisma.user.create({ data: u }); }
-  console.log(`  ✅ ${userRecords.length} users`);
-
-  // ─── Admissions ───────────────────────────────────
-  const admissions = [
-    { id: 1, userId: 3, academicYearId: 2, semesterId: 1, firstName: 'Maria', lastName: 'Santos', email: 'maria.santos@email.com', phone: '+63 912 345 6789', dob: '2010-05-14', gender: 'Female', address: '123 Rizal St, San Jose, Batangas', gradeLevel: 'Grade 7', prevSchool: 'Manila Elementary School', schoolYear: '2026-2027', lrn: '123456789012', applicantType: 'New', guardian: 'Elena Santos', guardianRelation: 'Mother', guardianPhone: '+63 912 000 1111', guardianEmail: 'elena.santos@email.com', status: 'Accepted', notes: 'Complete requirements. Approved for admission.', documents: ['PSA Birth Certificate', '2x2 ID Photos', 'Baptismal Certificate', 'Report Card / Form 138', 'Certificate of Good Moral Character', 'Latest Income Tax Return'] },
-    { id: 2, userId: 4, academicYearId: 2, semesterId: 1, firstName: 'Juan', lastName: 'Dela Cruz', email: 'juan.dc@email.com', phone: '+63 917 654 3210', dob: '2009-11-22', gender: 'Male', address: '456 Mabini Ave, San Jose, Batangas', gradeLevel: 'Grade 11 — STEM', prevSchool: 'Makati High School', schoolYear: '2026-2027', lrn: '234567890123', applicantType: 'Transferee', guardian: 'Pedro Dela Cruz', guardianRelation: 'Father', guardianPhone: '+63 917 000 2222', guardianEmail: '', status: 'Under Screening', notes: '', documents: ['PSA Birth Certificate', 'Report Card / Form 138'] },
-    { id: 3, userId: 5, academicYearId: 2, semesterId: 1, firstName: 'Ana', lastName: 'Reyes', email: 'ana.reyes@email.com', phone: '+63 926 111 2233', dob: '2011-03-08', gender: 'Female', address: '789 Luna St, San Jose, Batangas', gradeLevel: 'Grade 10', prevSchool: 'Pasig National High School', schoolYear: '2026-2027', lrn: '345678901234', applicantType: 'New', guardian: 'Rosa Reyes', guardianRelation: 'Mother', guardianPhone: '+63 926 000 3333', guardianEmail: '', status: 'Under Evaluation', notes: 'Excellent grades. Scholarship candidate.', documents: ['PSA Birth Certificate', '2x2 ID Photos', 'Baptismal Certificate', 'Report Card / Form 138', 'Certificate of Good Moral Character', 'ESC Certificate'] },
-    { id: 4, userId: 6, academicYearId: 2, semesterId: 1, firstName: 'Carlos', lastName: 'Garcia', email: 'c.garcia@email.com', phone: '+63 935 222 4455', dob: '2012-07-30', gender: 'Male', address: '321 Aguinaldo Blvd, San Jose, Batangas', gradeLevel: 'Grade 8', prevSchool: 'Cavite Academy', schoolYear: '2026-2027', lrn: '', applicantType: 'Transferee', guardian: 'Jose Garcia', guardianRelation: 'Father', guardianPhone: '+63 935 000 4444', guardianEmail: '', status: 'Rejected', notes: 'Incomplete requirements. Missing PSA birth certificate and good moral.', documents: ['Report Card / Form 138'] },
-    { id: 5, userId: 7, academicYearId: 2, semesterId: 1, firstName: 'Isabella', lastName: 'Torres', email: 'bella.t@email.com', phone: '+63 905 333 6677', dob: '2008-12-15', gender: 'Female', address: '567 Bonifacio Dr, San Jose, Batangas', gradeLevel: 'Grade 12 — ABM', prevSchool: 'BGC International School', schoolYear: '2026-2027', lrn: '567890123456', applicantType: 'New', guardian: 'Carmen Torres', guardianRelation: 'Mother', guardianPhone: '+63 905 000 5555', guardianEmail: '', status: 'Submitted', notes: '', documents: ['PSA Birth Certificate', '2x2 ID Photos', 'Report Card / Form 138', 'Certificate of Good Moral Character'] },
-    { id: 6, userId: 8, academicYearId: 2, semesterId: 1, firstName: 'Miguel', lastName: 'Ramos', email: 'm.ramos@email.com', phone: '+63 918 444 8899', dob: '2011-09-03', gender: 'Male', address: '890 Del Pilar St, San Jose, Batangas', gradeLevel: 'Grade 9', prevSchool: 'Manila Science High School', schoolYear: '2026-2027', lrn: '678901234567', applicantType: 'New', guardian: 'Luis Ramos', guardianRelation: 'Father', guardianPhone: '+63 918 000 6666', guardianEmail: '', status: 'Under Evaluation', notes: '', documents: ['PSA Birth Certificate', '2x2 ID Photos', 'Report Card / Form 138'] },
-  ];
-
-  for (const { documents, ...adm } of admissions) {
-    await prisma.admission.create({
-      data: {
-        ...adm,
-        trackingId: `GK-ADM-2026-${String(adm.id).padStart(5, '0')}`,
-        documents: documents.length ? { create: documents.map(d => ({ documentName: d })) } : undefined,
-      },
-    });
-  }
-  console.log(`  ✅ ${admissions.length} admissions`);
-
-  // ─── Exams ────────────────────────────────────────
-  // Exam 1: Grade 7
-  await prisma.exam.create({
-    data: {
-      id: 1,
-      title: 'Entrance Exam — Grade 7',
-      gradeLevel: 'Grade 7',
-      durationMinutes: 60,
-      passingScore: 60,
-      isActive: true,
-      createdById: 1,
-      academicYearId: 2,
-      semesterId: 1,
-      questions: {
-        create: [
-          { questionText: 'What is the capital of the Philippines?', questionType: 'mc', points: 5, orderNum: 1, choices: { create: [
-            { choiceText: 'Cebu', isCorrect: false, orderNum: 1 },
-            { choiceText: 'Manila', isCorrect: true, orderNum: 2 },
-            { choiceText: 'Davao', isCorrect: false, orderNum: 3 },
-            { choiceText: 'Quezon City', isCorrect: false, orderNum: 4 },
-          ] } },
-          { questionText: 'Solve: 15 × 8 + 12 = ?', questionType: 'mc', points: 5, orderNum: 2, choices: { create: [
-            { choiceText: '120', isCorrect: false, orderNum: 1 },
-            { choiceText: '132', isCorrect: true, orderNum: 2 },
-            { choiceText: '140', isCorrect: false, orderNum: 3 },
-            { choiceText: '128', isCorrect: false, orderNum: 4 },
-          ] } },
-          { questionText: 'Which planet is known as the Red Planet?', questionType: 'mc', points: 5, orderNum: 3, choices: { create: [
-            { choiceText: 'Venus', isCorrect: false, orderNum: 1 },
-            { choiceText: 'Jupiter', isCorrect: false, orderNum: 2 },
-            { choiceText: 'Mars', isCorrect: true, orderNum: 3 },
-            { choiceText: 'Saturn', isCorrect: false, orderNum: 4 },
-          ] } },
-          { questionText: "What is the Filipino word for 'freedom'?", questionType: 'mc', points: 5, orderNum: 4, choices: { create: [
-            { choiceText: 'Kalayaan', isCorrect: true, orderNum: 1 },
-            { choiceText: 'Kapayapaan', isCorrect: false, orderNum: 2 },
-            { choiceText: 'Kasarinlan', isCorrect: false, orderNum: 3 },
-            { choiceText: 'Katarungan', isCorrect: false, orderNum: 4 },
-          ] } },
-          { questionText: 'Who is the national hero of the Philippines?', questionType: 'mc', points: 5, orderNum: 5, choices: { create: [
-            { choiceText: 'Andres Bonifacio', isCorrect: false, orderNum: 1 },
-            { choiceText: 'Jose Rizal', isCorrect: true, orderNum: 2 },
-            { choiceText: 'Emilio Aguinaldo', isCorrect: false, orderNum: 3 },
-            { choiceText: 'Apolinario Mabini', isCorrect: false, orderNum: 4 },
-          ] } },
-          { questionText: 'Simplify: 3/4 + 1/2 = ?', questionType: 'mc', points: 5, orderNum: 6, choices: { create: [
-            { choiceText: '1', isCorrect: false, orderNum: 1 },
-            { choiceText: '5/4', isCorrect: true, orderNum: 2 },
-            { choiceText: '4/6', isCorrect: false, orderNum: 3 },
-            { choiceText: '7/4', isCorrect: false, orderNum: 4 },
-          ] } },
-          { questionText: 'What is the largest organ in the human body?', questionType: 'mc', points: 5, orderNum: 7, choices: { create: [
-            { choiceText: 'Heart', isCorrect: false, orderNum: 1 },
-            { choiceText: 'Liver', isCorrect: false, orderNum: 2 },
-            { choiceText: 'Skin', isCorrect: true, orderNum: 3 },
-            { choiceText: 'Brain', isCorrect: false, orderNum: 4 },
-          ] } },
-          { questionText: 'Which of the following is a renewable energy source?', questionType: 'mc', points: 5, orderNum: 8, choices: { create: [
-            { choiceText: 'Coal', isCorrect: false, orderNum: 1 },
-            { choiceText: 'Natural Gas', isCorrect: false, orderNum: 2 },
-            { choiceText: 'Solar Energy', isCorrect: true, orderNum: 3 },
-            { choiceText: 'Petroleum', isCorrect: false, orderNum: 4 },
-          ] } },
-          { questionText: 'What is the value of x if 2x + 6 = 20?', questionType: 'mc', points: 5, orderNum: 9, choices: { create: [
-            { choiceText: '5', isCorrect: false, orderNum: 1 },
-            { choiceText: '7', isCorrect: true, orderNum: 2 },
-            { choiceText: '8', isCorrect: false, orderNum: 3 },
-            { choiceText: '10', isCorrect: false, orderNum: 4 },
-          ] } },
-          { questionText: 'Write a short paragraph about why education is important.', questionType: 'essay', points: 15, orderNum: 10 },
-        ],
-      },
-    },
-  });
-
-  // Exam 2: Senior High (Grade 11 STEM)
-  await prisma.exam.create({
-    data: {
-      id: 2,
-      title: 'Entrance Exam — Senior High',
-      gradeLevel: 'Grade 11 — STEM',
-      durationMinutes: 90,
-      passingScore: 70,
-      isActive: true,
-      createdById: 1,
-      academicYearId: 2,
-      semesterId: 1,
-      questions: {
-        create: [
-          { questionText: 'What is the derivative of f(x) = 3x² + 2x?', questionType: 'mc', points: 5, orderNum: 1, choices: { create: [
-            { choiceText: '6x + 2', isCorrect: true, orderNum: 1 },
-            { choiceText: '3x + 2', isCorrect: false, orderNum: 2 },
-            { choiceText: '6x² + 2', isCorrect: false, orderNum: 3 },
-            { choiceText: 'x² + 2x', isCorrect: false, orderNum: 4 },
-          ] } },
-          { questionText: "Who wrote 'Noli Me Tangere'?", questionType: 'mc', points: 5, orderNum: 2, choices: { create: [
-            { choiceText: 'Andres Bonifacio', isCorrect: false, orderNum: 1 },
-            { choiceText: 'Jose Rizal', isCorrect: true, orderNum: 2 },
-            { choiceText: 'Marcelo H. del Pilar', isCorrect: false, orderNum: 3 },
-            { choiceText: 'Graciano Lopez Jaena', isCorrect: false, orderNum: 4 },
-          ] } },
-          { questionText: 'Discuss the importance of critical thinking in modern education.', questionType: 'essay', points: 20, orderNum: 3 },
-        ],
-      },
-    },
-  });
-  console.log('  ✅ 2 exams with questions');
-
-  // ─── Schedules ────────────────────────────────────
-  await prisma.examSchedule.createMany({
-    data: [
-      { id: 1, examId: 1, scheduledDate: '2026-03-05', startTime: '09:00', endTime: '10:00', maxSlots: 30, slotsTaken: 12 },
-      { id: 2, examId: 1, scheduledDate: '2026-03-12', startTime: '09:00', endTime: '10:00', maxSlots: 30, slotsTaken: 8 },
-      { id: 3, examId: 2, scheduledDate: '2026-03-12', startTime: '13:00', endTime: '14:30', maxSlots: 25, slotsTaken: 5 },
-      { id: 4, examId: 1, scheduledDate: '2026-03-20', startTime: '09:00', endTime: '10:00', maxSlots: 30, slotsTaken: 0 },
-    ],
-  });
-  console.log('  ✅ 4 schedules');
-
-  // ─── Registrations ────────────────────────────────
-  await prisma.examRegistration.createMany({
-    data: [
-      { id: 1, trackingId: 'GK-EXM-2026-00001', userEmail: 'maria.santos@email.com', scheduleId: 1, status: 'done', startedAt: new Date('2026-03-05T09:02:00'), submittedAt: new Date('2026-03-05T09:55:00') },
-      { id: 2, trackingId: 'GK-EXM-2026-00002', userEmail: 'ana.reyes@email.com',    scheduleId: 1, status: 'done', startedAt: new Date('2026-03-05T09:01:00'), submittedAt: new Date('2026-03-05T09:48:00') },
-    ],
-  });
-  console.log('  ✅ 2 registrations');
-
-  // ─── Results ──────────────────────────────────────
-  await prisma.examResult.createMany({
-    data: [
-      { registrationId: 1, totalScore: 47, maxPossible: 60, percentage: 78.3, passed: true, essayReviewed: true, reviewedById: 1 },
-      { registrationId: 2, totalScore: 45, maxPossible: 60, percentage: 75.0, passed: false, essayReviewed: false },
-    ],
-  });
-  console.log('  ✅ 2 exam results');
-
-  // ─── Reset PostgreSQL auto-increment sequences ───
+async function resetSequences() {
   const tables = [
-    'users', 'admissions', 'admission_documents', 'exams',
-    'exam_questions', 'question_choices', 'exam_schedules',
-    'exam_registrations', 'exam_results', 'submitted_answers',
-    'essay_answers', 'academic_years', 'semesters',
+    'users', 'applicant_profiles', 'staff_profiles',
+    'academic_years', 'semesters',
+    'admissions', 'admission_documents',
+    'exams', 'exam_questions', 'question_choices',
+    'exam_schedules', 'exam_registrations',
+    'submitted_answers', 'essay_answers', 'exam_results',
+    'audit_logs',
   ];
+
   for (const table of tables) {
     await prisma.$executeRawUnsafe(
       `SELECT setval(pg_get_serial_sequence('${table}', 'id'), COALESCE((SELECT MAX(id) FROM "${table}"), 1))`
     );
   }
-  console.log('  ✅ PostgreSQL sequences reset');
+}
 
-  console.log('✨ Seed complete!');
+async function main() {
+  console.log('🌱 Seeding comprehensive test dataset...');
+  await clearAll();
+
+  const currentYear = new Date().getFullYear();
+  const activeYearName = `${currentYear}-${currentYear + 1}`;
+
+  const ayOld = await prisma.academicYear.create({
+    data: { year: `${currentYear - 1}-${currentYear}`, isActive: false },
+  });
+  const ayActive = await prisma.academicYear.create({
+    data: { year: activeYearName, isActive: true },
+  });
+
+  const sem1 = await prisma.semester.create({ data: { name: 'First Semester', academicYearId: ayActive.id, isActive: true } });
+  const sem2 = await prisma.semester.create({ data: { name: 'Second Semester', academicYearId: ayActive.id, isActive: false } });
+  await prisma.semester.create({ data: { name: 'Summer', academicYearId: ayActive.id, isActive: false } });
+
+  const adminHash = await bcrypt.hash('admin123', 12);
+  const teacherHash = await bcrypt.hash('teacher123', 12);
+  const registrarHash = await bcrypt.hash('registrar123', 12);
+  const studentHash = await bcrypt.hash('student123', 12);
+
+  const users = await Promise.all([
+    prisma.user.create({ data: { firstName: 'Admin', middleName: 'System', lastName: 'User', email: 'admin@goldenkey.edu', passwordHash: adminHash, role: 'administrator', status: 'Active', emailVerified: true } }),
+    prisma.user.create({ data: { firstName: 'Registrar', middleName: 'Office', lastName: 'Staff', email: 'registrar@goldenkey.edu', passwordHash: registrarHash, role: 'registrar', status: 'Active', emailVerified: true } }),
+    prisma.user.create({ data: { firstName: 'Teacher', middleName: 'Exam', lastName: 'Proctor', email: 'teacher@goldenkey.edu', passwordHash: teacherHash, role: 'teacher', status: 'Active', emailVerified: true } }),
+    prisma.user.create({ data: { firstName: 'Maria', middleName: 'Lopez', lastName: 'Santos', email: 'maria.santos@email.com', passwordHash: studentHash, role: 'applicant', status: 'Active', emailVerified: true } }),
+    prisma.user.create({ data: { firstName: 'Juan', middleName: 'Perez', lastName: 'Cruz', email: 'juan.cruz@email.com', passwordHash: studentHash, role: 'applicant', status: 'Active', emailVerified: true } }),
+    prisma.user.create({ data: { firstName: 'Ana', middleName: 'Ramos', lastName: 'Reyes', email: 'ana.reyes@email.com', passwordHash: studentHash, role: 'applicant', status: 'Active', emailVerified: true } }),
+    prisma.user.create({ data: { firstName: 'Carlo', middleName: 'Mendoza', lastName: 'Garcia', email: 'carlo.garcia@email.com', passwordHash: studentHash, role: 'applicant', status: 'Active', emailVerified: true } }),
+  ]);
+
+  const [admin, registrar, teacher, maria, juan, ana, carlo] = users;
+
+  await prisma.staffProfile.createMany({
+    data: [
+      { userId: admin.id, employeeId: 'EMP-ADM-0001', position: 'System Administrator' },
+      { userId: registrar.id, employeeId: 'EMP-REG-0001', position: 'Registrar Officer' },
+      { userId: teacher.id, employeeId: 'EMP-TCH-0001', position: 'Entrance Exam Teacher' },
+    ],
+  });
+
+  await prisma.applicantProfile.createMany({
+    data: [
+      { userId: maria.id, studentNumber: 'S-2026-0001', gradeLevel: 'Grade 7', guardian: 'Elena Santos', guardianPhone: '+63 912 000 0001', guardianEmail: 'elena.santos@email.com' },
+      { userId: juan.id, studentNumber: 'S-2026-0002', gradeLevel: 'Grade 11 - STEM', guardian: 'Pedro Cruz', guardianPhone: '+63 912 000 0002', guardianEmail: 'pedro.cruz@email.com' },
+      { userId: ana.id, studentNumber: 'S-2026-0003', gradeLevel: 'Grade 10', guardian: 'Rosa Reyes', guardianPhone: '+63 912 000 0003', guardianEmail: 'rosa.reyes@email.com' },
+      { userId: carlo.id, studentNumber: 'S-2026-0004', gradeLevel: 'Grade 8', guardian: 'Jose Garcia', guardianPhone: '+63 912 000 0004', guardianEmail: 'jose.garcia@email.com' },
+    ],
+  });
+
+  const admissions = await Promise.all([
+    prisma.admission.create({
+      data: {
+        trackingId: 'GK-ADM-2026-00001',
+        userId: maria.id,
+        firstName: 'Maria', middleName: 'Lopez', lastName: 'Santos',
+        email: maria.email, phone: '+63 912 345 6789', dob: '2010-05-14', gender: 'Female',
+        address: '123 Rizal St, San Jose, Batangas',
+        gradeLevel: 'Grade 7', schoolYear: activeYearName, applicantType: 'New',
+        guardian: 'Elena Santos', guardianRelation: 'Mother', guardianPhone: '+63 912 000 0001', guardianEmail: 'elena.santos@email.com',
+        status: 'Accepted', notes: 'Complete requirements. Approved.',
+        academicYearId: ayActive.id, semesterId: sem1.id,
+      },
+    }),
+    prisma.admission.create({
+      data: {
+        trackingId: 'GK-ADM-2026-00002',
+        userId: juan.id,
+        firstName: 'Juan', middleName: 'Perez', lastName: 'Cruz',
+        email: juan.email, phone: '+63 917 111 1111', dob: '2009-09-21', gender: 'Male',
+        address: '456 Mabini Ave, San Jose, Batangas',
+        gradeLevel: 'Grade 11 - STEM', schoolYear: activeYearName, applicantType: 'Transferee',
+        guardian: 'Pedro Cruz', guardianRelation: 'Father', guardianPhone: '+63 912 000 0002', guardianEmail: 'pedro.cruz@email.com',
+        status: 'Under Screening', notes: 'Awaiting final document checks.',
+        academicYearId: ayActive.id, semesterId: sem1.id,
+      },
+    }),
+    prisma.admission.create({
+      data: {
+        trackingId: 'GK-ADM-2026-00003',
+        userId: ana.id,
+        firstName: 'Ana', middleName: 'Ramos', lastName: 'Reyes',
+        email: ana.email, phone: '+63 905 222 2222', dob: '2011-03-08', gender: 'Female',
+        address: '789 Luna St, San Jose, Batangas',
+        gradeLevel: 'Grade 10', schoolYear: activeYearName, applicantType: 'New',
+        guardian: 'Rosa Reyes', guardianRelation: 'Mother', guardianPhone: '+63 912 000 0003', guardianEmail: 'rosa.reyes@email.com',
+        status: 'Submitted', notes: '',
+        academicYearId: ayActive.id, semesterId: sem1.id,
+      },
+    }),
+  ]);
+
+  await prisma.admissionDocument.createMany({
+    data: [
+      { admissionId: admissions[0].id, documentName: 'PSA Birth Certificate', reviewStatus: 'accepted', reviewedAt: new Date(), reviewedById: registrar.id },
+      { admissionId: admissions[0].id, documentName: 'Report Card / Form 138', reviewStatus: 'accepted', reviewedAt: new Date(), reviewedById: registrar.id },
+      { admissionId: admissions[1].id, documentName: 'PSA Birth Certificate', reviewStatus: 'pending' },
+      { admissionId: admissions[1].id, documentName: 'Good Moral Certificate', reviewStatus: 'pending' },
+      { admissionId: admissions[2].id, documentName: 'PSA Birth Certificate', reviewStatus: 'pending' },
+    ],
+  });
+
+  const examGrade7 = await prisma.exam.create({
+    data: {
+      title: 'Entrance Exam - Grade 7',
+      gradeLevel: 'Grade 7',
+      durationMinutes: 60,
+      passingScore: 70,
+      isActive: true,
+      academicYearId: ayActive.id,
+      semesterId: sem1.id,
+      createdById: teacher.id,
+      questions: {
+        create: [
+          { questionText: '2 + 2 = ?', questionType: 'mc', points: 5, orderNum: 1, choices: { create: [
+            { choiceText: '3', isCorrect: false, orderNum: 1 },
+            { choiceText: '4', isCorrect: true, orderNum: 2 },
+            { choiceText: '5', isCorrect: false, orderNum: 3 },
+            { choiceText: '6', isCorrect: false, orderNum: 4 },
+          ] } },
+          { questionText: 'What is the capital of the Philippines?', questionType: 'mc', points: 5, orderNum: 2, choices: { create: [
+            { choiceText: 'Cebu', isCorrect: false, orderNum: 1 },
+            { choiceText: 'Manila', isCorrect: true, orderNum: 2 },
+            { choiceText: 'Davao', isCorrect: false, orderNum: 3 },
+            { choiceText: 'Baguio', isCorrect: false, orderNum: 4 },
+          ] } },
+          { questionText: 'Why is education important?', questionType: 'essay', points: 10, orderNum: 3 },
+        ],
+      },
+    },
+  });
+
+  const examSHS = await prisma.exam.create({
+    data: {
+      title: 'Entrance Exam - Grade 11 STEM',
+      gradeLevel: 'Grade 11 - STEM',
+      durationMinutes: 90,
+      passingScore: 75,
+      isActive: true,
+      academicYearId: ayActive.id,
+      semesterId: sem1.id,
+      createdById: teacher.id,
+      questions: {
+        create: [
+          { questionText: 'Derivative of 3x^2 + 2x is?', questionType: 'mc', points: 10, orderNum: 1, choices: { create: [
+            { choiceText: '6x + 2', isCorrect: true, orderNum: 1 },
+            { choiceText: '3x + 2', isCorrect: false, orderNum: 2 },
+            { choiceText: '6x^2 + 2', isCorrect: false, orderNum: 3 },
+            { choiceText: '2x + 3', isCorrect: false, orderNum: 4 },
+          ] } },
+          { questionText: 'Explain one real-world use of calculus.', questionType: 'essay', points: 20, orderNum: 2 },
+        ],
+      },
+    },
+  });
+
+  const examAll = await prisma.exam.create({
+    data: {
+      title: 'General Aptitude Screening',
+      gradeLevel: 'All Levels',
+      durationMinutes: 45,
+      passingScore: 60,
+      isActive: true,
+      academicYearId: ayActive.id,
+      semesterId: sem2.id,
+      createdById: teacher.id,
+      questions: {
+        create: [
+          { questionText: 'The sun rises in the?', questionType: 'mc', points: 5, orderNum: 1, choices: { create: [
+            { choiceText: 'North', isCorrect: false, orderNum: 1 },
+            { choiceText: 'South', isCorrect: false, orderNum: 2 },
+            { choiceText: 'East', isCorrect: true, orderNum: 3 },
+            { choiceText: 'West', isCorrect: false, orderNum: 4 },
+          ] } },
+        ],
+      },
+    },
+  });
+
+  const schedules = await Promise.all([
+    prisma.examSchedule.create({
+      data: {
+        examId: examGrade7.id,
+        scheduledDate: isoDatePlus(3),
+        startTime: '09:00',
+        endTime: '10:00',
+        visibilityStartDate: isoDatePlus(0),
+        visibilityEndDate: isoDatePlus(9),
+        registrationOpenDate: isoDatePlus(0),
+        registrationCloseDate: isoDatePlus(2),
+        maxSlots: 40,
+        slotsTaken: 1,
+        venue: 'Computer Lab A',
+      },
+    }),
+    prisma.examSchedule.create({
+      data: {
+        examId: examSHS.id,
+        scheduledDate: isoDatePlus(5),
+        startTime: '13:00',
+        endTime: '14:30',
+        visibilityStartDate: isoDatePlus(0),
+        visibilityEndDate: isoDatePlus(10),
+        registrationOpenDate: isoDatePlus(0),
+        registrationCloseDate: isoDatePlus(4),
+        maxSlots: 30,
+        slotsTaken: 1,
+        venue: 'Science Hall',
+      },
+    }),
+    prisma.examSchedule.create({
+      data: {
+        examId: examAll.id,
+        scheduledDate: isoDatePlus(7),
+        startTime: '10:30',
+        endTime: '11:15',
+        visibilityStartDate: isoDatePlus(0),
+        visibilityEndDate: isoDatePlus(12),
+        registrationOpenDate: isoDatePlus(0),
+        registrationCloseDate: isoDatePlus(6),
+        maxSlots: 60,
+        slotsTaken: 0,
+        venue: 'Multipurpose Room',
+      },
+    }),
+  ]);
+
+  const regDone = await prisma.examRegistration.create({
+    data: {
+      trackingId: 'GK-EXM-2026-00001',
+      userEmail: maria.email,
+      userId: maria.id,
+      scheduleId: schedules[0].id,
+      status: 'done',
+      startedAt: new Date(Date.now() - 3600000),
+      submittedAt: new Date(Date.now() - 1800000),
+    },
+  });
+
+  const regStarted = await prisma.examRegistration.create({
+    data: {
+      trackingId: 'GK-EXM-2026-00002',
+      userEmail: juan.email,
+      userId: juan.id,
+      scheduleId: schedules[1].id,
+      status: 'started',
+      startedAt: new Date(),
+    },
+  });
+
+  await prisma.examResult.create({
+    data: {
+      registrationId: regDone.id,
+      totalScore: 18,
+      maxPossible: 20,
+      percentage: 90,
+      passed: true,
+      essayReviewed: true,
+      reviewedById: teacher.id,
+    },
+  });
+
+  await prisma.auditLog.createMany({
+    data: [
+      { userId: admin.id, action: 'system.seed', entity: 'system', details: JSON.stringify({ phase: 'rebuild-dataset' }), ipAddress: '127.0.0.1' },
+      { userId: registrar.id, action: 'admission.review', entity: 'admission', entityId: admissions[0].id, details: JSON.stringify({ status: 'Accepted' }), ipAddress: '127.0.0.1' },
+      { userId: teacher.id, action: 'exam.create', entity: 'exam', entityId: examGrade7.id, details: JSON.stringify({ title: examGrade7.title }), ipAddress: '127.0.0.1' },
+    ],
+  });
+
+  await resetSequences();
+
+  console.log('✅ Dataset created successfully.');
+  console.log('Accounts:');
+  console.log('  admin@goldenkey.edu / admin123');
+  console.log('  registrar@goldenkey.edu / registrar123');
+  console.log('  teacher@goldenkey.edu / teacher123');
+  console.log('  maria.santos@email.com / student123');
 }
 
 main()
@@ -238,4 +338,6 @@ main()
     console.error('Seed failed:', e);
     process.exit(1);
   })
-  .finally(() => prisma.$disconnect());
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

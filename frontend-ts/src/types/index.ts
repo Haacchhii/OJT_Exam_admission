@@ -147,6 +147,8 @@ export interface ExamSchedule {
   scheduledDate: string;
   startTime: string;
   endTime: string;
+  visibilityStartDate?: string | null;
+  visibilityEndDate?: string | null;
   registrationOpenDate?: string | null;
   registrationCloseDate?: string | null;
   maxSlots: number;

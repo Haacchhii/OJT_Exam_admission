@@ -54,7 +54,7 @@ export async function authenticate(req, res, next) {
       }
     }
 
-    if (!user || user.status !== 'Active') {
+    if (!user || user.deletedAt || user.status !== 'Active') {
       return res.status(401).json({ error: 'User not found or inactive', code: 'UNAUTHORIZED' });
     }
 

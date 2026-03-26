@@ -21,15 +21,15 @@ export default function StudentAdmission() {
   if (w.gateError) return <ErrorAlert error={w.gateError} onRetry={w.refetch} />;
 
   /* Exam gate */
-  if (!w.existingApp && !w.examPassed) {
+  if (!w.existingApp && !w.examCompleted) {
     return (
       <div>
         <PageHeader title="Admission Application" subtitle={`${SCHOOL_NAME} \u2014 Admission Form`} />
         <div className="gk-section-card p-8 text-center">
           <div className="w-16 h-16 rounded-2xl bg-forest-50 flex items-center justify-center mx-auto mb-4"><Icon name="lock" className="w-8 h-8 text-forest-500" /></div>
-          <h3 className="text-xl font-bold text-forest-500 mb-2">Entrance Exam Required</h3>
-          <p className="text-gray-500 mb-2">You must pass the entrance examination before you can submit an admission application.</p>
-          <p className="text-gray-400 text-sm mb-6">Please take and pass the entrance exam first, then come back here to complete your admission.</p>
+          <h3 className="text-xl font-bold text-forest-500 mb-2">Entrance Exam Completion Required</h3>
+          <p className="text-gray-500 mb-2">You must complete the entrance examination before you can submit an admission application.</p>
+          <p className="text-gray-400 text-sm mb-6">Please complete your entrance exam first, then come back here to continue your admission.</p>
           <Link to="/student/exam" className="inline-block bg-gradient-to-r from-forest-500 to-forest-400 text-white px-6 py-3 rounded-lg font-semibold hover:from-gold-500 hover:to-gold-600 shadow-md">Go to Entrance Exam</Link>
         </div>
       </div>
@@ -50,7 +50,7 @@ export default function StudentAdmission() {
         <h4 className="font-semibold text-forest-700 text-sm mb-2 flex items-center gap-1.5"><Icon name="clipboard" className="w-4 h-4" /> Admission Policy & Procedure</h4>
         <div className="text-xs text-forest-600 space-y-1">
           <p>Admission is open to all students regardless of race, religion, gender, or socioeconomic status.</p>
-          <p><strong>Procedure:</strong> 1) Pass Entrance Exam, then 2) Submit Application and Documents, then 3) Screening and Evaluation, then 4) Admission Confirmation</p>
+          <p><strong>Procedure:</strong> 1) Complete Entrance Exam, then 2) Submit Application and Documents, then 3) Screening and Evaluation, then 4) Admission Confirmation</p>
           <p><strong>Age Requirement:</strong> Kindergarten applicants must be 5 years old by October 31 of the school year. Grade 1 requires proof of kindergarten completion.</p>
           <p><strong>Late Admission:</strong> Accepted up to 2 weeks after the first day of classes with School Head approval.</p>
           <p className="text-gray-400">New students may undergo an interview and/or diagnostic entrance test as required. All data handled per RA 10173 (Data Privacy Act).</p>
@@ -92,7 +92,7 @@ export default function StudentAdmission() {
       {w.step === 1 && <StepPersonalInfo form={w.form} set={w.set} setForm={w.setForm} goTo={w.goTo} errors={w.errors} clearError={w.clearError} />}
       {w.step === 2 && <StepSchoolInfo form={w.form} set={w.set} setForm={w.setForm} goTo={w.goTo} requiredDocs={w.requiredDocs} slotFiles={w.slotFiles} user={w.user} errors={w.errors} clearError={w.clearError} />}
       {w.step === 3 && <StepFamilyDetails form={w.form} set={w.set} goTo={w.goTo} errors={w.errors} />}
-      {w.step === 4 && <StepDocuments form={w.form} requiredDocs={w.requiredDocs} slotFiles={w.slotFiles} extraFiles={w.extraFiles} goTo={w.goTo} handleSlotFile={w.handleSlotFile} handleExtraFiles={w.handleExtraFiles} removeSlot={w.removeSlot} removeExtra={w.removeExtra} />}
+      {w.step === 4 && <StepDocuments form={w.form} requiredDocs={w.requiredDocs} optionalDocs={w.optionalDocs} slotFiles={w.slotFiles} extraFiles={w.extraFiles} goTo={w.goTo} handleSlotFile={w.handleSlotFile} handleExtraFiles={w.handleExtraFiles} removeSlot={w.removeSlot} removeExtra={w.removeExtra} />}
       {w.step === 5 && <StepReview form={w.form} slotFiles={w.slotFiles} extraFiles={w.extraFiles} requiredDocs={w.requiredDocs} privacyConsent={w.privacyConsent} setPrivacyConsent={w.setPrivacyConsent} saving={w.saving} goTo={w.goTo} handleSubmit={w.handleSubmit} />}
 
       <Modal open={w.successOpen} onClose={() => w.setSuccessOpen(false)}>

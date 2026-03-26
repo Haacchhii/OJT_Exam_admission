@@ -23,6 +23,7 @@ router.get('/registrations/mine',  authorize(ROLES.APPLICANT), ctrl.getMyRegistr
 router.post('/registrations',      authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.APPLICANT), validate(createRegistrationSchema), ctrl.createRegistration);
 router.patch('/registrations/:id/start', authorize(ROLES.APPLICANT), ctrl.startExam);
 router.patch('/registrations/:id/save-draft', authorize(ROLES.APPLICANT), ctrl.saveDraftAnswers);
+router.delete('/registrations/:id', authorize(ROLES.APPLICANT), ctrl.cancelRegistration);
 
 // ─── Exams CRUD ────────────────────────────────────
 router.get('/',     validateQuery(examsQuerySchema), ctrl.getExams);

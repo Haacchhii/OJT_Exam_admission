@@ -14,6 +14,21 @@ interface ExamParams {
   limit?: number;
 }
 
+export interface ExamSchedulePayload {
+  examId: number;
+  scheduledDate: string;
+  startTime: string;
+  endTime: string;
+  visibilityStartDate?: string | null;
+  visibilityEndDate?: string | null;
+  registrationOpenDate?: string | null;
+  registrationCloseDate?: string | null;
+  maxSlots: number;
+  venue?: string | null;
+}
+
+export type UpdateExamSchedulePayload = Partial<Omit<ExamSchedulePayload, 'examId'>>;
+
 export async function getExams(params?: ExamParams) {
   return client.get<Exam[]>(`/exams${qs(params)}`);
 }
@@ -66,11 +81,11 @@ export async function notifyNoExamSchedule(message?: string) {
   });
 }
 
-export async function addExamSchedule(schedule: Record<string, unknown>) {
+export async function addExamSchedule(schedule: ExamSchedulePayload) {
   return client.post<ExamSchedule>('/exams/schedules', schedule);
 }
 
-export async function updateExamSchedule(id: number, updates: Record<string, unknown>) {
+export async function updateExamSchedule(id: number, updates: UpdateExamSchedulePayload) {
   return client.put<ExamSchedule>(`/exams/schedules/${id}`, updates);
 }
 
@@ -106,4 +121,8 @@ export async function saveDraftAnswers(registrationId: number, answers: Record<s
     `/exams/registrations/${registrationId}/save-draft`,
     { answers }
   );
+}
+
+export async function cancelExamRegistration(registrationId: number) {
+  return client.delete<void>(`/exams/registrations/${registrationId}`);
 }

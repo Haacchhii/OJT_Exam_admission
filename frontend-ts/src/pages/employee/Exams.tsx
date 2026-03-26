@@ -34,7 +34,7 @@ export default function EmployeeExams() {
 
   return (
     <div>
-      <div className="mb-2 text-xs text-gray-500">Choose a tab to switch between exam records, authoring, and scheduling tools.</div>
+      <div className="mb-2 text-xs text-gray-500">Choose a tab to switch between exam records, authoring, and scheduling tools.{isRegistrar ? ' Registrar access is view-only for exam records.' : ''}</div>
       <div className="inline-flex flex-wrap gap-2 mb-6 p-1.5 rounded-2xl border border-gray-200 bg-white/80 shadow-sm" role="tablist" aria-label="Exams workspace tabs">
         {tabs.map(([k,l]) => {
           const tabIcon = k === 'exams' ? 'documentText' : k === 'builder' ? 'plus' : 'calendar';

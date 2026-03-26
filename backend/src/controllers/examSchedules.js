@@ -35,6 +35,34 @@ function validateRegistrationPeriod({ scheduledDate, registrationOpenDate, regis
   return null;
 }
 
+function addDaysIso(isoDate, days) {
+  const d = new Date(`${isoDate}T00:00:00`);
+  d.setDate(d.getDate() + days);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function normalizeVisibilityWindow({ scheduledDate, visibilityStartDate, visibilityEndDate }) {
+  const start = visibilityStartDate || null;
+  let end = visibilityEndDate || null;
+
+  // If visibility start is set but end is omitted, default to a 10-day window.
+  if (start && !end) {
+    end = addDaysIso(start, 9);
+  }
+
+  if (start && end && start > end) {
+    return { error: 'visibilityEndDate must be on or after visibilityStartDate' };
+  }
+  if (end && scheduledDate && end > scheduledDate) {
+    return { error: 'visibilityEndDate cannot be after scheduledDate' };
+  }
+
+  return { start, end, error: null };
+}
+
 function normalizeGradeLabel(value = '') {
   return String(value).toLowerCase().replace(/[\u2013\u2014]/g, '-').replace(/\s+/g, ' ').trim();
 }
@@ -90,17 +118,16 @@ export async function getAvailableSchedules(req, res, next) {
     let gradeFilter = {};
     if (req.user?.role === ROLES.APPLICANT) {
       const profile = await prisma.applicantProfile.findUnique({ where: { userId: req.user.id } });
-      if (!profile?.gradeLevel) {
-        return res.json([]);
-      }
-
-      const resolvedKey = resolveGradeKey(profile.gradeLevel);
-      const examLevel = resolvedKey ? GRADE_TO_EXAM_LEVEL[resolvedKey] : null;
-      const legacyLevel = resolvedKey ? GRADE_TO_LEGACY_EXAM_LEVEL[resolvedKey] : null;
-      const inferredLegacy = inferLegacyGradeBucket(profile.gradeLevel);
-      const allowedLevels = [...new Set([examLevel, legacyLevel, inferredLegacy, 'All Levels'].filter(Boolean))];
-      if (allowedLevels.length > 0) {
-        gradeFilter = { gradeLevel: { in: allowedLevels } };
+      // If grade profile is missing (manual account creation), do not block exam visibility.
+      if (profile?.gradeLevel) {
+        const resolvedKey = resolveGradeKey(profile.gradeLevel);
+        const examLevel = resolvedKey ? GRADE_TO_EXAM_LEVEL[resolvedKey] : null;
+        const legacyLevel = resolvedKey ? GRADE_TO_LEGACY_EXAM_LEVEL[resolvedKey] : null;
+        const inferredLegacy = inferLegacyGradeBucket(profile.gradeLevel);
+        const allowedLevels = [...new Set([examLevel, legacyLevel, inferredLegacy, profile.gradeLevel, 'All Levels'].filter(Boolean))];
+        if (allowedLevels.length > 0) {
+          gradeFilter = { gradeLevel: { in: allowedLevels } };
+        }
       }
     }
 
@@ -113,9 +140,13 @@ export async function getAvailableSchedules(req, res, next) {
       orderBy: { scheduledDate: 'asc' },
     });
 
-    // Filter: remaining slots > 0 and registration window is open (if configured)
+    // Filter: remaining slots > 0, visibility window open, and registration window is open (if configured)
     const available = schedules.filter(s => {
       if (s.slotsTaken >= s.maxSlots) return false;
+      // Check visibility dates: exam must be within visibility window
+      if (s.visibilityStartDate && today < s.visibilityStartDate) return false;
+      if (s.visibilityEndDate && today > s.visibilityEndDate) return false;
+      // Check registration window: if configured, today must be within registration dates
       if (s.registrationOpenDate && today < s.registrationOpenDate) return false;
       if (s.registrationCloseDate && today > s.registrationCloseDate) return false;
       return true;
@@ -127,7 +158,7 @@ export async function getAvailableSchedules(req, res, next) {
 // POST /api/exams/schedules
 export async function createSchedule(req, res, next) {
   try {
-    const { examId, scheduledDate, startTime, endTime, registrationOpenDate, registrationCloseDate, maxSlots, venue } = req.body;
+    const { examId, scheduledDate, startTime, endTime, visibilityStartDate, visibilityEndDate, registrationOpenDate, registrationCloseDate, maxSlots, venue } = req.body;
     if (!examId || !scheduledDate || !startTime || !endTime || !maxSlots) {
       return res.status(400).json({ error: 'examId, scheduledDate, startTime, endTime, maxSlots required', code: 'VALIDATION_ERROR' });
     }
@@ -142,12 +173,19 @@ export async function createSchedule(req, res, next) {
       return res.status(400).json({ error: periodError, code: 'VALIDATION_ERROR' });
     }
 
+    const visibility = normalizeVisibilityWindow({ scheduledDate, visibilityStartDate, visibilityEndDate });
+    if (visibility.error) {
+      return res.status(400).json({ error: visibility.error, code: 'VALIDATION_ERROR' });
+    }
+
     const schedule = await prisma.examSchedule.create({
       data: {
         examId,
         scheduledDate,
         startTime,
         endTime,
+        visibilityStartDate: visibility.start,
+        visibilityEndDate: visibility.end,
         registrationOpenDate: registrationOpenDate || null,
         registrationCloseDate: registrationCloseDate || null,
         maxSlots,
@@ -164,7 +202,7 @@ export async function createSchedule(req, res, next) {
 export async function updateSchedule(req, res, next) {
   try {
     const id = Number(req.params.id);
-    const { scheduledDate, startTime, endTime, registrationOpenDate, registrationCloseDate, maxSlots, venue } = req.body;
+    const { scheduledDate, startTime, endTime, visibilityStartDate, visibilityEndDate, registrationOpenDate, registrationCloseDate, maxSlots, venue } = req.body;
     const existing = await prisma.examSchedule.findUnique({ where: { id } });
     if (!existing) {
       return res.status(404).json({ error: 'Schedule not found', code: 'NOT_FOUND' });
@@ -173,6 +211,8 @@ export async function updateSchedule(req, res, next) {
     const nextScheduledDate = scheduledDate !== undefined ? scheduledDate : existing.scheduledDate;
     const nextStartTime = startTime !== undefined ? startTime : existing.startTime;
     const nextEndTime = endTime !== undefined ? endTime : existing.endTime;
+    const nextVisibilityStartDate = visibilityStartDate !== undefined ? visibilityStartDate : existing.visibilityStartDate;
+    const nextVisibilityEndDate = visibilityEndDate !== undefined ? visibilityEndDate : existing.visibilityEndDate;
     const nextRegistrationOpenDate = registrationOpenDate !== undefined ? registrationOpenDate : existing.registrationOpenDate;
     const nextRegistrationCloseDate = registrationCloseDate !== undefined ? registrationCloseDate : existing.registrationCloseDate;
 
@@ -193,10 +233,23 @@ export async function updateSchedule(req, res, next) {
       return res.status(400).json({ error: periodError, code: 'VALIDATION_ERROR' });
     }
 
+    const visibility = normalizeVisibilityWindow({
+      scheduledDate: nextScheduledDate,
+      visibilityStartDate: nextVisibilityStartDate,
+      visibilityEndDate: nextVisibilityEndDate,
+    });
+    if (visibility.error) {
+      return res.status(400).json({ error: visibility.error, code: 'VALIDATION_ERROR' });
+    }
+
     const data = {};
     if (scheduledDate !== undefined) data.scheduledDate = scheduledDate;
     if (startTime !== undefined)     data.startTime = startTime;
     if (endTime !== undefined)       data.endTime = endTime;
+    if (visibilityStartDate !== undefined || visibilityEndDate !== undefined) {
+      data.visibilityStartDate = visibility.start;
+      data.visibilityEndDate = visibility.end;
+    }
     if (registrationOpenDate !== undefined) data.registrationOpenDate = registrationOpenDate || null;
     if (registrationCloseDate !== undefined) data.registrationCloseDate = registrationCloseDate || null;
     if (maxSlots !== undefined)      data.maxSlots = maxSlots;

@@ -486,10 +486,9 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
       </div>
 
       {/* Upload Preview Modal */}
-      <Modal open={!!uploadPreview} onClose={() => { setUploadPreview(null); setUploadQueue([]); setUploadQueueIndex(0); setQueuedExamTitle(''); }}>
+      <Modal title="Import Preview" open={!!uploadPreview} onClose={() => { setUploadPreview(null); setUploadQueue([]); setUploadQueueIndex(0); setQueuedExamTitle(''); }}>
         {uploadPreview && (
           <div>
-            <h3 className="text-lg font-bold text-forest-500 mb-2 flex items-center gap-1.5"><Icon name="clipboard" className="w-5 h-5" /> Import Preview</h3>
             <p className="text-gray-500 text-sm mb-4">File: <span className="font-medium text-forest-500">{uploadPreview.fileName}</span></p>
             {uploadQueue.length > 1 && (
               <p className="text-xs text-gray-500 mb-3">Queued file {uploadQueueIndex + 1} of {uploadQueue.length}. Each file is handled as an individual exam import.</p>

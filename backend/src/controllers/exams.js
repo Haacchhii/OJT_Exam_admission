@@ -8,7 +8,7 @@ import { cached } from '../utils/cache.js';
 
 // Re-export schedule and registration controllers so routes/exams.js keeps working
 export { getSchedules, getAvailableSchedules, createSchedule, updateSchedule, deleteSchedule, notifyNoSchedule } from './examSchedules.js';
-export { getRegistrations, getMyRegistrations, createRegistration, startExam, saveDraftAnswers } from './examRegistrations.js';
+export { getRegistrations, getMyRegistrations, createRegistration, startExam, saveDraftAnswers, cancelRegistration } from './examRegistrations.js';
 
 // ═══════════════════════════════════════════════════════
 // EXAMS CRUD
@@ -235,7 +235,7 @@ export async function updateExam(req, res, next) {
           },
           include: examDetailInclude,
         });
-      });
+      }, { timeout: 10000 });
       return res.json(shapeExam(result));
     }
 

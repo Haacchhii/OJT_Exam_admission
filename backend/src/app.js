@@ -108,6 +108,7 @@ const authLimiter = rateLimit({
 const uploadLimiter = rateLimit({
   windowMs: RATE_LIMITS.UPLOAD.windowMs,
   max: RATE_LIMITS.UPLOAD.max,
+  skip: (req) => req.method === 'OPTIONS' || req.method === 'GET' || req.method === 'HEAD',
   message: { error: 'Too many uploads, please try again later.', code: 'RATE_LIMIT' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -116,6 +117,7 @@ const uploadLimiter = rateLimit({
 const examSubmitLimiter = rateLimit({
   windowMs: RATE_LIMITS.EXAM_SUBMIT.windowMs,
   max: RATE_LIMITS.EXAM_SUBMIT.max,
+  skip: (req) => req.method === 'OPTIONS' || req.method === 'GET' || req.method === 'HEAD',
   message: { error: 'Too many exam submissions, please try again later.', code: 'RATE_LIMIT' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -124,6 +126,7 @@ const examSubmitLimiter = rateLimit({
 const bulkOpLimiter = rateLimit({
   windowMs: RATE_LIMITS.BULK.windowMs,
   max: RATE_LIMITS.BULK.max,
+  skip: (req) => req.method === 'OPTIONS' || req.method === 'GET' || req.method === 'HEAD',
   message: { error: 'Too many bulk operations, please try again later.', code: 'RATE_LIMIT' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -131,6 +134,11 @@ const bulkOpLimiter = rateLimit({
 
 // Serve uploaded files — require authentication
 app.use('/uploads', authenticate, express.static(path.resolve(env.UPLOAD_DIR)));
+
+// Apply specific rate limiters to sensitive operations (must be mounted before routes)
+app.use('/api/admissions/bulk-status', bulkOpLimiter);
+app.use('/api/admissions/:id/documents', uploadLimiter);
+app.use('/api/exams/registrations', examSubmitLimiter);
 
 // ─── API routes ───────────────────────────────────────
 app.use('/api/auth', authLimiter, noStore, authRoutes);
@@ -140,11 +148,6 @@ app.use('/api/results',       cachePrivate, resultsRoutes);
 app.use('/api/users',         cachePrivate, usersRoutes);
 app.use('/api/audit-logs',    cachePrivate, auditLogRoutes);
 app.use('/api/academic-years', cachePublic, academicYearsRoutes);
-
-// Apply specific rate limiters to sensitive operations
-app.use('/api/admissions/bulk-status', bulkOpLimiter);
-app.use('/api/admissions/:id/documents', uploadLimiter);
-app.use('/api/exams/registrations', examSubmitLimiter);
 
 // Health check (includes DB connectivity)
 app.get('/api/health', async (_req, res) => {

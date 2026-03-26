@@ -13,9 +13,11 @@
     "db:migrate": "npx prisma migrate dev",
     "db:deploy": "npx prisma migrate deploy",
     "db:seed": "node prisma/seed.js",
+    "db:backup": "node prisma/backup-data.js",
+    "db:restore": "node prisma/restore-backup.js",
     "db:audit-accounts": "node prisma/audit-accounts.js",
     "db:test-role-aspects": "node prisma/test-role-aspects.js",
-    "db:reset": "npx prisma migrate reset --force",
+    "db:reset": "node prisma/safe-reset.js",
     "db:studio": "npx prisma studio",
     "test": "vitest run",
     "test:watch": "vitest"

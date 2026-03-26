@@ -147,7 +147,7 @@ export async function createAdmission(req, res, next) {
     } = req.body;
 
     // Validate required fields
-    if (!firstName || !middleName || !lastName || !email || !dob || !gender || !address || !gradeLevel || !schoolYear || !guardian || !guardianRelation) {
+    if (!firstName || !lastName || !email || !dob || !gender || !address || !gradeLevel || !schoolYear || !guardian || !guardianRelation) {
       return res.status(400).json({ error: 'Missing required fields', code: 'VALIDATION_ERROR' });
     }
 

@@ -12,8 +12,7 @@ export function setToken(token: string | null): void {
   authToken = token;
   if (token) localStorage.setItem('gk_auth_token', token);
   else localStorage.removeItem('gk_auth_token');
-  inflightGetRequests.clear();
-  recentGetResponses.clear();
+  invalidateGetCache();
 }
 
 export function getToken(): string | null { return authToken; }
@@ -51,6 +50,14 @@ const GET_BURST_CACHE_MS = 1500;
 
 const inflightGetRequests = new Map<string, Promise<unknown>>();
 const recentGetResponses = new Map<string, { data: unknown; expiresAt: number }>();
+
+function invalidateGetCache() {
+  inflightGetRequests.clear();
+  recentGetResponses.clear();
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('gk:data-changed'));
+  }
+}
 
 function makeRequestKey(path: string): string {
   return `${authToken || 'anon'}::${path}`;
@@ -168,9 +175,9 @@ export const client = {
     inflightGetRequests.set(key, req as Promise<unknown>);
     return req;
   },
-  post:   <T = unknown>(path: string, body?: unknown) => request<T>('POST', path, body),
-  put:    <T = unknown>(path: string, body?: unknown) => request<T>('PUT', path, body),
-  patch:  <T = unknown>(path: string, body?: unknown) => request<T>('PATCH', path, body),
-  delete: <T = unknown>(path: string) => request<T>('DELETE', path),
-  upload: <T = unknown>(path: string, formData: FormData) => request<T>('POST', path, formData, { isFormData: true }),
+  post:   <T = unknown>(path: string, body?: unknown) => request<T>('POST', path, body).then((data) => { invalidateGetCache(); return data; }),
+  put:    <T = unknown>(path: string, body?: unknown) => request<T>('PUT', path, body).then((data) => { invalidateGetCache(); return data; }),
+  patch:  <T = unknown>(path: string, body?: unknown) => request<T>('PATCH', path, body).then((data) => { invalidateGetCache(); return data; }),
+  delete: <T = unknown>(path: string) => request<T>('DELETE', path).then((data) => { invalidateGetCache(); return data; }),
+  upload: <T = unknown>(path: string, formData: FormData) => request<T>('POST', path, formData, { isFormData: true }).then((data) => { invalidateGetCache(); return data; }),
 };

@@ -21,26 +21,32 @@ export default function StepReview({ form, slotFiles, extraFiles, requiredDocs, 
       <h3 className="text-lg font-bold text-forest-500 mb-1">Step 5: Review & Submit</h3>
       <p className="text-gray-500 text-sm mb-6">Please review all information before submitting.</p>
       <ReviewSection title={<><Icon name="userCircle" className="w-4 h-4 inline" /> Personal Information</>}>
-        <Detail label="Student Name" value={`${form.firstName} ${form.middleName} ${form.lastName}`.trim()} />
+        <Detail label="Student Name" value={`${form.firstName} ${form.middleName} ${form.lastName}`.replace(/\s+/g, ' ').trim()} />
+        <Detail label="Middle Name" value={form.noMiddleName ? 'No middle name' : (form.middleName || '-')} />
         <Detail label="Email" value={form.email} />
         <Detail label="Sex" value={form.gender} />
         <Detail label="Date of Birth" value={form.dob} />
         <Detail label="Place of Birth" value={form.placeOfBirth || '-'} />
         <Detail label="Religion" value={form.religion || '-'} />
-        <Detail label="Contact Number" value={form.phone || '-'} />
-        <div className="md:col-span-2"><Detail label="Complete Address" value={form.address} /></div>
+        <Detail label="Applicant's Phone Number" value={form.phone || '-'} />
+        <Detail label="House No. / Street" value={form.addressStreet || '-'} />
+        <Detail label="Barangay" value={form.addressBarangay || '-'} />
+        <Detail label="City / Municipality" value={form.addressCityMunicipality || '-'} />
+        <Detail label="Province" value={form.addressProvince || '-'} />
+        <Detail label="ZIP Code" value={form.addressZipCode || '-'} />
       </ReviewSection>
       <ReviewSection title={<><Icon name="graduationCap" className="w-4 h-4 inline" /> School Information</>}>
         <Detail label="Last School Attended" value={form.prevSchool || '-'} />
         <Detail label="Grade Level" value={form.gradeLevel} />
         <Detail label="School Year" value={form.schoolYear || '-'} />
         <Detail label="LRN" value={form.lrn || '-'} />
-        <div className="md:col-span-2"><Detail label="School Address" value={form.schoolAddress || '-'} /></div>
+        <div className="md:col-span-2"><Detail label="Previous School Address" value={form.schoolAddress || '-'} /></div>
       </ReviewSection>
       <ReviewSection title={<><Icon name="users" className="w-4 h-4 inline" /> Family Details</>}>
-        <Detail label="Father's Name & Occupation" value={form.fatherNameOccupation || '-'} />
+        <Detail label="Father's Full Name" value={form.fatherName || '-'} />
+        <Detail label="Father's Occupation" value={form.fatherOccupation || '-'} />
         <Detail label="Mother's Name & Occupation" value={form.motherNameOccupation || '-'} />
-        <Detail label="Guardian (if applicable)" value={form.guardian || '-'} />
+        <Detail label="Guardian (Optional)" value={form.guardian || '-'} />
       </ReviewSection>
       <div className="mb-6">
         <h4 className="font-semibold text-forest-500 mb-3 flex items-center gap-1.5"><Icon name="document" className="w-4 h-4" /> Uploaded Documents</h4>

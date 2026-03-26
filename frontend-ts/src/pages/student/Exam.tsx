@@ -4,6 +4,7 @@ import { useAsync } from '../../hooks/useAsync';
 import { getExamSchedules, getMyRegistrations, startExam as apiStartExam, getExamForStudent } from '../../api/exams';
 import { getMyResult } from '../../api/results';
 import { showToast } from '../../components/Toast';
+import { useConfirm } from '../../components/ConfirmDialog';
 import { SkeletonPage, ErrorAlert } from '../../components/UI';
 import Icon from '../../components/Icons';
 import { asArray } from '../../utils/helpers';
@@ -17,6 +18,7 @@ interface ExamData {
 }
 
 export default function StudentExam() {
+  const confirm = useConfirm();
   const [view, setView] = useState<'schedule' | 'lobby' | 'exam'>('schedule');
   const [currentExam, setCurrentExam] = useState<Exam | null>(null);
 
@@ -37,6 +39,14 @@ export default function StudentExam() {
   const showLobby = (exam: Exam) => { setCurrentExam(exam); setView('lobby'); };
   const handleStartExam = async () => {
     if (startingExam || !myReg) return;
+    const ok = await confirm({
+      title: 'Start Exam Now?',
+      message: 'You are about to begin the exam. You cannot pause or restart once it starts. Continue?',
+      confirmLabel: 'Start Exam',
+      variant: 'warning',
+    });
+    if (!ok) return;
+
     setStartingExam(true);
     try {
       await apiStartExam(myReg.id);

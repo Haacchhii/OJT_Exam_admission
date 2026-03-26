@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAsync } from '../../../hooks/useAsync';
-import { getExams, getExamSchedules, registerForExam, getAvailableSchedules, notifyNoExamSchedule } from '../../../api/exams';
+import { getExams, getExamSchedules, registerForExam, getAvailableSchedules, notifyNoExamSchedule, cancelExamRegistration } from '../../../api/exams';
 import { showToast } from '../../../components/Toast';
 import { useConfirm } from '../../../components/ConfirmDialog';
 import { PageHeader } from '../../../components/UI';
@@ -26,6 +26,7 @@ interface ScheduleViewProps {
 export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, user }: ScheduleViewProps) {
   const confirm = useConfirm();
   const [bookingSlotId, setBookingSlotId] = useState<number | null>(null);
+  const [cancelingRegistrationId, setCancelingRegistrationId] = useState<number | null>(null);
   const [noticeMessage, setNoticeMessage] = useState('');
   const [sendingNotice, setSendingNotice] = useState(false);
   const [noticeSent, setNoticeSent] = useState(false);
@@ -52,8 +53,38 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, user
     );
   }
 
+  const cancelSchedule = async (registrationId: number) => {
+    const ok = await confirm({
+      title: 'Cancel Scheduled Exam?',
+      message: 'This will cancel your current booking and release the slot. You will need to book a new available slot to take the exam.',
+      confirmLabel: 'Cancel Schedule',
+      variant: 'warning',
+    });
+    if (!ok) return;
+
+    setCancelingRegistrationId(registrationId);
+    try {
+      await cancelExamRegistration(registrationId);
+      showToast('Your exam schedule has been cancelled.', 'success');
+      onRefresh();
+    } catch (err: unknown) {
+      showToast((err as Error).message || 'Failed to cancel schedule. Please try again.', 'error');
+    } finally {
+      setCancelingRegistrationId(null);
+    }
+  };
+
   if (myReg) {
-    return <ScheduledView myReg={myReg} schedules={schedules} exams={exams} onLobby={onLobby} />;
+    return (
+      <ScheduledView
+        myReg={myReg}
+        schedules={schedules}
+        exams={exams}
+        onLobby={onLobby}
+        onCancel={cancelSchedule}
+        isCanceling={cancelingRegistrationId === myReg.id}
+      />
+    );
   }
 
   const available = schedData?.availableSchedules || [];
@@ -145,6 +176,11 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, user
                         Registration window: {s.registrationOpenDate || 'Anytime'} to {s.registrationCloseDate || 'Until exam date'}
                       </p>
                     )}
+                    {(s.visibilityStartDate || s.visibilityEndDate) && (
+                      <p className="text-gray-500 text-xs">
+                        Visible in portal: {s.visibilityStartDate || 'Now'} to {s.visibilityEndDate || 'No end date'}
+                      </p>
+                    )}
                     {(exam as any)?.gradeLevel && <span className="inline-block mt-1 text-xs bg-gold-100 text-gold-700 px-2 py-0.5 rounded-full font-medium">{(exam as any).gradeLevel}</span>}
                   </div>
                   <button
@@ -197,20 +233,14 @@ interface ScheduledViewProps {
   schedules: ExamSchedule[];
   exams: Exam[];
   onLobby: (exam: Exam) => void;
+  onCancel: (registrationId: number) => void;
+  isCanceling: boolean;
 }
 
-function ScheduledView({ myReg, schedules, exams, onLobby }: ScheduledViewProps) {
+function ScheduledView({ myReg, schedules, exams, onLobby, onCancel, isCanceling }: ScheduledViewProps) {
   const schedule = schedules.find((s: ExamSchedule) => s.id === myReg.scheduleId);
   const exam = schedule ? exams.find((e: Exam) => e.id === schedule.examId) : null;
-  const [now, setNow] = useState(() => new Date());
-  const schedStart = schedule ? new Date(`${schedule.scheduledDate}T${schedule.startTime}:00`) : null;
-  const canStart = schedStart ? now >= schedStart : false;
-
-  useEffect(() => {
-    if (canStart) return;
-    const interval = setInterval(() => setNow(new Date()), 30000);
-    return () => clearInterval(interval);
-  }, [canStart]);
+  const canStart = !!exam;
 
   return (
     <div>
@@ -233,7 +263,7 @@ function ScheduledView({ myReg, schedules, exams, onLobby }: ScheduledViewProps)
         <div className="max-w-xl mx-auto text-left rounded-lg border border-gold-200 bg-gold-50 px-4 py-3 mb-5">
           <p className="text-xs font-semibold text-gold-800 mb-1">Exam-day checklist</p>
           <ul className="text-xs text-gold-800 list-disc list-inside space-y-0.5">
-            <li>Open this page 10-15 minutes before your scheduled start.</li>
+            <li>You can take the exam immediately once your booking is confirmed while registration is open.</li>
             <li>Use a quiet place and avoid refreshing during the exam.</li>
             <li>If you encounter issues, share tracking ID <strong>{myReg.trackingId || 'N/A'}</strong> with support.</li>
           </ul>
@@ -242,6 +272,20 @@ function ScheduledView({ myReg, schedules, exams, onLobby }: ScheduledViewProps)
           <button onClick={() => onLobby(exam)} className="bg-gradient-to-r from-forest-500 to-forest-400 text-white px-8 py-3 rounded-lg font-semibold hover:from-gold-500 hover:to-gold-600 shadow-md">Take Exam Now</button>
         ) : (
           <p className="text-gray-400 text-sm flex items-center justify-center gap-1.5"><Icon name="clock" className="w-4 h-4" /> Exam will open on <strong>{schedule?.scheduledDate}</strong> at <strong>{formatTime(schedule?.startTime)}</strong></p>
+        )}
+        {myReg.status === 'scheduled' && (
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={() => onCancel(myReg.id)}
+              disabled={isCanceling}
+              className="inline-flex items-center gap-1.5 border border-red-300 text-red-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-red-50 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {isCanceling
+                ? <><span className="w-3.5 h-3.5 border-2 border-red-500 border-t-transparent rounded-full animate-spin" /> Cancelling...</>
+                : <><Icon name="trash" className="w-4 h-4" /> Cancel Schedule</>}
+            </button>
+          </div>
         )}
       </div>
     </div>
