@@ -111,6 +111,9 @@ async function request<T = unknown>(
     throw new ApiError('Network error. Please check your connection and try again.', 0);
   }
 
+  const contentType = res.headers.get('content-type') || '';
+  const data = contentType.includes('json') ? await res.json() : await res.text();
+
   if (res.status === 401) {
     setToken(null);
     if (onAuthError) onAuthError();
@@ -118,15 +121,18 @@ async function request<T = unknown>(
   }
 
   if (res.status === 403) {
-    throw new ApiError('You do not have permission to perform this action.', 403);
+    const message = typeof data === 'object' && data !== null && 'error' in data
+      ? String((data as { error?: string }).error || 'You do not have permission to perform this action.')
+      : 'You do not have permission to perform this action.';
+    throw new ApiError(message, 403, data);
   }
 
   if (res.status === 404) {
-    throw new ApiError('The requested resource was not found.', 404);
+    const message = typeof data === 'object' && data !== null && 'error' in data
+      ? String((data as { error?: string }).error || 'The requested resource was not found.')
+      : 'The requested resource was not found.';
+    throw new ApiError(message, 404, data);
   }
-
-  const contentType = res.headers.get('content-type') || '';
-  const data = contentType.includes('json') ? await res.json() : await res.text();
 
   if (!res.ok) {
     let message = `Request failed (${res.status})`;

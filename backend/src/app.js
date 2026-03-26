@@ -147,7 +147,7 @@ app.use('/api/exams',         cachePrivate, examsRoutes);
 app.use('/api/results',       cachePrivate, resultsRoutes);
 app.use('/api/users',         cachePrivate, usersRoutes);
 app.use('/api/audit-logs',    cachePrivate, auditLogRoutes);
-app.use('/api/academic-years', cachePublic, academicYearsRoutes);
+app.use('/api/academic-years', cachePrivate, academicYearsRoutes);
 
 // Health check (includes DB connectivity)
 app.get('/api/health', async (_req, res) => {

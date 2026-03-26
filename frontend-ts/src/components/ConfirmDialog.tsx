@@ -116,15 +116,27 @@ interface ConfirmState extends ConfirmOptions {
 
 export function ConfirmProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<ConfirmState | null>(null);
+  const resolvedRef = useRef(false);
 
   const confirm: ConfirmFn = useCallback((opts) => {
     return new Promise<boolean>((resolve) => {
+      resolvedRef.current = false;
       setState({ ...opts, resolve });
     });
   }, []);
 
-  const handleConfirm = () => { state?.resolve(true); setState(null); };
-  const handleCancel = () => { state?.resolve(false); setState(null); };
+  const handleConfirm = () => {
+    if (resolvedRef.current) return;
+    resolvedRef.current = true;
+    state?.resolve(true);
+    setState(null);
+  };
+  const handleCancel = () => {
+    if (resolvedRef.current) return;
+    resolvedRef.current = true;
+    state?.resolve(false);
+    setState(null);
+  };
 
   return (
     <ConfirmContext.Provider value={confirm}>

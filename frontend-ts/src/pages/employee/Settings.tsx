@@ -42,12 +42,14 @@ export default function EmployeeSettings() {
   const [yearForm, setYearForm] = useState<YearForm>({ ...emptyYearForm });
   const [yearErrors, setYearErrors] = useState<Record<string, string>>({});
   const [savingYear, setSavingYear] = useState(false);
+  const [deletingYearId, setDeletingYearId] = useState<number | null>(null);
 
   const [showSemModal, setShowSemModal] = useState(false);
   const [editSemId, setEditSemId] = useState<number | null>(null);
   const [semForm, setSemForm] = useState<SemForm>({ ...emptySemForm });
   const [semErrors, setSemErrors] = useState<Record<string, string>>({});
   const [savingSem, setSavingSem] = useState(false);
+  const [deletingSemId, setDeletingSemId] = useState<number | null>(null);
 
   const confirm = useConfirm();
 
@@ -96,12 +98,14 @@ export default function EmployeeSettings() {
   };
 
   const handleDeleteYear = async (y: AcademicYear) => {
+    if (deletingYearId === y.id) return;
     const ok = await confirm({
       title: 'Delete School Year',
       message: `Delete "${y.year}"? All semesters under this year will also be deleted.`,
       confirmLabel: 'Delete', variant: 'danger',
     });
     if (!ok) return;
+    setDeletingYearId(y.id);
     try {
       await deleteAcademicYear(y.id);
       showToast('School year deleted', 'success');
@@ -109,6 +113,8 @@ export default function EmployeeSettings() {
       refetchAY(); refetchSem();
     } catch (err: any) {
       showToast(err?.response?.data?.error || 'Failed to delete school year', 'error');
+    } finally {
+      setDeletingYearId(null);
     }
   };
 
@@ -160,6 +166,7 @@ export default function EmployeeSettings() {
   };
 
   const handleDeleteSem = async (s: Semester) => {
+    if (deletingSemId === s.id) return;
     const yearLabel = years.find(y => y.id === s.academicYearId)?.year || '';
     const ok = await confirm({
       title: 'Delete Semester',
@@ -167,12 +174,15 @@ export default function EmployeeSettings() {
       confirmLabel: 'Delete', variant: 'danger',
     });
     if (!ok) return;
+    setDeletingSemId(s.id);
     try {
       await deleteSemester(s.id);
       showToast('Semester deleted', 'success');
       refetchSem();
     } catch (err: any) {
       showToast(err?.response?.data?.error || 'Failed to delete semester', 'error');
+    } finally {
+      setDeletingSemId(null);
     }
   };
 
@@ -221,15 +231,28 @@ export default function EmployeeSettings() {
               >
                 <div className="flex items-center gap-3">
                   <span className="font-medium text-gray-800">{y.year}</span>
+                  {deletingYearId === y.id && (
+                    <Badge className="bg-gray-100 text-gray-700 inline-flex items-center gap-1">
+                      <Icon name="spinner" className="w-3 h-3 animate-spin" />
+                      Deleting...
+                    </Badge>
+                  )}
                   {y.isActive && <Badge className="bg-emerald-100 text-emerald-700">Active</Badge>}
-                  <button onClick={(e) => { e.stopPropagation(); setSelectedYearId(y.id); }} className="text-xs text-forest-600 hover:text-forest-800 px-2 py-1 rounded hover:bg-forest-50 transition-colors" title="View semesters">
+                  <button onClick={(e) => { e.stopPropagation(); setSelectedYearId(y.id); }} disabled={deletingYearId === y.id} className="text-xs text-forest-600 hover:text-forest-800 px-2 py-1 rounded hover:bg-forest-50 transition-colors disabled:opacity-50 disabled:pointer-events-none" title="View semesters">
                     <Icon name="eye" className="w-4 h-4" />
                   </button>
-                  <button onClick={(e) => { e.stopPropagation(); openEditYear(y); }} className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50 transition-colors" title="Edit">
+                  <button onClick={(e) => { e.stopPropagation(); openEditYear(y); }} disabled={deletingYearId === y.id} className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:pointer-events-none" title="Edit">
                     <Icon name="edit" className="w-4 h-4" />
                   </button>
-                  <button onClick={(e) => { e.stopPropagation(); handleDeleteYear(y); }} className="text-xs text-red-600 hover:text-red-800 px-2 py-1 rounded hover:bg-red-50 transition-colors" title="Delete">
-                    <Icon name="trash" className="w-4 h-4" />
+                  <button onClick={(e) => { e.stopPropagation(); handleDeleteYear(y); }} disabled={deletingYearId === y.id} className="text-xs text-red-600 hover:text-red-800 px-2 py-1 rounded hover:bg-red-50 transition-colors disabled:opacity-50 disabled:pointer-events-none inline-flex items-center gap-1" title="Delete">
+                    {deletingYearId === y.id ? (
+                      <>
+                        <Icon name="spinner" className="w-4 h-4 animate-spin" />
+                        Deleting...
+                      </>
+                    ) : (
+                      <Icon name="trash" className="w-4 h-4" />
+                    )}
                   </button>
                 </div>
               </div>
@@ -289,11 +312,18 @@ export default function EmployeeSettings() {
                     {s.isActive && <Badge className="bg-emerald-100 text-emerald-700">Active</Badge>}
                   </div>
                   <div className="flex items-center gap-2">
-                    <button onClick={() => openEditSem(s)} className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50 transition-colors" title="Edit">
+                    <button onClick={() => openEditSem(s)} disabled={deletingSemId === s.id} className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:pointer-events-none" title="Edit">
                       <Icon name="edit" className="w-4 h-4" />
                     </button>
-                    <button onClick={() => handleDeleteSem(s)} className="text-xs text-red-600 hover:text-red-800 px-2 py-1 rounded hover:bg-red-50 transition-colors" title="Delete">
-                      <Icon name="trash" className="w-4 h-4" />
+                    <button onClick={() => handleDeleteSem(s)} disabled={deletingSemId === s.id} className="text-xs text-red-600 hover:text-red-800 px-2 py-1 rounded hover:bg-red-50 transition-colors disabled:opacity-50 disabled:pointer-events-none inline-flex items-center gap-1" title="Delete">
+                      {deletingSemId === s.id ? (
+                        <>
+                          <Icon name="spinner" className="w-4 h-4 animate-spin" />
+                          Deleting...
+                        </>
+                      ) : (
+                        <Icon name="trash" className="w-4 h-4" />
+                      )}
                     </button>
                   </div>
                 </div>
