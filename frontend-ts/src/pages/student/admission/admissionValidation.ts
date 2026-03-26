@@ -136,10 +136,15 @@ export function validateStep3(form: AdmissionForm): AdmissionErrors {
   else if (!NAME_OCCUPATION_REGEX.test(form.fatherOccupation.trim())) e.fatherOccupation = 'Use only letters, numbers, spaces, commas, hyphens';
   else if (form.fatherOccupation.length > 120) e.fatherOccupation = 'Max 120 characters';
 
-  if (!form.motherNameOccupation?.trim()) e.motherNameOccupation = 'Required';
-  else if (form.motherNameOccupation.trim().length < 3) e.motherNameOccupation = 'At least 3 characters (e.g. Name, Occupation)';
-  else if (!NAME_OCCUPATION_REGEX.test(form.motherNameOccupation.trim())) e.motherNameOccupation = 'Use only letters, numbers, spaces, commas, hyphens';
-  else if (form.motherNameOccupation.length > 200) e.motherNameOccupation = 'Max 200 characters';
+  if (!form.motherName?.trim()) e.motherName = 'Required';
+  else if (form.motherName.trim().length < 3) e.motherName = 'At least 3 characters';
+  else if (!NAME_REGEX.test(form.motherName.trim())) e.motherName = 'Use only letters, spaces, hyphens, or apostrophes';
+  else if (form.motherName.length > 200) e.motherName = 'Max 200 characters';
+
+  if (!form.motherOccupation?.trim()) e.motherOccupation = 'Required';
+  else if (form.motherOccupation.trim().length < 2) e.motherOccupation = 'At least 2 characters';
+  else if (!NAME_OCCUPATION_REGEX.test(form.motherOccupation.trim())) e.motherOccupation = 'Use only letters, numbers, spaces, commas, hyphens';
+  else if (form.motherOccupation.length > 120) e.motherOccupation = 'Max 120 characters';
 
   if (form.guardian?.trim() && form.guardian.length > 200) e.guardian = 'Max 200 characters';
 

@@ -45,7 +45,8 @@ export default function StepReview({ form, slotFiles, extraFiles, requiredDocs, 
       <ReviewSection title={<><Icon name="users" className="w-4 h-4 inline" /> Family Details</>}>
         <Detail label="Father's Full Name" value={form.fatherName || '-'} />
         <Detail label="Father's Occupation" value={form.fatherOccupation || '-'} />
-        <Detail label="Mother's Name & Occupation" value={form.motherNameOccupation || '-'} />
+        <Detail label="Mother's Full Name" value={form.motherName || '-'} />
+        <Detail label="Mother's Occupation" value={form.motherOccupation || '-'} />
         <Detail label="Guardian (Optional)" value={form.guardian || '-'} />
       </ReviewSection>
       <div className="mb-6">

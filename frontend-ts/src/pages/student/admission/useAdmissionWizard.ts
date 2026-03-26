@@ -18,9 +18,20 @@ export interface AdmissionForm {
   addressStreet: string; addressBarangay: string; addressCityMunicipality: string; addressProvince: string; addressZipCode: string;
   prevSchool: string; schoolAddress: string; gradeLevel: string; schoolYear: string; lrn: string; applicantType: string;
   studentNumber: string;
-  fatherName: string; fatherOccupation: string; motherNameOccupation: string; guardian: string;
+  fatherName: string; fatherOccupation: string; motherName: string; motherOccupation: string; guardian: string;
   guardianRelation: string; guardianPhone: string; guardianEmail: string;
   [key: string]: string | boolean;
+}
+
+function splitLegacyMotherNameOccupation(value: string): { motherName: string; motherOccupation: string } {
+  const raw = String(value || '').trim();
+  if (!raw) return { motherName: '', motherOccupation: '' };
+  const commaIndex = raw.indexOf(',');
+  if (commaIndex === -1) return { motherName: raw, motherOccupation: '' };
+  return {
+    motherName: raw.slice(0, commaIndex).trim(),
+    motherOccupation: raw.slice(commaIndex + 1).trim(),
+  };
 }
 
 function composeHomeAddress(form: AdmissionForm): string {
@@ -67,7 +78,7 @@ export function useAdmissionWizard() {
     addressStreet: '', addressBarangay: '', addressCityMunicipality: '', addressProvince: '', addressZipCode: '',
     prevSchool: '', schoolAddress: '', gradeLevel: '', schoolYear: getCurrentSchoolYear(), lrn: '', applicantType: 'New',
     studentNumber: '',
-    fatherName: '', fatherOccupation: '', motherNameOccupation: '', guardian: '',
+    fatherName: '', fatherOccupation: '', motherName: '', motherOccupation: '', guardian: '',
     guardianRelation: '', guardianPhone: '', guardianEmail: '',
   });
 
@@ -108,7 +119,13 @@ export function useAdmissionWizard() {
     }
     const saved = restore();
     if (saved && !existingApp) {
-      setForm(f => ({ ...f, ...(saved as AdmissionForm) }));
+      const normalized = { ...(saved as AdmissionForm & { motherNameOccupation?: string }) };
+      if (!normalized.motherName?.trim() && !normalized.motherOccupation?.trim() && normalized.motherNameOccupation?.trim()) {
+        const legacy = splitLegacyMotherNameOccupation(normalized.motherNameOccupation);
+        normalized.motherName = legacy.motherName;
+        normalized.motherOccupation = legacy.motherOccupation;
+      }
+      setForm(f => ({ ...f, ...normalized }));
       showToast('Draft restored from your last session.', 'info');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -169,6 +186,7 @@ export function useAdmissionWizard() {
         ...form,
         address: composeHomeAddress(form),
         fatherNameOccupation: [form.fatherName.trim(), form.fatherOccupation.trim()].filter(Boolean).join(', '),
+        motherNameOccupation: [form.motherName.trim(), form.motherOccupation.trim()].filter(Boolean).join(', '),
         documents: docs.length ? docs : ['(No documents uploaded)'],
       });
       if ((result as any)?.error) { showToast((result as any).error, 'error'); return; }

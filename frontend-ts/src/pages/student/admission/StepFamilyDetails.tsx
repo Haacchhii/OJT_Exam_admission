@@ -36,14 +36,22 @@ export default function StepFamilyDetails({ form, set, goTo, errors = {} }: Prop
           error={errors.fatherOccupation}
         />
         <Input
-          label="Mother's Name & Occupation"
-          value={form.motherNameOccupation}
-          onChange={set('motherNameOccupation')}
+          label="Mother's Full Name"
+          value={form.motherName}
+          onChange={set('motherName')}
           required
-          placeholder="e.g. Maria Dela Cruz, Teacher"
+          placeholder="e.g. Maria Dela Cruz"
           maxLength={200}
-          className="md:col-span-2"
-          error={errors.motherNameOccupation}
+          error={errors.motherName}
+        />
+        <Input
+          label="Mother's Occupation"
+          value={form.motherOccupation}
+          onChange={set('motherOccupation')}
+          required
+          placeholder="e.g. Teacher"
+          maxLength={120}
+          error={errors.motherOccupation}
         />
         <div className="md:col-span-2">
           <Input
