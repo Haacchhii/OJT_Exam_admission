@@ -136,7 +136,7 @@ export async function register(req, res, next) {
             emailVerifyExpires: new Date(Date.now() + EMAIL_VERIFY_EXPIRY_MS),
           },
         });
-        sendVerificationEmail({ to: existing.email, firstName: existing.firstName, verifyToken });
+        await sendVerificationEmail({ to: existing.email, firstName: existing.firstName, verifyToken });
         return res.status(200).json({
           ok: true,
           emailVerificationRequired: true,
@@ -170,7 +170,7 @@ export async function register(req, res, next) {
     });
 
     // Send verification email
-    sendVerificationEmail({ to: user.email, firstName: user.firstName, verifyToken });
+    await sendVerificationEmail({ to: user.email, firstName: user.firstName, verifyToken });
 
     const token = signToken(user);
     logAudit({ userId: user.id, action: 'auth.register', entity: 'user', entityId: user.id, ipAddress: req.ip });
@@ -205,7 +205,7 @@ export async function verifyEmail(req, res, next) {
     });
 
     // Send the welcome email now that the email is verified
-    sendWelcomeEmail({ to: user.email, firstName: user.firstName });
+    await sendWelcomeEmail({ to: user.email, firstName: user.firstName });
 
     logAudit({ userId: user.id, action: 'auth.email_verified', entity: 'user', entityId: user.id });
     res.json({ ok: true, message: 'Email verified successfully!' });
@@ -236,7 +236,7 @@ export async function resendVerification(req, res, next) {
       },
     });
 
-    sendVerificationEmail({ to: user.email, firstName: user.firstName, verifyToken });
+    await sendVerificationEmail({ to: user.email, firstName: user.firstName, verifyToken });
 
     res.json({ ok: true, message: 'If an unverified account exists with this email, a verification link has been sent.' });
   } catch (err) { next(err); }
