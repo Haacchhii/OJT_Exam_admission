@@ -146,6 +146,14 @@ export async function createAdmission(req, res, next) {
       documents: docNames,
     } = req.body;
 
+    const normalizedDocNames = Array.isArray(docNames)
+      ? Array.from(new Set(
+          docNames
+            .map((d) => String(d || '').trim())
+            .filter(Boolean)
+        ))
+      : [];
+
     // Validate required fields
     if (!firstName || !lastName || !email || !dob || !gender || !address || !gradeLevel || !schoolYear || !guardian || !guardianRelation) {
       return res.status(400).json({ error: 'Missing required fields', code: 'VALIDATION_ERROR' });
@@ -196,6 +204,13 @@ export async function createAdmission(req, res, next) {
         ...(resolvedYearId && { academicYearId: resolvedYearId }),
         ...(resolvedSemesterId && { semesterId: resolvedSemesterId }),
         status: 'Submitted',
+        ...(normalizedDocNames.length
+          ? {
+              documents: {
+                create: normalizedDocNames.map((name) => ({ documentName: name })),
+              },
+            }
+          : {}),
       },
       include: { documents: true, academicYear: true, semester: true },
     });
