@@ -182,12 +182,17 @@ export async function register(req, res, next) {
 export async function verifyEmail(req, res, next) {
   try {
     const { token } = req.body;
-    if (!token) {
+    const normalizedToken = String(token || '')
+      .trim()
+      .replace(/^"+|"+$/g, '')
+      .replace(/^'+|'+$/g, '');
+
+    if (!normalizedToken) {
       return res.status(400).json({ error: 'Verification token is required', code: 'VALIDATION_ERROR' });
     }
 
     const user = await prisma.user.findFirst({
-      where: { emailVerifyToken: token, deletedAt: null },
+      where: { emailVerifyToken: normalizedToken, deletedAt: null },
     });
     if (!user) {
       return res.status(400).json({ error: 'Invalid verification token', code: 'VALIDATION_ERROR' });
