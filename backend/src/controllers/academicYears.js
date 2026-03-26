@@ -2,6 +2,13 @@ import prisma from '../config/db.js';
 import { logAudit } from '../utils/auditLog.js';
 import { cached, invalidatePrefix } from '../utils/cache.js';
 
+function validateDateWindow(startDate, endDate, label) {
+  if (startDate && endDate && new Date(startDate) > new Date(endDate)) {
+    return `${label} endDate must be on or after startDate`;
+  }
+  return null;
+}
+
 // ──────────────────────────────────────────────────────
 // ACADEMIC YEARS
 // ──────────────────────────────────────────────────────
@@ -46,6 +53,11 @@ export async function createAcademicYear(req, res, next) {
       return res.status(400).json({ error: 'Year must be in format YYYY-YYYY (e.g. 2026-2027)', code: 'VALIDATION_ERROR' });
     }
 
+    const dateError = validateDateWindow(startDate, endDate, 'Academic year');
+    if (dateError) {
+      return res.status(400).json({ error: dateError, code: 'VALIDATION_ERROR' });
+    }
+
     // If setting as active, deactivate others
     if (isActive) await prisma.academicYear.updateMany({ data: { isActive: false } });
 
@@ -76,6 +88,11 @@ export async function updateAcademicYear(req, res, next) {
 
     if (year && !/^\d{4}-\d{4}$/.test(year)) {
       return res.status(400).json({ error: 'Year must be in format YYYY-YYYY', code: 'VALIDATION_ERROR' });
+    }
+
+    const dateError = validateDateWindow(startDate, endDate, 'Academic year');
+    if (dateError) {
+      return res.status(400).json({ error: dateError, code: 'VALIDATION_ERROR' });
     }
 
     // If activating, deactivate others first
@@ -140,6 +157,11 @@ export async function createSemester(req, res, next) {
       return res.status(400).json({ error: 'name and academicYearId are required', code: 'VALIDATION_ERROR' });
     }
 
+    const dateError = validateDateWindow(startDate, endDate, 'Semester');
+    if (dateError) {
+      return res.status(400).json({ error: dateError, code: 'VALIDATION_ERROR' });
+    }
+
     // If setting as active, deactivate other semesters in the same year
     if (isActive) {
       await prisma.semester.updateMany({ where: { academicYearId: Number(academicYearId) }, data: { isActive: false } });
@@ -169,6 +191,11 @@ export async function updateSemester(req, res, next) {
   try {
     const id = Number(req.params.id);
     const { name, isActive, startDate, endDate } = req.body;
+
+    const dateError = validateDateWindow(startDate, endDate, 'Semester');
+    if (dateError) {
+      return res.status(400).json({ error: dateError, code: 'VALIDATION_ERROR' });
+    }
 
     // If activating, deactivate siblings first
     if (isActive) {

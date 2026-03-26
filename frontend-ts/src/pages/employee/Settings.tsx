@@ -14,10 +14,22 @@ import { SEMESTER_NAMES } from '../../utils/constants';
 import type { AcademicYear, Semester } from '../../types';
 
 interface YearForm { year: string; isActive: boolean }
-interface SemForm { name: string; academicYearId: number | string; isActive: boolean }
+interface SemForm {
+  name: string;
+  academicYearId: number | string;
+  isActive: boolean;
+  startDate: string;
+  endDate: string;
+}
 
 const emptyYearForm: YearForm = { year: '', isActive: false };
-const emptySemForm: SemForm = { name: 'First Semester', academicYearId: '', isActive: false };
+const emptySemForm: SemForm = {
+  name: 'First Semester',
+  academicYearId: '',
+  isActive: false,
+  startDate: '',
+  endDate: '',
+};
 
 export default function EmployeeSettings() {
   const { data: academicYears, loading: ayLoading, error: ayError, refetch: refetchAY } = useAsync<AcademicYear[]>(() => getAcademicYears());
@@ -101,11 +113,17 @@ export default function EmployeeSettings() {
   };
 
   const openAddSem = (yearId: number | string) => {
-    setSemForm({ name: 'First Semester', academicYearId: yearId, isActive: false });
+    setSemForm({ name: 'First Semester', academicYearId: yearId, isActive: false, startDate: '', endDate: '' });
     setEditSemId(null); setSemErrors({}); setShowSemModal(true);
   };
   const openEditSem = (s: Semester) => {
-    setSemForm({ name: s.name, academicYearId: s.academicYearId, isActive: !!s.isActive });
+    setSemForm({
+      name: s.name,
+      academicYearId: s.academicYearId,
+      isActive: !!s.isActive,
+      startDate: s.startDate ? String(s.startDate).slice(0, 10) : '',
+      endDate: s.endDate ? String(s.endDate).slice(0, 10) : '',
+    });
     setEditSemId(s.id); setSemErrors({}); setShowSemModal(true);
   };
 
@@ -113,6 +131,12 @@ export default function EmployeeSettings() {
     const e: Record<string, string> = {};
     if (!semForm.name) e.name = 'Semester name is required';
     if (!semForm.academicYearId) e.academicYearId = 'School year is required';
+    if (semForm.startDate && semForm.endDate && semForm.startDate > semForm.endDate) {
+      e.endDate = 'End date must be on or after start date';
+    }
+    if (semForm.isActive && (!semForm.startDate || !semForm.endDate)) {
+      e.startDate = 'Active semester requires start and end dates';
+    }
     return e;
   };
 
@@ -258,6 +282,9 @@ export default function EmployeeSettings() {
                     <div>
                       <span className="font-medium text-gray-800">{s.name}</span>
                       {!selectedYearId && <span className="text-sm text-gray-400 ml-2">{yearLabel}</span>}
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Period: {s.startDate ? String(s.startDate).slice(0, 10) : 'Not set'} to {s.endDate ? String(s.endDate).slice(0, 10) : 'Not set'}
+                      </p>
                     </div>
                     {s.isActive && <Badge className="bg-emerald-100 text-emerald-700">Active</Badge>}
                   </div>
@@ -354,6 +381,28 @@ export default function EmployeeSettings() {
               {years.map(y => <option key={y.id} value={y.id}>{y.year}</option>)}
             </select>
             {semErrors.academicYearId && <p id="sem-year-error" className="text-xs text-red-500 mt-1" role="alert">{semErrors.academicYearId}</p>}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Period Start</label>
+              <input
+                type="date"
+                value={semForm.startDate}
+                onChange={e => setSemForm(f => ({ ...f, startDate: e.target.value }))}
+                className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-forest-500 ${semErrors.startDate ? 'border-red-400' : 'border-gray-200'}`}
+              />
+              {semErrors.startDate && <p className="text-xs text-red-500 mt-1" role="alert">{semErrors.startDate}</p>}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Period End</label>
+              <input
+                type="date"
+                value={semForm.endDate}
+                onChange={e => setSemForm(f => ({ ...f, endDate: e.target.value }))}
+                className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-forest-500 ${semErrors.endDate ? 'border-red-400' : 'border-gray-200'}`}
+              />
+              {semErrors.endDate && <p className="text-xs text-red-500 mt-1" role="alert">{semErrors.endDate}</p>}
+            </div>
           </div>
           <label className="flex items-center gap-2 cursor-pointer">
             <input

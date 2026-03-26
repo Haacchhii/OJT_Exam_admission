@@ -12,6 +12,22 @@ function getTodayLocalIso() {
   return `${year}-${month}-${day}`;
 }
 
+function toIsoDay(value) {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function isWithinPeriod(todayIso, startDate, endDate) {
+  if (startDate && todayIso < startDate) return false;
+  if (endDate && todayIso > endDate) return false;
+  return true;
+}
+
 function validateScheduleFields({ scheduledDate, startTime, endTime }, { checkPastDate = false } = {}) {
   if (startTime && endTime && startTime >= endTime) {
     return 'endTime must be after startTime';
@@ -113,6 +129,24 @@ export async function getSchedules(req, res, next) {
 export async function getAvailableSchedules(req, res, next) {
   try {
     const today = getTodayLocalIso();
+    const activeYear = await prisma.academicYear.findFirst({ where: { isActive: true } });
+    if (!activeYear) {
+      return res.json([]);
+    }
+
+    const activeSemester = await prisma.semester.findFirst({
+      where: { academicYearId: activeYear.id, isActive: true },
+      orderBy: { id: 'asc' },
+    });
+    if (!activeSemester) {
+      return res.json([]);
+    }
+
+    const semStart = toIsoDay(activeSemester.startDate);
+    const semEnd = toIsoDay(activeSemester.endDate);
+    if (!isWithinPeriod(today, semStart, semEnd)) {
+      return res.json([]);
+    }
 
     // If the requester is an applicant, filter schedules to their grade level
     let gradeFilter = {};
@@ -134,7 +168,7 @@ export async function getAvailableSchedules(req, res, next) {
     const schedules = await prisma.examSchedule.findMany({
       where: {
         scheduledDate: { gte: today },
-        exam: { isActive: true, ...gradeFilter },
+        exam: { isActive: true, academicYearId: activeYear.id, ...gradeFilter },
       },
       include: { exam: { select: { title: true, gradeLevel: true } } },
       orderBy: { scheduledDate: 'asc' },

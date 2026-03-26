@@ -12,6 +12,41 @@ function getTodayLocalIso() {
   return `${year}-${month}-${day}`;
 }
 
+function getNowLocalTime() {
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2, '0');
+  const mm = String(now.getMinutes()).padStart(2, '0');
+  return `${hh}:${mm}`;
+}
+
+function isWithinPeriod(todayIso, startDate, endDate) {
+  if (startDate && todayIso < startDate) return false;
+  if (endDate && todayIso > endDate) return false;
+  return true;
+}
+
+function toIsoDay(value) {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+async function getActiveAcademicPeriod() {
+  const activeYear = await prisma.academicYear.findFirst({ where: { isActive: true } });
+  if (!activeYear) return null;
+
+  const activeSemester = await prisma.semester.findFirst({
+    where: { academicYearId: activeYear.id, isActive: true },
+    orderBy: { id: 'asc' },
+  });
+
+  return { activeYear, activeSemester };
+}
+
 function isWithinRegistrationWindow(schedule, todayIso) {
   const opens = !schedule.registrationOpenDate || todayIso >= schedule.registrationOpenDate;
   const closes = !schedule.registrationCloseDate || todayIso <= schedule.registrationCloseDate;
@@ -91,6 +126,22 @@ export async function createRegistration(req, res, next) {
     }
 
     const today = getTodayLocalIso();
+    const activePeriod = await getActiveAcademicPeriod();
+    if (!activePeriod?.activeSemester) {
+      return res.status(400).json({ error: 'Exam booking is currently closed. No active exam period is configured.', code: 'VALIDATION_ERROR' });
+    }
+
+    const semStartIso = toIsoDay(activePeriod.activeSemester.startDate);
+    const semEndIso = toIsoDay(activePeriod.activeSemester.endDate);
+
+    if (!isWithinPeriod(today, semStartIso, semEndIso)) {
+      return res.status(400).json({ error: 'Exam booking is outside the active exam period.', code: 'VALIDATION_ERROR' });
+    }
+
+    if (schedule.exam?.academicYear?.id && schedule.exam.academicYear.id !== activePeriod.activeYear.id) {
+      return res.status(400).json({ error: 'Registration is only allowed for exams in the active academic year', code: 'VALIDATION_ERROR' });
+    }
+
     if (schedule.scheduledDate < today) {
       return res.status(400).json({ error: 'This schedule is no longer available', code: 'VALIDATION_ERROR' });
     }
@@ -180,7 +231,16 @@ export async function createRegistration(req, res, next) {
 export async function startExam(req, res, next) {
   try {
     const id = Number(req.params.id);
-    const reg = await prisma.examRegistration.findUnique({ where: { id } });
+    const reg = await prisma.examRegistration.findUnique({
+      where: { id },
+      include: {
+        schedule: {
+          include: {
+            exam: { select: { academicYearId: true } },
+          },
+        },
+      },
+    });
     if (!reg) return res.status(404).json({ error: 'Registration not found', code: 'NOT_FOUND' });
 
     // Ownership check: only the registered student can start their own exam
@@ -190,6 +250,33 @@ export async function startExam(req, res, next) {
 
     if (reg.status !== 'scheduled') {
       return res.status(400).json({ error: 'Exam already started or completed', code: 'VALIDATION_ERROR' });
+    }
+
+    const activePeriod = await getActiveAcademicPeriod();
+    if (!activePeriod?.activeSemester) {
+      return res.status(400).json({ error: 'Exams are currently closed. No active exam period is configured.', code: 'VALIDATION_ERROR' });
+    }
+
+    const today = getTodayLocalIso();
+    const semStartIso = toIsoDay(activePeriod.activeSemester.startDate);
+    const semEndIso = toIsoDay(activePeriod.activeSemester.endDate);
+    if (!isWithinPeriod(today, semStartIso, semEndIso)) {
+      return res.status(400).json({ error: 'Exams are outside the active exam period.', code: 'VALIDATION_ERROR' });
+    }
+
+    if (reg.schedule?.exam?.academicYearId && reg.schedule.exam.academicYearId !== activePeriod.activeYear.id) {
+      return res.status(400).json({ error: 'Exams can only be started in the active academic year.', code: 'VALIDATION_ERROR' });
+    }
+
+    const nowTime = getNowLocalTime();
+    if (today < reg.schedule.scheduledDate) {
+      return res.status(400).json({ error: 'This exam is not available yet.', code: 'VALIDATION_ERROR' });
+    }
+    if (today > reg.schedule.scheduledDate || nowTime > reg.schedule.endTime) {
+      return res.status(400).json({ error: 'This exam schedule has already ended.', code: 'VALIDATION_ERROR' });
+    }
+    if (nowTime < reg.schedule.startTime) {
+      return res.status(400).json({ error: 'This exam has not started yet.', code: 'VALIDATION_ERROR' });
     }
 
     const updated = await prisma.examRegistration.update({
