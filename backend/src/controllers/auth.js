@@ -66,16 +66,17 @@ export async function getMe(req, res, next) {
 export async function login(req, res, next) {
   try {
     const { email, password } = req.body;
+    const normalizedEmail = String(email || '').trim().toLowerCase();
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required', code: 'VALIDATION_ERROR' });
     }
 
     const user = await prisma.user.findUnique({
-      where: { email },
+      where: { email: normalizedEmail },
       include: { applicantProfile: true, staffProfile: true },
     });
     if (!user || user.deletedAt) {
-      logAudit({ action: 'auth.login_failed', entity: 'user', details: { email, reason: 'user_not_found' }, ipAddress: req.ip });
+      logAudit({ action: 'auth.login_failed', entity: 'user', details: { email: normalizedEmail, reason: 'user_not_found' }, ipAddress: req.ip });
       return res.status(401).json({ error: 'Invalid email or password', code: 'UNAUTHORIZED' });
     }
 
