@@ -15,6 +15,13 @@ import type { Admission, AdmissionStats, AcademicYear, Semester } from '../../..
 const PER_PAGE = 10;
 const SLA_DAYS = 7;
 
+function semesterLabel(s: Semester) {
+  const start = s.startDate ? String(s.startDate).slice(0, 10) : null;
+  const end = s.endDate ? String(s.endDate).slice(0, 10) : null;
+  if (start || end) return `${s.name} (${start || 'open'} to ${end || 'open'})`;
+  return s.name;
+}
+
 function daysPending(submittedAt: string) {
   return Math.floor((Date.now() - new Date(submittedAt).getTime()) / 86400000);
 }
@@ -255,7 +262,7 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
         </select>
         <select value={semesterFilter} onChange={e => { setSemesterFilter(e.target.value); resetPage(); }} aria-label="Filter by semester" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white">
           <option value="all">All Semesters</option>
-          {semesterOptions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          {semesterOptions.map(s => <option key={s.id} value={s.id}>{semesterLabel(s)}</option>)}
         </select>
         <select value={sortBy} onChange={e => { setSortBy(e.target.value); resetPage(); }} aria-label="Sort by" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white">
           <option value="newest">Newest First</option>

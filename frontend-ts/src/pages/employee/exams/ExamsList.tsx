@@ -22,6 +22,13 @@ const EXAMS_PER_PAGE = 10;
 const READINESS_PER_PAGE = 10;
 const QUESTIONS_PER_PAGE = 5;
 
+function semesterLabel(s: Semester) {
+  const start = s.startDate ? String(s.startDate).slice(0, 10) : null;
+  const end = s.endDate ? String(s.endDate).slice(0, 10) : null;
+  if (start || end) return `${s.name} (${start || 'open'} to ${end || 'open'})`;
+  return s.name;
+}
+
 export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void }) {
   const canManageExams = !!onEdit;
   const confirm = useConfirm();
@@ -345,7 +352,7 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
         </select>
         <select value={semesterFilterExam} onChange={e => { setSemesterFilterExam(e.target.value); resetExamPage(); }} className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
           <option value="all">All Semesters</option>
-          {semesterOptionsExam.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          {semesterOptionsExam.map(s => <option key={s.id} value={s.id}>{semesterLabel(s)}</option>)}
         </select>
       </div>
 

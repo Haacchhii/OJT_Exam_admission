@@ -17,6 +17,13 @@ import type { ExamResult, EssayAnswer, ExamRegistration, ExamSchedule, Exam, Use
 const RESULTS_PER_PAGE = 10;
 const ANALYTICS_PER_PAGE = 8;
 
+function semesterLabel(s: Semester) {
+  const start = s.startDate ? String(s.startDate).slice(0, 10) : null;
+  const end = s.endDate ? String(s.endDate).slice(0, 10) : null;
+  if (start || end) return `${s.name} (${start || 'open'} to ${end || 'open'})`;
+  return s.name;
+}
+
 interface RawData {
   results: ExamResult[];
   regs: ExamRegistration[];
@@ -422,7 +429,7 @@ export default function EmployeeResults() {
                 </select>
                 <select value={semesterFilter} onChange={e => { setSemesterFilter(e.target.value); resetResultsPage(); }} aria-label="Filter by semester" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
                   <option value="all">All Semesters</option>
-                  {semesterOptions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  {semesterOptions.map(s => <option key={s.id} value={s.id}>{semesterLabel(s)}</option>)}
                 </select>
                 <select value={essayStatusFilter} onChange={e => { setEssayStatusFilter(e.target.value); resetResultsPage(); }} aria-label="Filter by essay status" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
                   <option value="all">All Essay Status</option>

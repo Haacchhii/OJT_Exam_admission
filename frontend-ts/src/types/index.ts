@@ -90,8 +90,8 @@ export interface Admission {
   updatedAt: string;
   documents: string[];
   documentFiles: { id: number; name: string; filePath: string | null; hasExtraction?: boolean; reviewStatus?: string; reviewNote?: string | null; reviewedAt?: string | null }[];
-  academicYear: { id: number; year: string } | null;
-  semester: { id: number; name: string } | null;
+  academicYear: { id: number; year: string; startDate?: string | null; endDate?: string | null } | null;
+  semester: { id: number; name: string; startDate?: string | null; endDate?: string | null } | null;
 }
 
 export interface AdmissionStats {
@@ -136,8 +136,8 @@ export interface Exam {
   questions: ExamQuestion[];
   questionCount?: number;
   scheduleCount?: number;
-  academicYear?: { id: number; year: string } | null;
-  semester?: { id: number; name: string } | null;
+  academicYear?: { id: number; year: string; startDate?: string | null; endDate?: string | null } | null;
+  semester?: { id: number; name: string; startDate?: string | null; endDate?: string | null } | null;
   _count?: { questions: number };
 }
 
@@ -231,6 +231,7 @@ export interface AcademicYear {
   isActive: boolean;
   startDate: string | null;
   endDate: string | null;
+  semesters?: Semester[];
 }
 
 export interface Semester {

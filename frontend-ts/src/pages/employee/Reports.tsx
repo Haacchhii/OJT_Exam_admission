@@ -37,6 +37,13 @@ function getRegUserId(reg: ExamRegistration): number | null {
   return typeof maybe === 'number' ? maybe : null;
 }
 
+function semesterLabel(s: Semester) {
+  const start = s.startDate ? String(s.startDate).slice(0, 10) : null;
+  const end = s.endDate ? String(s.endDate).slice(0, 10) : null;
+  if (start || end) return `${s.name} (${start || 'open'} to ${end || 'open'})`;
+  return s.name;
+}
+
 interface ReportData {
   admissions: Admission[];
   results: ExamResult[];
@@ -147,7 +154,9 @@ export default function EmployeeReports() {
       a.lastName,
       a.email,
       a.gradeLevel,
-      a.academicYear?.year && a.semester?.name ? `${a.academicYear.year} - ${a.semester.name}` : a.academicYear?.year || a.semester?.name || '',
+      a.academicYear?.year && a.semester?.name
+        ? `${a.academicYear.year} - ${a.semester.name}${a.semester?.startDate || a.semester?.endDate ? ` (${a.semester?.startDate || 'Open'} to ${a.semester?.endDate || 'Open'})` : ''}`
+        : a.academicYear?.year || a.semester?.name || '',
       a.status,
       a.submittedAt,
     ]);
@@ -367,7 +376,7 @@ export default function EmployeeReports() {
             <label className="block text-xs font-semibold text-gray-500 mb-1">Semester</label>
             <select value={semesterFilter} onChange={e => setSemesterFilter(e.target.value)} aria-label="Filter by semester" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
               <option value="all">All Semesters</option>
-              {semesterOptions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              {semesterOptions.map(s => <option key={s.id} value={s.id}>{semesterLabel(s)}</option>)}
             </select>
           </div>
 

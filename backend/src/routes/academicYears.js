@@ -9,7 +9,7 @@ router.use(authenticate);
 
 // Read — all authenticated employees can read
 router.get('/',           authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), ctrl.getAcademicYears);
-router.get('/active',     authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), ctrl.getActiveAcademicYear);
+router.get('/active',     authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER, ROLES.APPLICANT), ctrl.getActiveAcademicYear);
 router.get('/semesters',  authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), ctrl.getSemesters);
 
 // Write — administrator only

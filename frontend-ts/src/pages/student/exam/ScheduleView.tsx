@@ -2,6 +2,7 @@
 import { Link } from 'react-router-dom';
 import { useAsync } from '../../../hooks/useAsync';
 import { getExams, getExamSchedules, registerForExam, getAvailableSchedules, notifyNoExamSchedule, cancelExamRegistration } from '../../../api/exams';
+import { getActivePeriod } from '../../../api/academicYears';
 import { showToast } from '../../../components/Toast';
 import { useConfirm } from '../../../components/ConfirmDialog';
 import { PageHeader } from '../../../components/UI';
@@ -23,6 +24,22 @@ interface ScheduleViewProps {
   user: User | null;
 }
 
+function toIsoDay(v: unknown): string | null {
+  if (!v) return null;
+  const d = new Date(String(v));
+  if (Number.isNaN(d.getTime())) return null;
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function isWithinPeriod(today: string, start: string | null, end: string | null) {
+  if (start && today < start) return false;
+  if (end && today > end) return false;
+  return true;
+}
+
 export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, user }: ScheduleViewProps) {
   const confirm = useConfirm();
   const [bookingSlotId, setBookingSlotId] = useState<number | null>(null);
@@ -35,6 +52,13 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, user
     const [rawSched, rawExm, rawAvail] = await Promise.all([getExamSchedules(), getExams(), getAvailableSchedules()]);
     return { schedules: asArray<ExamSchedule>(rawSched), exams: asArray<Exam>(rawExm), availableSchedules: asArray<ExamSchedule>(rawAvail) };
   });
+  const { data: activePeriod } = useAsync(() => getActivePeriod());
+
+  const activeSemester = activePeriod?.semesters?.find(s => s.isActive) || null;
+  const todayIso = toIsoDay(new Date()) || '';
+  const semStart = toIsoDay(activeSemester?.startDate || null);
+  const semEnd = toIsoDay(activeSemester?.endDate || null);
+  const isExamPeriodOpen = !!activeSemester && isWithinPeriod(todayIso, semStart, semEnd);
 
   const schedules = schedData?.schedules || [];
   const exams = schedData?.exams || [];
@@ -133,6 +157,12 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, user
   return (
     <div>
       <PageHeader title="Entrance Examination" subtitle="Select an available exam slot and confirm your booking." />
+      {activePeriod && (
+        <div className={`mb-4 rounded-lg border px-4 py-3 text-sm ${isExamPeriodOpen ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+          <p className="font-semibold">Exam Period: {activePeriod.year} \u2014 {activeSemester?.name || 'N/A'}</p>
+          <p className="text-xs mt-1">Window: {semStart || 'Open'} to {semEnd || 'Open'}</p>
+        </div>
+      )}
       <div className="gk-section-card p-4 mb-6">
         <div className="flex items-center gap-3 text-forest-600">
           <Icon name="clipboard" className="w-6 h-6 text-forest-500" />
@@ -197,7 +227,9 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, user
         ) : (
           <div className="rounded-xl border border-gray-200 bg-gray-50 p-5">
             <p className="text-gray-500 text-sm text-center mb-3">
-              No available exam slots for your grade level at this time.
+              {activePeriod && !isExamPeriodOpen
+                ? 'The exam period is currently closed. Booking is disabled outside the active period window.'
+                : 'No available exam slots for your grade level at this time.'}
             </p>
             <div className="max-w-xl mx-auto">
               <label className="block text-xs font-semibold text-gray-700 mb-1.5">Optional note to staff</label>

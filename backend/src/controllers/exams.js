@@ -17,8 +17,8 @@ export { getRegistrations, getMyRegistrations, createRegistration, startExam, sa
 // Helper: include questions + choices + creator (for detail views)
 const examDetailInclude = {
   createdBy: { select: { firstName: true, middleName: true, lastName: true } },
-  academicYear: { select: { id: true, year: true } },
-  semester: { select: { id: true, name: true } },
+  academicYear: { select: { id: true, year: true, startDate: true, endDate: true } },
+  semester: { select: { id: true, name: true, startDate: true, endDate: true } },
   questions: {
     orderBy: { orderNum: 'asc' },
     include: { choices: { orderBy: { orderNum: 'asc' } } },
@@ -28,8 +28,8 @@ const examDetailInclude = {
 // Lightweight include for list views (no nested questions/choices)
 const examListInclude = {
   createdBy: { select: { firstName: true, middleName: true, lastName: true } },
-  academicYear: { select: { id: true, year: true } },
-  semester: { select: { id: true, name: true } },
+  academicYear: { select: { id: true, year: true, startDate: true, endDate: true } },
+  semester: { select: { id: true, name: true, startDate: true, endDate: true } },
   _count: { select: { questions: true, schedules: true } },
 };
 

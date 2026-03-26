@@ -52,6 +52,12 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
   if (!adm) return <p className="text-gray-500 p-4">Application not found.</p>;
 
   const currentStatus = statusVal || adm.status;
+  const periodLabel = adm.academicYear?.year && adm.semester?.name
+    ? `${adm.academicYear.year} - ${adm.semester.name}`
+    : adm.academicYear?.year || adm.semester?.name || 'N/A';
+  const periodWindow = adm.semester?.startDate || adm.semester?.endDate
+    ? `${adm.semester?.startDate || 'Open'} to ${adm.semester?.endDate || 'Open'}`
+    : null;
 
   const suggestedAction =
     currentStatus === 'Submitted'
@@ -183,7 +189,7 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
           <D label="Applicant Type" value={adm.applicantType || 'New'} />
           <D label="Student Number" value={adm.studentNumber || (adm.applicantType === 'New' || adm.applicantType === 'Transferee' ? 'Will be assigned on acceptance' : 'N/A')} />
           <D label="LRN" value={adm.lrn || 'N/A'} />
-          <D label="Application Period" value={adm.academicYear?.year && adm.semester?.name ? `${adm.academicYear.year} - ${adm.semester.name}` : adm.academicYear?.year || adm.semester?.name || 'N/A'} />
+          <D label="Application Period" value={periodWindow ? `${periodLabel} (${periodWindow})` : periodLabel} />
           <D label="Last School Attended" value={adm.prevSchool || 'N/A'} />
           <div className="md:col-span-2"><D label="School Address" value={adm.schoolAddress || 'N/A'} /></div>
           <D label="Father's Name & Occupation" value={adm.fatherNameOccupation || 'N/A'} />

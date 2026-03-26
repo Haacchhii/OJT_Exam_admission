@@ -1,4 +1,6 @@
 ﻿import { Link } from 'react-router-dom';
+import { useAsync } from '../../hooks/useAsync';
+import { getActivePeriod } from '../../api/academicYears';
 import { showToast } from '../../components/Toast';
 import { useAdmissionWizard } from './admission/useAdmissionWizard';
 import ExistingApplication from './admission/ExistingApplication';
@@ -14,11 +16,54 @@ import Icon from '../../components/Icons';
 
 const STEPS = ['Personal Info', 'School Info', 'Family Details', 'Documents', 'Review & Submit'];
 
+function toIsoDay(v: unknown): string | null {
+  if (!v) return null;
+  const d = new Date(String(v));
+  if (Number.isNaN(d.getTime())) return null;
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function isWithinPeriod(today: string, start: string | null, end: string | null) {
+  if (start && today < start) return false;
+  if (end && today > end) return false;
+  return true;
+}
+
 export default function StudentAdmission() {
   const w = useAdmissionWizard();
+  const { data: activePeriod } = useAsync(() => getActivePeriod());
+
+  const activeSemester = activePeriod?.semesters?.find(s => s.isActive) || null;
+  const todayIso = toIsoDay(new Date()) || '';
+  const semStart = toIsoDay(activeSemester?.startDate || null);
+  const semEnd = toIsoDay(activeSemester?.endDate || null);
+  const isApplicationPeriodOpen = !!activeSemester && isWithinPeriod(todayIso, semStart, semEnd);
 
   if (w.gateLoading && !w.gateData) return <SkeletonPage />;
   if (w.gateError) return <ErrorAlert error={w.gateError} onRetry={w.refetch} />;
+
+  if (!w.existingApp && activePeriod && !isApplicationPeriodOpen) {
+    return (
+      <div>
+        <PageHeader title="Admission Application" subtitle={`${SCHOOL_NAME} \u2014 Admission Form`} />
+        <div className="gk-section-card p-8 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4"><Icon name="clock" className="w-8 h-8 text-red-500" /></div>
+          <h3 className="text-xl font-bold text-red-600 mb-2">Application Period Is Currently Closed</h3>
+          <p className="text-gray-500 mb-2">Admissions are only accepted during the active school period.</p>
+          <p className="text-gray-400 text-sm mb-2">
+            Active period: <strong>{activePeriod.year}</strong> \u2014 <strong>{activeSemester?.name || 'N/A'}</strong>
+          </p>
+          <p className="text-gray-400 text-sm mb-6">
+            Window: <strong>{semStart || 'Open'}</strong> to <strong>{semEnd || 'Open'}</strong>
+          </p>
+          <Link to="/student/dashboard" className="inline-block bg-forest-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-forest-600">Back to Dashboard</Link>
+        </div>
+      </div>
+    );
+  }
 
   /* Exam gate */
   if (!w.existingApp && !w.examCompleted) {
@@ -45,6 +90,13 @@ export default function StudentAdmission() {
   return (
     <div>
       <PageHeader title="Admission Application" subtitle={`${SCHOOL_NAME} \u2014 Admission Form`} />
+
+      {activePeriod && (
+        <div className={`mb-4 rounded-lg border px-4 py-3 text-sm ${isApplicationPeriodOpen ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+          <p className="font-semibold">Application Period: {activePeriod.year} \u2014 {activeSemester?.name || 'N/A'}</p>
+          <p className="text-xs mt-1">Window: {semStart || 'Open'} to {semEnd || 'Open'}</p>
+        </div>
+      )}
 
       <div className="bg-forest-50 border border-forest-200 rounded-xl p-4 mb-6">
         <h4 className="font-semibold text-forest-700 text-sm mb-2 flex items-center gap-1.5"><Icon name="clipboard" className="w-4 h-4" /> Admission Policy & Procedure</h4>

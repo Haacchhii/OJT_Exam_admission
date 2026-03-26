@@ -33,8 +33,8 @@ function shapeAdmission(adm) {
     ...rest,
     documents: docs ? docs.map(d => d.documentName) : [],
     documentFiles: docs ? docs.map(d => ({ id: d.id, name: d.documentName, filePath: d.filePath, hasExtraction: !!(d.extractedText && d.extractedData), reviewStatus: d.reviewStatus, reviewNote: d.reviewNote || null, reviewedAt: d.reviewedAt })) : [],
-    academicYear: academicYear ? { id: academicYear.id, year: academicYear.year } : null,
-    semester: semester ? { id: semester.id, name: semester.name } : null,
+    academicYear: academicYear ? { id: academicYear.id, year: academicYear.year, startDate: academicYear.startDate || null, endDate: academicYear.endDate || null } : null,
+    semester: semester ? { id: semester.id, name: semester.name, startDate: semester.startDate || null, endDate: semester.endDate || null } : null,
   };
 }
 
@@ -89,7 +89,7 @@ export async function getAdmission(req, res, next) {
   try {
     const admission = await prisma.admission.findUnique({
       where: { id: Number(req.params.id) },
-      include: { documents: true },
+      include: { documents: true, academicYear: true, semester: true },
     });
     if (!admission || admission.deletedAt) return res.status(404).json({ error: 'Admission not found', code: 'NOT_FOUND' });
     // Ownership: applicants can only view their own admission
@@ -251,7 +251,7 @@ export async function updateStatus(req, res, next) {
     const { status, notes } = req.body;
     const id = Number(req.params.id);
 
-    const admission = await prisma.admission.findUnique({ where: { id }, include: { documents: true } });
+    const admission = await prisma.admission.findUnique({ where: { id }, include: { documents: true, academicYear: true, semester: true } });
     if (!admission || admission.deletedAt) return res.status(404).json({ error: 'Admission not found', code: 'NOT_FOUND' });
 
     // Validate transition
@@ -266,7 +266,7 @@ export async function updateStatus(req, res, next) {
     const updated = await prisma.admission.update({
       where: { id },
       data: { status, notes: notes !== undefined ? notes : admission.notes },
-      include: { documents: true },
+      include: { documents: true, academicYear: true, semester: true },
     });
 
     // When accepted, auto-assign a student number if the student doesn't have one yet
@@ -366,7 +366,7 @@ export async function trackApplication(req, res, next) {
     if (upper.includes('ADM')) {
       const admission = await prisma.admission.findUnique({
         where: { trackingId: upper },
-        include: { documents: true },
+        include: { documents: true, academicYear: true, semester: true },
       });
       if (admission && !admission.deletedAt) {
         // Ownership: applicants can only view their own tracking data
@@ -403,7 +403,7 @@ export async function trackApplication(req, res, next) {
     if (!results.type) {
       const admission = await prisma.admission.findUnique({
         where: { trackingId: upper },
-        include: { documents: true },
+        include: { documents: true, academicYear: true, semester: true },
       }).catch(() => null);
       if (admission) {
         results.type = 'admission';

@@ -82,6 +82,12 @@ export default function ApplicationTracker() {
 
 function AdmissionResult({ data, trackingId }: { data: Record<string, any>; trackingId: string }) {
   const statusOrder: Record<string, number> = { 'Submitted': 0, 'Under Screening': 1, 'Under Evaluation': 2, 'Accepted': 3, 'Rejected': -1 };
+  const periodLabel = data.academicYear?.year && data.semester?.name
+    ? `${data.academicYear.year} - ${data.semester.name}`
+    : data.academicYear?.year || data.semester?.name || 'N/A';
+  const periodWindow = data.semester?.startDate || data.semester?.endDate
+    ? `${data.semester?.startDate || 'Open'} to ${data.semester?.endDate || 'Open'}`
+    : null;
 
   return (
     <div className="gk-section-card p-6">
@@ -100,6 +106,7 @@ function AdmissionResult({ data, trackingId }: { data: Record<string, any>; trac
         <Field label="School Year" value={data.schoolYear} />
         <Field label="Gender" value={data.gender} />
         <Field label="Date of Birth" value={data.dob} />
+        <Field label="Application Period" value={periodWindow ? `${periodLabel} (${periodWindow})` : periodLabel} />
         <Field label="Applicant Type" value={data.applicantType} />
         <Field label="Guardian" value={`${data.guardian} (${data.guardianRelation})`} />
         <Field label="Submitted" value={formatDate(data.submittedAt)} />

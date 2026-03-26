@@ -224,6 +224,13 @@ function AdmissionStatusResult({ data, trackingId }: { data: Record<string, any>
 
   const current = statusOrder[data.status] ?? -1;
 
+  const periodLabel = data.academicYear?.year && data.semester?.name
+    ? `${data.academicYear.year} - ${data.semester.name}`
+    : data.academicYear?.year || data.semester?.name || 'N/A';
+  const periodWindow = data.semester?.startDate || data.semester?.endDate
+    ? `${data.semester?.startDate || 'Open'} to ${data.semester?.endDate || 'Open'}`
+    : null;
+
   return (
     <div className="gk-section-card p-6 mb-6">
       <div className="flex items-center justify-between mb-4 gap-3">
@@ -238,7 +245,7 @@ function AdmissionStatusResult({ data, trackingId }: { data: Record<string, any>
         <Field label="Applicant" value={formatPersonName(data) || 'N/A'} />
         <Field label="Grade Level" value={data.gradeLevel || 'N/A'} />
         <Field label="School Year" value={data.schoolYear || 'N/A'} />
-        <Field label="Application Period" value={data.academicYear?.year && data.semester?.name ? `${data.academicYear.year} - ${data.semester.name}` : data.academicYear?.year || data.semester?.name || 'N/A'} />
+        <Field label="Application Period" value={periodWindow ? `${periodLabel} (${periodWindow})` : periodLabel} />
         <Field label="Submitted" value={data.submittedAt ? formatDate(data.submittedAt) : 'N/A'} />
       </div>
 
