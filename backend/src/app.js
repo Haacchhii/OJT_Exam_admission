@@ -143,6 +143,15 @@ app.use('/api/admissions/bulk-status', bulkOpLimiter);
 app.use('/api/admissions/:id/documents', uploadLimiter);
 app.use('/api/exams/registrations', examSubmitLimiter);
 
+// Root route for platform checks and direct browser visits.
+app.get('/', (_req, res) => {
+  res.json({
+    status: 'ok',
+    service: 'Golden Key API',
+    health: '/api/health',
+  });
+});
+
 // ─── API routes ───────────────────────────────────────
 app.use('/api/auth', authLimiter, noStore, authRoutes);
 app.use('/api/admissions',    cachePrivate, admissionsRoutes);
