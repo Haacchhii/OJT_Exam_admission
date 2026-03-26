@@ -42,6 +42,7 @@ export default function StepFamilyDetails({ form, set, goTo, errors = {} }: Prop
           required
           placeholder="e.g. Maria Dela Cruz, Teacher"
           maxLength={200}
+          className="md:col-span-2"
           error={errors.motherNameOccupation}
         />
         <div className="md:col-span-2">
