@@ -85,25 +85,31 @@ interface OptionalDocRequirement {
   escCert?: boolean;
 }
 
+const REQ_NURSERY_KINDER: DocRequirement = { idPhoto: true, baptismal: true, birthCert: true };
+const REQ_GRADE_1: DocRequirement = { idPhoto: true, baptismal: true, birthCert: true, eccdChecklist: true };
+const REQ_GRADE_2_TO_6: DocRequirement = { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true };
+const REQ_GRADE_7: DocRequirement = { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true, incomeTax: true };
+const REQ_GRADE_8_TO_12: DocRequirement = { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true };
+
 export const DOC_REQUIREMENTS: Record<string, DocRequirement> = {
-  'Nursery':    { idPhoto: true, baptismal: true, birthCert: true },
-  'Kinder':     { idPhoto: true, baptismal: true, birthCert: true },
-  'Grade 1':    { idPhoto: true, baptismal: true, birthCert: true, eccdChecklist: true },
-  'Grade 2':    { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true },
-  'Grade 3':    { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true },
-  'Grade 4':    { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true },
-  'Grade 5':    { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true },
-  'Grade 6':    { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true },
-  'Grade 7':    { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true, incomeTax: true },
-  'Grade 8':    { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true },
-  'Grade 9':    { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true },
-  'Grade 10':   { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true },
-  'Grade 11 — ABM':  { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true },
-  'Grade 11 — STEM': { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true },
-  'Grade 11 — HUMSS':{ idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true },
-  'Grade 12 — ABM':  { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true },
-  'Grade 12 — STEM': { idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true },
-  'Grade 12 — HUMSS':{ idPhoto: true, baptismal: true, birthCert: true, reportCard: true, goodMoral: true },
+  'Nursery': REQ_NURSERY_KINDER,
+  'Kinder': REQ_NURSERY_KINDER,
+  'Grade 1': REQ_GRADE_1,
+  'Grade 2': REQ_GRADE_2_TO_6,
+  'Grade 3': REQ_GRADE_2_TO_6,
+  'Grade 4': REQ_GRADE_2_TO_6,
+  'Grade 5': REQ_GRADE_2_TO_6,
+  'Grade 6': REQ_GRADE_2_TO_6,
+  'Grade 7': REQ_GRADE_7,
+  'Grade 8': REQ_GRADE_8_TO_12,
+  'Grade 9': REQ_GRADE_8_TO_12,
+  'Grade 10': REQ_GRADE_8_TO_12,
+  'Grade 11 — ABM': REQ_GRADE_8_TO_12,
+  'Grade 11 — STEM': REQ_GRADE_8_TO_12,
+  'Grade 11 — HUMSS': REQ_GRADE_8_TO_12,
+  'Grade 12 — ABM': REQ_GRADE_8_TO_12,
+  'Grade 12 — STEM': REQ_GRADE_8_TO_12,
+  'Grade 12 — HUMSS': REQ_GRADE_8_TO_12,
 };
 
 export const DOC_OPTIONAL_REQUIREMENTS: Record<string, OptionalDocRequirement> = {
@@ -119,13 +125,13 @@ export const DOC_OPTIONAL_REQUIREMENTS: Record<string, OptionalDocRequirement> =
 };
 
 export const DOC_SLOT_LABELS: Record<string, string> = {
-  birthCert: 'PSA Birth Certificate (original & photocopy)',
+  birthCert: 'PSA Birth Certificate',
   idPhoto: '2x2 ID Photos (2 copies)',
-  reportCard: 'Report Card / Form 138',
-  goodMoral: 'Certificate of Good Moral Character',
+  reportCard: 'Card (Report Card / Form 138)',
+  goodMoral: 'Good Moral Certificate',
   baptismal: 'Baptismal Certificate',
   eccdChecklist: 'ECCD Checklist',
-  incomeTax: 'Latest Income Tax Return / Certificate of Tax Exemption / Municipal Cert. of Unemployment',
+  incomeTax: 'Latest Income Tax Return for previous year or Tax Exemption/Municipal Unemployment Certificate',
   escCert: 'ESC Certificate (if applicable)',
 };
 
