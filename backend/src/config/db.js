@@ -4,8 +4,14 @@ const logLevel = process.env.NODE_ENV === 'production'
   ? ['error', 'warn']
   : ['query', 'error', 'warn'];
 
-const poolSize = parseInt(process.env.DATABASE_POOL_SIZE, 10) || 20;
-const poolTimeout = parseInt(process.env.DATABASE_POOL_TIMEOUT, 10) || 10;
+const isServerless = Boolean(process.env.VERCEL);
+const defaultPoolSize = isServerless ? 1 : 20;
+const defaultPoolTimeout = isServerless ? 5 : 10;
+
+const parsedPoolSize = Number.parseInt(process.env.DATABASE_POOL_SIZE ?? '', 10);
+const parsedPoolTimeout = Number.parseInt(process.env.DATABASE_POOL_TIMEOUT ?? '', 10);
+const poolSize = Number.isNaN(parsedPoolSize) ? defaultPoolSize : parsedPoolSize;
+const poolTimeout = Number.isNaN(parsedPoolTimeout) ? defaultPoolTimeout : parsedPoolTimeout;
 
 const prisma = new PrismaClient({
   log: logLevel,

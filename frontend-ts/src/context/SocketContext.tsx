@@ -18,8 +18,23 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const [isConnected, setIsConnected] = useState(false);
   const { user } = useAuth();
 
+  const socketEnabled = (() => {
+    const raw = String(import.meta.env.VITE_ENABLE_SOCKET || '').trim().toLowerCase();
+    if (!raw) return import.meta.env.DEV;
+    return raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on';
+  })();
+
   useEffect(() => {
     const token = localStorage.getItem('gk_auth_token');
+
+    if (!socketEnabled) {
+      if (socket) {
+        socket.disconnect();
+        setSocket(null);
+      }
+      setIsConnected(false);
+      return;
+    }
     
     if (!user || !token) {
       if (socket) {
@@ -31,7 +46,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     }
 
     // Connect to server (adjust base URL if needed based on Vite config/env)
-    const backendUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || window.location.origin;
+    const backendUrl = (import.meta.env.VITE_API_URL || '').replace(/\/api\/?$/, '') || window.location.origin;
     
     const newSocket = io(backendUrl, {
       auth: { token },
@@ -58,7 +73,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     return () => {
       newSocket.disconnect();
     };
-  }, [user]);
+  }, [user, socketEnabled]);
 
   return (
     <SocketContext.Provider value={{ socket, isConnected }}>
