@@ -32,6 +32,50 @@ export class ApiError extends Error {
   }
 }
 
+function extractErrorMessage(data) {
+  if (!data) return '';
+  if (typeof data === 'string') return data;
+  if (typeof data !== 'object') return '';
+
+  if (typeof data.message === 'string' && data.message.trim()) return data.message;
+  if (typeof data.error === 'string' && data.error.trim()) return data.error;
+
+  if (Array.isArray(data.errors)) {
+    const fields = data.errors
+      .map((e) => {
+        if (!e) return '';
+        if (typeof e === 'string') return e;
+        if (typeof e.message === 'string' && e.message.trim()) {
+          if (typeof e.path === 'string' && e.path.trim()) return `${e.path}: ${e.message}`;
+          return e.message;
+        }
+        return '';
+      })
+      .filter(Boolean)
+      .join('; ');
+    if (fields) return fields;
+  }
+
+  return '';
+}
+
+async function parseResponseBody(res) {
+  const contentType = res.headers.get('content-type') || '';
+  if (contentType.includes('json')) {
+    try {
+      return await res.json();
+    } catch {
+      return null;
+    }
+  }
+
+  try {
+    return await res.text();
+  } catch {
+    return null;
+  }
+}
+
 // ---- Query string builder ----
 /**
  * Build a query string from an object, omitting null/undefined/empty values.
@@ -49,7 +93,8 @@ export function qs(params = {}) {
 async function request(method, path, body, { isFormData = false, signal } = {}) {
   const headers = {};
   if (!isFormData) headers['Content-Type'] = 'application/json';
-  if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+  const usingAuthToken = !!authToken;
+  if (usingAuthToken) headers['Authorization'] = `Bearer ${authToken}`;
 
   let res;
   try {
@@ -66,33 +111,37 @@ async function request(method, path, body, { isFormData = false, signal } = {}) 
     throw new ApiError('Network error. Please check your connection and try again.', 0);
   }
 
-  // 401 — session expired → auto-logout
+  const data = await parseResponseBody(res);
+  const serverMessage = extractErrorMessage(data);
+
+  // 401 — only auto-logout when a token-authenticated request fails
   if (res.status === 401) {
-    setToken(null);
-    if (onAuthError) onAuthError();
-    throw new ApiError('Session expired. Please log in again.', 401);
+    if (usingAuthToken) {
+      setToken(null);
+      if (onAuthError) onAuthError();
+    }
+    throw new ApiError(
+      serverMessage || (usingAuthToken
+        ? 'Your session has expired. Please log in again.'
+        : 'Unauthorized request.'),
+      401,
+      data
+    );
   }
 
   // 403 — forbidden
   if (res.status === 403) {
-    throw new ApiError('You do not have permission to perform this action.', 403);
+    throw new ApiError(serverMessage || 'You do not have permission to perform this action.', 403, data);
   }
 
   // 404 — not found
   if (res.status === 404) {
-    throw new ApiError('The requested resource was not found.', 404);
+    throw new ApiError(serverMessage || 'The requested resource was not found.', 404, data);
   }
-
-  // Parse response body
-  const contentType = res.headers.get('content-type') || '';
-  const data = contentType.includes('json') ? await res.json() : await res.text();
 
   // Any other non-2xx error
   if (!res.ok) {
-    const message =
-      typeof data === 'object' && data?.message ? data.message
-      : typeof data === 'object' && data?.error ? data.error
-      : `Request failed (${res.status})`;
+    const message = serverMessage || `Request failed (${res.status})`;
     throw new ApiError(message, res.status, data);
   }
 

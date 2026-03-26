@@ -50,7 +50,7 @@ export default function DocumentReview({ admissionId, documents, onReviewUpdate 
   const loadPreviewBlob = useCallback(async (doc: DocumentFile) => {
     const previewUrl = getDocumentPreviewUrl(admissionId, doc.id);
     if (!token) {
-      setPreviewLoadError('Session expired. Please log in again.');
+      setPreviewLoadError('You are not logged in. Please log in and try again.');
       return;
     }
     setPreviewLoading(true);
@@ -58,7 +58,20 @@ export default function DocumentReview({ admissionId, documents, onReviewUpdate 
     try {
       const res = await fetch(previewUrl, { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) {
-        throw new Error('Failed to load document preview');
+        let msg = 'Failed to load document preview';
+        try {
+          const contentType = res.headers.get('content-type') || '';
+          const payload = contentType.includes('json') ? await res.json() : await res.text();
+          if (typeof payload === 'string' && payload.trim()) msg = payload;
+          else if (payload && typeof payload === 'object') {
+            const p = payload as { message?: string; error?: string };
+            if (typeof p.message === 'string' && p.message.trim()) msg = p.message;
+            else if (typeof p.error === 'string' && p.error.trim()) msg = p.error;
+          }
+        } catch {
+          // Keep default message if payload parsing fails.
+        }
+        throw new Error(msg);
       }
       const blob = await res.blob();
       setPreviewBlobUrl((prev) => {

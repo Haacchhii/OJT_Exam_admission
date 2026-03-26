@@ -34,6 +34,55 @@ export class ApiError extends Error {
   }
 }
 
+function extractErrorMessage(data: unknown): string {
+  if (data == null) return '';
+  if (typeof data === 'string') return data;
+  if (typeof data !== 'object') return '';
+
+  const obj = data as {
+    message?: unknown;
+    error?: unknown;
+    errors?: Array<{ path?: unknown; message?: unknown } | string>;
+  };
+
+  if (typeof obj.message === 'string' && obj.message.trim()) return obj.message;
+  if (typeof obj.error === 'string' && obj.error.trim()) return obj.error;
+
+  if (Array.isArray(obj.errors)) {
+    const fields = obj.errors
+      .map((entry) => {
+        if (typeof entry === 'string') return entry;
+        if (!entry || typeof entry !== 'object') return '';
+        const message = typeof entry.message === 'string' ? entry.message : '';
+        const path = typeof entry.path === 'string' ? entry.path : '';
+        if (!message.trim()) return '';
+        return path.trim() ? `${path}: ${message}` : message;
+      })
+      .filter(Boolean)
+      .join('; ');
+    if (fields) return fields;
+  }
+
+  return '';
+}
+
+async function parseResponseBody(res: Response): Promise<unknown> {
+  const contentType = res.headers.get('content-type') || '';
+  if (contentType.includes('json')) {
+    try {
+      return await res.json();
+    } catch {
+      return null;
+    }
+  }
+
+  try {
+    return await res.text();
+  } catch {
+    return null;
+  }
+}
+
 // ---- Query string builder ----
 export function qs(params: Record<string, any> = {}): string {
   const entries = Object.entries(params)
@@ -94,7 +143,8 @@ async function request<T = unknown>(
 ): Promise<T> {
   const headers: Record<string, string> = {};
   if (!isFormData) headers['Content-Type'] = 'application/json';
-  if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+  const usingAuthToken = !!authToken;
+  if (usingAuthToken) headers['Authorization'] = `Bearer ${authToken}`;
 
   let res: Response;
   try {
@@ -111,42 +161,35 @@ async function request<T = unknown>(
     throw new ApiError('Network error. Please check your connection and try again.', 0);
   }
 
-  const contentType = res.headers.get('content-type') || '';
-  const data = contentType.includes('json') ? await res.json() : await res.text();
+  const data = await parseResponseBody(res);
+  const serverMessage = extractErrorMessage(data);
 
   if (res.status === 401) {
-    setToken(null);
-    if (onAuthError) onAuthError();
-    throw new ApiError('Session expired. Please log in again.', 401);
+    if (usingAuthToken) {
+      setToken(null);
+      if (onAuthError) onAuthError();
+    }
+    throw new ApiError(
+      serverMessage || (usingAuthToken
+        ? 'Your session has expired. Please log in again.'
+        : 'Unauthorized request.'),
+      401,
+      data
+    );
   }
 
   if (res.status === 403) {
-    const message = typeof data === 'object' && data !== null && 'error' in data
-      ? String((data as { error?: string }).error || 'You do not have permission to perform this action.')
-      : 'You do not have permission to perform this action.';
+    const message = serverMessage || 'You do not have permission to perform this action.';
     throw new ApiError(message, 403, data);
   }
 
   if (res.status === 404) {
-    const message = typeof data === 'object' && data !== null && 'error' in data
-      ? String((data as { error?: string }).error || 'The requested resource was not found.')
-      : 'The requested resource was not found.';
+    const message = serverMessage || 'The requested resource was not found.';
     throw new ApiError(message, 404, data);
   }
 
   if (!res.ok) {
-    let message = `Request failed (${res.status})`;
-    if (typeof data === 'object' && data !== null) {
-      if ('message' in data) message = (data as { message: string }).message;
-      else if ('error' in data) message = (data as { error: string }).error;
-      // Surface field-level validation errors from Zod
-      if ('errors' in data && Array.isArray((data as any).errors)) {
-        const fields = (data as { errors: { path?: string; message: string }[] }).errors
-          .map(e => e.path ? `${e.path}: ${e.message}` : e.message)
-          .join('; ');
-        if (fields) message = fields;
-      }
-    }
+    const message = serverMessage || `Request failed (${res.status})`;
     throw new ApiError(message, res.status, data);
   }
 
