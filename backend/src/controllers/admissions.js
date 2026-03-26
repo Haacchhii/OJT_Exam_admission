@@ -253,6 +253,17 @@ export async function uploadDocuments(req, res, next) {
       )
     );
 
+    await prisma.admissionDocumentSubmission.createMany({
+      data: docs.map((d, i) => ({
+        admissionId,
+        admissionDocumentId: d.id,
+        originalFileName: files[i].originalname,
+        storedFilePath: files[i].filename,
+        mimeType: files[i].mimetype || null,
+        fileSize: Number.isFinite(files[i].size) ? files[i].size : null,
+      })),
+    });
+
     // Return public URLs
     const baseUrl = `${req.protocol}://${req.get('host')}/uploads`;
     const urls = docs.map(d => `${baseUrl}/${d.filePath}`);

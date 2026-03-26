@@ -33,6 +33,7 @@ model User {
   reviewedResults ExamResult[]       @relation("ResultReviewer")
   scoredEssays    EssayAnswer[]      @relation("EssayScorer")
   reviewedDocs    AdmissionDocument[] @relation("DocumentReviewer")
+  reviewedDocSubmissions AdmissionDocumentSubmission[] @relation("DocumentSubmissionReviewer")
   auditLogs       AuditLog[]
   examRegistrations ExamRegistration[] @relation("ExamRegistrationUser")
 
@@ -76,6 +77,7 @@ model Admission {
 
   user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   documents     AdmissionDocument[]
+  documentSubmissions AdmissionDocumentSubmission[]
   academicYear  AcademicYear?       @relation(fields: [academicYearId], references: [id])
   semester      Semester?           @relation(fields: [semesterId], references: [id])
   @@index([userId])
@@ -104,9 +106,37 @@ model AdmissionDocument {
 
   admission  Admission @relation(fields: [admissionId], references: [id], onDelete: Cascade)
   reviewedBy User?     @relation("DocumentReviewer", fields: [reviewedById], references: [id])
+  submissions AdmissionDocumentSubmission[]
 
   @@index([admissionId])
   @@map("admission_documents")
+}
+
+model AdmissionDocumentSubmission {
+  id                 Int      @id @default(autoincrement())
+  admissionId        Int      @map("admission_id")
+  admissionDocumentId Int?    @map("admission_document_id")
+  originalFileName   String   @map("original_file_name")
+  storedFilePath     String   @map("stored_file_path")
+  mimeType           String?  @map("mime_type")
+  fileSize           Int?     @map("file_size")
+  uploadedAt         DateTime @default(now()) @map("uploaded_at")
+  extractedText      String?  @map("extracted_text")
+  extractedData      String?  @map("extracted_data")
+  extractedAt        DateTime? @map("extracted_at")
+  reviewStatus       String   @default("pending") @map("review_status")
+  reviewedAt         DateTime? @map("reviewed_at")
+  reviewedById       Int?     @map("reviewed_by_id")
+  reviewNote         String?  @map("review_note")
+
+  admission         Admission         @relation(fields: [admissionId], references: [id], onDelete: Cascade)
+  admissionDocument AdmissionDocument? @relation(fields: [admissionDocumentId], references: [id], onDelete: SetNull)
+  reviewedBy        User?             @relation("DocumentSubmissionReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([admissionId])
+  @@index([admissionDocumentId])
+  @@index([uploadedAt])
+  @@map("admission_document_submissions")
 }
 
 // ─── Exams ────────────────────────────────────────────
