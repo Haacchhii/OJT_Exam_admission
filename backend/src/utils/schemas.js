@@ -143,6 +143,7 @@ export const updateUserSchema = z.object({
   middleName: z.string().min(1).max(100).optional(),
   lastName: z.string().min(1).max(100).optional(),
   email: z.string().email().optional(),
+  password: passwordSchema.optional(),
   role: z.enum(ROLE_VALUES).optional(),
   status: z.enum(['Active', 'Inactive']).optional(),
 });

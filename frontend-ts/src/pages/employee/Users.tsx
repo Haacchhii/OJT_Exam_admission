@@ -90,7 +90,13 @@ export default function EmployeeUsers() {
       }
     }
     if (!editId && !form.password.trim()) e.password = 'Required for new users';
-    else if (form.password && form.password.length < 8) e.password = 'Min 8 characters';
+    else if (form.password) {
+      if (form.password.length < 8) e.password = 'Min 8 characters';
+      else if (!/[A-Z]/.test(form.password)) e.password = 'Must contain uppercase letter';
+      else if (!/[a-z]/.test(form.password)) e.password = 'Must contain lowercase letter';
+      else if (!/[0-9]/.test(form.password)) e.password = 'Must contain number';
+      else if (!/[^A-Za-z0-9]/.test(form.password)) e.password = 'Must contain special character';
+    }
     setErrors(e);
     return Object.keys(e).length === 0;
   };
