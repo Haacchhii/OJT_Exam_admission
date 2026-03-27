@@ -1,5 +1,5 @@
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { lazy, Suspense, useEffect, type ReactNode } from 'react';
+import { Suspense, useEffect, type ReactNode } from 'react';
 import { AuthProvider, ROLE_PERMISSIONS, type Permission } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 import { ToastContainer } from './components/Toast';
@@ -10,7 +10,8 @@ import PageErrorBoundary from './components/PageErrorBoundary';
 import ScrollToTop from './components/ScrollToTop';
 import NotFound from './pages/NotFound';
 import { useAuth } from './context/AuthContext';
-import { SkeletonPage, LoadingSpinner } from './components/UI';
+import { LoadingSpinner } from './components/UI';
+import { lazyWithRetry, LazyLoadingFallback } from './components/lazyWithRetry';
 
 /* Auth pages — eager load (first paint for most users) */
 import Login from './pages/auth/Login';
@@ -19,23 +20,23 @@ import ForgotPassword from './pages/auth/ForgotPassword';
 import ResetPassword from './pages/auth/ResetPassword';
 import VerifyEmail from './pages/auth/VerifyEmail';
 
-/* Student pages (lazy) */
-const StudentDashboard = lazy(() => import('./pages/student/Dashboard'));
-const StudentAdmission = lazy(() => import('./pages/student/Admission'));
-const StudentExam = lazy(() => import('./pages/student/Exam'));
-const StudentResults = lazy(() => import('./pages/student/Results'));
-const StudentApplicationTracker = lazy(() => import('./pages/student/ApplicationTracker'));
+/* Student pages (lazy with retry) */
+const StudentDashboard = lazyWithRetry(() => import('./pages/student/Dashboard'));
+const StudentAdmission = lazyWithRetry(() => import('./pages/student/Admission'));
+const StudentExam = lazyWithRetry(() => import('./pages/student/Exam'));
+const StudentResults = lazyWithRetry(() => import('./pages/student/Results'));
+const StudentApplicationTracker = lazyWithRetry(() => import('./pages/student/ApplicationTracker'));
 
-/* Employee pages (lazy) */
-const EmployeeDashboard = lazy(() => import('./pages/employee/Dashboard'));
-const EmployeeAdmissions = lazy(() => import('./pages/employee/Admissions'));
-const EmployeeExams = lazy(() => import('./pages/employee/Exams'));
-const EmployeeResults = lazy(() => import('./pages/employee/Results'));
-const EmployeeReports = lazy(() => import('./pages/employee/Reports'));
-const EmployeeUsers = lazy(() => import('./pages/employee/Users'));
-const EmployeeAuditLog = lazy(() => import('./pages/employee/AuditLog'));
-const EmployeeSettings = lazy(() => import('./pages/employee/Settings'));
-const Profile = lazy(() => import('./pages/shared/Profile'));
+/* Employee pages (lazy with retry) */
+const EmployeeDashboard = lazyWithRetry(() => import('./pages/employee/Dashboard'));
+const EmployeeAdmissions = lazyWithRetry(() => import('./pages/employee/Admissions'));
+const EmployeeExams = lazyWithRetry(() => import('./pages/employee/Exams'));
+const EmployeeResults = lazyWithRetry(() => import('./pages/employee/Results'));
+const EmployeeReports = lazyWithRetry(() => import('./pages/employee/Reports'));
+const EmployeeUsers = lazyWithRetry(() => import('./pages/employee/Users'));
+const EmployeeAuditLog = lazyWithRetry(() => import('./pages/employee/AuditLog'));
+const EmployeeSettings = lazyWithRetry(() => import('./pages/employee/Settings'));
+const Profile = lazyWithRetry(() => import('./pages/shared/Profile'));
 
 /* Route guard: redirects to /employee if user doesn't have permission for the page */
 function RoleGuard({ page, children }: { page: Permission; children: ReactNode }) {
@@ -73,7 +74,7 @@ export default function App() {
         <ConfirmProvider>
       <HashRouter>
         <ScrollToTop />
-        <Suspense fallback={<div className="min-h-[50vh] flex items-center justify-center"><LoadingSpinner /></div>}>
+        <Suspense fallback={<LazyLoadingFallback />}>
         <Routes>
           {/* Public auth routes */}
           <Route path="/login" element={<Login />} />
