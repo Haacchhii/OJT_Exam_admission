@@ -21,7 +21,7 @@ export default function StepDocuments({ form, requiredDocs, optionalDocs, slotFi
     <div className="gk-section-card p-6">
       <h3 className="text-lg font-bold text-forest-500 mb-1">Step 4: Required Documents</h3>
       <p className="text-gray-500 text-sm mb-2">Upload the documents required for <strong>{form.gradeLevel || 'your grade level'}</strong>.</p>
-      <p className="text-xs text-gray-400 mb-6">Accepted formats: PDF, JPG, PNG, DOC, DOCX.</p>
+      <p className="text-xs text-gray-400 mb-6">Accepted formats: PDF, JPG, JPEG, PNG, WEBP.</p>
       <h4 className="font-semibold text-forest-500 mb-3 flex items-center gap-1.5"><Icon name="document" className="w-4 h-4" /> Required Documents</h4>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         {requiredDocs.map(docKey => (
@@ -59,7 +59,7 @@ export default function StepDocuments({ form, requiredDocs, optionalDocs, slotFi
         <p className="text-gray-500 mt-2">Drag & drop files here or <span className="text-forest-500 font-medium">browse</span></p>
         <p className="text-xs text-gray-400 mt-1">Medical records, recommendation letters, other certificates</p>
       </div>
-      <input id="extraFileInput" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx" className="hidden" onChange={e => { handleExtraFiles(e.target.files); e.target.value = ''; }} />
+      <input id="extraFileInput" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden" onChange={e => { handleExtraFiles(e.target.files); e.target.value = ''; }} />
       {extraFiles.length > 0 && (
         <div className="mt-3 space-y-2">
           {extraFiles.map((f, i) => (

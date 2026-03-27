@@ -85,7 +85,7 @@ export function UploadSlot({ label, required, slot, file, onFile, onRemove }: Up
           <p className="text-gray-500 text-sm mt-1">Click or drag file here</p>
         </div>
       )}
-      <input id={`slot-${slot}`} type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" onChange={e => { if (e.target.files?.[0]) onFile(slot, e.target.files[0]); e.target.value = ''; }} />
+      <input id={`slot-${slot}`} type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={e => { if (e.target.files?.[0]) onFile(slot, e.target.files[0]); e.target.value = ''; }} />
     </div>
   );
 }

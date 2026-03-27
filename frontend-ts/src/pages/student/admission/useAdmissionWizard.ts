@@ -208,8 +208,8 @@ export function useAdmissionWizard() {
   };
 
   const validateFile = (file: File): boolean => {
-    if (!ALLOWED_FILE_TYPES.includes(file.type) && !file.name.match(/\.(pdf|jpg|jpeg|png|webp|doc|docx)$/i)) {
-      showToast(`"${file.name}" is not a supported file type. Use PDF, JPG, PNG, or DOC.`, 'error');
+    if (!ALLOWED_FILE_TYPES.includes(file.type) && !file.name.match(/\.(pdf|jpg|jpeg|png|webp)$/i)) {
+      showToast(`"${file.name}" is not a supported file type. Use PDF, JPG, JPEG, PNG, or WEBP.`, 'error');
       return false;
     }
     if (file.size > MAX_FILE_SIZE) {

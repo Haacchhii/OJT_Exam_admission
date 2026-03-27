@@ -140,8 +140,6 @@ export const ALLOWED_FILE_TYPES: string[] = [
   'image/jpeg',
   'image/png',
   'image/webp',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ];
 
 export const MAX_FILE_SIZE = 10 * 1024 * 1024;
