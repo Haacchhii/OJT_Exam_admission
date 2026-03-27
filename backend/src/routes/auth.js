@@ -2,7 +2,7 @@ import { Router } from 'express';
 import * as ctrl from '../controllers/auth.js';
 import { authenticate } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
-import { loginSchema, registerSchema, forgotPasswordSchema, resetPasswordSchema } from '../utils/schemas.js';
+import { loginSchema, registerSchema, forgotPasswordSchema, resetPasswordSchema, updateProfileSchema } from '../utils/schemas.js';
 
 const router = Router();
 
@@ -13,6 +13,6 @@ router.post('/resend-verification', ctrl.resendVerification);
 router.post('/forgot-password',  validate(forgotPasswordSchema), ctrl.forgotPassword);
 router.post('/reset-password',   validate(resetPasswordSchema), ctrl.resetPassword);
 router.get('/me',               authenticate, ctrl.getMe);
-router.patch('/profile',        authenticate, ctrl.updateProfile);
+router.patch('/profile',        authenticate, validate(updateProfileSchema), ctrl.updateProfile);
 
 export default router;

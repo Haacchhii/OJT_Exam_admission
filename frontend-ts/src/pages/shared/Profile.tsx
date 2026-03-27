@@ -6,6 +6,27 @@ import { PageHeader } from '../../components/UI';
 import { client } from '../../api/client';
 import { formatPersonName, personInitials } from '../../utils/helpers';
 
+// Validation patterns (must match backend validation)
+const NAME_REGEX = /^[\p{L}\p{M}\s\-'.]+$/u;
+const PHONE_REGEX = /^[+\d][\d\s()-]{6,}$/;
+const ADDRESS_REGEX = /^[\p{L}\p{M}\p{N}\s\-'.,/()]+$/u;
+const PASSWORD_PATTERNS = {
+  uppercase: /[A-Z]/,
+  lowercase: /[a-z]/,
+  digit: /[0-9]/,
+  special: /[^A-Za-z0-9]/,
+};
+
+interface ValidationErrors {
+  firstName?: string;
+  middleName?: string;
+  lastName?: string;
+  phone?: string;
+  address?: string;
+  newPassword?: string;
+  confirmPassword?: string;
+}
+
 export default function Profile() {
   const { user, refreshUser } = useAuth();
 
@@ -19,27 +40,84 @@ export default function Profile() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [saving, setSaving] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
+  const [errors, setErrors] = useState<ValidationErrors>({});
 
   if (!user) return null;
 
   const isEmployee = user.role !== 'applicant';
   const initials = personInitials(user);
 
-  const handleSaveProfile = async () => {
-    if (!firstName.trim() || !middleName.trim() || !lastName.trim()) {
-      showToast('First name, middle name, and surname are required.', 'error');
-      return;
+  const validateProfile = (): boolean => {
+    const e: ValidationErrors = {};
+
+    if (!firstName.trim()) e.firstName = 'First name is required';
+    else if (firstName.trim().length < 2) e.firstName = 'At least 2 characters';
+    else if (!NAME_REGEX.test(firstName.trim())) e.firstName = 'Use only letters, spaces, hyphens, or apostrophes';
+    else if (firstName.trim().length > 100) e.firstName = 'Maximum 100 characters';
+
+    if (!middleName.trim()) e.middleName = 'Middle name is required';
+    else if (middleName.trim().length < 2) e.middleName = 'At least 2 characters';
+    else if (!NAME_REGEX.test(middleName.trim())) e.middleName = 'Use only letters, spaces, hyphens, or apostrophes';
+    else if (middleName.trim().length > 100) e.middleName = 'Maximum 100 characters';
+
+    if (!lastName.trim()) e.lastName = 'Last name is required';
+    else if (lastName.trim().length < 2) e.lastName = 'At least 2 characters';
+    else if (!NAME_REGEX.test(lastName.trim())) e.lastName = 'Use only letters, spaces, hyphens, or apostrophes';
+    else if (lastName.trim().length > 100) e.lastName = 'Maximum 100 characters';
+
+    if (phone.trim() && !PHONE_REGEX.test(phone.trim())) {
+      e.phone = 'Invalid phone format';
+    } else if (phone.trim() && phone.trim().length > 20) {
+      e.phone = 'Maximum 20 characters';
     }
+
+    if (address.trim() && !ADDRESS_REGEX.test(address.trim())) {
+      e.address = 'Contains invalid characters';
+    } else if (address.trim() && address.trim().length > 500) {
+      e.address = 'Maximum 500 characters';
+    }
+
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const validatePassword = (): boolean => {
+    const e: ValidationErrors = {};
+
+    if (!newPassword) {
+      e.newPassword = 'New password is required';
+    } else {
+      if (newPassword.length < 8) e.newPassword = 'Minimum 8 characters';
+      else if (!PASSWORD_PATTERNS.uppercase.test(newPassword)) e.newPassword = 'Must contain uppercase letter';
+      else if (!PASSWORD_PATTERNS.lowercase.test(newPassword)) e.newPassword = 'Must contain lowercase letter';
+      else if (!PASSWORD_PATTERNS.digit.test(newPassword)) e.newPassword = 'Must contain number';
+      else if (!PASSWORD_PATTERNS.special.test(newPassword)) e.newPassword = 'Must contain special character';
+    }
+
+    if (!confirmPassword) {
+      e.confirmPassword = 'Confirmation is required';
+    } else if (newPassword !== confirmPassword) {
+      e.confirmPassword = 'Passwords do not match';
+    }
+
+    setErrors((prev) => ({ ...prev, ...e }));
+    return Object.keys(e).length === 0;
+  };
+
+  const handleSaveProfile = async () => {
+    if (!validateProfile()) return;
+
     setSaving(true);
     try {
       await client.patch('/auth/profile', {
         firstName: firstName.trim(),
         middleName: middleName.trim(),
         lastName: lastName.trim(),
-        phone: phone.trim(),
-        address: address.trim(),
+        phone: phone.trim() || undefined,
+        address: address.trim() || undefined,
       });
       await refreshUser();
+      setErrors({});
       showToast('Profile updated successfully!', 'success');
     } catch (err) {
       showToast((err as Error).message || 'Failed to update profile.', 'error');
@@ -53,14 +131,8 @@ export default function Profile() {
       showToast('Current password is required.', 'error');
       return;
     }
-    if (!newPassword) {
-      showToast('New password is required.', 'error');
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      showToast('New passwords do not match.', 'error');
-      return;
-    }
+    if (!validatePassword()) return;
+
     setChangingPassword(true);
     try {
       await client.patch('/auth/profile', { currentPassword, newPassword });
@@ -68,6 +140,7 @@ export default function Profile() {
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
+      setErrors({});
     } catch (err) {
       showToast((err as Error).message || 'Failed to change password.', 'error');
     } finally {
@@ -128,23 +201,28 @@ export default function Profile() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
-              <input type="text" value={firstName} onChange={e => setFirstName(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm" />
+              <input type="text" value={firstName} onChange={e => setFirstName(e.target.value)} className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm ${errors.firstName ? 'border-red-300 bg-red-50' : 'border-gray-300'}`} />
+              {errors.firstName && <p className="text-xs text-red-600 mt-1">{errors.firstName}</p>}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Middle Name</label>
-              <input type="text" value={middleName} onChange={e => setMiddleName(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm" />
+              <input type="text" value={middleName} onChange={e => setMiddleName(e.target.value)} className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm ${errors.middleName ? 'border-red-300 bg-red-50' : 'border-gray-300'}`} />
+              {errors.middleName && <p className="text-xs text-red-600 mt-1">{errors.middleName}</p>}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Surname</label>
-              <input type="text" value={lastName} onChange={e => setLastName(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm" />
+              <input type="text" value={lastName} onChange={e => setLastName(e.target.value)} className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm ${errors.lastName ? 'border-red-300 bg-red-50' : 'border-gray-300'}`} />
+              {errors.lastName && <p className="text-xs text-red-600 mt-1">{errors.lastName}</p>}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-              <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="e.g. 09171234567" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm" />
+              <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="e.g. 09171234567" className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm ${errors.phone ? 'border-red-300 bg-red-50' : 'border-gray-300'}`} />
+              {errors.phone && <p className="text-xs text-red-600 mt-1">{errors.phone}</p>}
             </div>
             <div className="sm:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
-              <input type="text" value={address} onChange={e => setAddress(e.target.value)} placeholder="Street, City, Province" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm" />
+              <input type="text" value={address} onChange={e => setAddress(e.target.value)} placeholder="Street, City, Province" className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm ${errors.address ? 'border-red-300 bg-red-50' : 'border-gray-300'}`} />
+              {errors.address && <p className="text-xs text-red-600 mt-1">{errors.address}</p>}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
@@ -170,11 +248,14 @@ export default function Profile() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
-              <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm" />
+              <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm ${errors.newPassword ? 'border-red-300 bg-red-50' : 'border-gray-300'}`} />
+              {errors.newPassword && <p className="text-xs text-red-600 mt-1">{errors.newPassword}</p>}
+              <p className="text-xs text-gray-500 mt-1">Min 8 chars, uppercase, lowercase, number, special char</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
-              <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm" />
+              <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm ${errors.confirmPassword ? 'border-red-300 bg-red-50' : 'border-gray-300'}`} />
+              {errors.confirmPassword && <p className="text-xs text-red-600 mt-1">{errors.confirmPassword}</p>}
             </div>
           </div>
           <button onClick={handleChangePassword} disabled={changingPassword} className="bg-forest-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-forest-600 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5 text-sm">

@@ -50,6 +50,16 @@ export const resetPasswordSchema = z.object({
   password: passwordSchema,
 });
 
+export const updateProfileSchema = z.object({
+  firstName: z.string().min(1).max(100).optional(),
+  middleName: z.string().min(1).max(100).optional(),
+  lastName: z.string().min(1).max(100).optional(),
+  phone: z.string().max(20).optional().nullable(),
+  address: z.string().max(500).optional().nullable(),
+  currentPassword: z.string().min(1, 'Current password is required').optional(),
+  newPassword: passwordSchema.optional(),
+});
+
 // ─── Admission Schemas ────────────────────────────────
 export const createAdmissionSchema = z.object({
   firstName: z.string().min(1).max(100),
@@ -77,6 +87,11 @@ export const createAdmissionSchema = z.object({
 export const updateStatusSchema = z.object({
   status: z.enum(STATUS_VALUES),
   notes: z.string().max(1000).optional().nullable(),
+});
+
+export const reviewDocumentSchema = z.object({
+  reviewStatus: z.enum(['accepted', 'rejected'], { message: 'Review status must be "accepted" or "rejected"' }),
+  reviewNote: z.string().max(2000, 'Review note cannot exceed 2000 characters').optional().nullable(),
 });
 
 export const bulkUpdateStatusSchema = z.object({
@@ -238,6 +253,14 @@ export const updateScheduleSchema = z.object({
   registrationCloseDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD format').optional().nullable(),
   maxSlots:      z.number().int().positive().optional(),
   venue:         z.string().max(200).optional().nullable(),
+});
+
+export const saveDraftSchema = z.object({
+  answers: z.record(z.string(), z.union([
+    z.number().int().positive(),     // choiceId for multiple choice
+    z.string().max(5000)             // essay answer text  
+  ]).or(z.null())).max(1000, 'Cannot save more than 1000 questions'),
+});
 });
 
 export const scoreEssaySchema = z.object({

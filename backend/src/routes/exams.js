@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { authenticate } from '../middleware/auth.js';
 import { authorize } from '../middleware/rbac.js';
 import { validate, validateQuery } from '../middleware/validate.js';
-import { createExamSchema, updateExamSchema, createScheduleSchema, updateScheduleSchema, bulkDeleteSchema, examsQuerySchema, schedulesQuerySchema, registrationsQuerySchema, createRegistrationSchema } from '../utils/schemas.js';
+import { createExamSchema, updateExamSchema, createScheduleSchema, updateScheduleSchema, bulkDeleteSchema, saveDraftSchema, examsQuerySchema, schedulesQuerySchema, registrationsQuerySchema, createRegistrationSchema } from '../utils/schemas.js';
 import * as ctrl from '../controllers/exams.js';
 import { ROLES } from '../utils/constants.js';
 
@@ -22,7 +22,7 @@ router.get('/registrations',       authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES
 router.get('/registrations/mine',  authorize(ROLES.APPLICANT), ctrl.getMyRegistrations);
 router.post('/registrations',      authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.APPLICANT), validate(createRegistrationSchema), ctrl.createRegistration);
 router.patch('/registrations/:id/start', authorize(ROLES.APPLICANT), ctrl.startExam);
-router.patch('/registrations/:id/save-draft', authorize(ROLES.APPLICANT), ctrl.saveDraftAnswers);
+router.patch('/registrations/:id/save-draft', authorize(ROLES.APPLICANT), validate(saveDraftSchema), ctrl.saveDraftAnswers);
 router.delete('/registrations/:id', authorize(ROLES.APPLICANT), ctrl.cancelRegistration);
 
 // ─── Exams CRUD ────────────────────────────────────

@@ -4,7 +4,7 @@ import { authorize } from '../middleware/rbac.js';
 import { upload } from '../middleware/upload.js';
 import { verifyMime } from '../middleware/verifyMime.js';
 import { validate, validateQuery } from '../middleware/validate.js';
-import { createAdmissionSchema, updateStatusSchema, bulkUpdateStatusSchema, bulkDeleteSchema, admissionsQuerySchema, admissionsStatsQuerySchema } from '../utils/schemas.js';
+import { createAdmissionSchema, updateStatusSchema, bulkUpdateStatusSchema, bulkDeleteSchema, reviewDocumentSchema, admissionsQuerySchema, admissionsStatsQuerySchema } from '../utils/schemas.js';
 import { writeLimiter } from '../middleware/rateLimits.js';
 import * as ctrl from '../controllers/admissions.js';
 import { previewDocument, extractDocument } from '../controllers/documentPreview.js';
@@ -39,7 +39,7 @@ router.get('/:id/documents/:docId/download', ctrl.downloadDocument);
 router.post('/:id/documents/:docId/extract', authorize(ROLES.ADMIN, ROLES.REGISTRAR), extractDocument);
 
 // Document review (accept/reject)
-router.patch('/:id/documents/:docId/review', authorize(ROLES.ADMIN, ROLES.REGISTRAR), ctrl.reviewDocument);
+router.patch('/:id/documents/:docId/review', authorize(ROLES.ADMIN, ROLES.REGISTRAR), validate(reviewDocumentSchema), ctrl.reviewDocument);
 
 // Bulk operations (MUST come before /:id to avoid param capture)
 router.patch('/bulk-status',  authorize(ROLES.ADMIN, ROLES.REGISTRAR), validate(bulkUpdateStatusSchema), ctrl.bulkUpdateStatus);
