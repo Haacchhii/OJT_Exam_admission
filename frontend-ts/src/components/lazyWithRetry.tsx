@@ -31,6 +31,24 @@ export function lazyWithRetry<T extends ComponentType<any>>(
       }
     }
     
+    // If chunks are stale after a deployment, force one hard reload to fetch fresh index/chunk map.
+    const message = String(lastError?.message || '');
+    const isChunkLoadError = /Failed to fetch dynamically imported module|Importing a module script failed|Loading chunk/i.test(message);
+    const reloadKey = 'gk_chunk_reload_once';
+    if (isChunkLoadError && typeof window !== 'undefined') {
+      try {
+        const alreadyReloaded = sessionStorage.getItem(reloadKey) === '1';
+        if (!alreadyReloaded) {
+          sessionStorage.setItem(reloadKey, '1');
+          window.location.reload();
+          return new Promise(() => { /* page is reloading */ }) as Promise<{ default: T }>;
+        }
+        sessionStorage.removeItem(reloadKey);
+      } catch {
+        // Ignore storage access issues and fall through to throw.
+      }
+    }
+
     // All retries exhausted
     throw lastError || new Error(`Failed to load module after ${maxAttempts} attempts`);
   }) as any;

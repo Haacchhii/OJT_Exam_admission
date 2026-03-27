@@ -193,7 +193,7 @@ export default function Login() {
                   <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400">
                     <Icon name="lock" className="w-4.5 h-4.5" />
                   </div>
-                  <input type={showPw ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} required aria-describedby={errors.password ? 'password-error' : undefined}
+                  <input type={showPw ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} required autoComplete="current-password" aria-describedby={errors.password ? 'password-error' : undefined}
                     data-testid="login-password"
                     className={`gk-input pl-11 pr-12 ${errors.password ? 'border-red-400 focus:border-red-400' : ''}`} placeholder="Enter your password" />
                   <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors" aria-label={showPw ? 'Hide password' : 'Show password'}>
