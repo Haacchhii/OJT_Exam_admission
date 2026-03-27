@@ -256,11 +256,13 @@ export const updateScheduleSchema = z.object({
 });
 
 export const saveDraftSchema = z.object({
-  answers: z.record(z.string(), z.union([
+  answers: z.record(z.union([
     z.number().int().positive(),     // choiceId for multiple choice
-    z.string().max(5000)             // essay answer text  
-  ]).or(z.null())).max(1000, 'Cannot save more than 1000 questions'),
-});
+    z.string().max(5000)             // essay answer text
+  ]).or(z.null())).refine(
+    (value) => Object.keys(value).length <= 1000,
+    'Cannot save more than 1000 questions'
+  ),
 });
 
 export const scoreEssaySchema = z.object({
