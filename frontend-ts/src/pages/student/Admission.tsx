@@ -32,6 +32,13 @@ function isWithinPeriod(today: string, start: string | null, end: string | null)
   return true;
 }
 
+function formatDisplayDate(v: string | null): string {
+  if (!v) return 'Open';
+  const d = new Date(`${v}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return v;
+  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+}
+
 export default function StudentAdmission() {
   const w = useAdmissionWizard();
   const { data: activePeriod } = useAsync(() => getActivePeriod());
@@ -40,6 +47,8 @@ export default function StudentAdmission() {
   const todayIso = toIsoDay(new Date()) || '';
   const semStart = toIsoDay(activeSemester?.startDate || null);
   const semEnd = toIsoDay(activeSemester?.endDate || null);
+  const semStartText = formatDisplayDate(semStart);
+  const semEndText = formatDisplayDate(semEnd);
   const isApplicationPeriodOpen = !!activeSemester && isWithinPeriod(todayIso, semStart, semEnd);
 
   if (w.gateLoading && !w.gateData) return <SkeletonPage />;
@@ -48,16 +57,16 @@ export default function StudentAdmission() {
   if (!w.existingApp && activePeriod && !isApplicationPeriodOpen) {
     return (
       <div>
-        <PageHeader title="Admission Application" subtitle={`${SCHOOL_NAME} \u2014 Admission Form`} />
+        <PageHeader title="Admission Application" subtitle={`${SCHOOL_NAME} - Admission Form`} />
         <div className="gk-section-card p-8 text-center">
           <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4"><Icon name="clock" className="w-8 h-8 text-red-500" /></div>
           <h3 className="text-xl font-bold text-red-600 mb-2">Application Period Is Currently Closed</h3>
           <p className="text-gray-500 mb-2">Admissions are only accepted during the active school period.</p>
           <p className="text-gray-400 text-sm mb-2">
-            Active period: <strong>{activePeriod.year}</strong> \u2014 <strong>{activeSemester?.name || 'N/A'}</strong>
+            Active period: <strong>{activePeriod.year}</strong> - <strong>{activeSemester?.name || 'N/A'}</strong>
           </p>
           <p className="text-gray-400 text-sm mb-6">
-            Window: <strong>{semStart || 'Open'}</strong> to <strong>{semEnd || 'Open'}</strong>
+            Window: <strong>{semStartText}</strong> to <strong>{semEndText}</strong>
           </p>
           <Link to="/student/dashboard" className="inline-block bg-forest-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-forest-600">Back to Dashboard</Link>
         </div>
@@ -69,7 +78,7 @@ export default function StudentAdmission() {
   if (!w.existingApp && !w.examCompleted) {
     return (
       <div>
-        <PageHeader title="Admission Application" subtitle={`${SCHOOL_NAME} \u2014 Admission Form`} />
+        <PageHeader title="Admission Application" subtitle={`${SCHOOL_NAME} - Admission Form`} />
         <div className="gk-section-card p-8 text-center">
           <div className="w-16 h-16 rounded-2xl bg-forest-50 flex items-center justify-center mx-auto mb-4"><Icon name="lock" className="w-8 h-8 text-forest-500" /></div>
           <h3 className="text-xl font-bold text-forest-500 mb-2">Entrance Exam Completion Required</h3>
@@ -89,12 +98,12 @@ export default function StudentAdmission() {
   /* Multi-step wizard */
   return (
     <div>
-      <PageHeader title="Admission Application" subtitle={`${SCHOOL_NAME} \u2014 Admission Form`} />
+      <PageHeader title="Admission Application" subtitle={`${SCHOOL_NAME} - Admission Form`} />
 
       {activePeriod && (
         <div className={`mb-4 rounded-lg border px-4 py-3 text-sm ${isApplicationPeriodOpen ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
-          <p className="font-semibold">Application Period: {activePeriod.year} \u2014 {activeSemester?.name || 'N/A'}</p>
-          <p className="text-xs mt-1">Window: {semStart || 'Open'} to {semEnd || 'Open'}</p>
+          <p className="font-semibold">Application Period: {activePeriod.year} - {activeSemester?.name || 'N/A'}</p>
+          <p className="text-xs mt-1">Window: {semStartText} to {semEndText}</p>
         </div>
       )}
 
