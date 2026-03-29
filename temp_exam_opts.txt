@@ -1,7 +1,0 @@
-        <input value={searchExam} onChange={e => { setSearchExam(e.target.value); resetExamPage(); }} placeholder="Search exams…" className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm" />          <select value={levelGroupFilterExam} onChange={e => { setLevelGroupFilterExam(e.target.value); resetExamPage(); }} className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
-            <option value="all">All Level Groups</option>
-            {GRADE_OPTIONS.map(g => <option key={g.group} value={g.group}>{g.group}</option>)}
-          </select>        <select value={gradeFilterExam} onChange={e => { setGradeFilterExam(e.target.value); resetExamPage(); }} className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
-          <option value="all">All Grades</option>
-          {examGrades.map(g => <option key={g} value={g}>{g}</option>)}
-        </select>

@@ -24,6 +24,14 @@ lerna-debug.log*
 **/*.db-journal
 **/.tmp-*
 
+# Generated backend reports and local scratch files
+backend/reports/*.json
+backend/seed-err.txt
+backend/temp_query.js
+backend/patch.js
+frontend-ts/fix.js
+temp_exam_opts.txt
+
 # OS/editor
 .DS_Store
 Thumbs.db

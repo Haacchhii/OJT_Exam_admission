@@ -159,10 +159,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const roleLabel = ROLE_LABELS[user?.role as string] || user?.role || '';
 
-  // Session inactivity timeout — logout after 30 minutes of no interaction
+  // Session inactivity timeout — logout after 60 minutes of no interaction
   useEffect(() => {
     if (!user) return;
-    const INACTIVITY_MS = 30 * 60 * 1000;
+    const INACTIVITY_MS = 60 * 60 * 1000;
     let timer: ReturnType<typeof setTimeout>;
     const reset = () => {
       clearTimeout(timer);

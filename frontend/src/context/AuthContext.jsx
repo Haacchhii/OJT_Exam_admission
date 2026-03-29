@@ -102,6 +102,24 @@ export function AuthProvider({ children }) {
 
   const roleLabel = ROLE_LABELS[user?.role] || user?.role || '';
 
+  // Session inactivity timeout — logout after 60 minutes of no interaction
+  useEffect(() => {
+    if (!user) return;
+    const INACTIVITY_MS = 60 * 60 * 1000;
+    let timer;
+    const reset = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => { logout(); }, INACTIVITY_MS);
+    };
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];
+    events.forEach((e) => window.addEventListener(e, reset));
+    reset();
+    return () => {
+      clearTimeout(timer);
+      events.forEach((e) => window.removeEventListener(e, reset));
+    };
+  }, [user, logout]);
+
   const value = useMemo(() => ({
     user, login, logout, refreshUser, isEmployee, canAccess, roleLabel
   }), [user, login, logout, refreshUser, isEmployee, canAccess, roleLabel]);

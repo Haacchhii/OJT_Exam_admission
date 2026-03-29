@@ -4,7 +4,7 @@ const env = {
   PORT:             parseInt(process.env.PORT, 10) || 3000,
   DATABASE_URL:     process.env.DATABASE_URL,
   JWT_SECRET:       process.env.JWT_SECRET || 'dev-secret',
-  JWT_EXPIRES_IN:   process.env.JWT_EXPIRES_IN || '7d',
+  JWT_EXPIRES_IN:   process.env.JWT_EXPIRES_IN || '60m',
   CORS_ORIGIN:      process.env.CORS_ORIGIN || 'http://localhost:5173',
   UPLOAD_DIR:       process.env.UPLOAD_DIR || 'uploads',
   MAX_FILE_SIZE_MB: parseInt(process.env.MAX_FILE_SIZE_MB, 10) || 10,
