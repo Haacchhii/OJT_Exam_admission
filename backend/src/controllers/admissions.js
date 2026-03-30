@@ -9,6 +9,8 @@ import { sendAdmissionSubmittedEmail, sendAdmissionStatusEmail } from '../utils/
 import { cached, invalidatePrefix } from '../utils/cache.js';
 import env from '../config/env.js';
 
+const ADMISSION_IN_PROGRESS = ['Submitted', 'Under Screening', 'Under Evaluation'];
+
 function toIsoDay(d) {
   if (!d) return null;
   const dt = new Date(d);
@@ -132,6 +134,132 @@ export async function getStats(req, res, next) {
     }, 15_000);
 
     res.json(counts);
+  } catch (err) { next(err); }
+}
+
+// GET /api/admissions/dashboard-summary
+export async function getDashboardSummary(req, res, next) {
+  try {
+    const cacheKey = `dashboardSummary:${req.user.role}`;
+    const summary = await cached(cacheKey, async () => {
+      const now = Date.now();
+      const weekAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
+      const twoWeeksAgo = new Date(now - 14 * 24 * 60 * 60 * 1000);
+
+      const [
+        total,
+        grouped,
+        recentAdmissions,
+        thisWeek,
+        lastWeek,
+        exams,
+        registrationGrouped,
+        pendingEssays,
+      ] = await Promise.all([
+        prisma.admission.count({ where: { deletedAt: null } }),
+        prisma.admission.groupBy({
+          by: ['status'],
+          _count: { _all: true },
+          where: { deletedAt: null },
+        }),
+        prisma.admission.findMany({
+          where: { deletedAt: null },
+          orderBy: { submittedAt: 'desc' },
+          take: 200,
+          include: { documents: true, academicYear: true, semester: true },
+        }),
+        prisma.admission.findMany({
+          where: { deletedAt: null, submittedAt: { gte: weekAgo } },
+          select: { status: true },
+        }),
+        prisma.admission.findMany({
+          where: { deletedAt: null, submittedAt: { gte: twoWeeksAgo, lt: weekAgo } },
+          select: { status: true },
+        }),
+        prisma.exam.findMany({
+          where: { deletedAt: null },
+          orderBy: { createdAt: 'desc' },
+          take: 20,
+          select: {
+            id: true,
+            title: true,
+            gradeLevel: true,
+            isActive: true,
+            _count: { select: { questions: true, schedules: true } },
+          },
+        }),
+        prisma.examRegistration.groupBy({ by: ['status'], _count: { _all: true } }),
+        prisma.essayAnswer.count({ where: { scored: false } }),
+      ]);
+
+      const scheduleIds = (await prisma.examSchedule.findMany({
+        where: { examId: { in: exams.map(e => e.id) } },
+        select: { id: true, examId: true },
+      })).reduce((acc, s) => {
+        if (!acc[s.examId]) acc[s.examId] = [];
+        acc[s.examId].push(s.id);
+        return acc;
+      }, {});
+
+      const allScheduleIds = Object.values(scheduleIds).flat();
+      const regCounts = allScheduleIds.length
+        ? await prisma.examRegistration.groupBy({
+            by: ['scheduleId'],
+            where: { scheduleId: { in: allScheduleIds } },
+            _count: { _all: true },
+          })
+        : [];
+
+      const regBySchedule = new Map(regCounts.map(r => [r.scheduleId, r._count._all]));
+      const examActivity = exams.map((exam) => {
+        const ids = scheduleIds[exam.id] || [];
+        const registrations = ids.reduce((sum, id) => sum + (regBySchedule.get(id) || 0), 0);
+        return {
+          id: exam.id,
+          title: exam.title,
+          gradeLevel: exam.gradeLevel,
+          questionCount: exam._count.questions,
+          scheduleCount: exam._count.schedules,
+          isActive: exam.isActive,
+          registrations,
+        };
+      });
+
+      const statusMap = Object.fromEntries(grouped.map(g => [g.status, g._count._all]));
+      const stats = {
+        total,
+        submitted: statusMap['Submitted'] || 0,
+        underScreening: statusMap['Under Screening'] || 0,
+        underEvaluation: statusMap['Under Evaluation'] || 0,
+        accepted: statusMap['Accepted'] || 0,
+        rejected: statusMap['Rejected'] || 0,
+      };
+
+      const pct = (curr, prev) => (prev === 0 ? (curr > 0 ? 100 : 0) : Math.round(((curr - prev) / prev) * 100));
+      const countStatus = (rows, status) => rows.filter((a) => a.status === status).length;
+      const countInProgress = (rows) => rows.filter((a) => ADMISSION_IN_PROGRESS.includes(a.status)).length;
+      const trends = {
+        total: pct(thisWeek.length, lastWeek.length),
+        accepted: pct(countStatus(thisWeek, 'Accepted'), countStatus(lastWeek, 'Accepted')),
+        inProgress: pct(countInProgress(thisWeek), countInProgress(lastWeek)),
+        rejected: pct(countStatus(thisWeek, 'Rejected'), countStatus(lastWeek, 'Rejected')),
+      };
+
+      const overdue = recentAdmissions.filter((a) => ADMISSION_IN_PROGRESS.includes(a.status) && Math.floor((Date.now() - new Date(a.submittedAt).getTime()) / 86400000) > 7).length;
+      const completed = (registrationGrouped.find(r => r.status === 'done')?._count._all) || 0;
+
+      return {
+        stats,
+        trends,
+        admissions: recentAdmissions.map(shapeAdmission),
+        overdue,
+        exams: examActivity,
+        completed,
+        pendingEssays,
+      };
+    }, 15_000);
+
+    res.json(summary);
   } catch (err) { next(err); }
 }
 

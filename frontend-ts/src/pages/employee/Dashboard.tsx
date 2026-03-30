@@ -3,34 +3,18 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
 import { useAsync } from '../../hooks/useAsync';
-import { getAdmissions, getStats } from '../../api/admissions';
-import { getExams, getExamSchedules, getExamRegistrations } from '../../api/exams';
-import { getExamResults, getEssayAnswers } from '../../api/results';
+import { getDashboardSummary, type EmployeeDashboardSummary } from '../../api/admissions';
 import { StatCard, PageHeader, Badge, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert } from '../../components/UI';
-import { formatDate, badgeClass, asArray, formatPersonName } from '../../utils/helpers';
+import { formatDate, badgeClass, formatPersonName } from '../../utils/helpers';
 import { ADMISSION_IN_PROGRESS, GRADE_OPTIONS, ALL_GRADE_LEVELS } from '../../utils/constants';
 import Icon from '../../components/Icons';
-import type { Admission, AdmissionStats, Exam, ExamSchedule, ExamRegistration, ExamResult as ExamResultType, EssayAnswer } from '../../types';
+import type { Admission } from '../../types';
 
 const PER_PAGE = 5;
 const SLA_DAYS = 7;
 
 function daysPending(submittedAt: string) {
   return Math.floor((Date.now() - new Date(submittedAt).getTime()) / 86400000);
-}
-
-interface DashboardData {
-  stats: AdmissionStats;
-  admissions: Admission[];
-  exams: Exam[];
-  schedules: ExamSchedule[];
-  regs: ExamRegistration[];
-  results: ExamResultType[];
-  pendingEssays: number;
-  completed: number;
-  grades: string[];
-  trends: { total: number; accepted: number; inProgress: number; rejected: number };
-  overdue: number;
 }
 
 export default function EmployeeDashboard() {
@@ -43,45 +27,8 @@ export default function EmployeeDashboard() {
 
   const { socket, isConnected } = useSocket();
 
-  const { data: rawData, loading, error, refetch } = useAsync<DashboardData>(async () => {
-    const canAdm = canAccess('admissions');
-    const canExm = canAccess('exams');
-    const canRes = canAccess('results');
-
-    const [stats, rawAdm, rawExm, rawSched, rawRegs, rawRes, rawEssay] = await Promise.all([
-      canAdm ? getStats() : Promise.resolve({ total: 0, submitted: 0, underScreening: 0, underEvaluation: 0, accepted: 0, rejected: 0 } as AdmissionStats),
-      canAdm ? getAdmissions() : Promise.resolve([] as Admission[]),
-      canExm ? getExams() : Promise.resolve([] as Exam[]),
-      canExm ? getExamSchedules() : Promise.resolve([] as ExamSchedule[]),
-      canExm ? getExamRegistrations() : Promise.resolve([] as ExamRegistration[]),
-      canRes ? getExamResults() : Promise.resolve([] as ExamResultType[]),
-      canRes ? getEssayAnswers().catch(() => [] as EssayAnswer[]) : Promise.resolve([] as EssayAnswer[]),
-    ]);
-    const admissions = asArray<Admission>(rawAdm);
-    const exams = asArray<Exam>(rawExm);
-    const schedules = asArray<ExamSchedule>(rawSched);
-    const regs = asArray<ExamRegistration>(rawRegs);
-    const results = asArray<ExamResultType>(rawRes);
-    const essayAnswers = asArray<EssayAnswer>(rawEssay);
-    const pendingEssays = essayAnswers.filter((e: EssayAnswer) => !e.scored).length;
-    const completed = regs.filter((r: ExamRegistration) => r.status === 'done').length;
-    const grades = [...new Set(admissions.map((a: Admission) => a.gradeLevel).filter(Boolean))].sort();
-
-    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
-    const thisWeek = admissions.filter((a: Admission) => new Date(a.submittedAt) >= weekAgo);
-    const lastWeek = admissions.filter((a: Admission) => { const d = new Date(a.submittedAt); return d >= twoWeeksAgo && d < weekAgo; });
-    const pct = (curr: number, prev: number) => prev === 0 ? (curr > 0 ? 100 : 0) : Math.round(((curr - prev) / prev) * 100);
-    const trends = {
-      total: pct(thisWeek.length, lastWeek.length),
-      accepted: pct(thisWeek.filter((a: Admission) => a.status === 'Accepted').length, lastWeek.filter((a: Admission) => a.status === 'Accepted').length),
-      inProgress: pct(thisWeek.filter((a: Admission) => (ADMISSION_IN_PROGRESS as readonly string[]).includes(a.status)).length, lastWeek.filter((a: Admission) => (ADMISSION_IN_PROGRESS as readonly string[]).includes(a.status)).length),
-      rejected: pct(thisWeek.filter((a: Admission) => a.status === 'Rejected').length, lastWeek.filter((a: Admission) => a.status === 'Rejected').length),
-    };
-
-    const overdue = admissions.filter((a: Admission) => (ADMISSION_IN_PROGRESS as readonly string[]).includes(a.status) && daysPending(a.submittedAt) > SLA_DAYS).length;
-
-    return { stats, admissions, exams, schedules, regs, results, pendingEssays, completed, grades, trends, overdue };
+  const { data: rawData, loading, error, refetch } = useAsync<EmployeeDashboardSummary>(async () => {
+    return getDashboardSummary();
   });
 
 
@@ -177,7 +124,7 @@ export default function EmployeeDashboard() {
           </select>
           <select value={gradeFilter} onChange={e => handleGrade(e.target.value)} className="gk-input bg-white">
             <option value="all">All Grades</option>
-            {(levelGroupFilter === 'all' ? ALL_GRADE_LEVELS : GRADE_OPTIONS.find(g => g.group === levelGroupFilter)?.items || []).map(g => <option key={g} value={g}>{g}</option>)}
+              {(levelGroupFilter === 'all' ? ALL_GRADE_LEVELS : GRADE_OPTIONS.find(g => g.group === levelGroupFilter)?.items || []).map(g => <option key={g} value={g}>{g}</option>)}
           </select>
         </div>
 
@@ -238,14 +185,12 @@ export default function EmployeeDashboard() {
             </thead>
             <tbody>
               {(rawData?.exams || []).map(exam => {
-                const schedIds = (rawData?.schedules || []).filter(s => s.examId === exam.id).map(s => s.id);
-                const regCount = (rawData?.regs || []).filter(r => schedIds.includes(r.scheduleId)).length;
                 return (
                   <tr key={exam.id}>
                     <td className="font-medium text-gray-800">{exam.title}</td>
                     <td>{exam.gradeLevel}</td>
-                    <td>{exam.questionCount ?? exam.questions?.length ?? 0}</td>
-                    <td>{regCount}</td>
+                    <td>{exam.questionCount ?? 0}</td>
+                    <td>{exam.registrations}</td>
                     <td><Badge className={exam.isActive ? 'gk-badge gk-badge-active' : 'gk-badge gk-badge-inactive'}>{exam.isActive ? 'Active' : 'Inactive'}</Badge></td>
                     <td><Link to="/employee/exams" className="text-forest-500 hover:text-forest-600 text-xs font-semibold transition-colors">Manage</Link></td>
                   </tr>

@@ -21,6 +21,24 @@ interface AdmissionParams {
   semesterId?: number;
 }
 
+export interface EmployeeDashboardSummary {
+  stats: AdmissionStats;
+  admissions: Admission[];
+  exams: Array<{
+    id: number;
+    title: string;
+    gradeLevel: string;
+    questionCount: number;
+    scheduleCount: number;
+    isActive: boolean;
+    registrations: number;
+  }>;
+  pendingEssays: number;
+  completed: number;
+  trends: { total: number; accepted: number; inProgress: number; rejected: number };
+  overdue: number;
+}
+
 export async function getAdmissions(params?: AdmissionParams) {
   return client.get<Admission[]>(`/admissions${qs(params)}`);
 }
@@ -53,6 +71,10 @@ export async function bulkDeleteAdmissions(ids: number[]) {
 
 export async function getStats(params?: Record<string, unknown>) {
   return client.get<AdmissionStats>(`/admissions/stats${qs(params)}`);
+}
+
+export async function getDashboardSummary() {
+  return client.get<EmployeeDashboardSummary>('/admissions/dashboard-summary');
 }
 
 export async function trackApplication(trackingId: string) {
