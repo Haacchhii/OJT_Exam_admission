@@ -3,7 +3,7 @@ import { useAsync } from '../../hooks/useAsync';
 import { getAdmissions } from '../../api/admissions';
 import { getExams, getExamSchedules, getExamRegistrations } from '../../api/exams';
 import { getExamResults, getEssayAnswers } from '../../api/results';
-import { asArray, formatPersonName } from '../../utils/helpers';
+import { asArray, formatPersonName, formatDate } from '../../utils/helpers';
 import { getUsers } from '../../api/users';
 import { getAcademicYears, getSemesters } from '../../api/academicYears';
 import { showToast } from '../../components/Toast';
@@ -38,10 +38,30 @@ function getRegUserId(reg: ExamRegistration): number | null {
 }
 
 function semesterLabel(s: Semester) {
-  const start = s.startDate ? String(s.startDate).slice(0, 10) : null;
-  const end = s.endDate ? String(s.endDate).slice(0, 10) : null;
+  const start = s.startDate ? formatDate(String(s.startDate)) : null;
+  const end = s.endDate ? formatDate(String(s.endDate)) : null;
   if (start || end) return `${s.name} (${start || 'open'} to ${end || 'open'})`;
   return s.name;
+}
+
+function compactDate(value?: string | null) {
+  if (!value) return '';
+  const dateOnlyMatch = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const d = dateOnlyMatch
+    ? new Date(Number(dateOnlyMatch[1]), Number(dateOnlyMatch[2]) - 1, Number(dateOnlyMatch[3]))
+    : new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function compactPeriod(a?: Admission) {
+  const semStart = compactDate(String(a?.semester?.startDate || ''));
+  const semEnd = compactDate(String(a?.semester?.endDate || ''));
+  const yearName = a?.academicYear?.year || '';
+  const semName = a?.semester?.name || '';
+  const base = [yearName, semName].filter(Boolean).join(' - ');
+  if (!semStart && !semEnd) return base;
+  return `${base}${base ? ' ' : ''}(${semStart || 'Open'} to ${semEnd || 'Open'})`;
 }
 
 interface ReportData {
@@ -154,11 +174,9 @@ export default function EmployeeReports() {
       a.lastName,
       a.email,
       a.gradeLevel,
-      a.academicYear?.year && a.semester?.name
-        ? `${a.academicYear.year} - ${a.semester.name}${a.semester?.startDate || a.semester?.endDate ? ` (${a.semester?.startDate || 'Open'} to ${a.semester?.endDate || 'Open'})` : ''}`
-        : a.academicYear?.year || a.semester?.name || '',
+      compactPeriod(a),
       a.status,
-      a.submittedAt,
+      compactDate(a.submittedAt),
     ]);
     const activeFilters = buildActiveFilters({
       statusFilter,
@@ -192,7 +210,7 @@ export default function EmployeeReports() {
       const student = reg ? (regUserId !== null ? usersById.get(regUserId) : usersByEmail.get(reg.userEmail)) : null;
       const sched = reg ? schedulesById.get(reg.scheduleId) : null;
       const exam = sched ? examsById.get(sched.examId) : null;
-      return [student ? formatPersonName(student) : 'Unknown', exam?.title || 'N/A', r.totalScore, r.maxPossible, r.percentage.toFixed(1) + '%', r.passed ? 'Yes' : 'No', r.essayReviewed ? 'Yes' : 'No', r.createdAt || ''];
+      return [student ? formatPersonName(student) : 'Unknown', exam?.title || 'N/A', r.totalScore, r.maxPossible, r.percentage.toFixed(1) + '%', r.passed ? 'Yes' : 'No', r.essayReviewed ? 'Yes' : 'No', compactDate(r.createdAt) || ''];
     });
     const activeFilters = buildActiveFilters({
       statusFilter,
@@ -224,11 +242,11 @@ export default function EmployeeReports() {
       const exam = exams.find(e => e.id === s.examId);
       return [
         exam?.title || 'N/A',
-        s.scheduledDate,
+        compactDate(s.scheduledDate),
         s.startTime,
         s.endTime,
-        s.registrationOpenDate || '',
-        s.registrationCloseDate || '',
+        compactDate(s.registrationOpenDate),
+        compactDate(s.registrationCloseDate),
         s.maxSlots,
         s.slotsTaken,
       ];
