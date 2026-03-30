@@ -1,9 +1,9 @@
-﻿import { useState, useMemo, type ChangeEvent, type FormEvent } from 'react';
+﻿import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { useAsync } from '../../../hooks/useAsync';
-import { getExams, getExamSchedules, addExamSchedule, updateExamSchedule, deleteExamSchedule } from '../../../api/exams';
+import { getExams, getExamSchedulesPage, addExamSchedule, updateExamSchedule, deleteExamSchedule } from '../../../api/exams';
 import { showToast } from '../../../components/Toast';
 import { useConfirm } from '../../../components/ConfirmDialog';
-import { PageHeader, Badge, EmptyState, Pagination, usePaginationSlice, SkeletonPage } from '../../../components/UI';
+import { PageHeader, Badge, EmptyState, Pagination, SkeletonPage } from '../../../components/UI';
 import Icon from '../../../components/Icons';
 import { formatTime, asArray } from '../../../utils/helpers';
 import { FormInput } from './ExamComponents';
@@ -71,31 +71,32 @@ export default function ScheduleManager() {
   };
 
   const { data: schedData, loading: schedLoading, error: schedError, refetch: schedRefetch } = useAsync(async () => {
-    const [rawExm, rawSched] = await Promise.all([getExams(), getExamSchedules()]);
-    return { exams: asArray<Exam>(rawExm), allSchedules: asArray<ExamSchedule>(rawSched) };
-  });
+    const [rawExm, schedulesPage] = await Promise.all([
+      getExams(),
+      getExamSchedulesPage({
+        examId: schedExamFilter !== 'all' ? Number(schedExamFilter) : undefined,
+        search: schedSearch.trim() || undefined,
+        page: schedPage,
+        limit: SCHED_PER_PAGE,
+      }),
+    ]);
+    return {
+      exams: asArray<Exam>(rawExm),
+      schedulesPage,
+    };
+  }, [schedExamFilter, schedSearch, schedPage]);
 
   const exams: Exam[] = schedData?.exams || [];
-  const allSchedules: ExamSchedule[] = schedData?.allSchedules || [];
+  const schedulesPage = schedData?.schedulesPage || { data: [] as ExamSchedule[], pagination: { page: 1, limit: SCHED_PER_PAGE, total: 0, totalPages: 1 } };
 
   const toggleBulkExam = (examId: number) => {
     setSelectedExamIds(prev => prev.includes(examId) ? prev.filter(id => id !== examId) : [...prev, examId]);
   };
 
-  const filteredScheds = useMemo(() => {
-    let list = allSchedules;
-    if (schedExamFilter !== 'all') list = list.filter(s => String(s.examId) === schedExamFilter);
-    if (schedSearch.trim()) {
-      const q = schedSearch.toLowerCase();
-      list = list.filter(s => {
-        const exam = exams.find(e => e.id === s.examId);
-        return (exam?.title || '').toLowerCase().includes(q) || s.scheduledDate.includes(q);
-      });
-    }
-    return list;
-  }, [allSchedules, schedExamFilter, schedSearch, exams]);
-
-  const { paginated: paginatedScheds, totalPages: schedTotalPages, safePage: schedSafePage, totalItems: schedTotal } = usePaginationSlice(filteredScheds, schedPage, SCHED_PER_PAGE);
+  const paginatedScheds = schedulesPage.data;
+  const schedTotalPages = schedulesPage.pagination.totalPages;
+  const schedSafePage = schedulesPage.pagination.page;
+  const schedTotal = schedulesPage.pagination.total;
   const resetSchedPage = () => setSchedPage(1);
 
   const handleSubmit = async (e: FormEvent) => {

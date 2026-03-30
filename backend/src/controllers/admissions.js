@@ -43,14 +43,20 @@ function shapeAdmission(adm) {
 // GET /api/admissions?status=&grade=&search=&sort=&page=&limit=&academicYearId=&semesterId=
 export async function getAdmissions(req, res, next) {
   try {
-    const { status, grade, search, sort, page, limit, academicYearId, semesterId } = req.query;
+    const { status, grade, levelGroup, search, sort, page, limit, academicYearId, semesterId, staleOnly, slaDays } = req.query;
     const pg = paginate(page, limit);
 
     const where = { deletedAt: null };
     if (status)        where.status = status;
     if (grade)         where.gradeLevel = grade;
+    if (levelGroup)    where.levelGroup = levelGroup;
     if (academicYearId) where.academicYearId = Number(academicYearId);
     if (semesterId)    where.semesterId = Number(semesterId);
+    if (staleOnly === 'true') {
+      const thresholdDays = Number(slaDays) > 0 ? Number(slaDays) : 7;
+      where.status = { in: ADMISSION_IN_PROGRESS };
+      where.submittedAt = { lt: new Date(Date.now() - thresholdDays * 24 * 60 * 60 * 1000) };
+    }
     if (search) {
       where.OR = [
         { firstName: { contains: search, mode: 'insensitive' } },
@@ -60,7 +66,10 @@ export async function getAdmissions(req, res, next) {
       ];
     }
 
-    const orderBy = sort === 'oldest' ? { submittedAt: 'asc' } : { submittedAt: 'desc' };
+    let orderBy = { submittedAt: 'desc' };
+    if (sort === 'oldest') orderBy = { submittedAt: 'asc' };
+    if (sort === 'name') orderBy = [{ lastName: 'asc' }, { firstName: 'asc' }];
+    if (sort === 'status') orderBy = [{ status: 'asc' }, { submittedAt: 'desc' }];
 
     const [admissions, total] = await Promise.all([
       prisma.admission.findMany({

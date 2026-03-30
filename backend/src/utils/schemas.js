@@ -169,7 +169,9 @@ export const admissionsQuerySchema = z.object({
   status: z.enum(STATUS_VALUES).optional(),
   grade:  optionalString,
   levelGroup: optionalString,
-  sort:   z.enum(['newest', 'oldest']).optional(),
+  sort:   z.enum(['newest', 'oldest', 'name', 'status']).optional(),
+  staleOnly: z.enum(['true', 'false']).optional(),
+  slaDays: z.coerce.number().int().min(1).max(60).optional(),
   academicYearId: coerceOptionalInt,
   semesterId:     coerceOptionalInt,
 });

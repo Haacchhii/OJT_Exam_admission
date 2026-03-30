@@ -14,6 +14,16 @@ interface ExamParams {
   limit?: number;
 }
 
+export interface PagedApiResponse<T> {
+  data: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
 export interface ExamSchedulePayload {
   examId: number;
   scheduledDate: string;
@@ -69,6 +79,10 @@ export async function getExamSchedules(examId?: number, params?: ExamParams) {
   return client.get<ExamSchedule[]>(
     `/exams/schedules${qs({ examId, ...params })}`
   );
+}
+
+export async function getExamSchedulesPage(params?: ExamParams & { examId?: number }) {
+  return client.get<PagedApiResponse<ExamSchedule>>(`/exams/schedules${qs(params)}`);
 }
 
 export async function getAvailableSchedules() {

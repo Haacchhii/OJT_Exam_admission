@@ -17,8 +17,20 @@ interface AdmissionParams {
   sort?: string;
   page?: number;
   limit?: number;
+  staleOnly?: boolean;
+  slaDays?: number;
   academicYearId?: number;
   semesterId?: number;
+}
+
+export interface PagedApiResponse<T> {
+  data: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 export interface EmployeeReportsSummary {
@@ -77,6 +89,10 @@ export interface EmployeeDashboardSummary {
 
 export async function getAdmissions(params?: AdmissionParams) {
   return client.get<Admission[]>(`/admissions${qs(params)}`);
+}
+
+export async function getAdmissionsPage(params?: AdmissionParams) {
+  return client.get<PagedApiResponse<Admission>>(`/admissions${qs(params)}`);
 }
 
 export async function getMyAdmission() {

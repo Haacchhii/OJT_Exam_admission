@@ -1,12 +1,12 @@
 ﻿import { useState, useMemo, useEffect } from 'react';
 import { useAsync } from '../../../hooks/useAsync';
-import { getAdmissions, getStats, bulkUpdateStatus, bulkDeleteAdmissions, VALID_TRANSITIONS } from '../../../api/admissions';
+import { getAdmissionsPage, getStats, bulkUpdateStatus, bulkDeleteAdmissions, VALID_TRANSITIONS } from '../../../api/admissions';
 import { getAcademicYears, getSemesters } from '../../../api/academicYears';
 import { showToast } from '../../../components/Toast';
 import { useConfirm } from '../../../components/ConfirmDialog';
-import { PageHeader, Badge, EmptyState, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert } from '../../../components/UI';
+import { PageHeader, Badge, EmptyState, Pagination, SkeletonPage, ErrorAlert } from '../../../components/UI';
 import Icon from '../../../components/Icons';
-import { formatDate, badgeClass, asArray, exportToCSV, formatPersonName } from '../../../utils/helpers';
+import { formatDate, badgeClass, exportToCSV, formatPersonName } from '../../../utils/helpers';
 import { ADMISSION_STATUSES, ADMISSION_IN_PROGRESS, GRADE_OPTIONS, ALL_GRADE_LEVELS } from '../../../utils/constants';
 import { useAuth } from '../../../context/AuthContext';
 import { useSocket } from '../../../context/SocketContext';
@@ -28,8 +28,15 @@ function daysPending(submittedAt: string) {
 
 interface RawData {
   stats: AdmissionStats;
-  admissions: Admission[];
-  grades: string[];
+  admissionsPage: {
+    data: Admission[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
+  };
 }
 
 interface Props {
@@ -58,11 +65,39 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
   const { socket, isConnected } = useSocket();
 
   const { data: rawData, loading, error, refetch } = useAsync<RawData>(async () => {
-    const [stats, rawAdm] = await Promise.all([getStats(), getAdmissions()]);
-    const admissions = asArray<Admission>(rawAdm);
-    const grades = [...new Set(admissions.map((a: Admission) => a.gradeLevel).filter(Boolean))].sort() as string[];
-    return { stats, admissions, grades };
-  });
+    const statsParams: Record<string, unknown> = {};
+    if (gradeFilter !== 'all') statsParams.grade = gradeFilter;
+    if (levelGroupFilter !== 'all') statsParams.levelGroup = levelGroupFilter;
+    if (yearFilter !== 'all') statsParams.academicYearId = Number(yearFilter);
+    if (semesterFilter !== 'all') statsParams.semesterId = Number(semesterFilter);
+
+    const admissionParams: Record<string, unknown> = {
+      page,
+      limit: PER_PAGE,
+      sort: sortBy,
+      staleOnly,
+      slaDays: SLA_DAYS,
+    };
+    if (filter !== 'all') admissionParams.status = filter;
+    if (gradeFilter !== 'all') admissionParams.grade = gradeFilter;
+    if (levelGroupFilter !== 'all') admissionParams.levelGroup = levelGroupFilter;
+    if (yearFilter !== 'all') admissionParams.academicYearId = Number(yearFilter);
+    if (semesterFilter !== 'all') admissionParams.semesterId = Number(semesterFilter);
+    if (search.trim()) admissionParams.search = search.trim();
+
+    const [stats, admissionsPage] = await Promise.all([
+      getStats(statsParams),
+      getAdmissionsPage(admissionParams),
+    ]);
+    return { stats, admissionsPage };
+  }, [filter, levelGroupFilter, gradeFilter, yearFilter, semesterFilter, sortBy, search, staleOnly, page]);
+
+  const { data: stalePreview } = useAsync(async () => {
+    if (!canManage) {
+      return { data: [] as Admission[], pagination: { page: 1, limit: 20, total: 0, totalPages: 1 } };
+    }
+    return getAdmissionsPage({ staleOnly: true, slaDays: SLA_DAYS, page: 1, limit: 20 });
+  }, [canManage]);
 
 
   useEffect(() => {
@@ -84,47 +119,30 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
     return list.filter(s => s.academicYearId === Number(yearFilter));
   }, [allSemesters, yearFilter]);
 
-  const admissions = useMemo(() => {
-    let list = rawData?.admissions || [];
-    if (filter !== 'all') list = list.filter(a => a.status === filter);
-    if (levelGroupFilter !== 'all') list = list.filter(a => a.levelGroup === levelGroupFilter);
-    if (gradeFilter !== 'all') list = list.filter(a => a.gradeLevel === gradeFilter);
-    if (yearFilter !== 'all') list = list.filter(a => a.academicYear?.id === Number(yearFilter));
-    if (semesterFilter !== 'all') list = list.filter(a => a.semester?.id === Number(semesterFilter));
-    if (staleOnly) {
-      list = list.filter(
-        a =>
-          (ADMISSION_IN_PROGRESS as readonly string[]).includes(a.status) &&
-          daysPending(a.submittedAt) > SLA_DAYS,
-      );
+  const admissions = rawData?.admissionsPage?.data || [];
+  const pagination = rawData?.admissionsPage?.pagination || { page: 1, limit: PER_PAGE, total: 0, totalPages: 1 };
+
+  const staleAdmissions = stalePreview?.data || [];
+  const staleCount = stalePreview?.pagination?.total || 0;
+
+  useEffect(() => {
+    setSelected(new Set());
+  }, [page, filter, levelGroupFilter, gradeFilter, yearFilter, semesterFilter, sortBy, search, staleOnly]);
+
+  useEffect(() => {
+    if (page > pagination.totalPages && pagination.totalPages > 0) {
+      setPage(pagination.totalPages);
     }
-    if (search) list = list.filter(a => `${formatPersonName(a)} ${a.email}`.toLowerCase().includes(search.toLowerCase()));
-    if (sortBy === 'newest') list = [...list].sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
-    else if (sortBy === 'oldest') list = [...list].sort((a, b) => new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime());
-    else if (sortBy === 'name') list = [...list].sort((a, b) => formatPersonName(a).localeCompare(formatPersonName(b)));
-    else if (sortBy === 'status') list = [...list].sort((a, b) => a.status.localeCompare(b.status));
-    return list;
-  }, [rawData, search, filter, levelGroupFilter, gradeFilter, yearFilter, semesterFilter, sortBy, staleOnly]);
-
-  const staleAdmissions = useMemo(
-    () => (rawData?.admissions || []).filter(
-      a =>
-        (ADMISSION_IN_PROGRESS as readonly string[]).includes(a.status) &&
-        daysPending(a.submittedAt) > SLA_DAYS,
-    ),
-    [rawData],
-  );
-
-  const { paginated, totalPages, safePage, totalItems } = usePaginationSlice(admissions, page, PER_PAGE);
+  }, [page, pagination.totalPages]);
 
   const resetPage = () => setPage(1);
 
   const toggleSelect = (id: number) => setSelected(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const toggleAll = () => {
-    if (paginated.every((a: Admission) => selected.has(a.id))) {
-      setSelected(s => { const n = new Set(s); paginated.forEach((a: Admission) => n.delete(a.id)); return n; });
+    if (admissions.every((a: Admission) => selected.has(a.id))) {
+      setSelected(s => { const n = new Set(s); admissions.forEach((a: Admission) => n.delete(a.id)); return n; });
     } else {
-      setSelected(s => { const n = new Set(s); paginated.forEach((a: Admission) => n.add(a.id)); return n; });
+      setSelected(s => { const n = new Set(s); admissions.forEach((a: Admission) => n.add(a.id)); return n; });
     }
   };
 
@@ -133,7 +151,7 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
     const validIds: number[] = [];
     const skippedIds: number[] = [];
     selected.forEach(id => {
-      const adm = (rawData?.admissions || []).find(a => a.id === id);
+      const adm = admissions.find(a => a.id === id);
       if (!adm) return;
       const allowed = VALID_TRANSITIONS[adm.status] || [];
       if (adm.status === bulkStatus || (allowed as string[]).includes(bulkStatus)) {
@@ -195,7 +213,7 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
     const lines = [
       'Admissions Escalation Draft',
       `Date: ${new Date().toLocaleDateString()}`,
-      `Over-SLA applications: ${staleAdmissions.length}`,
+      `Over-SLA applications: ${staleCount}`,
       '',
       ...staleAdmissions.slice(0, 20).map(a => {
         const name = formatPersonName(a);
@@ -287,11 +305,11 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
             onClick={() => { setStaleOnly(v => !v); resetPage(); }}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${staleOnly ? 'bg-red-50 text-red-700 border-red-200' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
           >
-            {staleOnly ? 'Showing Over-SLA Only' : `Show Over-SLA Only (${staleAdmissions.length})`}
+            {staleOnly ? 'Showing Over-SLA Only' : `Show Over-SLA Only (${staleCount})`}
           </button>
           <button
             onClick={copyEscalationDraft}
-            disabled={staleAdmissions.length === 0}
+            disabled={staleCount === 0}
             className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
           >
             <Icon name="clipboard" className="w-3.5 h-3.5" /> Copy Escalation Draft
@@ -299,10 +317,10 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
         </div>
       )}
 
-      {canManage && staleAdmissions.length > 0 && !staleOnly && (
+      {canManage && staleCount > 0 && !staleOnly && (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex flex-wrap items-center gap-2">
           <Icon name="exclamation" className="w-4 h-4" />
-          <span>{staleAdmissions.length} application(s) are over SLA ({SLA_DAYS}+ days in progress).</span>
+          <span>{staleCount} application(s) are over SLA ({SLA_DAYS}+ days in progress).</span>
           <button
             onClick={() => { setStaleOnly(true); resetPage(); }}
             className="ml-auto text-xs font-semibold underline hover:no-underline"
@@ -354,20 +372,20 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
       ) : null}
 
       <div className="gk-section-card p-4">
-        {paginated.length > 0 ? (
+        {admissions.length > 0 ? (
           <>
             <div className="table-scroll">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-200 text-left text-gray-400 uppercase text-xs">
-                    {canManage && <th scope="col" className="py-3 px-2 w-8"><input type="checkbox" checked={paginated.length > 0 && paginated.every((a: Admission) => selected.has(a.id))} onChange={toggleAll} className="accent-forest-500 rounded" /></th>}
+                    {canManage && <th scope="col" className="py-3 px-2 w-8"><input type="checkbox" checked={admissions.length > 0 && admissions.every((a: Admission) => selected.has(a.id))} onChange={toggleAll} className="accent-forest-500 rounded" /></th>}
                     <th scope="col" className="py-3 px-2">ID</th><th scope="col" className="py-3 px-2">Student Name</th><th scope="col" className="py-3 px-2">Email</th>
                     <th scope="col" className="py-3 px-2">Grade Level</th><th scope="col" className="py-3 px-2">Type</th><th scope="col" className="py-3 px-2">Documents</th><th scope="col" className="py-3 px-2">Status</th>
                     <th scope="col" className="py-3 px-2">Submitted</th><th scope="col" className="py-3 px-2">Days</th><th scope="col" className="py-3 px-2">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {paginated.map((a: Admission) => (
+                  {admissions.map((a: Admission) => (
                     <tr key={a.id} onClick={() => onShowDetail(a.id)} className={`border-b border-gray-50 hover:bg-gray-50 cursor-pointer ${selected.has(a.id) ? 'bg-gold-50/50' : ''}`}>
                       {canManage && <td className="py-3 px-2" onClick={e => e.stopPropagation()}><input type="checkbox" checked={selected.has(a.id)} onChange={() => toggleSelect(a.id)} className="accent-forest-500 rounded" /></td>}
                       <td className="py-3 px-2 text-gray-400">{a.id}</td>
@@ -387,7 +405,7 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
                 </tbody>
               </table>
             </div>
-            <Pagination currentPage={safePage} totalPages={totalPages} onPageChange={setPage} totalItems={totalItems} itemsPerPage={PER_PAGE} />
+            <Pagination currentPage={pagination.page} totalPages={pagination.totalPages} onPageChange={setPage} totalItems={pagination.total} itemsPerPage={PER_PAGE} />
           </>
         ) : (
           <EmptyState icon="inbox" title="No applications found" text={search ? `No applications match "${search}"${filter !== 'all' ? ` with status "${filter}"` : ''}.` : filter !== 'all' ? `No applications with status "${filter}".` : 'No admission applications match your current filters.'} />
