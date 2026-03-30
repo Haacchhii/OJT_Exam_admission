@@ -43,7 +43,13 @@ export default function Topbar({ title, onMenuToggle, userId, user }: TopbarProp
 
         {isEmployee && <GlobalSearch />}<div className="w-px h-7 bg-gray-200 mx-1 hidden sm:block" />
 
-        <div className="flex items-center gap-3 cursor-pointer hover:opacity-85 transition-all duration-200 group pl-1" onClick={() => navigate(isEmployee ? '/employee/profile' : '/student/profile')} title="View Profile">
+        <button
+          type="button"
+          className="flex items-center gap-3 hover:opacity-85 transition-all duration-200 group pl-1"
+          onClick={() => navigate(isEmployee ? '/employee/profile' : '/student/profile')}
+          title="View Profile"
+          aria-label="Open profile"
+        >
           <div className={`w-9 h-9 rounded-lg ${avatarCls} flex items-center justify-center text-xs font-bold`}>
             {initials}
           </div>
@@ -52,7 +58,7 @@ export default function Topbar({ title, onMenuToggle, userId, user }: TopbarProp
             <p className="text-[11px] text-forest-500 leading-tight capitalize font-medium">{user.role === 'applicant' ? 'Student' : user.role || ''}</p>
           </div>
           <Icon name="chevronDown" className="w-3.5 h-3.5 text-gray-400 hidden sm:block" />
-        </div>
+        </button>
       </div>
       </div>
 

@@ -289,6 +289,7 @@ function AdmissionStatusResult({ data, trackingId }: { data: Record<string, any>
 
 function ExamStatusResult({ data, trackingId }: { data: Record<string, any>; trackingId: string }) {
   const schedule = data.schedule;
+  const scheduleDate = schedule?.scheduledDate ? formatDate(schedule.scheduledDate) : null;
 
   return (
     <div className="gk-section-card p-6">
@@ -305,7 +306,7 @@ function ExamStatusResult({ data, trackingId }: { data: Record<string, any>; tra
         <Field label="Grade Level" value={schedule?.exam?.gradeLevel || 'N/A'} />
         <Field
           label="Schedule"
-          value={schedule ? `${schedule.scheduledDate} ${schedule.startTime} - ${schedule.endTime}` : 'N/A'}
+          value={schedule ? `${scheduleDate || schedule.scheduledDate} ${schedule.startTime} - ${schedule.endTime}` : 'N/A'}
         />
         <Field
           label="Registration Window"

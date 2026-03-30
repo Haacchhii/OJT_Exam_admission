@@ -103,9 +103,16 @@ export default function EmployeeUsers() {
 
   const handleBulkImportUsers = async (data: any[]) => {
     let successCount = 0;
+    let skippedCount = 0;
+    let failedCount = 0;
     setSaving(true);
     try {
       for (const row of data) {
+        const password = typeof row.password === 'string' ? row.password.trim() : '';
+        if (!password) {
+          skippedCount++;
+          continue;
+        }
         try {
           await addUser({
             firstName: row.firstName || '',
@@ -114,12 +121,18 @@ export default function EmployeeUsers() {
             email: row.email,
             role: row.role || 'applicant',
             status: row.status || 'Active',
-            password: row.password || 'password123',
+            password,
           });
           successCount++;
-        } catch (e) {}
+        } catch (e) {
+          failedCount++;
+        }
       }
-      showToast(`Successfully imported ${successCount} user(s)!`, successCount > 0 ? 'success' : 'warning');
+      if (successCount > 0) {
+        showToast(`Imported ${successCount} user(s). Skipped ${skippedCount}, failed ${failedCount}.`, 'success');
+      } else {
+        showToast('No users were imported. Ensure each row includes a valid password and email.', 'warning');
+      }
       refetch();
     } finally {
       setSaving(false);

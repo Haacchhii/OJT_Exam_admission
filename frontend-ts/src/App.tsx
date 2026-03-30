@@ -1,4 +1,4 @@
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
 import { Suspense, useEffect, type ReactNode } from 'react';
 import { AuthProvider, ROLE_PERMISSIONS, type Permission } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
@@ -44,7 +44,17 @@ function RoleGuard({ page, children }: { page: Permission; children: ReactNode }
   if (!user) return <Navigate to="/login" replace />;
   if (user.role === 'applicant') return <Navigate to="/student" replace />;
   const perms = ROLE_PERMISSIONS[user.role] || [];
-  if (!perms.includes(page)) return <Navigate to="/employee" replace />;
+  if (!perms.includes(page)) {
+    return (
+      <div className="max-w-2xl mx-auto gk-section-card p-8 text-center">
+        <h2 className="text-xl font-bold text-red-600 mb-2">Access Restricted</h2>
+        <p className="text-gray-500 mb-5">Your role does not have permission to access this page.</p>
+        <Link to="/employee/dashboard" className="inline-flex items-center justify-center px-5 py-2.5 rounded-lg bg-forest-600 text-white text-sm font-semibold hover:bg-forest-700">
+          Back to Dashboard
+        </Link>
+      </div>
+    );
+  }
   return <>{children}</>;
 }
 

@@ -11,6 +11,7 @@ import Icon from '../../components/Icons';
 import Modal from '../../components/Modal';
 import { useConfirm } from '../../components/ConfirmDialog';
 import { SEMESTER_NAMES } from '../../utils/constants';
+import { formatDate } from '../../utils/helpers';
 import type { AcademicYear, Semester } from '../../types';
 
 interface YearForm { year: string; isActive: boolean }
@@ -198,7 +199,7 @@ export default function EmployeeSettings() {
   if (ayError || semError) return (
     <div className="space-y-8">
       <PageHeader title="Settings" subtitle="Manage academic years and semesters" />
-      <ErrorAlert error={ayError || semError} />
+      <ErrorAlert error={ayError || semError} onRetry={() => { refetchAY(); refetchSem(); }} />
     </div>
   );
 
@@ -306,7 +307,7 @@ export default function EmployeeSettings() {
                       <span className="font-medium text-gray-800">{s.name}</span>
                       {!selectedYearId && <span className="text-sm text-gray-400 ml-2">{yearLabel}</span>}
                       <p className="text-xs text-gray-500 mt-0.5">
-                        Period: {s.startDate ? String(s.startDate).slice(0, 10) : 'Not set'} to {s.endDate ? String(s.endDate).slice(0, 10) : 'Not set'}
+                        Period: {s.startDate ? formatDate(String(s.startDate)) : 'Not set'} to {s.endDate ? formatDate(String(s.endDate)) : 'Not set'}
                       </p>
                     </div>
                     {s.isActive && <Badge className="bg-emerald-100 text-emerald-700">Active</Badge>}
