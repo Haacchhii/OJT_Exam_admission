@@ -263,6 +263,95 @@ export async function getDashboardSummary(req, res, next) {
   } catch (err) { next(err); }
 }
 
+// GET /api/admissions/reports-summary
+export async function getReportsSummary(req, res, next) {
+  try {
+    const cacheKey = 'reportsSummary:v1';
+    const summary = await cached(cacheKey, async () => {
+      const [admissions, results, exams, schedules, regs, essays, users] = await Promise.all([
+        prisma.admission.findMany({
+          where: { deletedAt: null },
+          orderBy: { submittedAt: 'desc' },
+          include: {
+            academicYear: { select: { id: true, year: true, startDate: true, endDate: true } },
+            semester: { select: { id: true, name: true, startDate: true, endDate: true } },
+          },
+        }),
+        prisma.examResult.findMany({
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            registrationId: true,
+            totalScore: true,
+            maxPossible: true,
+            percentage: true,
+            passed: true,
+            essayReviewed: true,
+            createdAt: true,
+          },
+        }),
+        prisma.exam.findMany({
+          where: { deletedAt: null },
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            title: true,
+            gradeLevel: true,
+          },
+        }),
+        prisma.examSchedule.findMany({
+          orderBy: { scheduledDate: 'desc' },
+          select: {
+            id: true,
+            examId: true,
+            scheduledDate: true,
+            startTime: true,
+            endTime: true,
+            registrationOpenDate: true,
+            registrationCloseDate: true,
+            maxSlots: true,
+            slotsTaken: true,
+          },
+        }),
+        prisma.examRegistration.findMany({
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            scheduleId: true,
+            userEmail: true,
+            userId: true,
+            status: true,
+          },
+        }),
+        prisma.essayAnswer.findMany({
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            registrationId: true,
+            scored: true,
+          },
+        }),
+        prisma.user.findMany({
+          where: { deletedAt: null },
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            firstName: true,
+            middleName: true,
+            lastName: true,
+            email: true,
+            applicantProfile: { select: { gradeLevel: true } },
+          },
+        }),
+      ]);
+
+      return { admissions, results, exams, schedules, regs, essays, users };
+    }, 15_000);
+
+    res.json(summary);
+  } catch (err) { next(err); }
+}
+
 // POST /api/admissions
 export async function createAdmission(req, res, next) {
   try {

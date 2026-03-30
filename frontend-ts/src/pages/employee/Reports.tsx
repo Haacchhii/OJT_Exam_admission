@@ -1,10 +1,7 @@
 ﻿import { useState, useMemo } from 'react';
 import { useAsync } from '../../hooks/useAsync';
-import { getAdmissions } from '../../api/admissions';
-import { getExams, getExamSchedules, getExamRegistrations } from '../../api/exams';
-import { getExamResults, getEssayAnswers } from '../../api/results';
-import { asArray, formatPersonName, formatDate } from '../../utils/helpers';
-import { getUsers } from '../../api/users';
+import { getReportsSummary, type EmployeeReportsSummary } from '../../api/admissions';
+import { formatPersonName, formatDate } from '../../utils/helpers';
 import { getAcademicYears, getSemesters } from '../../api/academicYears';
 import { showToast } from '../../components/Toast';
 import { PageHeader, SkeletonPage, ErrorAlert } from '../../components/UI';
@@ -84,28 +81,29 @@ export default function EmployeeReports() {
   const [dateTo, setDateTo] = useState('');
 
   const { data: rawData, loading, error, refetch } = useAsync<ReportData>(async () => {
-    const settled = await Promise.allSettled([
-      getAdmissions(),
-      getExamResults(),
-      getExams(),
-      getExamSchedules(),
-      getExamRegistrations(),
-      getEssayAnswers(),
-      getUsers(),
-    ]);
-    const extract = (r: PromiseSettledResult<unknown>): unknown => r.status === 'fulfilled' ? r.value : [];
-    const failures = settled.filter(r => r.status === 'rejected');
-    if (failures.length > 0) {
-      showToast(`${failures.length} data source(s) failed to load. Some report data may be incomplete.`, 'error');
+    const settled = await Promise.allSettled([getReportsSummary()]);
+    const only = settled[0];
+    if (only.status === 'rejected') {
+      showToast('Failed to load report data.', 'error');
+      return {
+        admissions: [],
+        results: [],
+        exams: [],
+        schedules: [],
+        regs: [],
+        essays: [],
+        users: [],
+      };
     }
+    const summary = only.value as EmployeeReportsSummary;
     return {
-      admissions: asArray<Admission>(extract(settled[0])),
-      results: asArray<ExamResult>(extract(settled[1])),
-      exams: asArray<Exam>(extract(settled[2])),
-      schedules: asArray<ExamSchedule>(extract(settled[3])),
-      regs: asArray<ExamRegistration>(extract(settled[4])),
-      essays: asArray<EssayAnswer>(extract(settled[5])),
-      users: asArray<User>(extract(settled[6])),
+      admissions: summary.admissions as Admission[],
+      results: summary.results as ExamResult[],
+      exams: summary.exams as Exam[],
+      schedules: summary.schedules as ExamSchedule[],
+      regs: summary.regs as ExamRegistration[],
+      essays: summary.essays as EssayAnswer[],
+      users: summary.users as User[],
     };
   });
 

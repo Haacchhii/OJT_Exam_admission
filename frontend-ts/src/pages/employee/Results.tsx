@@ -1,9 +1,7 @@
 ﻿import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useAsync } from '../../hooks/useAsync';
-import { getExamResults, getEssayAnswers, scoreEssay, getQuestionAnalyticsPage } from '../../api/results';
-import { getExamRegistrations, getExamSchedules, getExams } from '../../api/exams';
+import { getEmployeeResultsSummary, scoreEssay, getQuestionAnalyticsPage, type EmployeeResultsSummary } from '../../api/results';
 import { getAcademicYears, getSemesters } from '../../api/academicYears';
-import { getUsers } from '../../api/users';
 import { SCHOOL_NAME, SCHOOL_BRAND, SCHOOL_SUBTITLE, SCHOOL_ADDRESS, SCHOOL_PHONE } from '../../utils/constants';
 import { useAuth } from '../../context/AuthContext';
 import { showToast } from '../../components/Toast';
@@ -11,7 +9,7 @@ import { useConfirm } from '../../components/ConfirmDialog';
 import Modal from '../../components/Modal';
 import { PageHeader, StatCard, Badge, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert } from '../../components/UI';
 import Icon from '../../components/Icons';
-import { formatDate, asArray, exportToCSV, formatPersonName } from '../../utils/helpers';
+import { formatDate, exportToCSV, formatPersonName } from '../../utils/helpers';
 import type { ExamResult, EssayAnswer, ExamRegistration, ExamSchedule, Exam, User, AcademicYear, Semester } from '../../types';
 
 const RESULTS_PER_PAGE = 10;
@@ -89,14 +87,15 @@ export default function EmployeeResults() {
   const [selectedEssayExamId, setSelectedEssayExamId] = useState<number | null>(null);
 
   const { data: rawData, loading, error, refetch } = useAsync<RawData>(async () => {
-    const [rawRes, rawRegs, rawUsers, rawSched, rawExm, rawEssays] = await Promise.all([
-      getExamResults(), getExamRegistrations(),
-      getUsers(),
-      getExamSchedules(),
-      getExams(),
-      getEssayAnswers(),
-    ]);
-    return { results: asArray<ExamResult>(rawRes), regs: asArray<ExamRegistration>(rawRegs), users: asArray<User>(rawUsers), schedules: asArray<ExamSchedule>(rawSched), exams: asArray<Exam>(rawExm), essays: asArray<EssayAnswer>(rawEssays) } as RawData;
+    const summary = await getEmployeeResultsSummary();
+    return {
+      results: summary.results as ExamResult[],
+      regs: summary.regs as ExamRegistration[],
+      users: summary.users as User[],
+      schedules: summary.schedules as ExamSchedule[],
+      exams: summary.exams as Exam[],
+      essays: summary.essays as EssayAnswer[],
+    } as RawData;
   });
 
   const { data: academicYears } = useAsync<AcademicYear[]>(() => getAcademicYears());

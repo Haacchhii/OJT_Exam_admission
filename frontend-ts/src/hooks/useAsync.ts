@@ -71,5 +71,20 @@ export function useAsync<T>(
     return () => window.removeEventListener('gk:data-changed', onDataChanged);
   }, []);
 
+  useEffect(() => {
+    const onFocus = () => setRefreshCount(c => c + 1);
+    const onVisibility = () => {
+      if (!document.hidden) setRefreshCount(c => c + 1);
+    };
+
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, []);
+
   return { data, loading, error, refetch };
 }

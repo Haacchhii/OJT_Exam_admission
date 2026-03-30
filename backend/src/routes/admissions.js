@@ -21,6 +21,7 @@ router.use(authenticate);
 router.get('/mine',  ctrl.getMyAdmission);
 router.get('/stats', authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), validateQuery(admissionsStatsQuerySchema), ctrl.getStats);
 router.get('/dashboard-summary', authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), ctrl.getDashboardSummary);
+router.get('/reports-summary', authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), ctrl.getReportsSummary);
 
 // Tracking (search by tracking ID — any authenticated user)
 router.get('/track/:trackingId', ctrl.trackApplication);

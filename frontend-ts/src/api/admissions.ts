@@ -21,6 +21,42 @@ interface AdmissionParams {
   semesterId?: number;
 }
 
+export interface EmployeeReportsSummary {
+  admissions: Admission[];
+  results: Array<{
+    id: number;
+    registrationId: number;
+    totalScore: number;
+    maxPossible: number;
+    percentage: number;
+    passed: boolean;
+    essayReviewed: boolean;
+    createdAt: string;
+  }>;
+  exams: Array<{ id: number; title: string; gradeLevel: string }>;
+  schedules: Array<{
+    id: number;
+    examId: number;
+    scheduledDate: string;
+    startTime: string;
+    endTime: string;
+    registrationOpenDate?: string | null;
+    registrationCloseDate?: string | null;
+    maxSlots: number;
+    slotsTaken: number;
+  }>;
+  regs: Array<{ id: number; scheduleId: number; userEmail: string; userId?: number | null; status: string }>;
+  essays: Array<{ id: number; registrationId: number; scored: boolean }>;
+  users: Array<{
+    id: number;
+    firstName: string;
+    middleName?: string | null;
+    lastName: string;
+    email: string;
+    applicantProfile?: { gradeLevel?: string | null } | null;
+  }>;
+}
+
 export interface EmployeeDashboardSummary {
   stats: AdmissionStats;
   admissions: Admission[];
@@ -75,6 +111,10 @@ export async function getStats(params?: Record<string, unknown>) {
 
 export async function getDashboardSummary() {
   return client.get<EmployeeDashboardSummary>('/admissions/dashboard-summary');
+}
+
+export async function getReportsSummary() {
+  return client.get<EmployeeReportsSummary>('/admissions/reports-summary');
 }
 
 export async function trackApplication(trackingId: string) {

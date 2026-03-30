@@ -1,5 +1,6 @@
 import prisma from '../config/db.js';
 import { paginate, paginatedResponse } from '../utils/pagination.js';
+import { cached } from '../utils/cache.js';
 
 // Re-export submission and essay scoring controllers so routes/results.js keeps working
 export { submitExam } from './examSubmission.js';
@@ -265,5 +266,84 @@ export async function getQuestionAnalytics(req, res, next) {
         totalPages: pg ? Math.ceil(totalQuestions / pg.limit) : 1,
       },
     });
+  } catch (err) { next(err); }
+}
+
+// GET /api/results/employee-summary
+export async function getEmployeeSummary(req, res, next) {
+  try {
+    const cacheKey = 'resultsEmployeeSummary:v1';
+    const summary = await cached(cacheKey, async () => {
+      const [results, regs, users, schedules, exams, essays] = await Promise.all([
+        prisma.examResult.findMany({
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            registrationId: true,
+            totalScore: true,
+            maxPossible: true,
+            percentage: true,
+            passed: true,
+            essayReviewed: true,
+            createdAt: true,
+          },
+        }),
+        prisma.examRegistration.findMany({
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            scheduleId: true,
+            userEmail: true,
+            userId: true,
+            status: true,
+          },
+        }),
+        prisma.user.findMany({
+          where: { deletedAt: null },
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            firstName: true,
+            middleName: true,
+            lastName: true,
+            email: true,
+            applicantProfile: { select: { gradeLevel: true } },
+          },
+        }),
+        prisma.examSchedule.findMany({
+          orderBy: { scheduledDate: 'desc' },
+          select: {
+            id: true,
+            examId: true,
+            scheduledDate: true,
+            startTime: true,
+            endTime: true,
+          },
+        }),
+        prisma.exam.findMany({
+          where: { deletedAt: null },
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            title: true,
+            gradeLevel: true,
+            passingScore: true,
+            academicYear: { select: { id: true } },
+            semester: { select: { id: true } },
+            questions: { select: { id: true, questionText: true } },
+          },
+        }),
+        prisma.essayAnswer.findMany({
+          orderBy: { createdAt: 'desc' },
+          include: {
+            question: { select: { questionText: true } },
+          },
+        }),
+      ]);
+
+      return { results, regs, users, schedules, exams, essays };
+    }, 15_000);
+
+    res.json(summary);
   } catch (err) { next(err); }
 }

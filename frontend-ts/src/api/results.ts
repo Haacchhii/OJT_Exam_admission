@@ -19,8 +19,36 @@ interface EssayParams {
   limit?: number;
 }
 
+export interface EmployeeResultsSummary {
+  results: ExamResult[];
+  regs: Array<{ id: number; scheduleId: number; userEmail: string; userId?: number | null; status: string }>;
+  users: Array<{
+    id: number;
+    firstName: string;
+    middleName?: string | null;
+    lastName: string;
+    email: string;
+    applicantProfile?: { gradeLevel?: string | null } | null;
+  }>;
+  schedules: Array<{ id: number; examId: number; scheduledDate: string; startTime: string; endTime: string }>;
+  exams: Array<{
+    id: number;
+    title: string;
+    gradeLevel: string;
+    passingScore: number;
+    academicYear?: { id: number } | null;
+    semester?: { id: number } | null;
+    questions?: Array<{ id: number; questionText: string }>;
+  }>;
+  essays: EssayAnswer[];
+}
+
 export async function getExamResults(params?: ResultParams) {
   return client.get<ExamResult[]>(`/results${qs(params)}`);
+}
+
+export async function getEmployeeResultsSummary() {
+  return client.get<EmployeeResultsSummary>('/results/employee-summary');
 }
 
 export async function getMyResult() {

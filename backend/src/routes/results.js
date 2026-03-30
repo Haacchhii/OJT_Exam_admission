@@ -21,6 +21,7 @@ router.post('/submit', authorize(ROLES.APPLICANT), ctrl.submitExam);
 
 // General
 router.get('/',                       authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), validateQuery(resultsQuerySchema), ctrl.getResults);
+router.get('/employee-summary',      authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), ctrl.getEmployeeSummary);
 router.get('/analytics/:examId',      authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), ctrl.getQuestionAnalytics);
 router.get('/answers/:registrationId', authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER, ROLES.APPLICANT), ctrl.getSubmittedAnswers);
 router.get('/:registrationId',       authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER, ROLES.APPLICANT), ctrl.getResult);
