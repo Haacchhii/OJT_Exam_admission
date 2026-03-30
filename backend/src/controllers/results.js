@@ -330,7 +330,6 @@ export async function getEmployeeSummary(req, res, next) {
             passingScore: true,
             academicYear: { select: { id: true } },
             semester: { select: { id: true } },
-            questions: { select: { id: true, questionText: true } },
           },
         }),
         prisma.essayAnswer.findMany({

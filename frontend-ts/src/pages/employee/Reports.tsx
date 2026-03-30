@@ -1,4 +1,4 @@
-﻿import { useState, useMemo } from 'react';
+﻿import { Suspense, useState, useMemo } from 'react';
 import { useAsync } from '../../hooks/useAsync';
 import { getReportsSummary, type EmployeeReportsSummary } from '../../api/admissions';
 import { formatPersonName, formatDate } from '../../utils/helpers';
@@ -6,10 +6,11 @@ import { getAcademicYears, getSemesters } from '../../api/academicYears';
 import { showToast } from '../../components/Toast';
 import { PageHeader, SkeletonPage, ErrorAlert } from '../../components/UI';
 import Icon from '../../components/Icons';
+import { lazyWithRetry, LazyLoadingFallback } from '../../components/lazyWithRetry';
 import { ADMISSION_STATUSES, SCHOOL_NAME, GRADE_OPTIONS, ALL_GRADE_LEVELS } from '../../utils/constants';
 import type { Admission, ExamResult, Exam, ExamSchedule, ExamRegistration, EssayAnswer, User, AcademicYear, Semester } from '../../types';
-import ReportsCharts from './reports/ReportsCharts';
-import { buildActiveFilters, downloadCSV, getChartSvgMarkup, printPdfReport } from './reports/reportExport';
+
+const ReportsCharts = lazyWithRetry(() => import('./reports/ReportsCharts'));
 
 const STATUS_COLORS: Record<string, string> = {
   Submitted: '#8b5cf6',
@@ -163,7 +164,8 @@ export default function EmployeeReports() {
   const now = new Date();
   const thisMonth = admissions.filter(a => { const d = new Date(a.submittedAt); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); }).length;
 
-  const exportApplicants = (format: 'csv' | 'pdf' = 'csv') => {
+  const exportApplicants = async (format: 'csv' | 'pdf' = 'csv') => {
+    const { buildActiveFilters, downloadCSV, getChartSvgMarkup, printPdfReport } = await import('./reports/reportExport');
     const headers = ['ID', 'First Name', 'Middle Name', 'Last Name', 'Email', 'Grade Level', 'Application Period', 'Status', 'Submitted'];
     const rows: (string | number)[][] = admissions.map(a => [
       a.id,
@@ -200,7 +202,8 @@ export default function EmployeeReports() {
     showToast(`Applicant list ${format === 'pdf' ? 'exported' : 'downloaded'}!`, 'success');
   };
 
-  const exportResults = (format: 'csv' | 'pdf' = 'csv') => {
+  const exportResults = async (format: 'csv' | 'pdf' = 'csv') => {
+    const { buildActiveFilters, downloadCSV, getChartSvgMarkup, printPdfReport } = await import('./reports/reportExport');
     const headers = ['Student', 'Exam', 'Score', 'Max', 'Percentage', 'Passed', 'Essay Reviewed', 'Date'];
     const rows: (string | number)[][] = results.map(r => {
       const reg = regsById.get(r.registrationId);
@@ -234,7 +237,8 @@ export default function EmployeeReports() {
     showToast(`Results ${format === 'pdf' ? 'exported' : 'downloaded'}!`, 'success');
   };
 
-  const exportSchedules = (format: 'csv' | 'pdf' = 'csv') => {
+  const exportSchedules = async (format: 'csv' | 'pdf' = 'csv') => {
+    const { buildActiveFilters, downloadCSV, getChartSvgMarkup, printPdfReport } = await import('./reports/reportExport');
     const headers = ['Exam', 'Date', 'Start Time', 'End Time', 'Registration Open', 'Registration Close', 'Max Slots', 'Booked'];
     const rows: (string | number)[][] = schedules.map(s => {
       const exam = exams.find(e => e.id === s.examId);
@@ -447,16 +451,18 @@ export default function EmployeeReports() {
         })}
       </div>
 
-      <ReportsCharts
-        sortedStats={sortedStats}
-        monthData={monthData}
-        admissionStatusData={admissionStatusData}
-        admissionStatusTotal={admissionStatusTotal}
-        resultsCount={results.length}
-        passFailData={passFailData}
-        scoreBandData={scoreBandData}
-        scheduleUtilizationData={scheduleUtilizationData}
-      />
+      <Suspense fallback={<LazyLoadingFallback />}>
+        <ReportsCharts
+          sortedStats={sortedStats}
+          monthData={monthData}
+          admissionStatusData={admissionStatusData}
+          admissionStatusTotal={admissionStatusTotal}
+          resultsCount={results.length}
+          passFailData={passFailData}
+          scoreBandData={scoreBandData}
+          scheduleUtilizationData={scheduleUtilizationData}
+        />
+      </Suspense>
       
       {/* Key Metrics Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

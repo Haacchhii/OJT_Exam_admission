@@ -87,6 +87,9 @@ model Admission {
   @@index([semesterId])
   @@index([submittedAt])
   @@index([deletedAt])
+  @@index([deletedAt, status, submittedAt])
+  @@index([deletedAt, levelGroup, gradeLevel, submittedAt])
+  @@index([deletedAt, academicYearId, semesterId, submittedAt])
   @@map("admissions")
 }
 
@@ -223,6 +226,8 @@ model ExamSchedule {
 
   @@index([examId])
   @@index([scheduledDate])
+  @@index([examId, scheduledDate])
+  @@index([scheduledDate, examId])
   @@map("exam_schedules")
 }
 
@@ -249,6 +254,8 @@ model ExamRegistration {
   @@index([scheduleId])
   @@index([status])
   @@index([userEmail, status])
+  @@index([scheduleId, status])
+  @@index([createdAt])
   @@map("exam_registrations")
 }
 
@@ -310,6 +317,8 @@ model EssayAnswer {
 
   @@index([scored])
   @@index([registrationId])
+  @@index([registrationId, scored])
+  @@index([scored, createdAt])
   @@unique([registrationId, questionId])
   @@map("essay_answers")
 }

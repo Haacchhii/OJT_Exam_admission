@@ -1,12 +1,14 @@
-﻿import { useEffect, useState } from 'react';
+﻿import { Suspense, useEffect, useState } from 'react';
 import Icon from '../../components/Icons';
-import ExamsList from './exams/ExamsList';
-import ExamBuilder from './exams/ExamBuilder';
-import ScheduleManager from './exams/ScheduleManager';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
 import { showToast } from '../../components/Toast';
+import { lazyWithRetry, LazyLoadingFallback } from '../../components/lazyWithRetry';
 import type { Exam } from '../../types';
+
+const ExamsList = lazyWithRetry(() => import('./exams/ExamsList'));
+const ExamBuilder = lazyWithRetry(() => import('./exams/ExamBuilder'));
+const ScheduleManager = lazyWithRetry(() => import('./exams/ScheduleManager'));
 
 export default function EmployeeExams() {
   const { user } = useAuth();
@@ -53,9 +55,11 @@ export default function EmployeeExams() {
           </button>
         )})}
       </div>
-      {tab === 'exams' && <ExamsList onEdit={isRegistrar ? undefined : (exam: Exam) => { setEditExamData(exam); setTab('builder'); }} />}
-      {tab === 'builder' && !isRegistrar && <ExamBuilder editExam={editExamData} onDone={() => { setEditExamData(null); setTab('exams'); }} />}
-      {tab === 'schedules' && !isRegistrar && <ScheduleManager />}
+      <Suspense fallback={<LazyLoadingFallback />}>
+        {tab === 'exams' && <ExamsList onEdit={isRegistrar ? undefined : (exam: Exam) => { setEditExamData(exam); setTab('builder'); }} />}
+        {tab === 'builder' && !isRegistrar && <ExamBuilder editExam={editExamData} onDone={() => { setEditExamData(null); setTab('exams'); }} />}
+        {tab === 'schedules' && !isRegistrar && <ScheduleManager />}
+      </Suspense>
     </div>
   );
 }

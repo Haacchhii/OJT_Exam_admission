@@ -175,7 +175,17 @@ export async function getDashboardSummary(req, res, next) {
           where: { deletedAt: null },
           orderBy: { submittedAt: 'desc' },
           take: 200,
-          include: { documents: true, academicYear: true, semester: true },
+          select: {
+            id: true,
+            firstName: true,
+            middleName: true,
+            lastName: true,
+            email: true,
+            gradeLevel: true,
+            levelGroup: true,
+            status: true,
+            submittedAt: true,
+          },
         }),
         prisma.admission.findMany({
           where: { deletedAt: null, submittedAt: { gte: weekAgo } },
@@ -260,7 +270,7 @@ export async function getDashboardSummary(req, res, next) {
       return {
         stats,
         trends,
-        admissions: recentAdmissions.map(shapeAdmission),
+        admissions: recentAdmissions,
         overdue,
         exams: examActivity,
         completed,
