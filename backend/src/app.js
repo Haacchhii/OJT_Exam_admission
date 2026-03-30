@@ -74,6 +74,14 @@ app.use(express.urlencoded({ extended: true, limit: BODY_SIZE_LIMIT }));
 // Lightweight API timing log to track endpoint p95 improvements.
 app.use((req, res, next) => {
   const startedAt = process.hrtime.bigint();
+  const originalJson = res.json.bind(res);
+  res.json = (payload) => {
+    if (req.originalUrl.startsWith('/api/')) {
+      const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
+      res.setHeader('X-Response-Time-Ms', elapsedMs.toFixed(1));
+    }
+    return originalJson(payload);
+  };
   res.on('finish', () => {
     if (!req.originalUrl.startsWith('/api/')) return;
     const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;

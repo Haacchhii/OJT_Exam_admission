@@ -21,6 +21,15 @@ export function useAsync<T>(
   fnRef.current = asyncFn;
 
   const isFirstLoad = useRef(true);
+  const lastAutoRefreshAt = useRef(0);
+  const AUTO_REFRESH_MIN_INTERVAL_MS = 8000;
+
+  const triggerAutoRefresh = useCallback(() => {
+    const now = Date.now();
+    if (now - lastAutoRefreshAt.current < AUTO_REFRESH_MIN_INTERVAL_MS) return;
+    lastAutoRefreshAt.current = now;
+    setRefreshCount(c => c + 1);
+  }, []);
 
   const refetch = useCallback(() => setRefreshCount(c => c + 1), []);
 
@@ -58,23 +67,23 @@ export function useAsync<T>(
       const timer = setInterval(() => {
         // Only fetch if the browser tab is currently active
         if (!document.hidden) {
-          setRefreshCount(c => c + 1);
+          triggerAutoRefresh();
         }
       }, pollInterval);
       return () => clearInterval(timer);
     }
-  }, [pollInterval]);
+  }, [pollInterval, triggerAutoRefresh]);
 
   useEffect(() => {
-    const onDataChanged = () => setRefreshCount(c => c + 1);
+    const onDataChanged = () => triggerAutoRefresh();
     window.addEventListener('gk:data-changed', onDataChanged);
     return () => window.removeEventListener('gk:data-changed', onDataChanged);
-  }, []);
+  }, [triggerAutoRefresh]);
 
   useEffect(() => {
-    const onFocus = () => setRefreshCount(c => c + 1);
+    const onFocus = () => triggerAutoRefresh();
     const onVisibility = () => {
-      if (!document.hidden) setRefreshCount(c => c + 1);
+      if (!document.hidden) triggerAutoRefresh();
     };
 
     window.addEventListener('focus', onFocus);
@@ -84,7 +93,7 @@ export function useAsync<T>(
       window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, []);
+  }, [triggerAutoRefresh]);
 
   return { data, loading, error, refetch };
 }
