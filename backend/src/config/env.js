@@ -1,5 +1,28 @@
 import 'dotenv/config';
 
+function normalizeUrl(url) {
+  return String(url || '').trim().replace(/\/+$/, '');
+}
+
+function isLocalUrl(url) {
+  return /localhost|127\.0\.0\.1/i.test(String(url || ''));
+}
+
+function deriveAppUrl() {
+  const explicit = normalizeUrl(process.env.APP_URL);
+  if (explicit) return explicit;
+
+  const corsOrigins = String(process.env.CORS_ORIGIN || '')
+    .split(',')
+    .map((origin) => normalizeUrl(origin))
+    .filter(Boolean);
+
+  const nonLocalOrigin = corsOrigins.find((origin) => !isLocalUrl(origin));
+  if (nonLocalOrigin) return nonLocalOrigin;
+
+  return 'http://localhost:5173';
+}
+
 const env = {
   PORT:             parseInt(process.env.PORT, 10) || 3000,
   DATABASE_URL:     process.env.DATABASE_URL,
@@ -16,7 +39,7 @@ const env = {
   SMTP_PASS:        process.env.SMTP_PASS || '',
   SMTP_FROM:        process.env.SMTP_FROM || '',
   // Public URL of the frontend (used in email links)
-  APP_URL:          process.env.APP_URL || 'http://localhost:5173',
+  APP_URL:          deriveAppUrl(),
   // Toggle whether applicants must verify email before accessing protected routes
   EMAIL_VERIFICATION_REQUIRED: (process.env.EMAIL_VERIFICATION_REQUIRED || 'true').toLowerCase() === 'true',
   CORS_MAX_AGE_SECONDS: parseInt(process.env.CORS_MAX_AGE_SECONDS, 10) || 600,
@@ -40,6 +63,9 @@ if (env.NODE_ENV === 'production') {
   }
   if (env.CORS_ORIGIN.includes('localhost')) {
     console.warn('WARNING: CORS_ORIGIN contains "localhost" in production — set it to your deployed URL');
+  }
+  if (isLocalUrl(env.APP_URL)) {
+    console.warn('WARNING: APP_URL resolves to localhost in production — email links will be invalid. Set APP_URL to your deployed frontend URL.');
   }
 } else {
   if (env.JWT_SECRET === 'dev-secret') {
