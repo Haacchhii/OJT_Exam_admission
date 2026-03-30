@@ -14,6 +14,8 @@ import type { ExamResult, EssayAnswer, ExamRegistration, ExamSchedule, Exam, Use
 
 const RESULTS_PER_PAGE = 10;
 const ANALYTICS_PER_PAGE = 8;
+const ESSAY_EXAMS_PER_PAGE = 8;
+const ESSAY_ROWS_PER_PAGE = 8;
 
 function semesterLabel(s: Semester) {
   const start = s.startDate ? formatDate(String(s.startDate)) : null;
@@ -83,6 +85,8 @@ export default function EmployeeResults() {
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsPage, setAnalyticsPage] = useState(1);
   const [resultsPage, setResultsPage] = useState(1);
+  const [essayExamsPage, setEssayExamsPage] = useState(1);
+  const [essayRowsPage, setEssayRowsPage] = useState(1);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [selectedEssayExamId, setSelectedEssayExamId] = useState<number | null>(null);
 
@@ -212,6 +216,8 @@ export default function EmployeeResults() {
     return summaries.sort((a, b) => b.pendingCount - a.pendingCount || a.examTitle.localeCompare(b.examTitle));
   }, [enrichedEssays, regsById, schedulesById, examsById]);
 
+  const { paginated: paginatedEssaySummary, totalPages: essaySummaryTotalPages, safePage: essaySummarySafePage, totalItems: essaySummaryTotal } = usePaginationSlice(examEssaySummary, essayExamsPage, ESSAY_EXAMS_PER_PAGE);
+
 
   const essaysByExamId = useMemo(() => {
     const grouped = new Map<number, EnrichedEssay[]>();
@@ -228,6 +234,13 @@ export default function EmployeeResults() {
     }
     return grouped;
   }, [enrichedEssays, regsById, schedulesById, examsById]);
+
+  const selectedExamRows = useMemo(() => {
+    if (!selectedEssayExamId) return [] as EnrichedEssay[];
+    return essaysByExamId.get(selectedEssayExamId) || [];
+  }, [selectedEssayExamId, essaysByExamId]);
+
+  const { paginated: paginatedEssayRows, totalPages: essayRowsTotalPages, safePage: essayRowsSafePage, totalItems: essayRowsTotal } = usePaginationSlice(selectedExamRows, essayRowsPage, ESSAY_ROWS_PER_PAGE);
 
   function getStudentName(regId: number): string {
     const reg = regsById.get(regId);
@@ -515,9 +528,8 @@ export default function EmployeeResults() {
                         </tr>
                       </thead>
                       <tbody>
-                        {examEssaySummary.map(row => {
+                        {paginatedEssaySummary.map(row => {
                           const active = selectedEssayExamId === row.examId;
-                          const examRows = essaysByExamId.get(row.examId) || [];
                           return (
                             <Fragment key={row.examId}>
                               <tr key={row.examId} className={`border-b border-gray-50 hover:bg-gray-50 ${active ? 'bg-forest-50/50' : ''}`}>
@@ -535,7 +547,10 @@ export default function EmployeeResults() {
                                 <td className="py-3 px-2 text-right">
                                   <button
                                     type="button"
-                                    onClick={() => setSelectedEssayExamId(active ? null : row.examId)}
+                                    onClick={() => {
+                                      setSelectedEssayExamId(active ? null : row.examId);
+                                      setEssayRowsPage(1);
+                                    }}
                                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${active ? 'border border-gray-300 text-gray-700 hover:bg-gray-50' : 'bg-forest-500 text-white hover:bg-forest-600'}`}
                                   >
                                     {active ? 'Hide Students' : 'View Students'}
@@ -545,7 +560,7 @@ export default function EmployeeResults() {
                               {active && (
                                 <tr className="bg-white border-b border-gray-100">
                                   <td colSpan={7} className="px-2 py-3">
-                                    {examRows.length > 0 ? (
+                                    {paginatedEssayRows.length > 0 ? (
                                       <div className="rounded-lg border border-gray-200 overflow-hidden">
                                         <table className="w-full text-sm">
                                           <thead>
@@ -559,7 +574,7 @@ export default function EmployeeResults() {
                                             </tr>
                                           </thead>
                                           <tbody>
-                                            {examRows.map(e => (
+                                            {paginatedEssayRows.map(e => (
                                               <tr key={e.id} className="border-t border-gray-100 hover:bg-gray-50 align-top">
                                                 <td className="py-2 px-2 font-medium text-forest-500">{e.studentName}</td>
                                                 <td className="py-2 px-2 max-w-[420px]">
@@ -588,6 +603,9 @@ export default function EmployeeResults() {
                                             ))}
                                           </tbody>
                                         </table>
+                                        <div className="px-2">
+                                          <Pagination currentPage={essayRowsSafePage} totalPages={essayRowsTotalPages} onPageChange={setEssayRowsPage} totalItems={essayRowsTotal} itemsPerPage={ESSAY_ROWS_PER_PAGE} />
+                                        </div>
                                       </div>
                                     ) : (
                                       <p className="text-sm text-gray-500">No essay answers found for this exam.</p>
@@ -601,6 +619,7 @@ export default function EmployeeResults() {
                       </tbody>
                     </table>
                   </div>
+                  <Pagination currentPage={essaySummarySafePage} totalPages={essaySummaryTotalPages} onPageChange={setEssayExamsPage} totalItems={essaySummaryTotal} itemsPerPage={ESSAY_EXAMS_PER_PAGE} />
                 </div>
               )}
             </div>

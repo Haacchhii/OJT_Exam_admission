@@ -11,6 +11,7 @@ import Icon from '../../components/Icons';
 import type { Admission } from '../../types';
 
 const PER_PAGE = 5;
+const EXAMS_PER_PAGE = 8;
 const SLA_DAYS = 7;
 
 function daysPending(submittedAt: string) {
@@ -24,6 +25,7 @@ export default function EmployeeDashboard() {
   const [levelGroupFilter, setLevelGroupFilter] = useState('all');
   const [gradeFilter, setGradeFilter] = useState('all');
   const [page, setPage] = useState(1);
+  const [examPage, setExamPage] = useState(1);
 
   const { socket, isConnected } = useSocket();
 
@@ -56,6 +58,7 @@ export default function EmployeeDashboard() {
   }, [rawData, statusFilter, levelGroupFilter, gradeFilter, search]);
 
   const { paginated, totalPages, safePage, totalItems } = usePaginationSlice(filtered, page, PER_PAGE);
+  const { paginated: paginatedExams, totalPages: examTotalPages, safePage: safeExamPage, totalItems: examTotalItems } = usePaginationSlice(rawData?.exams || [], examPage, EXAMS_PER_PAGE);
 
   const handleSearch = (v: string) => { setSearch(v); setPage(1); };
   const handleStatus = (v: string) => { setStatusFilter(v); setPage(1); };
@@ -184,7 +187,7 @@ export default function EmployeeDashboard() {
               </tr>
             </thead>
             <tbody>
-              {(rawData?.exams || []).map(exam => {
+              {paginatedExams.map(exam => {
                 return (
                   <tr key={exam.id}>
                     <td className="font-medium text-gray-800">{exam.title}</td>
@@ -196,10 +199,11 @@ export default function EmployeeDashboard() {
                   </tr>
                 );
               })}
-              {(rawData?.exams || []).length === 0 && <tr><td colSpan={6} className="text-center text-gray-400 py-8">No exams created yet.</td></tr>}
+              {paginatedExams.length === 0 && <tr><td colSpan={6} className="text-center text-gray-400 py-8">No exams created yet.</td></tr>}
             </tbody>
           </table>
         </div>
+        <Pagination currentPage={safeExamPage} totalPages={examTotalPages} onPageChange={setExamPage} totalItems={examTotalItems} itemsPerPage={EXAMS_PER_PAGE} />
       </div>
       )}
     </div>
