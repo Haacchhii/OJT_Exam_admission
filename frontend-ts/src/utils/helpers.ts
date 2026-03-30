@@ -15,9 +15,12 @@ export function asArray<T>(val: unknown): T[] {
 
 export function formatDate(isoString: string | null | undefined): string {
   if (!isoString) return '—';
-  const d = new Date(isoString);
+  const dateOnlyMatch = String(isoString).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const d = dateOnlyMatch
+    ? new Date(Number(dateOnlyMatch[1]), Number(dateOnlyMatch[2]) - 1, Number(dateOnlyMatch[3]))
+    : new Date(isoString);
   if (isNaN(d.getTime())) return '—';
-  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
 export function formatTime(timeStr: string | null | undefined): string {

@@ -10,7 +10,7 @@ import { useSelection } from '../../../hooks/useSelection';
 import BulkActionBar from '../../../components/BulkActionBar';
 import { PageHeader, StatCard, Badge, EmptyState, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert } from '../../../components/UI';
 import Icon from '../../../components/Icons';
-import { formatTime, badgeClass, asArray, exportToCSV, formatPersonName } from '../../../utils/helpers';
+import { formatTime, badgeClass, asArray, exportToCSV, formatPersonName, formatDate } from '../../../utils/helpers';
 import { DetailField, QuestionCard } from './ExamComponents';
 import ExamPreviewModal from './ExamPreviewModal';
 import { CSVUploader } from '../../../components/CSVUploader';
@@ -23,8 +23,8 @@ const READINESS_PER_PAGE = 10;
 const QUESTIONS_PER_PAGE = 5;
 
 function semesterLabel(s: Semester) {
-  const start = s.startDate ? String(s.startDate).slice(0, 10) : null;
-  const end = s.endDate ? String(s.endDate).slice(0, 10) : null;
+  const start = s.startDate ? formatDate(String(s.startDate)) : null;
+  const end = s.endDate ? formatDate(String(s.endDate)) : null;
   if (start || end) return `${s.name} (${start || 'open'} to ${end || 'open'})`;
   return s.name;
 }

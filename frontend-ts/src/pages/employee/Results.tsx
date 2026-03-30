@@ -18,8 +18,8 @@ const RESULTS_PER_PAGE = 10;
 const ANALYTICS_PER_PAGE = 8;
 
 function semesterLabel(s: Semester) {
-  const start = s.startDate ? String(s.startDate).slice(0, 10) : null;
-  const end = s.endDate ? String(s.endDate).slice(0, 10) : null;
+  const start = s.startDate ? formatDate(String(s.startDate)) : null;
+  const end = s.endDate ? formatDate(String(s.endDate)) : null;
   if (start || end) return `${s.name} (${start || 'open'} to ${end || 'open'})`;
   return s.name;
 }
