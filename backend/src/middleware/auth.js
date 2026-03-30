@@ -56,8 +56,13 @@ export async function authenticate(req, res, next) {
     }
 
     if (user?.role === ROLES.APPLICANT) {
-      const syncResult = await syncApplicantUserStatusById(user.id);
-      user.status = syncResult.status || user.status;
+      try {
+        const syncResult = await syncApplicantUserStatusById(user.id);
+        user.status = syncResult.status || user.status;
+      } catch (err) {
+        // If status sync fails, use existing cached status instead of crashing
+        console.error('[Auth] Status sync failed:', err.message);
+      }
     }
 
     if (!user || user.deletedAt || user.status !== 'Active') {

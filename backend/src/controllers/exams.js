@@ -235,7 +235,7 @@ export async function updateExam(req, res, next) {
           },
           include: examDetailInclude,
         });
-      }, { timeout: 10000 });
+      }, { timeout: 20000 });  // Increased from 10s → 20s for Vercel cold starts
       return res.json(shapeExam(result));
     }
 

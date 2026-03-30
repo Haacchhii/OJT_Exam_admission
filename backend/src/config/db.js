@@ -5,8 +5,8 @@ const logLevel = process.env.NODE_ENV === 'production'
   : ['query', 'error', 'warn'];
 
 const isServerless = Boolean(process.env.VERCEL);
-const defaultPoolSize = isServerless ? 1 : 20;
-const defaultPoolTimeout = isServerless ? 5 : 10;
+const defaultPoolSize = isServerless ? 5 : 20;        // Increased from 1 → 5 for Vercel
+const defaultPoolTimeout = isServerless ? 10 : 10;     // Increased from 5 → 10 for Vercel
 
 const parsedPoolSize = Number.parseInt(process.env.DATABASE_POOL_SIZE ?? '', 10);
 const parsedPoolTimeout = Number.parseInt(process.env.DATABASE_POOL_TIMEOUT ?? '', 10);

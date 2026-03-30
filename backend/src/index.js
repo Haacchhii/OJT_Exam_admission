@@ -8,8 +8,13 @@ const server = app.listen(env.PORT, () => {
   console.log(`[cors] allowed origins from env: ${env.CORS_ORIGIN}`);
 });
 
-// Initialize Socket.io attached to the HTTP server
-initIo(server);
+// Initialize Socket.io only on non-serverless environments
+// Vercel serverless doesn't support persistent connections (no cold start optimization)
+if (!process.env.VERCEL) {
+  initIo(server);
+} else {
+  console.log('[Socket.io] Disabled in Vercel serverless environment');
+}
 
 // --- Graceful shutdown ----------------------------------------------
 async function shutdown(signal) {
