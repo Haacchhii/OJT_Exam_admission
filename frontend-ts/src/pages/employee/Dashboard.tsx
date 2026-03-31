@@ -36,12 +36,18 @@ export default function EmployeeDashboard() {
 
   useEffect(() => {
     if (!socket || !isConnected) return;
+    let refetchTimer: ReturnType<typeof setTimeout> | null = null;
     const handleUpdate = () => {
-      refetch();
+      if (refetchTimer) return;
+      refetchTimer = setTimeout(() => {
+        refetchTimer = null;
+        refetch();
+      }, 350);
     };
     socket.on('admission_status_updated', handleUpdate);
     return () => {
       socket.off('admission_status_updated', handleUpdate);
+      if (refetchTimer) clearTimeout(refetchTimer);
     };
   }, [socket, isConnected, refetch]);
 

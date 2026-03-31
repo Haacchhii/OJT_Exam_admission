@@ -1,7 +1,6 @@
 ﻿import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useAsync } from '../../hooks/useAsync';
-import { getEmployeeResultsSummary, scoreEssay, getQuestionAnalyticsPage, type EmployeeResultsSummary } from '../../api/results';
-import { getAcademicYears, getSemesters } from '../../api/academicYears';
+import { getEmployeeResultsSummary, scoreEssay, getQuestionAnalyticsPage } from '../../api/results';
 import { SCHOOL_NAME, SCHOOL_BRAND, SCHOOL_SUBTITLE, SCHOOL_ADDRESS, SCHOOL_PHONE } from '../../utils/constants';
 import { useAuth } from '../../context/AuthContext';
 import { showToast } from '../../components/Toast';
@@ -31,6 +30,8 @@ interface RawData {
   schedules: ExamSchedule[];
   exams: Exam[];
   essays: EssayAnswer[];
+  academicYears: AcademicYear[];
+  semesters: Semester[];
 }
 
 interface EnrichedResult extends ExamResult {
@@ -102,12 +103,14 @@ export default function EmployeeResults() {
     } as RawData;
   });
 
-  const { data: academicYears } = useAsync<AcademicYear[]>(() => getAcademicYears());
-  const { data: allSemesters } = useAsync<Semester[]>(() => getSemesters());
+  const academicYears = rawData?.academicYears || [];
+  const allSemesters = rawData?.semesters || [];
 
-  const semesterOptions = (allSemesters || []).filter(s =>
-    yearFilter === 'all' || s.academicYearId === Number(yearFilter)
-  );
+  const semesterOptions = useMemo(() => {
+    return allSemesters.filter((s: Semester) =>
+      yearFilter === 'all' || s.academicYearId === Number(yearFilter)
+    );
+  }, [allSemesters, yearFilter]);
 
   const results = rawData?.results || [];
   const regs = rawData?.regs || [];

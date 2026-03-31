@@ -272,9 +272,9 @@ export async function getQuestionAnalytics(req, res, next) {
 // GET /api/results/employee-summary
 export async function getEmployeeSummary(req, res, next) {
   try {
-    const cacheKey = 'resultsEmployeeSummary:v1';
+    const cacheKey = 'resultsEmployeeSummary:v2';
     const summary = await cached(cacheKey, async () => {
-      const [results, regs, users, schedules, exams, essays] = await Promise.all([
+      const [results, essays, academicYears, semesters] = await Promise.all([
         prisma.examResult.findMany({
           orderBy: { createdAt: 'desc' },
           select: {
@@ -288,18 +288,75 @@ export async function getEmployeeSummary(req, res, next) {
             createdAt: true,
           },
         }),
-        prisma.examRegistration.findMany({
+        prisma.essayAnswer.findMany({
           orderBy: { createdAt: 'desc' },
           select: {
             id: true,
-            scheduleId: true,
-            userEmail: true,
-            userId: true,
-            status: true,
+            registrationId: true,
+            questionId: true,
+            essayResponse: true,
+            pointsAwarded: true,
+            maxPoints: true,
+            comment: true,
+            scored: true,
+            scoredById: true,
+            scoredAt: true,
+            question: { select: { questionText: true } },
           },
         }),
+        prisma.academicYear.findMany({
+          orderBy: { year: 'desc' },
+          select: { id: true, year: true, isActive: true, startDate: true, endDate: true },
+        }),
+        prisma.semester.findMany({
+          orderBy: [{ academicYearId: 'desc' }, { name: 'asc' }],
+          select: { id: true, name: true, academicYearId: true, isActive: true, startDate: true, endDate: true },
+        }),
+      ]);
+
+      const registrationIds = Array.from(new Set([
+        ...results.map((r) => r.registrationId),
+        ...essays.map((e) => e.registrationId),
+      ]));
+
+      if (!registrationIds.length) {
+        return {
+          results: [],
+          regs: [],
+          users: [],
+          schedules: [],
+          exams: [],
+          essays: [],
+          academicYears,
+          semesters,
+        };
+      }
+
+      const regs = await prisma.examRegistration.findMany({
+        where: { id: { in: registrationIds } },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          scheduleId: true,
+          userEmail: true,
+          userId: true,
+          status: true,
+        },
+      });
+
+      const scheduleIds = Array.from(new Set(regs.map((r) => r.scheduleId)));
+      const userIds = Array.from(new Set(regs.map((r) => r.userId).filter((id) => typeof id === 'number')));
+      const userEmails = Array.from(new Set(regs.map((r) => r.userEmail).filter(Boolean)));
+
+      const [users, schedules] = await Promise.all([
         prisma.user.findMany({
-          where: { deletedAt: null },
+          where: {
+            deletedAt: null,
+            OR: [
+              ...(userIds.length ? [{ id: { in: userIds } }] : []),
+              ...(userEmails.length ? [{ email: { in: userEmails } }] : []),
+            ],
+          },
           orderBy: { createdAt: 'desc' },
           select: {
             id: true,
@@ -310,37 +367,38 @@ export async function getEmployeeSummary(req, res, next) {
             applicantProfile: { select: { gradeLevel: true } },
           },
         }),
-        prisma.examSchedule.findMany({
-          orderBy: { scheduledDate: 'desc' },
-          select: {
-            id: true,
-            examId: true,
-            scheduledDate: true,
-            startTime: true,
-            endTime: true,
-          },
-        }),
-        prisma.exam.findMany({
-          where: { deletedAt: null },
-          orderBy: { createdAt: 'desc' },
-          select: {
-            id: true,
-            title: true,
-            gradeLevel: true,
-            passingScore: true,
-            academicYear: { select: { id: true } },
-            semester: { select: { id: true } },
-          },
-        }),
-        prisma.essayAnswer.findMany({
-          orderBy: { createdAt: 'desc' },
-          include: {
-            question: { select: { questionText: true } },
-          },
-        }),
+        scheduleIds.length
+          ? prisma.examSchedule.findMany({
+              where: { id: { in: scheduleIds } },
+              orderBy: { scheduledDate: 'desc' },
+              select: {
+                id: true,
+                examId: true,
+                scheduledDate: true,
+                startTime: true,
+                endTime: true,
+              },
+            })
+          : Promise.resolve([]),
       ]);
 
-      return { results, regs, users, schedules, exams, essays };
+      const examIds = Array.from(new Set(schedules.map((s) => s.examId)));
+      const exams = examIds.length
+        ? await prisma.exam.findMany({
+            where: { id: { in: examIds }, deletedAt: null },
+            orderBy: { createdAt: 'desc' },
+            select: {
+              id: true,
+              title: true,
+              gradeLevel: true,
+              passingScore: true,
+              academicYear: { select: { id: true } },
+              semester: { select: { id: true } },
+            },
+          })
+        : [];
+
+      return { results, regs, users, schedules, exams, essays, academicYears, semesters };
     }, 15_000);
 
     res.json(summary);

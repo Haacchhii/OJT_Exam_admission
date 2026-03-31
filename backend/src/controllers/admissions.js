@@ -159,8 +159,10 @@ export async function getDashboardSummary(req, res, next) {
         total,
         grouped,
         recentAdmissions,
-        thisWeek,
-        lastWeek,
+        thisWeekTotal,
+        lastWeekTotal,
+        thisWeekGrouped,
+        lastWeekGrouped,
         exams,
         registrationGrouped,
         pendingEssays,
@@ -187,13 +189,17 @@ export async function getDashboardSummary(req, res, next) {
             submittedAt: true,
           },
         }),
-        prisma.admission.findMany({
+        prisma.admission.count({ where: { deletedAt: null, submittedAt: { gte: weekAgo } } }),
+        prisma.admission.count({ where: { deletedAt: null, submittedAt: { gte: twoWeeksAgo, lt: weekAgo } } }),
+        prisma.admission.groupBy({
+          by: ['status'],
+          _count: { _all: true },
           where: { deletedAt: null, submittedAt: { gte: weekAgo } },
-          select: { status: true },
         }),
-        prisma.admission.findMany({
+        prisma.admission.groupBy({
+          by: ['status'],
+          _count: { _all: true },
           where: { deletedAt: null, submittedAt: { gte: twoWeeksAgo, lt: weekAgo } },
-          select: { status: true },
         }),
         prisma.exam.findMany({
           where: { deletedAt: null },
@@ -255,13 +261,16 @@ export async function getDashboardSummary(req, res, next) {
       };
 
       const pct = (curr, prev) => (prev === 0 ? (curr > 0 ? 100 : 0) : Math.round(((curr - prev) / prev) * 100));
-      const countStatus = (rows, status) => rows.filter((a) => a.status === status).length;
-      const countInProgress = (rows) => rows.filter((a) => ADMISSION_IN_PROGRESS.includes(a.status)).length;
+      const statusCountMap = (rows) => Object.fromEntries(rows.map((row) => [row.status, row._count._all]));
+      const thisWeekStatusMap = statusCountMap(thisWeekGrouped);
+      const lastWeekStatusMap = statusCountMap(lastWeekGrouped);
+      const countStatus = (map, status) => map[status] || 0;
+      const countInProgress = (map) => ADMISSION_IN_PROGRESS.reduce((sum, status) => sum + (map[status] || 0), 0);
       const trends = {
-        total: pct(thisWeek.length, lastWeek.length),
-        accepted: pct(countStatus(thisWeek, 'Accepted'), countStatus(lastWeek, 'Accepted')),
-        inProgress: pct(countInProgress(thisWeek), countInProgress(lastWeek)),
-        rejected: pct(countStatus(thisWeek, 'Rejected'), countStatus(lastWeek, 'Rejected')),
+        total: pct(thisWeekTotal, lastWeekTotal),
+        accepted: pct(countStatus(thisWeekStatusMap, 'Accepted'), countStatus(lastWeekStatusMap, 'Accepted')),
+        inProgress: pct(countInProgress(thisWeekStatusMap), countInProgress(lastWeekStatusMap)),
+        rejected: pct(countStatus(thisWeekStatusMap, 'Rejected'), countStatus(lastWeekStatusMap, 'Rejected')),
       };
 
       const overdue = recentAdmissions.filter((a) => ADMISSION_IN_PROGRESS.includes(a.status) && Math.floor((Date.now() - new Date(a.submittedAt).getTime()) / 86400000) > 7).length;

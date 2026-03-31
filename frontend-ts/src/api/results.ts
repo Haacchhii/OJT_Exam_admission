@@ -1,7 +1,9 @@
 import { client, qs } from './client';
 import type {
+  AcademicYear,
   ExamResult,
   EssayAnswer,
+  Semester,
   SubmittedAnswer,
 } from '../types';
 
@@ -41,6 +43,8 @@ export interface EmployeeResultsSummary {
     questions?: Array<{ id: number; questionText: string }>;
   }>;
   essays: EssayAnswer[];
+  academicYears: AcademicYear[];
+  semesters: Semester[];
 }
 
 export async function getExamResults(params?: ResultParams) {

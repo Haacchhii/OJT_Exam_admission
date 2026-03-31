@@ -78,6 +78,11 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
   const allUsers: User[] = data?.allUsers || [];
   const allResults: ExamResult[] = data?.allResults || [];
 
+  const usersByEmail = useMemo(() => new Map(allUsers.map(u => [u.email, u])), [allUsers]);
+  const schedulesById = useMemo(() => new Map(schedules.map(s => [s.id, s])), [schedules]);
+  const examsById = useMemo(() => new Map(exams.map(e => [e.id, e])), [exams]);
+  const resultsByRegId = useMemo(() => new Map(allResults.map(r => [r.registrationId, r])), [allResults]);
+
   const filteredExams = useMemo(() => {
     let list = exams;
     if (searchExam.trim()) {
@@ -195,13 +200,13 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
 
   const readinessRows = useMemo(() => {
     return regs.map(r => {
-      const user = allUsers.find(u => u.email === r.userEmail);
-      const sched = schedules.find(s => s.id === r.scheduleId);
-      const exam = sched ? exams.find(e => e.id === sched.examId) : null;
-      const result = allResults.find(res => res.registrationId === r.id);
+      const user = usersByEmail.get(r.userEmail);
+      const sched = schedulesById.get(r.scheduleId);
+      const exam = sched ? examsById.get(sched.examId) : null;
+      const result = resultsByRegId.get(r.id);
       return { ...r, user, exam, schedule: sched, result };
     });
-  }, [regs, allUsers, schedules, exams, allResults]);
+  }, [regs, usersByEmail, schedulesById, examsById, resultsByRegId]);
 
   const filteredReadiness = useMemo(() => {
     let list = readinessRows;
@@ -231,7 +236,8 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
     const exam = exams.find(e => e.id === detailId);
     if (!exam) return null;
     const eSched = schedules.filter(s => s.examId === exam.id);
-    const eRegs = regs.filter(r => eSched.some(s => s.id === r.scheduleId));
+    const eSchedIds = new Set(eSched.map(s => s.id));
+    const eRegs = regs.filter(r => eSchedIds.has(r.scheduleId));
     const completed = eRegs.filter(r => r.status === 'done').length;
     
 
@@ -282,8 +288,8 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
                 </tr></thead>
                 <tbody>
                   {eRegs.map(r => {
-                    const student = allUsers.find(u => u.email === r.userEmail);
-                    const sc = eSched.find(s => s.id === r.scheduleId);
+                    const student = usersByEmail.get(r.userEmail);
+                    const sc = schedulesById.get(r.scheduleId);
                     return (
                       <tr key={r.id} className="border-b border-gray-50">
                         <td className="py-3 px-2 font-medium">{student ? formatPersonName(student) : 'Unknown'}</td>

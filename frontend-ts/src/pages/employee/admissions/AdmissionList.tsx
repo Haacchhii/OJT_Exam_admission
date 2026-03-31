@@ -102,11 +102,18 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
 
   useEffect(() => {
     if (!socket || !isConnected) return;
-    socket.on('admission_status_updated', () => {
-      refetch();
-    });
+    let refetchTimer: ReturnType<typeof setTimeout> | null = null;
+    const handleStatusUpdate = () => {
+      if (refetchTimer) return;
+      refetchTimer = setTimeout(() => {
+        refetchTimer = null;
+        refetch();
+      }, 350);
+    };
+    socket.on('admission_status_updated', handleStatusUpdate);
     return () => {
-      socket.off('admission_status_updated');
+      socket.off('admission_status_updated', handleStatusUpdate);
+      if (refetchTimer) clearTimeout(refetchTimer);
     };
   }, [socket, isConnected, refetch]);
 
