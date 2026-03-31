@@ -12,6 +12,7 @@ import NotFound from './pages/NotFound';
 import { useAuth } from './context/AuthContext';
 import { LoadingSpinner } from './components/UI';
 import { lazyWithRetry, LazyLoadingFallback } from './components/lazyWithRetry';
+import { prefetchLikelyRoutesForRole } from './utils/routePrefetch';
 
 /* Auth pages — eager load (first paint for most users) */
 import Login from './pages/auth/Login';
@@ -74,6 +75,21 @@ export default function App() {
       localStorage.removeItem('gk_dark');
     } catch {
       // Ignore storage access issues
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('gk_current_user');
+      const parsed = raw ? (JSON.parse(raw) as { role?: string }) : null;
+      const role = parsed?.role || null;
+      const currentPath = window.location.hash ? window.location.hash.slice(1) : '/';
+
+      if (role === 'applicant' || role === 'administrator' || role === 'registrar' || role === 'teacher') {
+        prefetchLikelyRoutesForRole(role, currentPath);
+      }
+    } catch {
+      // Ignore storage access issues.
     }
   }, []);
 

@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useConfirm } from './ConfirmDialog';
 import Icon from './Icons';
 import { SCHOOL_BRAND, SCHOOL_SUBTITLE } from '../utils/constants';
+import { prefetchRouteByPath } from '../utils/routePrefetch';
 
 interface LinkItem {
   to: string;
@@ -93,6 +94,9 @@ export default function Sidebar({ open, onClose, role, collapsed, onToggleCollap
                 to={l.to}
                 end={l.end}
                 onClick={onClose}
+                onMouseEnter={() => prefetchRouteByPath(l.to)}
+                onFocus={() => prefetchRouteByPath(l.to)}
+                onTouchStart={() => prefetchRouteByPath(l.to)}
                 title={collapsed ? l.label : undefined}
                 aria-label={l.label}
                 className={({ isActive }) =>
