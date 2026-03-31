@@ -1,13 +1,12 @@
 ﻿import { Suspense, useState, useMemo } from 'react';
 import { useAsync } from '../../hooks/useAsync';
-import { getReportsSummary, type EmployeeReportsSummary } from '../../api/admissions';
+import { getReportsSummary } from '../../api/admissions';
 import { formatPersonName, formatDate } from '../../utils/helpers';
-import { getAcademicYears, getSemesters } from '../../api/academicYears';
 import { showToast } from '../../components/Toast';
 import { PageHeader, SkeletonPage, ErrorAlert } from '../../components/UI';
 import Icon from '../../components/Icons';
 import { lazyWithRetry, LazyLoadingFallback } from '../../components/lazyWithRetry';
-import { ADMISSION_STATUSES, SCHOOL_NAME, GRADE_OPTIONS, ALL_GRADE_LEVELS } from '../../utils/constants';
+import { ADMISSION_STATUSES, GRADE_OPTIONS, ALL_GRADE_LEVELS } from '../../utils/constants';
 import type { Admission, ExamResult, Exam, ExamSchedule, ExamRegistration, EssayAnswer, User, AcademicYear, Semester } from '../../types';
 
 const ReportsCharts = lazyWithRetry(() => import('./reports/ReportsCharts'));
@@ -70,7 +69,21 @@ interface ReportData {
   regs: ExamRegistration[];
   essays: EssayAnswer[];
   users: User[];
+  academicYears: AcademicYear[];
+  semesters: Semester[];
 }
+
+const EMPTY_REPORT_DATA: ReportData = {
+  admissions: [],
+  results: [],
+  exams: [],
+  schedules: [],
+  regs: [],
+  essays: [],
+  users: [],
+  academicYears: [],
+  semesters: [],
+};
 
 export default function EmployeeReports() {
   const [statusFilter, setStatusFilter] = useState('all');
@@ -82,75 +95,100 @@ export default function EmployeeReports() {
   const [dateTo, setDateTo] = useState('');
 
   const { data: rawData, loading, error, refetch } = useAsync<ReportData>(async () => {
-    const settled = await Promise.allSettled([getReportsSummary()]);
-    const only = settled[0];
-    if (only.status === 'rejected') {
-      showToast('Failed to load report data.', 'error');
+    try {
+      const summary = await getReportsSummary();
       return {
-        admissions: [],
-        results: [],
-        exams: [],
-        schedules: [],
-        regs: [],
-        essays: [],
-        users: [],
+        admissions: summary.admissions as Admission[],
+        results: summary.results as ExamResult[],
+        exams: summary.exams as Exam[],
+        schedules: summary.schedules as ExamSchedule[],
+        regs: summary.regs as ExamRegistration[],
+        essays: summary.essays as EssayAnswer[],
+        users: summary.users as User[],
+        academicYears: summary.academicYears as AcademicYear[],
+        semesters: summary.semesters as Semester[],
       };
+    } catch {
+      showToast('Failed to load report data.', 'error');
+      return EMPTY_REPORT_DATA;
     }
-    const summary = only.value as EmployeeReportsSummary;
-    return {
-      admissions: summary.admissions as Admission[],
-      results: summary.results as ExamResult[],
-      exams: summary.exams as Exam[],
-      schedules: summary.schedules as ExamSchedule[],
-      regs: summary.regs as ExamRegistration[],
-      essays: summary.essays as EssayAnswer[],
-      users: summary.users as User[],
-    };
-  });
-
-  const { data: academicYears } = useAsync<AcademicYear[]>(() => getAcademicYears());
-  const { data: allSemesters } = useAsync<Semester[]>(() => getSemesters());
-
-  const semesterOptions = (allSemesters || []).filter(s =>
-    yearFilter === 'all' || s.academicYearId === Number(yearFilter)
-  );
+  }, [], 120000);
 
   const hasInvalidDateRange = Boolean(dateFrom && dateTo && dateFrom > dateTo);
 
-  const { admissions, results, exams, schedules, regs, essays, users } = useMemo(() => {
-    let adm = rawData?.admissions || [];
-    if (statusFilter !== 'all') adm = adm.filter(a => a.status === statusFilter);
-    if (levelGroupFilter !== 'all') adm = adm.filter(a => a.levelGroup === levelGroupFilter);
-    if (gradeFilter !== 'all') adm = adm.filter(a => a.gradeLevel === gradeFilter);
-    if (yearFilter !== 'all') adm = adm.filter(a => a.academicYear?.id === Number(yearFilter));
-    if (semesterFilter !== 'all') adm = adm.filter(a => a.semester?.id === Number(semesterFilter));
-    if (!hasInvalidDateRange) {
-      if (dateFrom) adm = adm.filter(a => toLocalDateIso(a.submittedAt) >= dateFrom);
-      if (dateTo) adm = adm.filter(a => toLocalDateIso(a.submittedAt) <= dateTo);
-    }
+  const {
+    admissions,
+    results,
+    exams,
+    schedules,
+    regs,
+    academicYears,
+    allSemesters,
+    usersById,
+    usersByEmail,
+    regsById,
+    schedulesById,
+    examsById,
+  } = useMemo(() => {
+    const source = rawData || EMPTY_REPORT_DATA;
+    const yearId = yearFilter === 'all' ? null : Number(yearFilter);
+    const semId = semesterFilter === 'all' ? null : Number(semesterFilter);
 
-    const admUserIds = new Set(adm.map(a => a.userId).filter((id): id is number => typeof id === 'number'));
-    const admEmails = new Set(adm.map(a => a.email));
-    const filteredRegs = (rawData?.regs || []).filter(r => {
-      const regUserId = getRegUserId(r);
-      if (regUserId !== null && admUserIds.has(regUserId)) return true;
-      return admEmails.has(r.userEmail);
+    const filteredAdmissions = source.admissions.filter((a) => {
+      if (statusFilter !== 'all' && a.status !== statusFilter) return false;
+      if (levelGroupFilter !== 'all' && a.levelGroup !== levelGroupFilter) return false;
+      if (gradeFilter !== 'all' && a.gradeLevel !== gradeFilter) return false;
+      if (yearId !== null && a.academicYear?.id !== yearId) return false;
+      if (semId !== null && a.semester?.id !== semId) return false;
+
+      if (!hasInvalidDateRange && (dateFrom || dateTo)) {
+        const submittedAt = toLocalDateIso(a.submittedAt);
+        if (dateFrom && submittedAt < dateFrom) return false;
+        if (dateTo && submittedAt > dateTo) return false;
+      }
+
+      return true;
     });
-    const regIds = new Set(filteredRegs.map(r => r.id));
-    const filteredResults = (rawData?.results || []).filter(r => regIds.has(r.registrationId));
+
+    const admissionUserIds = new Set(filteredAdmissions.map(a => a.userId).filter((id): id is number => typeof id === 'number'));
+    const admissionEmails = new Set(filteredAdmissions.map(a => a.email));
+
+    const filteredRegs = source.regs.filter((r) => {
+      const regUserId = getRegUserId(r);
+      if (regUserId !== null && admissionUserIds.has(regUserId)) return true;
+      return admissionEmails.has(r.userEmail);
+    });
+
+    const registrationIds = new Set(filteredRegs.map(r => r.id));
+    const filteredResults = source.results.filter(r => registrationIds.has(r.registrationId));
+    const filteredEssays = source.essays.filter(e => registrationIds.has(e.registrationId));
+
+    const scheduleIds = new Set(filteredRegs.map(r => r.scheduleId));
+    const filteredSchedules = source.schedules.filter(s => scheduleIds.has(s.id));
+    const examIds = new Set(filteredSchedules.map(s => s.examId));
+    const filteredExams = source.exams.filter(e => examIds.has(e.id));
 
     return {
-      admissions: adm, results: filteredResults, exams: rawData?.exams || [],
-      schedules: rawData?.schedules || [], regs: filteredRegs, essays: rawData?.essays || [],
-      users: rawData?.users || [],
+      admissions: filteredAdmissions,
+      results: filteredResults,
+      exams: filteredExams,
+      schedules: filteredSchedules,
+      regs: filteredRegs,
+      essays: filteredEssays,
+      users: source.users,
+      academicYears: source.academicYears,
+      allSemesters: source.semesters,
+      usersById: new Map(source.users.map(u => [u.id, u])),
+      usersByEmail: new Map(source.users.map(u => [u.email, u])),
+      regsById: new Map(filteredRegs.map(r => [r.id, r])),
+      schedulesById: new Map(filteredSchedules.map(s => [s.id, s])),
+      examsById: new Map(filteredExams.map(e => [e.id, e])),
     };
   }, [rawData, statusFilter, levelGroupFilter, gradeFilter, yearFilter, semesterFilter, dateFrom, dateTo, hasInvalidDateRange]);
 
-  const usersById = useMemo(() => new Map(users.map(u => [u.id, u])), [users]);
-  const usersByEmail = useMemo(() => new Map(users.map(u => [u.email, u])), [users]);
-  const regsById = useMemo(() => new Map(regs.map(r => [r.id, r])), [regs]);
-  const schedulesById = useMemo(() => new Map(schedules.map(s => [s.id, s])), [schedules]);
-  const examsById = useMemo(() => new Map(exams.map(e => [e.id, e])), [exams]);
+  const semesterOptions = allSemesters.filter(s =>
+    yearFilter === 'all' || s.academicYearId === Number(yearFilter)
+  );
 
   if (loading && !rawData) return <SkeletonPage />;
   if (error) return <ErrorAlert error={error} onRetry={refetch} />;
@@ -159,10 +197,8 @@ export default function EmployeeReports() {
   const accepted = admissions.filter(a => a.status === 'Accepted').length;
   const passed = results.filter(r => r.passed).length;
   const avg = results.length > 0 ? (results.reduce((s, r) => s + r.percentage, 0) / results.length).toFixed(1) : '0.0';
-  const pendingEssays = essays.filter(e => !e.scored).length;
 
   const now = new Date();
-  const thisMonth = admissions.filter(a => { const d = new Date(a.submittedAt); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); }).length;
 
   const exportApplicants = async (format: 'csv' | 'pdf' = 'csv') => {
     const { buildActiveFilters, downloadCSV, getChartSvgMarkup, printPdfReport } = await import('./reports/reportExport');
@@ -241,7 +277,7 @@ export default function EmployeeReports() {
     const { buildActiveFilters, downloadCSV, getChartSvgMarkup, printPdfReport } = await import('./reports/reportExport');
     const headers = ['Exam', 'Date', 'Start Time', 'End Time', 'Registration Open', 'Registration Close', 'Max Slots', 'Booked'];
     const rows: (string | number)[][] = schedules.map(s => {
-      const exam = exams.find(e => e.id === s.examId);
+      const exam = examsById.get(s.examId);
       return [
         exam?.title || 'N/A',
         compactDate(s.scheduledDate),
@@ -277,34 +313,81 @@ export default function EmployeeReports() {
     showToast(`Schedules ${format === 'pdf' ? 'exported' : 'downloaded'}!`, 'success');
   };
 
+  const scheduleExamMap = new Map(schedules.map(s => [s.id, s.examId]));
+  const regExamMap = new Map<number, number>();
+  for (const reg of regs) {
+    const examId = scheduleExamMap.get(reg.scheduleId);
+    if (typeof examId === 'number') regExamMap.set(reg.id, examId);
+  }
+
+  const examScoreMap = new Map<number, { passed: number; total: number }>();
+  for (const result of results) {
+    const examId = regExamMap.get(result.registrationId);
+    if (typeof examId !== 'number') continue;
+    const current = examScoreMap.get(examId) || { passed: 0, total: 0 };
+    current.total += 1;
+    if (result.passed) current.passed += 1;
+    examScoreMap.set(examId, current);
+  }
+
   const examStats = exams.map(exam => {
-    const eScheds = schedules.filter(s => s.examId === exam.id);
-    const eRegs = regs.filter(r => eScheds.some(s => s.id === r.scheduleId));
-    const eResults = results.filter(r => eRegs.some(rg => rg.id === r.registrationId));
-    const p = eResults.filter(r => r.passed).length;
-    const t = eResults.length;
-    return { name: exam.title.replace('Entrance Examination ', ''), passed: p, total: t, rate: t > 0 ? Math.round((p / t) * 100) : 0 };
+    const score = examScoreMap.get(exam.id) || { passed: 0, total: 0 };
+    return {
+      name: exam.title.replace('Entrance Examination ', ''),
+      passed: score.passed,
+      total: score.total,
+      rate: score.total > 0 ? Math.round((score.passed / score.total) * 100) : 0,
+    };
   });
+
+  const monthKeyCounts = new Map<string, number>();
+  for (const admission of admissions) {
+    const d = new Date(admission.submittedAt);
+    const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`;
+    monthKeyCounts.set(key, (monthKeyCounts.get(key) || 0) + 1);
+  }
 
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const monthData: { label: string; count: number }[] = [];
   for (let i = 5; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`;
-    const count = admissions.filter(a => { const ad = new Date(a.submittedAt); return `${ad.getFullYear()}-${String(ad.getMonth()).padStart(2, '0')}` === key; }).length;
+    const count = monthKeyCounts.get(key) || 0;
     monthData.push({ label: monthNames[d.getMonth()], count });
+  }
+
+  const thisMonthKey = `${now.getFullYear()}-${String(now.getMonth()).padStart(2, '0')}`;
+  const thisMonth = monthKeyCounts.get(thisMonthKey) || 0;
+
+  const admissionStatusCounts = new Map<string, number>();
+  for (const admission of admissions) {
+    admissionStatusCounts.set(admission.status, (admissionStatusCounts.get(admission.status) || 0) + 1);
   }
 
   const admissionStatusData = ADMISSION_STATUSES.map(status => ({
     name: status,
-    value: admissions.filter(a => a.status === status).length,
+    value: admissionStatusCounts.get(status) || 0,
     color: STATUS_COLORS[status] || CHART_FALLBACK_COLORS[0],
   })).filter(d => d.value > 0);
   const admissionStatusTotal = admissionStatusData.reduce((sum, item) => sum + item.value, 0);
 
+  let passedCount = 0;
+  let failedCount = 0;
+  const scoreBandCounts = [0, 0, 0, 0, 0];
+  for (const result of results) {
+    if (result.passed) passedCount += 1;
+    else failedCount += 1;
+
+    if (result.percentage >= 90) scoreBandCounts[0] += 1;
+    else if (result.percentage >= 80) scoreBandCounts[1] += 1;
+    else if (result.percentage >= 70) scoreBandCounts[2] += 1;
+    else if (result.percentage >= 60) scoreBandCounts[3] += 1;
+    else scoreBandCounts[4] += 1;
+  }
+
   const passFailData = [
-    { name: 'Passed', value: results.filter(r => r.passed).length, color: '#16a34a' },
-    { name: 'Failed', value: results.filter(r => !r.passed).length, color: '#ef4444' },
+    { name: 'Passed', value: passedCount, color: '#16a34a' },
+    { name: 'Failed', value: failedCount, color: '#ef4444' },
   ].filter(d => d.value > 0);
 
   const scoreBands = [
@@ -315,14 +398,14 @@ export default function EmployeeReports() {
     { name: '< 60', min: -Infinity, max: 59.99 },
   ];
 
-  const scoreBandData = scoreBands.map(b => ({
+  const scoreBandData = scoreBands.map((b, index) => ({
     band: b.name,
-    count: results.filter(r => r.percentage >= b.min && r.percentage <= b.max).length,
+    count: scoreBandCounts[index],
   }));
 
   const scheduleUtilizationData = schedules
     .map(s => {
-      const exam = exams.find(e => e.id === s.examId);
+      const exam = examsById.get(s.examId);
       const used = Number(s.slotsTaken || 0);
       const total = Number(s.maxSlots || 0);
       const utilization = total > 0 ? Math.round((used / total) * 100) : 0;
@@ -336,17 +419,7 @@ export default function EmployeeReports() {
     .sort((a, b) => b.utilization - a.utilization)
     .slice(0, 6);
 
-    const sortedStats = [...examStats].sort((a, b) => b.rate - a.rate);
-
-  const metrics = [
-    { label: 'Total Applicants', value: totalApplicants, change: `+${thisMonth} this month` },
-    { label: 'Accepted', value: accepted, change: `${totalApplicants > 0 ? Math.round((accepted / totalApplicants) * 100) : 0}% acceptance rate` },
-    { label: 'Exams Taken', value: results.length, change: `${exams.length} exams available` },
-    { label: 'Overall Pass Rate', value: `${results.length > 0 ? Math.round((passed / results.length) * 100) : 0}%`, change: `${passed} of ${results.length} passed` },
-    { label: 'Average Score', value: `${avg}%`, change: 'Across all exams' },
-    { label: 'Pending Essay Reviews', value: pendingEssays, change: pendingEssays > 0 ? 'Action needed' : 'All reviewed' },
-    { label: 'Open Exam Slots', value: schedules.reduce((s, sc) => s + sc.maxSlots, 0), change: `${schedules.length} schedules` },
-  ];
+  const sortedStats = [...examStats].sort((a, b) => b.rate - a.rate);
 
   return (
     <div>

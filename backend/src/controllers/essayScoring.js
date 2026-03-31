@@ -60,39 +60,60 @@ export async function scoreEssay(req, res, next) {
     });
 
     // Check if ALL essays for this registration are scored → recalculate result
-    const allEssays = await prisma.essayAnswer.findMany({
-      where: { registrationId: essay.registrationId },
-    });
+    const [allEssays, result, reg] = await Promise.all([
+      prisma.essayAnswer.findMany({
+        where: { registrationId: essay.registrationId },
+        select: { id: true, scored: true, pointsAwarded: true },
+      }),
+      prisma.examResult.findUnique({
+        where: { registrationId: essay.registrationId },
+        select: { id: true, maxPossible: true },
+      }),
+      prisma.examRegistration.findUnique({
+        where: { id: essay.registrationId },
+        select: { userEmail: true, schedule: { select: { examId: true } } },
+      }),
+    ]);
+
     const allScored = allEssays.every(e => e.scored);
 
-    if (allScored) {
-      // Recalculate total score
-      const result = await prisma.examResult.findUnique({
-        where: { registrationId: essay.registrationId },
-      });
-
-      if (result) {
-        const essayPoints = allEssays.reduce((sum, e) => sum + (e.pointsAwarded || 0), 0);
-        const reg = await prisma.examRegistration.findUnique({
-          where: { id: essay.registrationId },
-          include: { schedule: true },
-        });
-        const exam = await prisma.exam.findUnique({
+    if (allScored && result && reg?.schedule?.examId) {
+      const [exam, submitted, student] = await Promise.all([
+        prisma.exam.findUnique({
           where: { id: reg.schedule.examId },
-          include: { questions: { include: { choices: true } } },
-        });
-        const submitted = await prisma.submittedAnswer.findMany({
+          select: {
+            title: true,
+            passingScore: true,
+            questions: {
+              where: { questionType: 'mc' },
+              select: {
+                id: true,
+                points: true,
+                choices: { where: { isCorrect: true }, select: { id: true } },
+              },
+            },
+          },
+        }),
+        prisma.submittedAnswer.findMany({
           where: { registrationId: essay.registrationId },
-        });
+          select: { questionId: true, selectedChoiceId: true },
+        }),
+        prisma.user.findFirst({
+          where: { email: reg.userEmail },
+          select: { email: true, firstName: true },
+        }),
+      ]);
+
+      if (exam) {
+        const answerByQuestionId = new Map(submitted.map(s => [s.questionId, s]));
+        const essayPoints = allEssays.reduce((sum, e) => sum + (e.pointsAwarded || 0), 0);
 
         let mcScore = 0;
         for (const q of exam.questions) {
-          if (q.questionType === 'mc') {
-            const ans = submitted.find(s => s.questionId === q.id);
-            if (ans?.selectedChoiceId) {
-              const correct = q.choices.find(c => c.isCorrect);
-              if (correct && correct.id === ans.selectedChoiceId) mcScore += q.points;
-            }
+          const ans = answerByQuestionId.get(q.id);
+          const correctChoiceId = q.choices[0]?.id;
+          if (ans?.selectedChoiceId && correctChoiceId && ans.selectedChoiceId === correctChoiceId) {
+            mcScore += q.points;
           }
         }
 
@@ -112,8 +133,6 @@ export async function scoreEssay(req, res, next) {
           },
         });
 
-        // Send final result email once essay review is complete.
-        const student = await prisma.user.findFirst({ where: { email: reg.userEmail } });
         if (student) {
           sendExamResultEmail({
             to: student.email,

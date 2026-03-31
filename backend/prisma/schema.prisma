@@ -88,6 +88,7 @@ model Admission {
   @@index([submittedAt])
   @@index([deletedAt])
   @@index([deletedAt, status, submittedAt])
+  @@index([deletedAt, status, academicYearId])
   @@index([deletedAt, levelGroup, gradeLevel, submittedAt])
   @@index([deletedAt, academicYearId, semesterId, submittedAt])
   @@map("admissions")
@@ -255,6 +256,7 @@ model ExamRegistration {
   @@index([status])
   @@index([userEmail, status])
   @@index([scheduleId, status])
+  @@index([userEmail, status, scheduleId])
   @@index([createdAt])
   @@map("exam_registrations")
 }
@@ -277,6 +279,7 @@ model ExamResult {
 
   @@index([createdAt])
   @@index([passed])
+  @@index([passed, createdAt])
   @@map("exam_results")
 }
 

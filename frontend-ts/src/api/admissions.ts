@@ -1,5 +1,5 @@
 import { client, qs } from './client';
-import type { Admission, AdmissionStats, AdmissionStatus } from '../types';
+import type { Admission, AdmissionStats, AdmissionStatus, AcademicYear, Semester } from '../types';
 
 export const VALID_TRANSITIONS: Record<string, AdmissionStatus[]> = {
   'Submitted': ['Under Screening', 'Rejected'],
@@ -21,6 +21,16 @@ interface AdmissionParams {
   slaDays?: number;
   academicYearId?: number;
   semesterId?: number;
+}
+
+interface ReportsSummaryParams {
+  status?: string;
+  levelGroup?: string;
+  grade?: string;
+  academicYearId?: number;
+  semesterId?: number;
+  dateFrom?: string;
+  dateTo?: string;
 }
 
 export interface PagedApiResponse<T> {
@@ -67,6 +77,8 @@ export interface EmployeeReportsSummary {
     email: string;
     applicantProfile?: { gradeLevel?: string | null } | null;
   }>;
+  academicYears: AcademicYear[];
+  semesters: Semester[];
 }
 
 export interface EmployeeDashboardSummary {
@@ -129,8 +141,8 @@ export async function getDashboardSummary() {
   return client.get<EmployeeDashboardSummary>('/admissions/dashboard-summary');
 }
 
-export async function getReportsSummary() {
-  return client.get<EmployeeReportsSummary>('/admissions/reports-summary');
+export async function getReportsSummary(params?: ReportsSummaryParams) {
+  return client.get<EmployeeReportsSummary>(`/admissions/reports-summary${qs(params)}`);
 }
 
 export async function trackApplication(trackingId: string) {
