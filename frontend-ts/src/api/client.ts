@@ -100,6 +100,10 @@ const GET_BURST_CACHE_MS = 15000;
 const inflightGetRequests = new Map<string, Promise<unknown>>();
 const recentGetResponses = new Map<string, { data: unknown; expiresAt: number }>();
 
+export type RequestOptions = {
+  signal?: AbortSignal;
+};
+
 function getPathFromKey(key: string): string {
   const sep = key.indexOf('::');
   return sep >= 0 ? key.slice(sep + 2) : key;
@@ -131,6 +135,9 @@ function invalidateGetCache(prefixes?: string[]) {
   }
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('gk:data-changed'));
+    window.dispatchEvent(new CustomEvent('gk:data-changed-scoped', {
+      detail: { prefixes: prefixes && prefixes.length > 0 ? prefixes : undefined },
+    }));
   }
 }
 
@@ -177,7 +184,7 @@ async function request<T = unknown>(
   method: string,
   path: string,
   body?: unknown,
-  { isFormData = false }: { isFormData?: boolean } = {}
+  { isFormData = false, signal }: { isFormData?: boolean; signal?: AbortSignal } = {}
 ): Promise<T> {
   const startedAt = performance.now();
   const headers: Record<string, string> = {};
@@ -190,13 +197,17 @@ async function request<T = unknown>(
     res = await fetch(`${BASE_URL}${path}`, {
       method,
       headers,
+      signal,
       body: isFormData
         ? (body as BodyInit)
         : body !== undefined
           ? JSON.stringify(body)
           : undefined,
     });
-  } catch {
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new ApiError('Request cancelled', -1);
+    }
     throw new ApiError('Network error. Please check your connection and try again.', 0);
   }
 
@@ -240,8 +251,15 @@ async function request<T = unknown>(
 
 // ---- Public client interface ----
 export const client = {
-  get:    <T = unknown>(path: string) => {
+  get:    <T = unknown>(path: string, options?: RequestOptions) => {
     clearExpiredGetCache();
+
+    // If this request is caller-cancellable, do not dedupe it with shared in-flight requests.
+    // This avoids accidental cross-cancellation between unrelated UI interactions.
+    if (options?.signal) {
+      return withRetry(() => request<T>('GET', path, undefined, { signal: options.signal }));
+    }
+
     const key = makeRequestKey(path);
     const cached = recentGetResponses.get(key);
     if (cached && cached.expiresAt > Date.now()) {
@@ -267,9 +285,26 @@ export const client = {
     inflightGetRequests.set(key, req as Promise<unknown>);
     return req;
   },
-  post:   <T = unknown>(path: string, body?: unknown) => request<T>('POST', path, body).then((data) => { invalidateGetCache([toResourcePrefix(path)]); return data; }),
-  put:    <T = unknown>(path: string, body?: unknown) => request<T>('PUT', path, body).then((data) => { invalidateGetCache([toResourcePrefix(path)]); return data; }),
-  patch:  <T = unknown>(path: string, body?: unknown) => request<T>('PATCH', path, body).then((data) => { invalidateGetCache([toResourcePrefix(path)]); return data; }),
-  delete: <T = unknown>(path: string) => request<T>('DELETE', path).then((data) => { invalidateGetCache([toResourcePrefix(path)]); return data; }),
-  upload: <T = unknown>(path: string, formData: FormData) => request<T>('POST', path, formData, { isFormData: true }).then((data) => { invalidateGetCache([toResourcePrefix(path)]); return data; }),
+  post:   <T = unknown>(path: string, body?: unknown, options?: RequestOptions) => request<T>('POST', path, body, { signal: options?.signal }).then((data) => { invalidateGetCache([toResourcePrefix(path)]); return data; }),
+  put:    <T = unknown>(path: string, body?: unknown, options?: RequestOptions) => request<T>('PUT', path, body, { signal: options?.signal }).then((data) => { invalidateGetCache([toResourcePrefix(path)]); return data; }),
+  patch:  <T = unknown>(path: string, body?: unknown, options?: RequestOptions) => request<T>('PATCH', path, body, { signal: options?.signal }).then((data) => { invalidateGetCache([toResourcePrefix(path)]); return data; }),
+  delete: <T = unknown>(path: string, options?: RequestOptions) => request<T>('DELETE', path, undefined, { signal: options?.signal }).then((data) => { invalidateGetCache([toResourcePrefix(path)]); return data; }),
+  upload: <T = unknown>(path: string, formData: FormData, options?: RequestOptions) => request<T>('POST', path, formData, { isFormData: true, signal: options?.signal }).then((data) => { invalidateGetCache([toResourcePrefix(path)]); return data; }),
 };
+
+// Utility for filter/search UIs: cancel prior request before issuing the next one.
+export function createRequestCanceller() {
+  let controller: AbortController | null = null;
+
+  return {
+    nextSignal(): AbortSignal {
+      if (controller) controller.abort();
+      controller = new AbortController();
+      return controller.signal;
+    },
+    cancel(): void {
+      if (controller) controller.abort();
+      controller = null;
+    },
+  };
+}

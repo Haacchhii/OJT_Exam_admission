@@ -155,11 +155,13 @@ export async function getDashboardSummary(req, res, next) {
       const now = Date.now();
       const weekAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
       const twoWeeksAgo = new Date(now - 14 * 24 * 60 * 60 * 1000);
+      const overdueThreshold = new Date(now - 7 * 24 * 60 * 60 * 1000);
 
       const [
         total,
         grouped,
         recentAdmissions,
+        overdueCount,
         thisWeekTotal,
         lastWeekTotal,
         thisWeekGrouped,
@@ -177,7 +179,7 @@ export async function getDashboardSummary(req, res, next) {
         prisma.admission.findMany({
           where: { deletedAt: null },
           orderBy: { submittedAt: 'desc' },
-          take: 200,
+          take: 60,
           select: {
             id: true,
             firstName: true,
@@ -188,6 +190,13 @@ export async function getDashboardSummary(req, res, next) {
             levelGroup: true,
             status: true,
             submittedAt: true,
+          },
+        }),
+        prisma.admission.count({
+          where: {
+            deletedAt: null,
+            status: { in: ADMISSION_IN_PROGRESS },
+            submittedAt: { lt: overdueThreshold },
           },
         }),
         prisma.admission.count({ where: { deletedAt: null, submittedAt: { gte: weekAgo } } }),
@@ -274,19 +283,18 @@ export async function getDashboardSummary(req, res, next) {
         rejected: pct(countStatus(thisWeekStatusMap, 'Rejected'), countStatus(lastWeekStatusMap, 'Rejected')),
       };
 
-      const overdue = recentAdmissions.filter((a) => ADMISSION_IN_PROGRESS.includes(a.status) && Math.floor((Date.now() - new Date(a.submittedAt).getTime()) / 86400000) > 7).length;
       const completed = (registrationGrouped.find(r => r.status === 'done')?._count._all) || 0;
 
       return {
         stats,
         trends,
         admissions: recentAdmissions,
-        overdue,
+        overdue: overdueCount,
         exams: examActivity,
         completed,
         pendingEssays,
       };
-    }, 15_000);
+    }, 30_000);
 
     res.json(summary);
   } catch (err) { next(err); }

@@ -45,6 +45,9 @@ const env = {
   CORS_MAX_AGE_SECONDS: parseInt(process.env.CORS_MAX_AGE_SECONDS, 10) || 600,
   PERF_LOG_THRESHOLD_MS: parseInt(process.env.PERF_LOG_THRESHOLD_MS, 10) || 200,
   AUTH_USER_CACHE_TTL_MS: parseInt(process.env.AUTH_USER_CACHE_TTL_MS, 10) || 5000,
+  DB_SLOW_QUERY_MS: parseInt(process.env.DB_SLOW_QUERY_MS, 10) || 200,
+  PRISMA_LOG_QUERIES: (process.env.PRISMA_LOG_QUERIES || 'false').toLowerCase() === 'true',
+  PERF_INGEST_ENABLED: (process.env.PERF_INGEST_ENABLED || 'true').toLowerCase() === 'true',
 };
 
 // ─── Validate critical env vars ───────────────────────

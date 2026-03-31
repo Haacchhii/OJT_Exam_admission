@@ -21,6 +21,7 @@ import resultsRoutes       from './routes/results.js';
 import usersRoutes         from './routes/users.js';
 import auditLogRoutes      from './routes/auditLog.js';
 import academicYearsRoutes from './routes/academicYears.js';
+import perfRoutes          from './routes/perf.js';
 
 const app = express();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -73,6 +74,8 @@ app.use(express.urlencoded({ extended: true, limit: BODY_SIZE_LIMIT }));
 
 // Lightweight API timing log to track endpoint p95 improvements.
 app.use((req, res, next) => {
+  globalThis.__gkRequestPath = req.originalUrl;
+
   const startedAt = process.hrtime.bigint();
   const originalJson = res.json.bind(res);
   res.json = (payload) => {
@@ -87,6 +90,9 @@ app.use((req, res, next) => {
     const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
     if (elapsedMs >= env.PERF_LOG_THRESHOLD_MS) {
       console.log(`[perf] ${req.method} ${req.originalUrl} ${res.statusCode} ${elapsedMs.toFixed(1)}ms`);
+    }
+    if (globalThis.__gkRequestPath === req.originalUrl) {
+      globalThis.__gkRequestPath = undefined;
     }
   });
   next();
@@ -162,6 +168,7 @@ app.get('/', (_req, res) => {
 
 // ─── API routes ───────────────────────────────────────
 app.use('/api/auth', authLimiter, noStore, authRoutes);
+app.use('/api/perf', noStore, perfRoutes);
 app.use('/api/admissions',    cachePrivate, admissionsRoutes);
 app.use('/api/exams',         cachePrivate, examsRoutes);
 app.use('/api/results',       cachePrivate, resultsRoutes);

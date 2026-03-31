@@ -7,15 +7,38 @@ interface UseAsyncResult<T> {
   refetch: () => void;
 }
 
+interface UseAsyncOptions {
+  autoRefreshOnDataChange?: boolean;
+  autoRefreshOnFocus?: boolean;
+  resourcePrefixes?: string[];
+}
+
+interface DataChangedDetail {
+  prefixes?: string[];
+}
+
+function shouldRefreshForPrefixes(resourcePrefixes: string[] | undefined, changedPrefixes: string[] | undefined): boolean {
+  if (!resourcePrefixes || resourcePrefixes.length === 0) return true;
+  if (!changedPrefixes || changedPrefixes.length === 0) return true;
+  return resourcePrefixes.some(prefix => changedPrefixes.includes(prefix));
+}
+
 export function useAsync<T>(
   asyncFn: () => Promise<T>, 
   deps: unknown[] = [],
-  pollInterval: number = 60000 // default 60s auto-refresh polling
+  pollInterval: number = 0,
+  options: UseAsyncOptions = {}
 ): UseAsyncResult<T> {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [refreshCount, setRefreshCount] = useState(0);
+
+  const {
+    autoRefreshOnDataChange = false,
+    autoRefreshOnFocus = false,
+    resourcePrefixes,
+  } = options;
 
   const fnRef = useRef(asyncFn);
   fnRef.current = asyncFn;
@@ -75,12 +98,24 @@ export function useAsync<T>(
   }, [pollInterval, triggerAutoRefresh]);
 
   useEffect(() => {
+    if (!autoRefreshOnDataChange) return;
     const onDataChanged = () => triggerAutoRefresh();
+    const onScopedDataChanged = (evt: Event) => {
+      const customEvt = evt as CustomEvent<DataChangedDetail>;
+      if (shouldRefreshForPrefixes(resourcePrefixes, customEvt.detail?.prefixes)) {
+        triggerAutoRefresh();
+      }
+    };
     window.addEventListener('gk:data-changed', onDataChanged);
-    return () => window.removeEventListener('gk:data-changed', onDataChanged);
-  }, [triggerAutoRefresh]);
+    window.addEventListener('gk:data-changed-scoped', onScopedDataChanged);
+    return () => {
+      window.removeEventListener('gk:data-changed', onDataChanged);
+      window.removeEventListener('gk:data-changed-scoped', onScopedDataChanged);
+    };
+  }, [autoRefreshOnDataChange, triggerAutoRefresh, resourcePrefixes]);
 
   useEffect(() => {
+    if (!autoRefreshOnFocus) return;
     const onFocus = () => triggerAutoRefresh();
     const onVisibility = () => {
       if (!document.hidden) triggerAutoRefresh();
@@ -93,7 +128,7 @@ export function useAsync<T>(
       window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [triggerAutoRefresh]);
+  }, [autoRefreshOnFocus, triggerAutoRefresh]);
 
   return { data, loading, error, refetch };
 }
