@@ -1,9 +1,9 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
 import { useAsync } from '../../hooks/useAsync';
-import { getDashboardSummary, type EmployeeDashboardSummary } from '../../api/admissions';
+import { getAdmissionsPage, getDashboardSummary, type EmployeeDashboardSummary } from '../../api/admissions';
 import { StatCard, PageHeader, Badge, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert } from '../../components/UI';
 import { formatDate, badgeClass, formatPersonName } from '../../utils/helpers';
 import { ADMISSION_IN_PROGRESS, GRADE_OPTIONS, ALL_GRADE_LEVELS } from '../../utils/constants';
@@ -33,6 +33,29 @@ export default function EmployeeDashboard() {
     return getDashboardSummary();
   });
 
+  const {
+    data: admissionsPage,
+    loading: admissionsLoading,
+    error: admissionsError,
+    refetch: refetchAdmissions,
+  } = useAsync(async () => {
+    const params: {
+      page: number;
+      limit: number;
+      status?: string;
+      levelGroup?: string;
+      grade?: string;
+      search?: string;
+    } = { page, limit: PER_PAGE };
+
+    if (statusFilter !== 'all') params.status = statusFilter;
+    if (levelGroupFilter !== 'all') params.levelGroup = levelGroupFilter;
+    if (gradeFilter !== 'all') params.grade = gradeFilter;
+    if (search.trim()) params.search = search.trim();
+
+    return getAdmissionsPage(params);
+  }, [statusFilter, levelGroupFilter, gradeFilter, search, page]);
+
 
   useEffect(() => {
     if (!socket || !isConnected) return;
@@ -42,6 +65,7 @@ export default function EmployeeDashboard() {
       refetchTimer = setTimeout(() => {
         refetchTimer = null;
         refetch();
+        refetchAdmissions();
       }, 350);
     };
     socket.on('admission_status_updated', handleUpdate);
@@ -49,21 +73,16 @@ export default function EmployeeDashboard() {
       socket.off('admission_status_updated', handleUpdate);
       if (refetchTimer) clearTimeout(refetchTimer);
     };
-  }, [socket, isConnected, refetch]);
+  }, [socket, isConnected, refetch, refetchAdmissions]);
 
-  const filtered = useMemo(() => {
-    let list = rawData?.admissions || [];
-    if (statusFilter !== 'all') list = list.filter(a => a.status === statusFilter);
-    if (levelGroupFilter !== 'all') list = list.filter(a => a.levelGroup === levelGroupFilter);
-    if (gradeFilter !== 'all') list = list.filter(a => a.gradeLevel === gradeFilter);
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter(a => `${formatPersonName(a)} ${a.email}`.toLowerCase().includes(q));
-    }
-    return list;
-  }, [rawData, statusFilter, levelGroupFilter, gradeFilter, search]);
+  const admissions = admissionsPage?.data || [];
+  const admissionsPagination = admissionsPage?.pagination || {
+    page,
+    limit: PER_PAGE,
+    total: admissions.length,
+    totalPages: 1,
+  };
 
-  const { paginated, totalPages, safePage, totalItems } = usePaginationSlice(filtered, page, PER_PAGE);
   const { paginated: paginatedExams, totalPages: examTotalPages, safePage: safeExamPage, totalItems: examTotalItems } = usePaginationSlice(rawData?.exams || [], examPage, EXAMS_PER_PAGE);
 
   const handleSearch = (v: string) => { setSearch(v); setPage(1); };
@@ -72,6 +91,7 @@ export default function EmployeeDashboard() {
   const handleGrade = (v: string) => { setGradeFilter(v); setPage(1); };
   if (loading && !rawData) return <SkeletonPage />;
   if (error) return <ErrorAlert error={error} onRetry={refetch} />;
+  if (admissionsError && !admissionsPage) return <ErrorAlert error={admissionsError} onRetry={refetchAdmissions} />;
 
   return (
     <div className="animate-[fadeIn_0.3s_ease-out]">
@@ -151,9 +171,9 @@ export default function EmployeeDashboard() {
               </tr>
             </thead>
             <tbody>
-              {paginated.map((a, i) => (
+              {admissions.map((a: Admission, i: number) => (
                 <tr key={a.id}>
-                  <td className="text-gray-400">{(safePage - 1) * PER_PAGE + i + 1}</td>
+                  <td className="text-gray-400">{(admissionsPagination.page - 1) * PER_PAGE + i + 1}</td>
                   <td className="font-medium text-gray-800">{formatPersonName(a)}</td>
                   <td>{a.gradeLevel}</td>
                   <td><Badge className={badgeClass(a.status)}>{a.status}</Badge></td>
@@ -164,11 +184,12 @@ export default function EmployeeDashboard() {
                   <td><Link to={`/employee/admissions?id=${a.id}`} className="text-forest-500 hover:text-forest-600 text-xs font-semibold transition-colors">View</Link></td>
                 </tr>
               ))}
-              {paginated.length === 0 && <tr><td colSpan={7} className="text-center text-gray-400 py-8">No admissions match your filters.</td></tr>}
+              {admissionsLoading && admissions.length === 0 && <tr><td colSpan={7} className="text-center text-gray-400 py-8">Loading admissions...</td></tr>}
+              {!admissionsLoading && admissions.length === 0 && <tr><td colSpan={7} className="text-center text-gray-400 py-8">No admissions match your filters.</td></tr>}
             </tbody>
           </table>
         </div>
-        <Pagination currentPage={safePage} totalPages={totalPages} onPageChange={setPage} totalItems={totalItems} itemsPerPage={PER_PAGE} />
+        <Pagination currentPage={admissionsPagination.page} totalPages={admissionsPagination.totalPages} onPageChange={setPage} totalItems={admissionsPagination.total} itemsPerPage={PER_PAGE} />
       </div>
       )}
 

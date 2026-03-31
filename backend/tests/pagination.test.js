@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { paginate, paginatedResponse } from '../src/utils/pagination.js';
 
 describe('paginate()', () => {
-  it('defaults to page 1 and default limit when no page or limit is provided', () => {
-    expect(paginate(undefined, undefined)).toEqual({ skip: 0, take: 10, page: 1, limit: 10 });
-    expect(paginate(null, null)).toEqual({ skip: 0, take: 10, page: 1, limit: 10 });
+  it('returns null when no page or limit is provided', () => {
+    expect(paginate(undefined, undefined)).toBeNull();
+    expect(paginate(null, null)).toBeNull();
   });
 
   it('returns correct skip/take for page 1', () => {
