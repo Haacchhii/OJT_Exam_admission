@@ -1,4 +1,4 @@
-﻿import { useState, useCallback } from 'react';
+﻿import { useState, useCallback, useEffect } from 'react';
 import { useAsync } from '../../hooks/useAsync';
 import { auditApi } from '../../api/auditLog';
 import { PageHeader, SkeletonPage, ErrorAlert } from '../../components/UI';
@@ -45,10 +45,18 @@ function formatDetails(details: unknown): string {
 
 export default function AuditLog() {
   const [page, setPage] = useState(1);
+  const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [entity, setEntity] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearch(searchInput.trim());
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   const fetchLogs = useCallback(async () => {
     const params: Record<string, string | number> = { page, limit: DEFAULT_PAGE_SIZE };
@@ -83,8 +91,8 @@ export default function AuditLog() {
             <input
               type="text"
               placeholder="Search actions, entities, details..."
-              value={search}
-              onChange={e => { setSearch(e.target.value); setPage(1); }}
+              value={searchInput}
+              onChange={e => { setSearchInput(e.target.value); setPage(1); }}
               className="gk-input pl-10 w-full"
             />
           </div>

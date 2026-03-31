@@ -48,6 +48,7 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
   const { user } = useAuth();
   const canManage = user?.role === 'administrator' || user?.role === 'registrar';
   const confirm = useConfirm();
+  const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState(directStatus || 'all');
   const [gradeFilter, setGradeFilter] = useState('all');
@@ -63,6 +64,13 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
   const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const { socket, isConnected } = useSocket();
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearch(searchInput.trim());
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   const { data: rawData, loading, error, refetch } = useAsync<RawData>(async () => {
     const statsParams: Record<string, unknown> = {};
@@ -270,7 +278,7 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
 
       {/* Filter bar */}
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
-        <input type="text" value={search} onChange={e => { setSearch(e.target.value); resetPage(); }} placeholder="Search by name or email..." aria-label="Search applications" className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none" />
+        <input type="text" value={searchInput} onChange={e => { setSearchInput(e.target.value); resetPage(); }} placeholder="Search by name or email..." aria-label="Search applications" className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none" />
         <select value={filter} onChange={e => { setFilter(e.target.value); resetPage(); }} aria-label="Filter by status" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white">
           <option value="all">All Status</option>
           {ADMISSION_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
