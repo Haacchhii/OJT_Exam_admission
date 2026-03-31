@@ -21,14 +21,6 @@ const STATUS_COLORS: Record<string, string> = {
 
 const CHART_FALLBACK_COLORS = ['#16a34a', '#0ea5e9', '#f59e0b', '#8b5cf6', '#ef4444', '#14b8a6'];
 
-function toLocalDateIso(value: string | Date) {
-  const d = new Date(value);
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
 function getRegUserId(reg: ExamRegistration): number | null {
   const maybe = (reg as ExamRegistration & { userId?: unknown }).userId;
   return typeof maybe === 'number' ? maybe : null;
@@ -71,6 +63,12 @@ interface ReportData {
   users: User[];
   academicYears: AcademicYear[];
   semesters: Semester[];
+  meta?: {
+    admissionCountTotal: number;
+    admissionCountReturned: number;
+    admissionLimit: number;
+    admissionsCapped: boolean;
+  };
 }
 
 const EMPTY_REPORT_DATA: ReportData = {
@@ -83,6 +81,12 @@ const EMPTY_REPORT_DATA: ReportData = {
   users: [],
   academicYears: [],
   semesters: [],
+  meta: {
+    admissionCountTotal: 0,
+    admissionCountReturned: 0,
+    admissionLimit: 1200,
+    admissionsCapped: false,
+  },
 };
 
 export default function EmployeeReports() {
@@ -94,9 +98,38 @@ export default function EmployeeReports() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
+  const hasInvalidDateRange = Boolean(dateFrom && dateTo && dateFrom > dateTo);
+
+  const reportsParams = useMemo(() => {
+    const params: {
+      status?: string;
+      levelGroup?: string;
+      grade?: string;
+      academicYearId?: number;
+      semesterId?: number;
+      dateFrom?: string;
+      dateTo?: string;
+      limit: number;
+    } = {
+      limit: 1200,
+    };
+
+    if (statusFilter !== 'all') params.status = statusFilter;
+    if (levelGroupFilter !== 'all') params.levelGroup = levelGroupFilter;
+    if (gradeFilter !== 'all') params.grade = gradeFilter;
+    if (yearFilter !== 'all') params.academicYearId = Number(yearFilter);
+    if (semesterFilter !== 'all') params.semesterId = Number(semesterFilter);
+    if (!hasInvalidDateRange) {
+      if (dateFrom) params.dateFrom = dateFrom;
+      if (dateTo) params.dateTo = dateTo;
+    }
+
+    return params;
+  }, [statusFilter, levelGroupFilter, gradeFilter, yearFilter, semesterFilter, dateFrom, dateTo, hasInvalidDateRange]);
+
   const { data: rawData, loading, error, refetch } = useAsync<ReportData>(async () => {
     try {
-      const summary = await getReportsSummary();
+      const summary = await getReportsSummary(reportsParams);
       return {
         admissions: summary.admissions as Admission[],
         results: summary.results as ExamResult[],
@@ -107,14 +140,13 @@ export default function EmployeeReports() {
         users: summary.users as User[],
         academicYears: summary.academicYears as AcademicYear[],
         semesters: summary.semesters as Semester[],
+        meta: summary.meta,
       };
     } catch {
       showToast('Failed to load report data.', 'error');
       return EMPTY_REPORT_DATA;
     }
-  }, [], 120000);
-
-  const hasInvalidDateRange = Boolean(dateFrom && dateTo && dateFrom > dateTo);
+  }, [reportsParams], 120000);
 
   const {
     admissions,
@@ -129,26 +161,10 @@ export default function EmployeeReports() {
     regsById,
     schedulesById,
     examsById,
+    meta,
   } = useMemo(() => {
     const source = rawData || EMPTY_REPORT_DATA;
-    const yearId = yearFilter === 'all' ? null : Number(yearFilter);
-    const semId = semesterFilter === 'all' ? null : Number(semesterFilter);
-
-    const filteredAdmissions = source.admissions.filter((a) => {
-      if (statusFilter !== 'all' && a.status !== statusFilter) return false;
-      if (levelGroupFilter !== 'all' && a.levelGroup !== levelGroupFilter) return false;
-      if (gradeFilter !== 'all' && a.gradeLevel !== gradeFilter) return false;
-      if (yearId !== null && a.academicYear?.id !== yearId) return false;
-      if (semId !== null && a.semester?.id !== semId) return false;
-
-      if (!hasInvalidDateRange && (dateFrom || dateTo)) {
-        const submittedAt = toLocalDateIso(a.submittedAt);
-        if (dateFrom && submittedAt < dateFrom) return false;
-        if (dateTo && submittedAt > dateTo) return false;
-      }
-
-      return true;
-    });
+    const filteredAdmissions = source.admissions;
 
     const admissionUserIds = new Set(filteredAdmissions.map(a => a.userId).filter((id): id is number => typeof id === 'number'));
     const admissionEmails = new Set(filteredAdmissions.map(a => a.email));
@@ -183,8 +199,9 @@ export default function EmployeeReports() {
       regsById: new Map(filteredRegs.map(r => [r.id, r])),
       schedulesById: new Map(filteredSchedules.map(s => [s.id, s])),
       examsById: new Map(filteredExams.map(e => [e.id, e])),
+      meta: source.meta,
     };
-  }, [rawData, statusFilter, levelGroupFilter, gradeFilter, yearFilter, semesterFilter, dateFrom, dateTo, hasInvalidDateRange]);
+  }, [rawData]);
 
   const semesterOptions = allSemesters.filter(s =>
     yearFilter === 'all' || s.academicYearId === Number(yearFilter)
@@ -493,6 +510,11 @@ export default function EmployeeReports() {
         </div>
         {hasInvalidDateRange && (
           <p className="mt-2 text-xs text-red-600">Invalid date range: "From" must be before or equal to "To".</p>
+        )}
+        {!hasInvalidDateRange && meta?.admissionsCapped && (
+          <p className="mt-2 text-xs text-amber-700">
+            Showing the newest {meta.admissionCountReturned} of {meta.admissionCountTotal} matching admissions for performance. Apply narrower filters or date range for targeted reporting.
+          </p>
         )}
       </div>
 

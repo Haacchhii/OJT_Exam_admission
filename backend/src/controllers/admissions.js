@@ -10,6 +10,7 @@ import { cached, invalidatePrefix } from '../utils/cache.js';
 import env from '../config/env.js';
 
 const ADMISSION_IN_PROGRESS = ['Submitted', 'Under Screening', 'Under Evaluation'];
+const REPORTS_MAX_ADMISSIONS = 1200;
 
 function toIsoDay(d) {
   if (!d) return null;
@@ -302,7 +303,13 @@ export async function getReportsSummary(req, res, next) {
       semesterId,
       dateFrom,
       dateTo,
+      limit,
     } = req.query;
+
+    const requestedLimit = Number(limit);
+    const admissionLimit = Number.isFinite(requestedLimit) && requestedLimit > 0
+      ? Math.min(Math.floor(requestedLimit), REPORTS_MAX_ADMISSIONS)
+      : REPORTS_MAX_ADMISSIONS;
 
     const admissionWhere = { deletedAt: null };
     if (status) admissionWhere.status = status;
@@ -331,12 +338,15 @@ export async function getReportsSummary(req, res, next) {
       semesterId: semesterId ? Number(semesterId) : null,
       dateFrom: dateFrom || null,
       dateTo: dateTo || null,
+      limit: admissionLimit,
     })}`;
     const summary = await cached(cacheKey, async () => {
-      const [admissions, academicYears, semesters] = await Promise.all([
+      const [totalAdmissions, admissions, academicYears, semesters] = await Promise.all([
+        prisma.admission.count({ where: admissionWhere }),
         prisma.admission.findMany({
           where: admissionWhere,
           orderBy: { submittedAt: 'desc' },
+          take: admissionLimit,
           select: {
             id: true,
             userId: true,
@@ -362,6 +372,13 @@ export async function getReportsSummary(req, res, next) {
         }),
       ]);
 
+      const meta = {
+        admissionCountTotal: totalAdmissions,
+        admissionCountReturned: admissions.length,
+        admissionLimit,
+        admissionsCapped: totalAdmissions > admissions.length,
+      };
+
       if (!admissions.length) {
         return {
           admissions: [],
@@ -373,6 +390,7 @@ export async function getReportsSummary(req, res, next) {
           users: [],
           academicYears,
           semesters,
+          meta,
         };
       }
 
@@ -424,6 +442,7 @@ export async function getReportsSummary(req, res, next) {
           users,
           academicYears,
           semesters,
+          meta,
         };
       }
 
@@ -497,7 +516,7 @@ export async function getReportsSummary(req, res, next) {
           })
         : [];
 
-      return { admissions, results, exams, schedules, regs, essays, users, academicYears, semesters };
+      return { admissions, results, exams, schedules, regs, essays, users, academicYears, semesters, meta };
     }, 15_000);
 
     res.json(summary);

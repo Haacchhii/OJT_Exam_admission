@@ -31,6 +31,7 @@ interface ReportsSummaryParams {
   semesterId?: number;
   dateFrom?: string;
   dateTo?: string;
+  limit?: number;
 }
 
 export interface PagedApiResponse<T> {
@@ -79,6 +80,12 @@ export interface EmployeeReportsSummary {
   }>;
   academicYears: AcademicYear[];
   semesters: Semester[];
+  meta?: {
+    admissionCountTotal: number;
+    admissionCountReturned: number;
+    admissionLimit: number;
+    admissionsCapped: boolean;
+  };
 }
 
 export interface EmployeeDashboardSummary {
