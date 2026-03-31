@@ -169,31 +169,54 @@ export async function getQuestionAnalytics(req, res, next) {
       where: { examId },
       ...(pg && { skip: pg.skip, take: pg.take }),
       orderBy: { orderNum: 'asc' },
-      include: { choices: { orderBy: { orderNum: 'asc' } } },
+      include: {
+        choices: {
+          orderBy: { orderNum: 'asc' },
+          select: { id: true, choiceText: true, isCorrect: true },
+        },
+      },
     });
     const questionIds = questions.map(q => q.id);
 
-    // Get all schedules for this exam then all submitted answers
-    const scheduleIds = (await prisma.examSchedule.findMany({ where: { examId }, select: { id: true } })).map(s => s.id);
-    const registrationIds = (await prisma.examRegistration.findMany({
-      where: { scheduleId: { in: scheduleIds }, status: 'done' },
-      select: { id: true },
-    })).map(r => r.id);
-
-    const submissions = await prisma.submittedAnswer.findMany({
-      where: {
-        registrationId: { in: registrationIds },
-        ...(questionIds.length > 0 && { questionId: { in: questionIds } }),
-      },
-    });
-    const essayAnswers = await prisma.essayAnswer.findMany({
-      where: {
-        registrationId: { in: registrationIds },
-        ...(questionIds.length > 0 && { questionId: { in: questionIds } }),
-      },
-    });
-
-    const totalTakers = registrationIds.length;
+    const [totalTakers, submissions, essayAnswers] = await Promise.all([
+      prisma.examRegistration.count({
+        where: {
+          status: 'done',
+          schedule: { examId },
+        },
+      }),
+      questionIds.length
+        ? prisma.submittedAnswer.findMany({
+            where: {
+              questionId: { in: questionIds },
+              registration: {
+                status: 'done',
+                schedule: { examId },
+              },
+            },
+            select: {
+              questionId: true,
+              selectedChoiceId: true,
+            },
+          })
+        : Promise.resolve([]),
+      questionIds.length
+        ? prisma.essayAnswer.findMany({
+            where: {
+              questionId: { in: questionIds },
+              registration: {
+                status: 'done',
+                schedule: { examId },
+              },
+            },
+            select: {
+              questionId: true,
+              scored: true,
+              pointsAwarded: true,
+            },
+          })
+        : Promise.resolve([]),
+    ]);
 
     // Build Maps for O(1) lookup instead of O(n) .filter() per question
     const subsByQuestion = new Map();
