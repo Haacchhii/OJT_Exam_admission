@@ -16,12 +16,7 @@ const routePrefetchers: Record<string, PrefetchFn> = {
   '/employee/admissions': () => import('../pages/employee/Admissions'),
   '/employee/exams': () => import('../pages/employee/Exams'),
   '/employee/results': () => import('../pages/employee/Results'),
-  '/employee/reports': async () => {
-    await Promise.all([
-      import('../pages/employee/Reports'),
-      import('../pages/employee/reports/ReportsCharts'),
-    ]);
-  },
+  '/employee/reports': () => import('../pages/employee/Reports'),
   '/employee/users': () => import('../pages/employee/Users'),
   '/employee/audit': () => import('../pages/employee/AuditLog'),
   '/employee/settings': () => import('../pages/employee/Settings'),

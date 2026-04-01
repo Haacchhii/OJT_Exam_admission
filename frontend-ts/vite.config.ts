@@ -24,8 +24,33 @@ export default defineConfig({
     cssMinify: true,
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router-dom'],
+        manualChunks: (id) => {
+          const normalizedId = id.replace(/\\/g, '/');
+
+          if (normalizedId.includes('node_modules')) {
+            if (
+              normalizedId.includes('/react/') ||
+              normalizedId.includes('/react-dom/') ||
+              normalizedId.includes('/react-router-dom/')
+            ) {
+              return 'vendor';
+            }
+            if (normalizedId.includes('/recharts/')) {
+              return 'charts-vendor';
+            }
+            if (normalizedId.includes('/xlsx/') || normalizedId.includes('/papaparse/')) {
+              return 'exam-io-vendor';
+            }
+          }
+
+          if (normalizedId.includes('/src/pages/employee/reports/charts/')) {
+            return 'reports-charts';
+          }
+          if (normalizedId.includes('/src/pages/employee/exams/examParsers.ts')) {
+            return 'exam-parsers';
+          }
+
+          return undefined;
         },
         chunkFileNames: 'assets/[name]-[hash].js',
         entryFileNames: 'assets/[name]-[hash].js',

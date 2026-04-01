@@ -1,4 +1,4 @@
-﻿import { Suspense, useState, useMemo } from 'react';
+﻿import { Suspense, useState, useMemo, useEffect, useRef, type ReactNode } from 'react';
 import { useAsync } from '../../hooks/useAsync';
 import { getReportsSummary } from '../../api/admissions';
 import { formatPersonName, formatDate } from '../../utils/helpers';
@@ -9,7 +9,9 @@ import { lazyWithRetry, LazyLoadingFallback } from '../../components/lazyWithRet
 import { ADMISSION_STATUSES, GRADE_OPTIONS, ALL_GRADE_LEVELS } from '../../utils/constants';
 import type { Admission, ExamResult, Exam, ExamSchedule, ExamRegistration, EssayAnswer, User, AcademicYear, Semester } from '../../types';
 
-const ReportsCharts = lazyWithRetry(() => import('./reports/ReportsCharts'));
+const PassRateMonthlyCharts = lazyWithRetry(() => import('./reports/charts/PassRateMonthlyCharts'));
+const ResultsBreakdownCharts = lazyWithRetry(() => import('./reports/charts/ResultsBreakdownCharts'));
+const ScheduleUtilizationChart = lazyWithRetry(() => import('./reports/charts/ScheduleUtilizationChart'));
 
 const STATUS_COLORS: Record<string, string> = {
   Submitted: '#8b5cf6',
@@ -20,6 +22,34 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const CHART_FALLBACK_COLORS = ['#16a34a', '#0ea5e9', '#f59e0b', '#8b5cf6', '#ef4444', '#14b8a6'];
+
+function DeferredChartSection({ children, minHeight = 320 }: { children: ReactNode; minHeight?: number }) {
+  const [isReady, setIsReady] = useState(false);
+  const hostRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (isReady || !hostRef.current) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setIsReady(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '200px 0px' }
+    );
+
+    observer.observe(hostRef.current);
+    return () => observer.disconnect();
+  }, [isReady]);
+
+  return (
+    <div ref={hostRef} style={{ minHeight }}>
+      {isReady ? children : <div className="gk-section-card p-6 mb-6 text-sm text-gray-400">Loading chart section...</div>}
+    </div>
+  );
+}
 
 function getRegUserId(reg: ExamRegistration): number | null {
   const maybe = (reg as ExamRegistration & { userId?: unknown }).userId;
@@ -547,17 +577,29 @@ export default function EmployeeReports() {
       </div>
 
       <Suspense fallback={<LazyLoadingFallback />}>
-        <ReportsCharts
+        <PassRateMonthlyCharts
           sortedStats={sortedStats}
           monthData={monthData}
           admissionStatusData={admissionStatusData}
           admissionStatusTotal={admissionStatusTotal}
+        />
+      </Suspense>
+
+      <DeferredChartSection minHeight={430}>
+        <Suspense fallback={<LazyLoadingFallback />}>
+          <ResultsBreakdownCharts
           resultsCount={results.length}
           passFailData={passFailData}
           scoreBandData={scoreBandData}
-          scheduleUtilizationData={scheduleUtilizationData}
         />
-      </Suspense>
+        </Suspense>
+      </DeferredChartSection>
+
+      <DeferredChartSection minHeight={360}>
+        <Suspense fallback={<LazyLoadingFallback />}>
+          <ScheduleUtilizationChart scheduleUtilizationData={scheduleUtilizationData} />
+        </Suspense>
+      </DeferredChartSection>
       
       {/* Key Metrics Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
