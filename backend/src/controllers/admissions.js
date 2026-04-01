@@ -150,145 +150,146 @@ export async function getStats(req, res, next) {
 // GET /api/admissions/dashboard-summary
 export async function getDashboardSummary(req, res, next) {
   try {
-    const cacheKey = `dashboardSummary:${req.user.role}`;
+    const role = req.user?.role;
+    const includeAdmissions = role === ROLES.ADMIN || role === ROLES.REGISTRAR;
+    const includeExams = role === ROLES.ADMIN || role === ROLES.TEACHER;
+    const includeResults = role === ROLES.ADMIN || role === ROLES.REGISTRAR || role === ROLES.TEACHER;
+
+    const cacheKey = `dashboardSummary:${role}:a${includeAdmissions ? 1 : 0}:e${includeExams ? 1 : 0}:r${includeResults ? 1 : 0}`;
     const summary = await cached(cacheKey, async () => {
-      const now = Date.now();
-      const weekAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
-      const twoWeeksAgo = new Date(now - 14 * 24 * 60 * 60 * 1000);
-      const overdueThreshold = new Date(now - 7 * 24 * 60 * 60 * 1000);
+      let stats = {
+        total: 0,
+        submitted: 0,
+        underScreening: 0,
+        underEvaluation: 0,
+        accepted: 0,
+        rejected: 0,
+      };
+      let trends = { total: 0, accepted: 0, inProgress: 0, rejected: 0 };
+      let overdueCount = 0;
 
-      const [
-        total,
-        grouped,
-        recentAdmissions,
-        overdueCount,
-        thisWeekTotal,
-        lastWeekTotal,
-        thisWeekGrouped,
-        lastWeekGrouped,
-        exams,
-        registrationGrouped,
-        pendingEssays,
-      ] = await Promise.all([
-        prisma.admission.count({ where: { deletedAt: null } }),
-        prisma.admission.groupBy({
-          by: ['status'],
-          _count: { _all: true },
-          where: { deletedAt: null },
-        }),
-        prisma.admission.findMany({
-          where: { deletedAt: null },
-          orderBy: { submittedAt: 'desc' },
-          take: 60,
-          select: {
-            id: true,
-            firstName: true,
-            middleName: true,
-            lastName: true,
-            email: true,
-            gradeLevel: true,
-            levelGroup: true,
-            status: true,
-            submittedAt: true,
-          },
-        }),
-        prisma.admission.count({
-          where: {
-            deletedAt: null,
-            status: { in: ADMISSION_IN_PROGRESS },
-            submittedAt: { lt: overdueThreshold },
-          },
-        }),
-        prisma.admission.count({ where: { deletedAt: null, submittedAt: { gte: weekAgo } } }),
-        prisma.admission.count({ where: { deletedAt: null, submittedAt: { gte: twoWeeksAgo, lt: weekAgo } } }),
-        prisma.admission.groupBy({
-          by: ['status'],
-          _count: { _all: true },
-          where: { deletedAt: null, submittedAt: { gte: weekAgo } },
-        }),
-        prisma.admission.groupBy({
-          by: ['status'],
-          _count: { _all: true },
-          where: { deletedAt: null, submittedAt: { gte: twoWeeksAgo, lt: weekAgo } },
-        }),
-        prisma.exam.findMany({
-          where: { deletedAt: null },
-          orderBy: { createdAt: 'desc' },
-          take: 20,
-          select: {
-            id: true,
-            title: true,
-            gradeLevel: true,
-            isActive: true,
-            _count: { select: { questions: true, schedules: true } },
-          },
-        }),
-        prisma.examRegistration.groupBy({ by: ['status'], _count: { _all: true } }),
-        prisma.essayAnswer.count({ where: { scored: false } }),
-      ]);
+      if (includeAdmissions) {
+        const now = Date.now();
+        const weekAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
+        const twoWeeksAgo = new Date(now - 14 * 24 * 60 * 60 * 1000);
+        const overdueThreshold = new Date(now - 7 * 24 * 60 * 60 * 1000);
 
-      const scheduleIds = (await prisma.examSchedule.findMany({
-        where: { examId: { in: exams.map(e => e.id) } },
-        select: { id: true, examId: true },
-      })).reduce((acc, s) => {
-        if (!acc[s.examId]) acc[s.examId] = [];
-        acc[s.examId].push(s.id);
-        return acc;
-      }, {});
-
-      const allScheduleIds = Object.values(scheduleIds).flat();
-      const regCounts = allScheduleIds.length
-        ? await prisma.examRegistration.groupBy({
-            by: ['scheduleId'],
-            where: { scheduleId: { in: allScheduleIds } },
+        const [total, grouped, overdue, thisWeekTotal, lastWeekTotal, thisWeekGrouped, lastWeekGrouped] = await Promise.all([
+          prisma.admission.count({ where: { deletedAt: null } }),
+          prisma.admission.groupBy({
+            by: ['status'],
             _count: { _all: true },
-          })
-        : [];
+            where: { deletedAt: null },
+          }),
+          prisma.admission.count({
+            where: {
+              deletedAt: null,
+              status: { in: ADMISSION_IN_PROGRESS },
+              submittedAt: { lt: overdueThreshold },
+            },
+          }),
+          prisma.admission.count({ where: { deletedAt: null, submittedAt: { gte: weekAgo } } }),
+          prisma.admission.count({ where: { deletedAt: null, submittedAt: { gte: twoWeeksAgo, lt: weekAgo } } }),
+          prisma.admission.groupBy({
+            by: ['status'],
+            _count: { _all: true },
+            where: { deletedAt: null, submittedAt: { gte: weekAgo } },
+          }),
+          prisma.admission.groupBy({
+            by: ['status'],
+            _count: { _all: true },
+            where: { deletedAt: null, submittedAt: { gte: twoWeeksAgo, lt: weekAgo } },
+          }),
+        ]);
 
-      const regBySchedule = new Map(regCounts.map(r => [r.scheduleId, r._count._all]));
-      const examActivity = exams.map((exam) => {
-        const ids = scheduleIds[exam.id] || [];
-        const registrations = ids.reduce((sum, id) => sum + (regBySchedule.get(id) || 0), 0);
-        return {
-          id: exam.id,
-          title: exam.title,
-          gradeLevel: exam.gradeLevel,
-          questionCount: exam._count.questions,
-          scheduleCount: exam._count.schedules,
-          isActive: exam.isActive,
-          registrations,
+        overdueCount = overdue;
+        const statusMap = Object.fromEntries(grouped.map(g => [g.status, g._count._all]));
+        stats = {
+          total,
+          submitted: statusMap['Submitted'] || 0,
+          underScreening: statusMap['Under Screening'] || 0,
+          underEvaluation: statusMap['Under Evaluation'] || 0,
+          accepted: statusMap['Accepted'] || 0,
+          rejected: statusMap['Rejected'] || 0,
         };
-      });
 
-      const statusMap = Object.fromEntries(grouped.map(g => [g.status, g._count._all]));
-      const stats = {
-        total,
-        submitted: statusMap['Submitted'] || 0,
-        underScreening: statusMap['Under Screening'] || 0,
-        underEvaluation: statusMap['Under Evaluation'] || 0,
-        accepted: statusMap['Accepted'] || 0,
-        rejected: statusMap['Rejected'] || 0,
-      };
+        const pct = (curr, prev) => (prev === 0 ? (curr > 0 ? 100 : 0) : Math.round(((curr - prev) / prev) * 100));
+        const statusCountMap = (rows) => Object.fromEntries(rows.map((row) => [row.status, row._count._all]));
+        const thisWeekStatusMap = statusCountMap(thisWeekGrouped);
+        const lastWeekStatusMap = statusCountMap(lastWeekGrouped);
+        const countStatus = (map, status) => map[status] || 0;
+        const countInProgress = (map) => ADMISSION_IN_PROGRESS.reduce((sum, status) => sum + (map[status] || 0), 0);
+        trends = {
+          total: pct(thisWeekTotal, lastWeekTotal),
+          accepted: pct(countStatus(thisWeekStatusMap, 'Accepted'), countStatus(lastWeekStatusMap, 'Accepted')),
+          inProgress: pct(countInProgress(thisWeekStatusMap), countInProgress(lastWeekStatusMap)),
+          rejected: pct(countStatus(thisWeekStatusMap, 'Rejected'), countStatus(lastWeekStatusMap, 'Rejected')),
+        };
+      }
 
-      const pct = (curr, prev) => (prev === 0 ? (curr > 0 ? 100 : 0) : Math.round(((curr - prev) / prev) * 100));
-      const statusCountMap = (rows) => Object.fromEntries(rows.map((row) => [row.status, row._count._all]));
-      const thisWeekStatusMap = statusCountMap(thisWeekGrouped);
-      const lastWeekStatusMap = statusCountMap(lastWeekGrouped);
-      const countStatus = (map, status) => map[status] || 0;
-      const countInProgress = (map) => ADMISSION_IN_PROGRESS.reduce((sum, status) => sum + (map[status] || 0), 0);
-      const trends = {
-        total: pct(thisWeekTotal, lastWeekTotal),
-        accepted: pct(countStatus(thisWeekStatusMap, 'Accepted'), countStatus(lastWeekStatusMap, 'Accepted')),
-        inProgress: pct(countInProgress(thisWeekStatusMap), countInProgress(lastWeekStatusMap)),
-        rejected: pct(countStatus(thisWeekStatusMap, 'Rejected'), countStatus(lastWeekStatusMap, 'Rejected')),
-      };
+      let examActivity = [];
+      let completed = 0;
+      if (includeExams) {
+        const [exams, registrationGrouped] = await Promise.all([
+          prisma.exam.findMany({
+            where: { deletedAt: null },
+            orderBy: { createdAt: 'desc' },
+            take: 20,
+            select: {
+              id: true,
+              title: true,
+              gradeLevel: true,
+              isActive: true,
+              _count: { select: { questions: true, schedules: true } },
+            },
+          }),
+          prisma.examRegistration.groupBy({ by: ['status'], _count: { _all: true } }),
+        ]);
 
-      const completed = (registrationGrouped.find(r => r.status === 'done')?._count._all) || 0;
+        const scheduleIds = (await prisma.examSchedule.findMany({
+          where: { examId: { in: exams.map(e => e.id) } },
+          select: { id: true, examId: true },
+        })).reduce((acc, s) => {
+          if (!acc[s.examId]) acc[s.examId] = [];
+          acc[s.examId].push(s.id);
+          return acc;
+        }, {});
+
+        const allScheduleIds = Object.values(scheduleIds).flat();
+        const regCounts = allScheduleIds.length
+          ? await prisma.examRegistration.groupBy({
+              by: ['scheduleId'],
+              where: { scheduleId: { in: allScheduleIds } },
+              _count: { _all: true },
+            })
+          : [];
+
+        const regBySchedule = new Map(regCounts.map(r => [r.scheduleId, r._count._all]));
+        examActivity = exams.map((exam) => {
+          const ids = scheduleIds[exam.id] || [];
+          const registrations = ids.reduce((sum, id) => sum + (regBySchedule.get(id) || 0), 0);
+          return {
+            id: exam.id,
+            title: exam.title,
+            gradeLevel: exam.gradeLevel,
+            questionCount: exam._count.questions,
+            scheduleCount: exam._count.schedules,
+            isActive: exam.isActive,
+            registrations,
+          };
+        });
+
+        completed = (registrationGrouped.find(r => r.status === 'done')?._count._all) || 0;
+      }
+
+      const pendingEssays = includeResults
+        ? await prisma.essayAnswer.count({ where: { scored: false } })
+        : 0;
 
       return {
         stats,
         trends,
-        admissions: recentAdmissions,
+        admissions: [],
         overdue: overdueCount,
         exams: examActivity,
         completed,
