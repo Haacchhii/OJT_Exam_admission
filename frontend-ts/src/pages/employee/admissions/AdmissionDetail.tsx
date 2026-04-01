@@ -1,8 +1,8 @@
 ﻿import { showToast } from '../../../components/Toast';
 import { useConfirm } from '../../../components/ConfirmDialog';
-import { getAdmissions, updateAdmissionStatus, VALID_TRANSITIONS } from '../../../api/admissions';
+import { getAdmission, updateAdmissionStatus, VALID_TRANSITIONS } from '../../../api/admissions';
 import { useAsync } from '../../../hooks/useAsync';
-import { asArray, formatPersonName } from '../../../utils/helpers';
+import { formatPersonName } from '../../../utils/helpers';
 import DocumentReview from '../../../components/DocumentReview';
 import { PageHeader, Badge, SkeletonPage } from '../../../components/UI';
 import Icon from '../../../components/Icons';
@@ -31,9 +31,11 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
   const canManage = user?.role === 'administrator' || user?.role === 'registrar';
   const confirm = useConfirm();
   const { data: adm, loading, refetch } = useAsync<Admission | null>(async () => {
-    const raw = await getAdmissions();
-    const all = asArray<Admission>(raw);
-    return all.find(a => a.id === admissionId) || null;
+    try {
+      return await getAdmission(admissionId);
+    } catch {
+      return null;
+    }
   }, [admissionId]);
 
   const [statusVal, setStatusVal] = useState('');

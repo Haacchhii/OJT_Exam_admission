@@ -201,7 +201,13 @@ export const schedulesQuerySchema = z.object({
 
 export const registrationsQuerySchema = z.object({
   ...paginationQuery,
+  examId: coerceOptionalInt,
   status: z.enum(['scheduled', 'started', 'done']).optional(),
+});
+
+export const examReadinessQuerySchema = z.object({
+  ...paginationQuery,
+  status: z.enum(['all', 'pending', 'done', 'passed', 'failed']).optional(),
 });
 
 export const createRegistrationSchema = z.object({

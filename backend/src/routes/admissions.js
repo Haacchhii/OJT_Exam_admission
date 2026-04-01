@@ -7,7 +7,7 @@ import { validate, validateQuery } from '../middleware/validate.js';
 import { createAdmissionSchema, updateStatusSchema, bulkUpdateStatusSchema, bulkDeleteSchema, reviewDocumentSchema, admissionsQuerySchema, admissionsStatsQuerySchema } from '../utils/schemas.js';
 import { writeLimiter } from '../middleware/rateLimits.js';
 import * as ctrl from '../controllers/admissions.js';
-import { previewDocument, extractDocument } from '../controllers/documentPreview.js';
+import { previewDocument, extractDocument, getExtractionJobStatus } from '../controllers/documentPreview.js';
 import { ROLES } from '../utils/constants.js';
 
 const router = Router();
@@ -39,6 +39,7 @@ router.get('/:id/documents/:docId/download', ctrl.downloadDocument);
 
 // Document OCR / text extraction — ownership checked in controller
 router.post('/:id/documents/:docId/extract', authorize(ROLES.ADMIN, ROLES.REGISTRAR), extractDocument);
+router.get('/:id/documents/:docId/extract/:jobId', authorize(ROLES.ADMIN, ROLES.REGISTRAR), getExtractionJobStatus);
 
 // Document review (accept/reject)
 router.patch('/:id/documents/:docId/review', authorize(ROLES.ADMIN, ROLES.REGISTRAR), validate(reviewDocumentSchema), ctrl.reviewDocument);

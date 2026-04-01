@@ -37,6 +37,31 @@ export async function getUsers(req, res, next) {
   } catch (err) { next(err); }
 }
 
+// GET /api/users/stats
+export async function getUserStats(req, res, next) {
+  try {
+    const where = { deletedAt: null };
+
+    const [total, grouped] = await Promise.all([
+      prisma.user.count({ where }),
+      prisma.user.groupBy({
+        by: ['role'],
+        _count: { _all: true },
+        where,
+      }),
+    ]);
+
+    const byRole = Object.fromEntries(grouped.map((row) => [row.role, row._count._all]));
+    res.json({
+      total,
+      admins: byRole['administrator'] || 0,
+      registrars: byRole['registrar'] || 0,
+      teachers: byRole['teacher'] || 0,
+      applicants: byRole['applicant'] || 0,
+    });
+  } catch (err) { next(err); }
+}
+
 // GET /api/users/:id
 export async function getUser(req, res, next) {
   try {

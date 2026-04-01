@@ -1,9 +1,9 @@
-﻿import { useState, useMemo } from 'react';
+﻿import { useState } from 'react';
 import { useAsync } from '../../hooks/useAsync';
-import { getUsers, addUser, updateUser, deleteUser, getUserByEmail, bulkDeleteUsers } from '../../api/users';
+import { getUsersPage, getUserStats, addUser, updateUser, deleteUser, getUserByEmail, bulkDeleteUsers, type UserStats } from '../../api/users';
 import { useAuth } from '../../context/AuthContext';
 import { showToast } from '../../components/Toast';
-import { PageHeader, StatCard, Badge, EmptyState, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert } from '../../components/UI';
+import { PageHeader, StatCard, Badge, EmptyState, Pagination, SkeletonPage, ErrorAlert } from '../../components/UI';
 import Icon from '../../components/Icons';
 import Modal from '../../components/Modal';
 import { useConfirm } from '../../components/ConfirmDialog';
@@ -11,7 +11,7 @@ import BulkActionBar from '../../components/BulkActionBar';
 import { useSelection } from '../../hooks/useSelection';
 import { CSVUploader } from '../../components/CSVUploader';
 import { USER_ROLE_OPTIONS } from '../../utils/constants';
-import { asArray, exportToCSV, formatPersonName } from '../../utils/helpers';
+import { exportToCSV, formatPersonName } from '../../utils/helpers';
 import type { User } from '../../types';
 
 const USERS_PER_PAGE = 10;
@@ -31,7 +31,6 @@ const emptyForm: UserForm = { firstName: '', middleName: '', lastName: '', email
 
 export default function EmployeeUsers() {
   const { user: authUser } = useAuth();
-  const { data: users, loading, error, refetch } = useAsync<User[]>(async () => asArray<User>(await getUsers()));
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -46,30 +45,21 @@ export default function EmployeeUsers() {
   const confirm = useConfirm();
   const { selected, toggle, togglePage, clear: clearSelection, isAllSelected, count: selectedCount } = useSelection();
 
-  const filtered = useMemo(() => {
-    let list = users || [];
-    if (roleFilter !== 'all') list = list.filter(u => u.role === roleFilter);
-    if (statusFilter !== 'all') list = list.filter(u => u.status === statusFilter);
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter(u => `${formatPersonName(u)} ${u.email}`.toLowerCase().includes(q));
-    }
-    return list;
-  }, [users, roleFilter, statusFilter, search]);
+  const { data: usersPage, loading, error, refetch } = useAsync(async () => {
+    return getUsersPage({
+      search: search.trim() || undefined,
+      role: roleFilter !== 'all' ? roleFilter : undefined,
+      status: statusFilter !== 'all' ? statusFilter : undefined,
+      page,
+      limit: USERS_PER_PAGE,
+    });
+  }, [search, roleFilter, statusFilter, page]);
 
-  const { paginated, totalPages, safePage, totalItems } = usePaginationSlice(filtered, page, USERS_PER_PAGE);
+  const { data: stats, refetch: refetchStats } = useAsync<UserStats>(() => getUserStats());
+
+  const users: User[] = usersPage?.data || [];
+  const pagination = usersPage?.pagination || { page: 1, limit: USERS_PER_PAGE, total: 0, totalPages: 1 };
   const resetPage = () => setPage(1);
-
-  const stats = useMemo(() => {
-    const list = users || [];
-    return {
-      total: list.length,
-      admins: list.filter(u => u.role === 'administrator').length,
-      registrars: list.filter(u => u.role === 'registrar').length,
-      teachers: list.filter(u => u.role === 'teacher').length,
-      applicants: list.filter(u => u.role === 'applicant').length,
-    };
-  }, [users]);
 
   const openAdd = () => { setForm({ ...emptyForm }); setEditId(null); setErrors({}); setShowModal(true); };
   const openEdit = (u: User) => { setForm({ firstName: u.firstName, middleName: u.middleName || '', lastName: u.lastName, email: u.email, role: u.role, status: u.status, password: '' }); setEditId(u.id); setErrors({}); setShowModal(true); };
@@ -134,6 +124,7 @@ export default function EmployeeUsers() {
         showToast('No users were imported. Ensure each row includes a valid password and email.', 'warning');
       }
       refetch();
+      refetchStats();
     } finally {
       setSaving(false);
     }
@@ -153,6 +144,7 @@ export default function EmployeeUsers() {
         showToast('User added!', 'success');
       }
       refetch();
+      refetchStats();
       setShowModal(false);
     } catch {
       showToast('Failed to save user.', 'error');
@@ -176,6 +168,7 @@ export default function EmployeeUsers() {
       try {
         await deleteUser(userId);
         refetch();
+        refetchStats();
         showToast('User deleted.', 'info');
       } catch {
         showToast('Failed to delete user.', 'error');
@@ -205,6 +198,7 @@ export default function EmployeeUsers() {
       showToast(`${ids.length} user(s) deleted.`, 'info');
       clearSelection();
       refetch();
+      refetchStats();
     } catch {
       showToast('Failed to delete users.', 'error');
     } finally {
@@ -214,7 +208,7 @@ export default function EmployeeUsers() {
 
   const roleLabel = (r: string) => ROLES.find(ro => ro.value === r)?.label || r;
 
-  if (loading && !users) return <SkeletonPage />;
+  if (loading && !usersPage) return <SkeletonPage />;
   if (error) return <ErrorAlert error={error} onRetry={refetch} />;
 
   if (authUser?.role !== 'administrator') {
@@ -232,7 +226,7 @@ export default function EmployeeUsers() {
       <PageHeader title="User Management" subtitle="Manage system user accounts.">
         <div className="flex gap-2">
             <button 
-              onClick={() => exportToCSV(filtered.map(u => ({
+              onClick={() => exportToCSV(users.map(u => ({
                 'First Name': u.firstName,
                 'Middle Name': u.middleName || '',
                 'Last Name': u.lastName,
@@ -241,7 +235,7 @@ export default function EmployeeUsers() {
                 'Status': u.status
               })), 'Users_Export.csv')}
               className="bg-white text-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 flex items-center gap-2 border border-gray-300"
-              title="Download full list as CSV"
+              title="Download current page as CSV"
             >
               <Icon name="download" className="w-5 h-5" /> Export
             </button>
@@ -255,11 +249,11 @@ export default function EmployeeUsers() {
           </div>
         </PageHeader>
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-        <StatCard label="Total Users" value={stats.total} icon="users" />
-        <StatCard label="Administrators" value={stats.admins} icon="shieldCheck" />
-        <StatCard label="Registrars" value={stats.registrars} icon="clipboard" />
-        <StatCard label="Teachers" value={stats.teachers} icon="graduationCap" />
-        <StatCard label="Applicants" value={stats.applicants} icon="userCircle" />
+          <StatCard label="Total Users" value={stats?.total || 0} icon="users" />
+          <StatCard label="Administrators" value={stats?.admins || 0} icon="shieldCheck" />
+          <StatCard label="Registrars" value={stats?.registrars || 0} icon="clipboard" />
+          <StatCard label="Teachers" value={stats?.teachers || 0} icon="graduationCap" />
+          <StatCard label="Applicants" value={stats?.applicants || 0} icon="userCircle" />
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
@@ -275,17 +269,17 @@ export default function EmployeeUsers() {
         </select>
       </div>
 
-      {paginated.length > 0 ? (
+      {users.length > 0 ? (
         <>
         <BulkActionBar count={selectedCount} onDelete={handleBulkDelete} onClear={clearSelection} deleting={bulkDeleting} />
         <div className="gk-section-card table-scroll">
           <table className="w-full text-sm">
             <thead><tr className="border-b border-gray-200 text-left text-gray-400 uppercase text-xs bg-gray-50/95 sticky top-0 z-10 backdrop-blur-sm">
-              <th scope="col" className="py-3 px-2 w-8"><input type="checkbox" checked={isAllSelected(paginated)} onChange={() => togglePage(paginated)} className="accent-forest-500 rounded" aria-label="Select all users" /></th>
+              <th scope="col" className="py-3 px-2 w-8"><input type="checkbox" checked={isAllSelected(users)} onChange={() => togglePage(users)} className="accent-forest-500 rounded" aria-label="Select all users" /></th>
               <th scope="col" className="py-3 px-4">Name</th><th scope="col" className="py-3 px-4">Email</th><th scope="col" className="py-3 px-4">Role</th><th scope="col" className="py-3 px-4">Status</th><th scope="col" className="py-3 px-4 text-right">Actions</th>
             </tr></thead>
             <tbody>
-              {paginated.map(u => (
+              {users.map(u => (
                 <tr key={u.id} className={`border-b border-gray-50 hover:bg-gray-50/50 ${selected.has(u.id) ? 'bg-gold-50/50' : ''}`}>
                   <td className="py-3 px-2"><input type="checkbox" checked={selected.has(u.id)} onChange={() => toggle(u.id)} className="accent-forest-500 rounded" aria-label={`Select ${formatPersonName(u)}`} /></td>
                   <td className="py-3 px-4 font-medium text-forest-500">{formatPersonName(u)}</td>
@@ -301,7 +295,7 @@ export default function EmployeeUsers() {
             </tbody>
           </table>
           <div className="px-4">
-            <Pagination currentPage={safePage} totalPages={totalPages} onPageChange={setPage} totalItems={totalItems} itemsPerPage={USERS_PER_PAGE} />
+            <Pagination currentPage={pagination.page} totalPages={pagination.totalPages} onPageChange={setPage} totalItems={pagination.total} itemsPerPage={USERS_PER_PAGE} />
           </div>
         </div>
         </>

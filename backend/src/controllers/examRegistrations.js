@@ -56,11 +56,14 @@ function isWithinRegistrationWindow(schedule, todayIso) {
 // GET /api/exams/registrations/list?search=&status=&page=&limit=
 export async function getRegistrations(req, res, next) {
   try {
-    const { search, status, page, limit } = req.query;
+    const { search, status, examId, page, limit } = req.query;
     const pg = paginate(page, limit);
 
     const where = {};
     if (status) where.status = status;
+    if (examId) {
+      where.schedule = { examId: Number(examId) };
+    }
     if (search) {
       where.userEmail = { contains: search, mode: 'insensitive' };
     }

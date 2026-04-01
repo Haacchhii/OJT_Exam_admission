@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { authenticate } from '../middleware/auth.js';
 import { authorize } from '../middleware/rbac.js';
 import { validate, validateQuery } from '../middleware/validate.js';
-import { createExamSchema, updateExamSchema, createScheduleSchema, updateScheduleSchema, bulkDeleteSchema, saveDraftSchema, examsQuerySchema, schedulesQuerySchema, registrationsQuerySchema, createRegistrationSchema } from '../utils/schemas.js';
+import { createExamSchema, updateExamSchema, createScheduleSchema, updateScheduleSchema, bulkDeleteSchema, saveDraftSchema, examsQuerySchema, schedulesQuerySchema, registrationsQuerySchema, createRegistrationSchema, examReadinessQuerySchema } from '../utils/schemas.js';
 import * as ctrl from '../controllers/exams.js';
 import { ROLES } from '../utils/constants.js';
 
@@ -19,6 +19,7 @@ router.delete('/schedules/:id',    authorize(ROLES.ADMIN, ROLES.TEACHER), ctrl.d
 
 // ─── Registrations (MUST be before /:id to avoid param capture) ───
 router.get('/registrations',       authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), validateQuery(registrationsQuerySchema), ctrl.getRegistrations);
+router.get('/readiness',           authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), validateQuery(examReadinessQuerySchema), ctrl.getReadiness);
 router.get('/registrations/mine',  authorize(ROLES.APPLICANT), ctrl.getMyRegistrations);
 router.post('/registrations',      authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.APPLICANT), validate(createRegistrationSchema), ctrl.createRegistration);
 router.patch('/registrations/:id/start', authorize(ROLES.APPLICANT), ctrl.startExam);

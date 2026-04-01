@@ -10,6 +10,12 @@ import { ROLES, DOC_CACHE_MAX_AGE, MAX_KV_PAIRS } from '../utils/constants.js';
 let Tesseract = null;
 let pdfParse = null;
 
+const EXTRACTION_JOB_TTL_MS = 10 * 60 * 1000;
+const extractionJobs = new Map();
+const extractionQueue = [];
+const activeDocJobs = new Map();
+let extractionWorkerBusy = false;
+
 async function loadTesseract() {
   if (!Tesseract) Tesseract = await import('tesseract.js');
   return Tesseract;
@@ -49,6 +55,113 @@ async function authenticatePreview(req) {
     return safeUser;
   } catch {
     return null;
+  }
+}
+
+function generateJobId(docId) {
+  return `extract_${docId}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function cleanupExtractionJobs() {
+  const now = Date.now();
+  for (const [jobId, job] of extractionJobs.entries()) {
+    const terminal = job.status === 'completed' || job.status === 'failed';
+    if (terminal && now - job.updatedAtMs > EXTRACTION_JOB_TTL_MS) {
+      extractionJobs.delete(jobId);
+      if (activeDocJobs.get(job.docId) === jobId) activeDocJobs.delete(job.docId);
+    }
+  }
+}
+
+async function extractTextFromFile(filePath, ext) {
+  if (ext === '.pdf') {
+    const parse = await loadPdfParse();
+    const buffer = await fs.readFile(filePath);
+    const pdfData = await parse(buffer);
+    const pdfText = pdfData.text || '';
+    if (!pdfText.trim()) {
+      return '[Scanned PDF - no embedded text detected. For best results, upload image files (JPG/PNG) of scanned documents.]';
+    }
+    return pdfText;
+  }
+
+  if (['.jpg', '.jpeg', '.png', '.webp'].includes(ext)) {
+    const tesseract = await loadTesseract();
+    const worker = await tesseract.createWorker('eng');
+    try {
+      const result = await worker.recognize(filePath);
+      return result.data.text || '';
+    } finally {
+      await worker.terminate();
+    }
+  }
+
+  return '[Text extraction is not supported for this file type. Supported: PDF, JPG, PNG, WebP]';
+}
+
+async function performDocumentExtraction(doc) {
+  const filePath = path.resolve(env.UPLOAD_DIR, doc.filePath);
+  if (!existsSync(filePath)) {
+    throw new Error('File not found on server');
+  }
+
+  const ext = path.extname(doc.filePath).toLowerCase();
+  const extractedText = await extractTextFromFile(filePath, ext);
+  const parsedData = parseDocumentFields(extractedText, doc.documentName);
+  const extractedAt = new Date();
+
+  await prisma.admissionDocument.update({
+    where: { id: doc.id },
+    data: {
+      extractedText,
+      extractedData: JSON.stringify(parsedData),
+      extractedAt,
+    },
+  });
+
+  return {
+    text: extractedText,
+    data: parsedData,
+    extractedAt,
+    cached: false,
+  };
+}
+
+async function processExtractionQueue() {
+  if (extractionWorkerBusy) return;
+  extractionWorkerBusy = true;
+
+  try {
+    while (extractionQueue.length > 0) {
+      const jobId = extractionQueue.shift();
+      const job = extractionJobs.get(jobId);
+      if (!job || job.status !== 'queued') continue;
+
+      job.status = 'running';
+      job.updatedAtMs = Date.now();
+
+      try {
+        const doc = await prisma.admissionDocument.findUnique({ where: { id: job.docId } });
+        if (!doc || doc.admissionId !== job.admissionId || !doc.filePath) {
+          throw new Error('Document not found');
+        }
+
+        job.result = await performDocumentExtraction(doc);
+        job.status = 'completed';
+      } catch (err) {
+        job.error = err?.message || 'Extraction failed';
+        job.status = 'failed';
+      } finally {
+        job.updatedAtMs = Date.now();
+        if (activeDocJobs.get(job.docId) === jobId) {
+          activeDocJobs.delete(job.docId);
+        }
+      }
+
+      cleanupExtractionJobs();
+    }
+  } finally {
+    extractionWorkerBusy = false;
   }
 }
 
@@ -103,9 +216,11 @@ export async function previewDocument(req, res, next) {
 }
 
 // POST /api/admissions/:id/documents/:docId/extract
-// Runs OCR / text extraction and returns structured data
+// Queues OCR / text extraction and returns job metadata.
 export async function extractDocument(req, res, next) {
   try {
+    cleanupExtractionJobs();
+
     const admissionId = Number(req.params.id);
     const docId = Number(req.params.docId);
 
@@ -123,63 +238,96 @@ export async function extractDocument(req, res, next) {
     // Return cached extraction if available
     if (doc.extractedText && doc.extractedData) {
       return res.json({
-        text: doc.extractedText,
-        data: JSON.parse(doc.extractedData),
-        extractedAt: doc.extractedAt,
-        cached: true,
+        jobId: null,
+        status: 'completed',
+        result: {
+          text: doc.extractedText,
+          data: JSON.parse(doc.extractedData),
+          extractedAt: doc.extractedAt,
+          cached: true,
+        },
       });
     }
 
-    const filePath = path.resolve(env.UPLOAD_DIR, doc.filePath);
-    if (!existsSync(filePath)) {
-      return res.status(404).json({ error: 'File not found on server', code: 'NOT_FOUND' });
+    const existingJobId = activeDocJobs.get(docId);
+    if (existingJobId && extractionJobs.has(existingJobId)) {
+      const existing = extractionJobs.get(existingJobId);
+      return res.status(202).json({
+        jobId: existingJobId,
+        status: existing.status,
+      });
     }
 
-    const ext = path.extname(doc.filePath).toLowerCase();
-    let extractedText = '';
+    const jobId = generateJobId(docId);
+    extractionJobs.set(jobId, {
+      jobId,
+      admissionId,
+      docId,
+      status: 'queued',
+      result: null,
+      error: null,
+      updatedAtMs: Date.now(),
+    });
+    activeDocJobs.set(docId, jobId);
+    extractionQueue.push(jobId);
+    void processExtractionQueue();
 
-    // ── Extract text based on file type ───────────────
-    if (ext === '.pdf') {
-      const parse = await loadPdfParse();
-      const buffer = await fs.readFile(filePath);
-      const pdfData = await parse(buffer);
-      extractedText = pdfData.text || '';
+    res.status(202).json({ jobId, status: 'queued' });
+  } catch (err) { next(err); }
+}
 
-      // If the PDF is scanned (no text layer), try OCR is not feasible on PDFs directly
-      // We'll inform the user
-      if (!extractedText.trim()) {
-        extractedText = '[Scanned PDF — no embedded text detected. For best results, upload image files (JPG/PNG) of scanned documents.]';
+// GET /api/admissions/:id/documents/:docId/extract/:jobId
+// Poll extraction status and return result once complete.
+export async function getExtractionJobStatus(req, res, next) {
+  try {
+    cleanupExtractionJobs();
+
+    const admissionId = Number(req.params.id);
+    const docId = Number(req.params.docId);
+    const { jobId } = req.params;
+
+    const access = await verifyAccess(req.user, admissionId);
+    if (access.error) return res.status(access.status).json({ error: access.error });
+
+    const doc = await prisma.admissionDocument.findUnique({ where: { id: docId } });
+    if (!doc || doc.admissionId !== admissionId) {
+      return res.status(404).json({ error: 'Document not found', code: 'NOT_FOUND' });
+    }
+
+    const job = extractionJobs.get(jobId);
+    if (!job || job.docId !== docId || job.admissionId !== admissionId) {
+      if (doc.extractedText && doc.extractedData) {
+        return res.json({
+          jobId,
+          status: 'completed',
+          result: {
+            text: doc.extractedText,
+            data: JSON.parse(doc.extractedData),
+            extractedAt: doc.extractedAt,
+            cached: true,
+          },
+        });
       }
-    } else if (['.jpg', '.jpeg', '.png', '.webp'].includes(ext)) {
-      const tesseract = await loadTesseract();
-      const worker = await tesseract.createWorker('eng');
-      const result = await worker.recognize(filePath);
-      extractedText = result.data.text || '';
-      await worker.terminate();
-    } else {
-      // DOC/DOCX — can't extract without additional heavy libraries
-      extractedText = '[Text extraction is not supported for this file type. Supported: PDF, JPG, PNG, WebP]';
+      return res.status(404).json({ error: 'Extraction job not found', code: 'NOT_FOUND' });
     }
 
-    // ── Parse template fields from extracted text ─────
-    const parsedData = parseDocumentFields(extractedText, doc.documentName);
+    if (job.status === 'completed') {
+      return res.json({
+        jobId,
+        status: 'completed',
+        result: job.result,
+      });
+    }
 
-    // ── Cache results ────────────────────────────────
-    await prisma.admissionDocument.update({
-      where: { id: docId },
-      data: {
-        extractedText,
-        extractedData: JSON.stringify(parsedData),
-        extractedAt: new Date(),
-      },
-    });
+    if (job.status === 'failed') {
+      return res.json({
+        jobId,
+        status: 'failed',
+        error: job.error || 'Extraction failed',
+      });
+    }
 
-    res.json({
-      text: extractedText,
-      data: parsedData,
-      extractedAt: new Date(),
-      cached: false,
-    });
+    return res.json({ jobId, status: job.status });
   } catch (err) { next(err); }
 }
 

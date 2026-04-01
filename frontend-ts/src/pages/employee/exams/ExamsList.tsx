@@ -1,9 +1,7 @@
 ﻿import { useState, useMemo } from 'react';
 import { useAsync } from '../../../hooks/useAsync';
-import { getExams, getExam, updateExam, deleteExam, bulkDeleteExams, cloneExam, getExamSchedules, getExamRegistrations } from '../../../api/exams';
+import { getExams, getExam, updateExam, deleteExam, bulkDeleteExams, cloneExam, getExamSchedules, getExamRegistrations, getExamReadinessPage } from '../../../api/exams';
 import { getAcademicYears, getSemesters } from '../../../api/academicYears';
-import { getExamResults } from '../../../api/results';
-import { getUsers } from '../../../api/users';
 import { showToast } from '../../../components/Toast';
 import { useConfirm } from '../../../components/ConfirmDialog';
 import { useSelection } from '../../../hooks/useSelection';
@@ -15,7 +13,7 @@ import { DetailField, QuestionCard } from './ExamComponents';
 import ExamPreviewModal from './ExamPreviewModal';
 import { CSVUploader } from '../../../components/CSVUploader';
 import { addExam } from '../../../api/exams';
-import type { Exam, ExamSchedule, ExamRegistration, ExamResult, User, AcademicYear, Semester } from '../../../types';
+import type { Exam, ExamSchedule, ExamRegistration, AcademicYear, Semester } from '../../../types';
 import { GRADE_OPTIONS, ALL_GRADE_LEVELS } from '../../../utils/constants';
 
 const EXAMS_PER_PAGE = 10;
@@ -49,13 +47,20 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
   const { selected, toggle, togglePage, clear: clearSelection, isAllSelected, count: selectedCount } = useSelection();
 
   const { data, loading, error, refetch } = useAsync(async () => {
-    const [rawExm, rawSched, rawRegs, rawUsers, rawRes] = await Promise.all([
+    const [rawExm, rawSched, rawRegs] = await Promise.all([
       getExams(), getExamSchedules(), getExamRegistrations(),
-      getUsers(),
-      getExamResults(),
     ]);
-    return { exams: asArray<Exam>(rawExm), schedules: asArray<ExamSchedule>(rawSched), regs: asArray<ExamRegistration>(rawRegs), allUsers: asArray<User>(rawUsers), allResults: asArray<ExamResult>(rawRes) };
+    return { exams: asArray<Exam>(rawExm), schedules: asArray<ExamSchedule>(rawSched), regs: asArray<ExamRegistration>(rawRegs) };
   });
+
+  const { data: readinessPage } = useAsync(async () => {
+    return getExamReadinessPage({
+      search: readSearch.trim() || undefined,
+      status: readStatusFilter as 'all' | 'pending' | 'done' | 'passed' | 'failed',
+      page: readPage,
+      limit: READINESS_PER_PAGE,
+    });
+  }, [readSearch, readStatusFilter, readPage]);
 
   // Fetch full exam (with questions) when viewing detail
   const { data: fullExam, loading: examDetailLoading } = useAsync<Exam | null>(
@@ -75,13 +80,9 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
   const exams: Exam[] = data?.exams || [];
   const schedules: ExamSchedule[] = data?.schedules || [];
   const regs: ExamRegistration[] = data?.regs || [];
-  const allUsers: User[] = data?.allUsers || [];
-  const allResults: ExamResult[] = data?.allResults || [];
 
-  const usersByEmail = useMemo(() => new Map(allUsers.map(u => [u.email, u])), [allUsers]);
   const schedulesById = useMemo(() => new Map(schedules.map(s => [s.id, s])), [schedules]);
   const examsById = useMemo(() => new Map(exams.map(e => [e.id, e])), [exams]);
-  const resultsByRegId = useMemo(() => new Map(allResults.map(r => [r.registrationId, r])), [allResults]);
 
   const filteredExams = useMemo(() => {
     let list = exams;
@@ -198,33 +199,12 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
     }
   };
 
-  const readinessRows = useMemo(() => {
-    return regs.map(r => {
-      const user = usersByEmail.get(r.userEmail);
-      const sched = schedulesById.get(r.scheduleId);
-      const exam = sched ? examsById.get(sched.examId) : null;
-      const result = resultsByRegId.get(r.id);
-      return { ...r, user, exam, schedule: sched, result };
-    });
-  }, [regs, usersByEmail, schedulesById, examsById, resultsByRegId]);
-
-  const filteredReadiness = useMemo(() => {
-    let list = readinessRows;
-    if (readSearch.trim()) {
-      const q = readSearch.toLowerCase();
-      list = list.filter(r => r.user && formatPersonName(r.user).toLowerCase().includes(q));
-    }
-    if (readStatusFilter !== 'all') {
-      if (readStatusFilter === 'passed') list = list.filter(r => r.result?.passed === true);
-      else if (readStatusFilter === 'failed') list = list.filter(r => r.result && !r.result.passed);
-      else if (readStatusFilter === 'pending') list = list.filter(r => r.status !== 'done');
-      else if (readStatusFilter === 'done') list = list.filter(r => r.status === 'done');
-    }
-    return list;
-  }, [readinessRows, readSearch, readStatusFilter]);
-
-  const { paginated: paginatedReadiness, totalPages: readTotalPages, safePage: readSafePage, totalItems: readTotal } = usePaginationSlice(filteredReadiness, readPage, READINESS_PER_PAGE);
   const resetReadPage = () => setReadPage(1);
+
+  const paginatedReadiness = readinessPage?.data || [];
+  const readTotalPages = readinessPage?.pagination?.totalPages || 1;
+  const readSafePage = readinessPage?.pagination?.page || 1;
+  const readTotal = readinessPage?.pagination?.total || 0;
 
   const detailQuestions = useMemo(() => fullExam?.questions || exams.find(e => e.id === detailId)?.questions || [], [fullExam, exams, detailId]);
   const { paginated: paginatedQuestions, totalPages: qTotalPages, safePage: qSafePage, totalItems: qTotal } = usePaginationSlice(detailQuestions, questionPage, QUESTIONS_PER_PAGE);
@@ -288,11 +268,10 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
                 </tr></thead>
                 <tbody>
                   {eRegs.map(r => {
-                    const student = usersByEmail.get(r.userEmail);
                     const sc = schedulesById.get(r.scheduleId);
                     return (
                       <tr key={r.id} className="border-b border-gray-50">
-                        <td className="py-3 px-2 font-medium">{student ? formatPersonName(student) : 'Unknown'}</td>
+                        <td className="py-3 px-2 font-medium">{r.userEmail}</td>
                         <td className="py-3 px-2 text-gray-500">{r.userEmail}</td>
                         <td className="py-3 px-2"><Badge className={badgeClass(r.status)}>{r.status}</Badge></td>
                         <td className="py-3 px-2 text-gray-500">{sc ? `${sc.scheduledDate} ${formatTime(sc.startTime)}` : 'N/A'}</td>
@@ -432,7 +411,7 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
                   {paginatedReadiness.map(r => (
                     <tr key={r.id} className="border-b border-gray-50">
                       <td className="py-3 px-2 font-medium">{r.user ? formatPersonName(r.user) : r.userEmail}</td>
-                      <td className="py-3 px-2">{r.exam?.title || 'N/A'}</td>
+                      <td className="py-3 px-2">{r.schedule?.exam?.title || 'N/A'}</td>
                       <td className="py-3 px-2"><Badge className={badgeClass(r.status)}>{r.status}</Badge></td>
                       <td className="py-3 px-2">{r.result ? `${r.result.totalScore}/${r.result.maxPossible} (${r.result.percentage.toFixed(1)}%)` : '-'}</td>
                       <td className="py-3 px-2">{r.result ? <Badge className={r.result.passed ? 'gk-badge gk-badge-passed' : 'gk-badge gk-badge-failed'}>{r.result.passed ? 'Passed' : (r.result.essayReviewed ? 'Failed' : 'Pending Review')}</Badge> : <Badge className="gk-badge gk-badge-neutral">Awaiting</Badge>}</td>

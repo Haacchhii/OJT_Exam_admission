@@ -110,6 +110,10 @@ export async function getAdmissions(params?: AdmissionParams) {
   return client.get<Admission[]>(`/admissions${qs(params)}`);
 }
 
+export async function getAdmission(id: number) {
+  return client.get<Admission>(`/admissions/${id}`);
+}
+
 export async function getAdmissionsPage(params?: AdmissionParams) {
   return client.get<PagedApiResponse<Admission>>(`/admissions${qs(params)}`);
 }
@@ -173,8 +177,30 @@ export interface ExtractedResult {
   cached: boolean;
 }
 
+interface ExtractJobResponse {
+  jobId: string | null;
+  status: 'queued' | 'running' | 'completed' | 'failed';
+  result?: ExtractedResult;
+  error?: string;
+}
+
 export async function extractDocumentData(admissionId: number, docId: number): Promise<ExtractedResult> {
-  return client.post<ExtractedResult>(`/admissions/${admissionId}/documents/${docId}/extract`, {});
+  const start = await client.post<ExtractJobResponse>(`/admissions/${admissionId}/documents/${docId}/extract`, {});
+  if (start.status === 'completed' && start.result) return start.result;
+  if (start.status === 'failed') throw new Error(start.error || 'Document extraction failed');
+  if (!start.jobId) throw new Error('Document extraction did not start');
+
+  const startedAt = Date.now();
+  const timeoutMs = 90_000;
+
+  while (Date.now() - startedAt < timeoutMs) {
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    const status = await client.get<ExtractJobResponse>(`/admissions/${admissionId}/documents/${docId}/extract/${encodeURIComponent(start.jobId)}`);
+    if (status.status === 'completed' && status.result) return status.result;
+    if (status.status === 'failed') throw new Error(status.error || 'Document extraction failed');
+  }
+
+  throw new Error('Document extraction is taking longer than expected. Please try again in a moment.');
 }
 
 export async function reviewDocument(admissionId: number, docId: number, reviewStatus: 'accepted' | 'rejected', reviewNote?: string) {

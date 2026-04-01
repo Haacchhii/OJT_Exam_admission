@@ -1,6 +1,24 @@
 import { client, qs } from './client';
 import type { User } from '../types';
 
+export interface PagedApiResponse<T> {
+  data: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export interface UserStats {
+  total: number;
+  admins: number;
+  registrars: number;
+  teachers: number;
+  applicants: number;
+}
+
 interface UserParams {
   search?: string;
   role?: string;
@@ -11,6 +29,14 @@ interface UserParams {
 
 export async function getUsers(params?: UserParams) {
   return client.get<User[]>(`/users${qs(params)}`);
+}
+
+export async function getUsersPage(params?: UserParams) {
+  return client.get<PagedApiResponse<User>>(`/users${qs(params)}`);
+}
+
+export async function getUserStats() {
+  return client.get<UserStats>('/users/stats');
 }
 
 export async function getUserByEmail(email: string) {

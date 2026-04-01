@@ -14,6 +14,13 @@ interface ExamParams {
   limit?: number;
 }
 
+interface ExamReadinessParams {
+  search?: string;
+  status?: 'all' | 'pending' | 'done' | 'passed' | 'failed';
+  page?: number;
+  limit?: number;
+}
+
 export interface PagedApiResponse<T> {
   data: T[];
   pagination: {
@@ -111,6 +118,14 @@ export async function getExamRegistrations(params?: ExamParams) {
   return client.get<ExamRegistration[]>(
     `/exams/registrations${qs(params)}`
   );
+}
+
+export async function getExamReadinessPage(params?: ExamReadinessParams) {
+  return client.get<PagedApiResponse<ExamRegistration & {
+    user?: { id: number; firstName: string; middleName?: string | null; lastName: string; email: string } | null;
+    schedule?: { exam?: { title?: string } };
+    result?: { totalScore: number; maxPossible: number; percentage: number; passed: boolean; essayReviewed: boolean } | null;
+  }>>(`/exams/readiness${qs(params)}`);
 }
 
 export async function getMyRegistrations() {

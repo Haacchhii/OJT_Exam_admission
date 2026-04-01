@@ -109,6 +109,87 @@ export async function getExams(req, res, next) {
   } catch (err) { next(err); }
 }
 
+// GET /api/exams/readiness?search=&status=&page=&limit=
+export async function getReadiness(req, res, next) {
+  try {
+    const { search, status = 'all', page, limit } = req.query;
+    const pg = paginate(page, limit);
+
+    const where = {};
+
+    if (search) {
+      where.OR = [
+        { userEmail: { contains: search, mode: 'insensitive' } },
+        {
+          user: {
+            is: {
+              OR: [
+                { firstName: { contains: search, mode: 'insensitive' } },
+                { middleName: { contains: search, mode: 'insensitive' } },
+                { lastName: { contains: search, mode: 'insensitive' } },
+                { email: { contains: search, mode: 'insensitive' } },
+              ],
+            },
+          },
+        },
+      ];
+    }
+
+    if (status === 'pending') {
+      where.status = { in: ['scheduled', 'started'] };
+    } else if (status === 'done') {
+      where.status = 'done';
+    } else if (status === 'passed') {
+      where.result = { is: { passed: true } };
+    } else if (status === 'failed') {
+      where.result = { is: { passed: false } };
+    }
+
+    const [rows, total] = await Promise.all([
+      prisma.examRegistration.findMany({
+        where,
+        ...(pg && { skip: pg.skip, take: pg.take }),
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          userEmail: true,
+          status: true,
+          schedule: {
+            select: {
+              exam: {
+                select: {
+                  title: true,
+                },
+              },
+            },
+          },
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              middleName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+          result: {
+            select: {
+              totalScore: true,
+              maxPossible: true,
+              percentage: true,
+              passed: true,
+              essayReviewed: true,
+            },
+          },
+        },
+      }),
+      prisma.examRegistration.count({ where }),
+    ]);
+
+    res.json(paginatedResponse(rows, total, pg));
+  } catch (err) { next(err); }
+}
+
 // GET /api/exams/:id  (full — with isCorrect)
 export async function getExam(req, res, next) {
   try {
