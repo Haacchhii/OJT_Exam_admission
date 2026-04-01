@@ -48,6 +48,10 @@ const env = {
   DB_SLOW_QUERY_MS: parseInt(process.env.DB_SLOW_QUERY_MS, 10) || 200,
   PRISMA_LOG_QUERIES: (process.env.PRISMA_LOG_QUERIES || 'false').toLowerCase() === 'true',
   PERF_INGEST_ENABLED: (process.env.PERF_INGEST_ENABLED || 'true').toLowerCase() === 'true',
+  ENABLE_REDIS_CACHE: (process.env.ENABLE_REDIS_CACHE || 'false').toLowerCase() === 'true',
+  REDIS_URL: String(process.env.REDIS_URL || '').trim(),
+  REDIS_CONNECT_TIMEOUT_MS: parseInt(process.env.REDIS_CONNECT_TIMEOUT_MS, 10) || 1500,
+  DASHBOARD_ROLE_AWARE_QUERIES: (process.env.DASHBOARD_ROLE_AWARE_QUERIES || 'true').toLowerCase() === 'true',
 };
 
 // ─── Validate critical env vars ───────────────────────
@@ -69,6 +73,9 @@ if (env.NODE_ENV === 'production') {
   }
   if (isLocalUrl(env.APP_URL)) {
     console.warn('WARNING: APP_URL resolves to localhost in production — email links will be invalid. Set APP_URL to your deployed frontend URL.');
+  }
+  if (env.ENABLE_REDIS_CACHE && !env.REDIS_URL) {
+    console.warn('WARNING: ENABLE_REDIS_CACHE is true but REDIS_URL is empty. Falling back to in-memory cache.');
   }
 } else {
   if (env.JWT_SECRET === 'dev-secret') {

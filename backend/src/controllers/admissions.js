@@ -151,9 +151,10 @@ export async function getStats(req, res, next) {
 export async function getDashboardSummary(req, res, next) {
   try {
     const role = req.user?.role;
-    const includeAdmissions = role === ROLES.ADMIN || role === ROLES.REGISTRAR;
-    const includeExams = role === ROLES.ADMIN || role === ROLES.TEACHER;
-    const includeResults = role === ROLES.ADMIN || role === ROLES.REGISTRAR || role === ROLES.TEACHER;
+    const roleAwareEnabled = env.DASHBOARD_ROLE_AWARE_QUERIES;
+    const includeAdmissions = !roleAwareEnabled || role === ROLES.ADMIN || role === ROLES.REGISTRAR;
+    const includeExams = !roleAwareEnabled || role === ROLES.ADMIN || role === ROLES.TEACHER;
+    const includeResults = !roleAwareEnabled || role === ROLES.ADMIN || role === ROLES.REGISTRAR || role === ROLES.TEACHER;
 
     const cacheKey = `dashboardSummary:${role}:a${includeAdmissions ? 1 : 0}:e${includeExams ? 1 : 0}:r${includeResults ? 1 : 0}`;
     const summary = await cached(cacheKey, async () => {
