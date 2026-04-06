@@ -34,6 +34,17 @@ interface ReportsSummaryParams {
   limit?: number;
 }
 
+const DEFAULT_ADMISSIONS_PAGE = 1;
+const DEFAULT_ADMISSIONS_LIMIT = 50;
+
+function withDefaultAdmissionListParams<T extends { page?: number; limit?: number }>(params?: T): T {
+  return {
+    ...(params || {}),
+    page: params?.page ?? DEFAULT_ADMISSIONS_PAGE,
+    limit: params?.limit ?? DEFAULT_ADMISSIONS_LIMIT,
+  } as T;
+}
+
 export interface PagedApiResponse<T> {
   data: T[];
   pagination: {
@@ -107,7 +118,7 @@ export interface EmployeeDashboardSummary {
 }
 
 export async function getAdmissions(params?: AdmissionParams, options?: RequestOptions) {
-  return client.get<Admission[]>(`/admissions${qs(params)}`, options);
+  return client.get<Admission[]>(`/admissions${qs(withDefaultAdmissionListParams(params))}`, options);
 }
 
 export async function getAdmission(id: number) {
@@ -115,7 +126,7 @@ export async function getAdmission(id: number) {
 }
 
 export async function getAdmissionsPage(params?: AdmissionParams) {
-  return client.get<PagedApiResponse<Admission>>(`/admissions${qs(params)}`);
+  return client.get<PagedApiResponse<Admission>>(`/admissions${qs(withDefaultAdmissionListParams(params))}`);
 }
 
 export async function getMyAdmission() {

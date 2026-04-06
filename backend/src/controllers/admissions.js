@@ -46,7 +46,7 @@ function shapeAdmission(adm) {
 export async function getAdmissions(req, res, next) {
   try {
     const { status, grade, levelGroup, search, sort, page, limit, academicYearId, semesterId, staleOnly, slaDays } = req.query;
-    const pg = paginate(page, limit);
+    const pg = paginate(page ?? 1, limit ?? 50);
 
     const where = { deletedAt: null };
     if (status)        where.status = status;
