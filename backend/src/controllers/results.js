@@ -2,6 +2,9 @@ import prisma from '../config/db.js';
 import { paginate, paginatedResponse } from '../utils/pagination.js';
 import { cached } from '../utils/cache.js';
 
+const EMPLOYEE_SUMMARY_DEFAULT_LIMIT = 500;
+const EMPLOYEE_SUMMARY_MAX_LIMIT = 1200;
+
 // Re-export submission and essay scoring controllers so routes/results.js keeps working
 export { submitExam } from './examSubmission.js';
 export { getEssayAnswers, scoreEssay } from './essayScoring.js';
@@ -12,7 +15,7 @@ export { getEssayAnswers, scoreEssay } from './essayScoring.js';
 export async function getResults(req, res, next) {
   try {
     const { search, passed, examId, page, limit } = req.query;
-    const pg = paginate(page, limit);
+    const pg = paginate(page ?? 1, limit ?? 100);
 
     const where = {};
     if (passed === 'true')  where.passed = true;
@@ -295,11 +298,26 @@ export async function getQuestionAnalytics(req, res, next) {
 // GET /api/results/employee-summary
 export async function getEmployeeSummary(req, res, next) {
   try {
-    const cacheKey = 'resultsEmployeeSummary:v2';
+    const requestedLimit = Number(req.query?.limit);
+    const summaryLimit = Number.isFinite(requestedLimit) && requestedLimit > 0
+      ? Math.min(Math.floor(requestedLimit), EMPLOYEE_SUMMARY_MAX_LIMIT)
+      : EMPLOYEE_SUMMARY_DEFAULT_LIMIT;
+
+    const cacheKey = `resultsEmployeeSummary:v3:${summaryLimit}`;
     const summary = await cached(cacheKey, async () => {
-      const [results, essays, academicYears, semesters] = await Promise.all([
+      const [
+        totalResults,
+        totalEssays,
+        results,
+        essays,
+        academicYears,
+        semesters,
+      ] = await Promise.all([
+        prisma.examResult.count(),
+        prisma.essayAnswer.count(),
         prisma.examResult.findMany({
           orderBy: { createdAt: 'desc' },
+          take: summaryLimit,
           select: {
             id: true,
             registrationId: true,
@@ -313,6 +331,7 @@ export async function getEmployeeSummary(req, res, next) {
         }),
         prisma.essayAnswer.findMany({
           orderBy: { createdAt: 'desc' },
+          take: summaryLimit,
           select: {
             id: true,
             registrationId: true,
@@ -337,6 +356,15 @@ export async function getEmployeeSummary(req, res, next) {
         }),
       ]);
 
+      const meta = {
+        totalResults,
+        returnedResults: results.length,
+        totalEssays,
+        returnedEssays: essays.length,
+        summaryLimit,
+        capped: totalResults > results.length || totalEssays > essays.length,
+      };
+
       const registrationIds = Array.from(new Set([
         ...results.map((r) => r.registrationId),
         ...essays.map((e) => e.registrationId),
@@ -352,6 +380,7 @@ export async function getEmployeeSummary(req, res, next) {
           essays: [],
           academicYears,
           semesters,
+          meta,
         };
       }
 
@@ -421,7 +450,7 @@ export async function getEmployeeSummary(req, res, next) {
           })
         : [];
 
-      return { results, regs, users, schedules, exams, essays, academicYears, semesters };
+      return { results, regs, users, schedules, exams, essays, academicYears, semesters, meta };
     }, 15_000);
 
     res.json(summary);

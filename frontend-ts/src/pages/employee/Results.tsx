@@ -15,6 +15,7 @@ const RESULTS_PER_PAGE = 10;
 const ANALYTICS_PER_PAGE = 8;
 const ESSAY_EXAMS_PER_PAGE = 8;
 const ESSAY_ROWS_PER_PAGE = 8;
+const RESULTS_SUMMARY_LIMIT = 500;
 
 function semesterLabel(s: Semester) {
   const start = s.startDate ? formatDate(String(s.startDate)) : null;
@@ -32,6 +33,14 @@ interface RawData {
   essays: EssayAnswer[];
   academicYears: AcademicYear[];
   semesters: Semester[];
+  meta?: {
+    totalResults: number;
+    returnedResults: number;
+    totalEssays: number;
+    returnedEssays: number;
+    summaryLimit: number;
+    capped: boolean;
+  };
 }
 
 interface EnrichedResult extends ExamResult {
@@ -92,7 +101,7 @@ export default function EmployeeResults() {
   const [selectedEssayExamId, setSelectedEssayExamId] = useState<number | null>(null);
 
   const { data: rawData, loading, error, refetch } = useAsync<RawData>(async () => {
-    const summary = await getEmployeeResultsSummary();
+    const summary = await getEmployeeResultsSummary({ limit: RESULTS_SUMMARY_LIMIT });
     return {
       results: summary.results as ExamResult[],
       regs: summary.regs as ExamRegistration[],
@@ -100,11 +109,15 @@ export default function EmployeeResults() {
       schedules: summary.schedules as ExamSchedule[],
       exams: summary.exams as Exam[],
       essays: summary.essays as EssayAnswer[],
+      academicYears: summary.academicYears as AcademicYear[],
+      semesters: summary.semesters as Semester[],
+      meta: summary.meta,
     } as RawData;
   });
 
   const academicYears = rawData?.academicYears || [];
   const allSemesters = rawData?.semesters || [];
+  const summaryMeta = rawData?.meta;
 
   const semesterOptions = useMemo(() => {
     return allSemesters.filter((s: Semester) =>
@@ -386,6 +399,12 @@ export default function EmployeeResults() {
         )}
         <button role="tab" aria-selected={tab === 'analytics'} onClick={() => setTab('analytics')} className={`px-4 py-2 rounded-lg text-sm font-medium transition inline-flex items-center gap-1.5 ${tab === 'analytics' ? 'bg-forest-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}><Icon name="arrowTrendUp" className="w-4 h-4" /> Analytics</button>
       </div>
+
+      {summaryMeta?.capped && (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Showing the newest {summaryMeta.returnedResults} of {summaryMeta.totalResults} results and {summaryMeta.returnedEssays} of {summaryMeta.totalEssays} essays for performance. Use specific filters to review targeted records.
+        </div>
+      )}
 
       {tab === 'results' && (
         <div>

@@ -21,6 +21,21 @@ interface EssayParams {
   limit?: number;
 }
 
+interface EmployeeResultsSummaryParams {
+  limit?: number;
+}
+
+const DEFAULT_RESULTS_PAGE = 1;
+const DEFAULT_RESULTS_LIMIT = 100;
+
+function withDefaultResultListParams<T extends { page?: number; limit?: number }>(params?: T): T {
+  return {
+    ...(params || {}),
+    page: params?.page ?? DEFAULT_RESULTS_PAGE,
+    limit: params?.limit ?? DEFAULT_RESULTS_LIMIT,
+  } as T;
+}
+
 export interface EmployeeResultsSummary {
   results: ExamResult[];
   regs: Array<{ id: number; scheduleId: number; userEmail: string; userId?: number | null; status: string }>;
@@ -45,14 +60,22 @@ export interface EmployeeResultsSummary {
   essays: EssayAnswer[];
   academicYears: AcademicYear[];
   semesters: Semester[];
+  meta?: {
+    totalResults: number;
+    returnedResults: number;
+    totalEssays: number;
+    returnedEssays: number;
+    summaryLimit: number;
+    capped: boolean;
+  };
 }
 
 export async function getExamResults(params?: ResultParams) {
-  return client.get<ExamResult[]>(`/results${qs(params)}`);
+  return client.get<ExamResult[]>(`/results${qs(withDefaultResultListParams(params))}`);
 }
 
-export async function getEmployeeResultsSummary() {
-  return client.get<EmployeeResultsSummary>('/results/employee-summary');
+export async function getEmployeeResultsSummary(params?: EmployeeResultsSummaryParams) {
+  return client.get<EmployeeResultsSummary>(`/results/employee-summary${qs(params)}`);
 }
 
 export async function getMyResult() {
@@ -60,7 +83,7 @@ export async function getMyResult() {
 }
 
 export async function getEssayAnswers(params?: EssayParams) {
-  return client.get<EssayAnswer[]>(`/results/essays${qs(params)}`);
+  return client.get<EssayAnswer[]>(`/results/essays${qs(withDefaultResultListParams(params))}`);
 }
 
 export async function scoreEssay(answerId: number, points: number, comment?: string) {

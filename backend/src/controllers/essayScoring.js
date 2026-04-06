@@ -9,7 +9,7 @@ import { sendExamResultEmail } from '../utils/email.js';
 export async function getEssayAnswers(req, res, next) {
   try {
     const { status, page, limit } = req.query;
-    const pg = paginate(page, limit);
+    const pg = paginate(page ?? 1, limit ?? 100);
 
     const where = {};
     if (status === 'pending') where.scored = false;

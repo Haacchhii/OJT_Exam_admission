@@ -113,7 +113,7 @@ export async function getExams(req, res, next) {
 export async function getReadiness(req, res, next) {
   try {
     const { search, status = 'all', page, limit } = req.query;
-    const pg = paginate(page, limit);
+    const pg = paginate(page ?? 1, limit ?? 100);
 
     const where = {};
 
