@@ -22,13 +22,21 @@ interface ExamReadinessParams {
 }
 
 const DEFAULT_LIST_PAGE = 1;
-const DEFAULT_LIST_LIMIT = 200;
+const MAX_LIST_LIMIT = 100;
+const DEFAULT_LIST_LIMIT = MAX_LIST_LIMIT;
+
+function normalizeLimit(limit?: number): number {
+  if (!Number.isFinite(limit)) return DEFAULT_LIST_LIMIT;
+  const safe = Math.trunc(Number(limit));
+  if (safe < 1) return 1;
+  return Math.min(MAX_LIST_LIMIT, safe);
+}
 
 function withDefaultListParams<T extends { page?: number; limit?: number }>(params?: T): T {
   return {
     ...(params || {}),
     page: params?.page ?? DEFAULT_LIST_PAGE,
-    limit: params?.limit ?? DEFAULT_LIST_LIMIT,
+    limit: normalizeLimit(params?.limit),
   } as T;
 }
 
@@ -101,7 +109,7 @@ export async function getExamSchedules(examId?: number, params?: ExamParams) {
 }
 
 export async function getExamSchedulesPage(params?: ExamParams & { examId?: number }) {
-  return client.get<PagedApiResponse<ExamSchedule>>(`/exams/schedules${qs(params)}`);
+  return client.get<PagedApiResponse<ExamSchedule>>(`/exams/schedules${qs(withDefaultListParams(params))}`);
 }
 
 export async function getAvailableSchedules() {
@@ -134,11 +142,12 @@ export async function getExamRegistrations(params?: ExamParams) {
 }
 
 export async function getExamReadinessPage(params?: ExamReadinessParams) {
+  const mergedParams = withDefaultListParams(params);
   return client.get<PagedApiResponse<ExamRegistration & {
     user?: { id: number; firstName: string; middleName?: string | null; lastName: string; email: string } | null;
     schedule?: { exam?: { title?: string } };
     result?: { totalScore: number; maxPossible: number; percentage: number; passed: boolean; essayReviewed: boolean } | null;
-  }>>(`/exams/readiness${qs(params)}`);
+  }>>(`/exams/readiness${qs(mergedParams)}`);
 }
 
 export async function getMyRegistrations() {
