@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getAdmissions } from '../api/admissions';
+import { createRequestCanceller } from '../api/client';
 import Icon from './Icons';
 import { showToast } from './Toast';
 import type { Admission } from '../types';
@@ -14,6 +15,7 @@ export function GlobalSearch() {
   const [searchError, setSearchError] = useState('');
   const [activeIndex, setActiveIndex] = useState(-1);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const searchCancellerRef = useRef(createRequestCanceller());
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -28,27 +30,46 @@ export function GlobalSearch() {
 
   useEffect(() => {
     if (term.trim().length < 2) {
+      searchCancellerRef.current.cancel();
       setResults([]);
       setSearchError('');
       setActiveIndex(-1);
       return;
     }
+
+    let active = true;
     const timer = setTimeout(async () => {
       setLoading(true);
       setSearchError('');
       try {
-        const res = await getAdmissions({ search: term });
+        const res = await getAdmissions(
+          { search: term.trim(), page: 1, limit: 5, sort: 'newest' },
+          { signal: searchCancellerRef.current.nextSignal() }
+        );
+        if (!active) return;
         setResults(asArray(res).slice(0, 5) as Admission[]);
-      } catch (err) {
+      } catch (err: unknown) {
+        if (!active) return;
+        const cancelled = err instanceof Error && err.message === 'Request cancelled';
+        if (cancelled) return;
         setResults([]);
         setSearchError('Search is temporarily unavailable. Please try again.');
         showToast('Search is temporarily unavailable. Please try again.', 'error');
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
-    }, 400);
-    return () => clearTimeout(timer);
+    }, 350);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
   }, [term]);
+
+  useEffect(() => {
+    return () => {
+      searchCancellerRef.current.cancel();
+    };
+  }, []);
 
   useEffect(() => {
     setActiveIndex(-1);

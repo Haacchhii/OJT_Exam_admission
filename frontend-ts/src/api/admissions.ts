@@ -1,4 +1,4 @@
-import { client, qs } from './client';
+import { client, qs, type RequestOptions } from './client';
 import type { Admission, AdmissionStats, AdmissionStatus, AcademicYear, Semester } from '../types';
 
 export const VALID_TRANSITIONS: Record<string, AdmissionStatus[]> = {
@@ -106,8 +106,8 @@ export interface EmployeeDashboardSummary {
   overdue: number;
 }
 
-export async function getAdmissions(params?: AdmissionParams) {
-  return client.get<Admission[]>(`/admissions${qs(params)}`);
+export async function getAdmissions(params?: AdmissionParams, options?: RequestOptions) {
+  return client.get<Admission[]>(`/admissions${qs(params)}`, options);
 }
 
 export async function getAdmission(id: number) {

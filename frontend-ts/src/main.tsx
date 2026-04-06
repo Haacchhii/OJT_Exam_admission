@@ -4,7 +4,9 @@ import './index.css'
 import App from './App'
 import { startPerfVitalsReporting } from './utils/perfVitals'
 
-startPerfVitalsReporting()
+if (import.meta.env.PROD && import.meta.env.VITE_ENABLE_PERF_VITALS === 'true') {
+  startPerfVitalsReporting()
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

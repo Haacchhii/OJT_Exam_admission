@@ -176,7 +176,7 @@ export default function EmployeeReports() {
       showToast('Failed to load report data.', 'error');
       return EMPTY_REPORT_DATA;
     }
-  }, [reportsParams], 120000);
+  }, [reportsParams]);
 
   const {
     admissions,

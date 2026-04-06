@@ -7,6 +7,7 @@ import { CACHE_DEFAULT_TTL_MS } from './constants.js';
  */
 
 const store = new Map();
+const inflight = new Map();
 const CACHE_KEY_PREFIX = 'gk:cache:';
 
 let redisClient = null;
@@ -122,19 +123,37 @@ export async function cached(key, fn, ttlMs = CACHE_DEFAULT_TTL_MS) {
   }
 
   const entry = store.get(key);
-  if (entry && Date.now() - entry.ts < ttlMs) {
-    return entry.value;
+  if (entry) {
+    if (Date.now() - entry.ts < ttlMs) {
+      return entry.value;
+    }
+    store.delete(key);
   }
 
-  const value = await fn();
-  store.set(key, { value, ts: Date.now() });
-  void writeRedis(key, value, ttlMs);
-  return value;
+  const pending = inflight.get(key);
+  if (pending) {
+    return pending;
+  }
+
+  const pendingCompute = (async () => {
+    const value = await fn();
+    store.set(key, { value, ts: Date.now() });
+    void writeRedis(key, value, ttlMs);
+    return value;
+  })();
+
+  inflight.set(key, pendingCompute);
+  try {
+    return await pendingCompute;
+  } finally {
+    inflight.delete(key);
+  }
 }
 
 /** Invalidate a specific cache key. */
 export function invalidate(key) {
   store.delete(key);
+  inflight.delete(key);
   void deleteRedisKey(key);
 }
 
@@ -143,11 +162,15 @@ export function invalidatePrefix(prefix) {
   for (const key of store.keys()) {
     if (key.startsWith(prefix)) store.delete(key);
   }
+  for (const key of inflight.keys()) {
+    if (key.startsWith(prefix)) inflight.delete(key);
+  }
   void deleteRedisByPrefix(prefix);
 }
 
 /** Clear the entire cache. */
 export function clearCache() {
   store.clear();
+  inflight.clear();
   void clearRedisNamespace();
 }
