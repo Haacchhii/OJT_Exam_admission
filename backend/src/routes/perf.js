@@ -1,7 +1,14 @@
 import { Router } from 'express';
 import env from '../config/env.js';
+import { getPerfSummary, observeVitalMetric } from '../utils/perfStore.js';
 
 const router = Router();
+
+function hasSummaryAccess(req) {
+  if (env.NODE_ENV !== 'production' && !env.PERF_MONITOR_KEY) return true;
+  const provided = req.get('x-perf-key') || req.query?.key;
+  return Boolean(env.PERF_MONITOR_KEY) && provided === env.PERF_MONITOR_KEY;
+}
 
 // Lightweight endpoint for browser-side Web Vitals ingestion.
 router.post('/vitals', (req, res) => {
@@ -36,8 +43,19 @@ router.post('/vitals', (req, res) => {
     ip: req.ip,
   };
 
+  observeVitalMetric(payload);
   console.log(`[vitals] ${JSON.stringify(payload)}`);
   return res.status(202).json({ ok: true });
+});
+
+router.get('/summary', (req, res) => {
+  if (!hasSummaryAccess(req)) {
+    return res.status(403).json({ error: 'Performance summary access denied', code: 'FORBIDDEN' });
+  }
+
+  const minutes = Number(req.query?.minutes);
+  const limit = Number(req.query?.limit);
+  return res.json(getPerfSummary({ minutes, limit }));
 });
 
 export default router;

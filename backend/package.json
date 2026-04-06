@@ -20,7 +20,8 @@
     "db:reset": "node prisma/safe-reset.js",
     "db:studio": "npx prisma studio",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "perf:smoke": "node scripts/perf-smoke.mjs"
   },
   "keywords": [],
   "license": "ISC",

@@ -48,6 +48,7 @@ const env = {
   DB_SLOW_QUERY_MS: parseInt(process.env.DB_SLOW_QUERY_MS, 10) || 200,
   PRISMA_LOG_QUERIES: (process.env.PRISMA_LOG_QUERIES || 'false').toLowerCase() === 'true',
   PERF_INGEST_ENABLED: (process.env.PERF_INGEST_ENABLED || 'true').toLowerCase() === 'true',
+  PERF_MONITOR_KEY: String(process.env.PERF_MONITOR_KEY || '').trim(),
   ENABLE_REDIS_CACHE: (process.env.ENABLE_REDIS_CACHE || 'false').toLowerCase() === 'true',
   REDIS_URL: String(process.env.REDIS_URL || '').trim(),
   REDIS_CONNECT_TIMEOUT_MS: parseInt(process.env.REDIS_CONNECT_TIMEOUT_MS, 10) || 1500,

@@ -12,6 +12,7 @@ import { errorHandler } from './middleware/errors.js';
 import { authenticate } from './middleware/auth.js';
 import { RATE_LIMITS, BODY_SIZE_LIMIT } from './utils/constants.js';
 import { cachePublic, cachePrivate, noStore } from './middleware/cache.js';
+import { observeApiRequest } from './utils/perfStore.js';
 
 // Route imports
 import authRoutes          from './routes/auth.js';
@@ -88,6 +89,7 @@ app.use((req, res, next) => {
   res.on('finish', () => {
     if (!req.originalUrl.startsWith('/api/')) return;
     const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
+    observeApiRequest({ method: req.method, path: req.originalUrl, status: res.statusCode, durationMs: elapsedMs });
     if (elapsedMs >= env.PERF_LOG_THRESHOLD_MS) {
       console.log(`[perf] ${req.method} ${req.originalUrl} ${res.statusCode} ${elapsedMs.toFixed(1)}ms`);
     }
