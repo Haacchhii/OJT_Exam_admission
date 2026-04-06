@@ -1,5 +1,7 @@
 const baseUrl = String(process.env.PERF_SMOKE_BASE_URL || '').trim().replace(/\/+$/, '');
-const token = String(process.env.PERF_SMOKE_TOKEN || '').trim();
+const initialToken = String(process.env.PERF_SMOKE_TOKEN || '').trim();
+const smokeEmail = String(process.env.PERF_SMOKE_EMAIL || '').trim();
+const smokePassword = String(process.env.PERF_SMOKE_PASSWORD || '');
 
 function parseIntOrFallback(rawValue, fallback) {
   const parsed = Number.parseInt(String(rawValue ?? ''), 10);
@@ -34,18 +36,6 @@ const endpointChecks = [
   { name: 'exams-list', key: 'EXAMS_LIST', path: '/api/exams?page=1&limit=50', p95Ms: thresholdFor('EXAMS_LIST', 900), requireAuth: true },
 ];
 
-const activeChecks = endpointChecks.filter((item) => !item.requireAuth || Boolean(token));
-
-if (activeChecks.length === 0) {
-  const msg = '[perf-smoke] No runnable checks. Auth token is required for protected endpoint checks.';
-  if (required) {
-    console.error(msg);
-    process.exit(1);
-  }
-  console.log(msg);
-  process.exit(0);
-}
-
 function percentile(values, pct) {
   if (!values.length) return 0;
   const sorted = [...values].sort((a, b) => a - b);
@@ -53,14 +43,14 @@ function percentile(values, pct) {
   return sorted[idx];
 }
 
-async function hitEndpoint(path, requiresAuth) {
+async function hitEndpoint(path, requiresAuth, authToken) {
   const started = process.hrtime.bigint();
   const headers = {
     'Content-Type': 'application/json',
   };
 
-  if (requiresAuth && token) {
-    headers.Authorization = `Bearer ${token}`;
+  if (requiresAuth && authToken) {
+    headers.Authorization = `Bearer ${authToken}`;
   }
 
   const response = await fetch(`${baseUrl}${path}`, {
@@ -78,13 +68,62 @@ async function hitEndpoint(path, requiresAuth) {
   };
 }
 
+async function isTokenValid(candidateToken) {
+  if (!candidateToken) return false;
+  try {
+    const response = await fetch(`${baseUrl}/api/auth/me`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${candidateToken}`,
+      },
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function loginForToken() {
+  if (!smokeEmail || !smokePassword) return null;
+  try {
+    const response = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email: smokeEmail, password: smokePassword }),
+    });
+    if (!response.ok) {
+      return null;
+    }
+    const payload = await response.json();
+    return typeof payload?.token === 'string' ? payload.token : null;
+  } catch {
+    return null;
+  }
+}
+
+async function resolveAuthToken() {
+  if (await isTokenValid(initialToken)) {
+    return { token: initialToken, source: 'secret-token' };
+  }
+
+  const loginToken = await loginForToken();
+  if (await isTokenValid(loginToken)) {
+    return { token: loginToken, source: 'login' };
+  }
+
+  return { token: '', source: 'none' };
+}
+
 function summarizeStatuses(statusCounts) {
   const entries = Array.from(statusCounts.entries()).sort((a, b) => a[0] - b[0]);
   if (entries.length === 0) return 'none';
   return entries.map(([code, count]) => `${code}:${count}`).join(',');
 }
 
-async function runCheck(check) {
+async function runCheck(check, authToken) {
   const samples = [];
   let failures = 0;
   const statusCounts = new Map();
@@ -92,7 +131,7 @@ async function runCheck(check) {
 
   for (let i = 0; i < totalRequests; i += 1) {
     try {
-      const result = await hitEndpoint(check.path, check.requireAuth);
+      const result = await hitEndpoint(check.path, check.requireAuth, authToken);
       statusCounts.set(result.status, (statusCounts.get(result.status) || 0) + 1);
       if (i < warmupCount) continue;
       samples.push(result.ms);
@@ -124,11 +163,42 @@ async function runCheck(check) {
 }
 
 (async () => {
+  const auth = await resolveAuthToken();
+  const authInputProvided = Boolean(initialToken) || (Boolean(smokeEmail) && Boolean(smokePassword));
+
+  if (!auth.token && authInputProvided) {
+    console.error('[perf-smoke] Auth configuration is present but invalid. Refresh PERF_SMOKE_TOKEN or verify PERF_SMOKE_EMAIL/PERF_SMOKE_PASSWORD credentials and role access.');
+    process.exit(1);
+  }
+
+  if (!auth.token && required) {
+    console.error('[perf-smoke] PERF_SMOKE_REQUIRED=true but no valid auth token is available for protected checks.');
+    process.exit(1);
+  }
+
+  const activeChecks = endpointChecks.filter((item) => !item.requireAuth || Boolean(auth.token));
+
+  if (activeChecks.length === 0) {
+    const msg = '[perf-smoke] No runnable checks. Set PERF_SMOKE_TOKEN or PERF_SMOKE_EMAIL/PERF_SMOKE_PASSWORD for protected endpoint checks.';
+    if (required) {
+      console.error(msg);
+      process.exit(1);
+    }
+    console.log(msg);
+    process.exit(0);
+  }
+
+  if (auth.source === 'login') {
+    console.log('[perf-smoke] Auth token acquired from login credentials.');
+  } else if (initialToken && auth.source === 'none') {
+    console.warn('[perf-smoke] Provided PERF_SMOKE_TOKEN is invalid or expired.');
+  }
+
   console.log(`[perf-smoke] Running ${activeChecks.length} endpoint checks against ${baseUrl} (warmup=${warmupCount}, samples=${sampleCount})`);
   const results = [];
 
   for (const check of activeChecks) {
-    const result = await runCheck(check);
+    const result = await runCheck(check, auth.token);
     results.push(result);
     const status = result.pass ? 'PASS' : 'FAIL';
     console.log(
@@ -140,7 +210,7 @@ async function runCheck(check) {
   if (failed.length > 0) {
     const allAuthFailures = failed.every((item) => /^401:|,401:|^403:|,403:/.test(item.statusSummary));
     if (allAuthFailures) {
-      console.error('[perf-smoke] Protected endpoint checks are unauthorized. Verify PERF_SMOKE_TOKEN is valid and has employee/admin access.');
+      console.error('[perf-smoke] Protected endpoint checks are unauthorized. Verify PERF_SMOKE_TOKEN or PERF_SMOKE_EMAIL/PERF_SMOKE_PASSWORD has employee/admin access.');
     }
     console.error(`[perf-smoke] ${failed.length} check(s) failed.`);
     failed.forEach((item) => {

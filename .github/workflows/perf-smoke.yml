@@ -35,6 +35,8 @@ jobs:
         env:
           PERF_SMOKE_BASE_URL: ${{ secrets.PERF_SMOKE_BASE_URL }}
           PERF_SMOKE_TOKEN: ${{ secrets.PERF_SMOKE_TOKEN }}
+          PERF_SMOKE_EMAIL: ${{ secrets.PERF_SMOKE_EMAIL }}
+          PERF_SMOKE_PASSWORD: ${{ secrets.PERF_SMOKE_PASSWORD }}
           PERF_SMOKE_REQUIRED: ${{ vars.PERF_SMOKE_REQUIRED }}
           PERF_SMOKE_SAMPLES: ${{ vars.PERF_SMOKE_SAMPLES }}
           PERF_SMOKE_WARMUP: ${{ vars.PERF_SMOKE_WARMUP }}
