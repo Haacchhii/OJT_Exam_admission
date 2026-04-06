@@ -7,7 +7,6 @@ const routePrefetchers: Record<string, PrefetchFn> = {
   '/student/dashboard': () => import('../pages/student/Dashboard'),
   '/student/admission': () => import('../pages/student/Admission'),
   '/student/exam': () => import('../pages/student/Exam'),
-  '/student/track': () => import('../pages/student/ApplicationTracker'),
   '/student/results': () => import('../pages/student/Results'),
   '/student/profile': () => import('../pages/shared/Profile'),
 
@@ -57,7 +56,7 @@ export function prefetchRouteByPath(path: string): void {
 export function prefetchLikelyRoutesForRole(role: UserRole | null, currentPath: string): void {
   const normalizedCurrent = normalizePath(currentPath);
   const candidates = role === 'applicant'
-    ? ['/student/admission', '/student/exam', '/student/track', '/student/results']
+    ? ['/student/admission', '/student/exam', '/student/results']
     : ['/employee/admissions', '/employee/exams', '/employee/results', '/employee/reports'];
 
   const targets = candidates.filter((path) => path !== normalizedCurrent);

@@ -26,7 +26,6 @@ const StudentDashboard = lazyWithRetry(() => import('./pages/student/Dashboard')
 const StudentAdmission = lazyWithRetry(() => import('./pages/student/Admission'));
 const StudentExam = lazyWithRetry(() => import('./pages/student/Exam'));
 const StudentResults = lazyWithRetry(() => import('./pages/student/Results'));
-const StudentApplicationTracker = lazyWithRetry(() => import('./pages/student/ApplicationTracker'));
 
 /* Employee pages (lazy with retry) */
 const EmployeeDashboard = lazyWithRetry(() => import('./pages/employee/Dashboard'));
@@ -114,7 +113,7 @@ export default function App() {
             <Route index element={<PageErrorBoundary pageName="Dashboard"><StudentDashboard /></PageErrorBoundary>} />
             <Route path="dashboard" element={<PageErrorBoundary pageName="Dashboard"><StudentDashboard /></PageErrorBoundary>} />
             <Route path="admission" element={<PageErrorBoundary pageName="Admission"><StudentAdmission /></PageErrorBoundary>} />
-            <Route path="track" element={<PageErrorBoundary pageName="Track Application"><StudentApplicationTracker /></PageErrorBoundary>} />
+            <Route path="track" element={<Navigate to="/student/dashboard" replace />} />
             <Route path="exam" element={<PageErrorBoundary pageName="Exam"><StudentExam /></PageErrorBoundary>} />
             <Route path="results" element={<PageErrorBoundary pageName="Results"><StudentResults /></PageErrorBoundary>} />
             <Route path="profile" element={<PageErrorBoundary pageName="Profile"><Profile /></PageErrorBoundary>} />

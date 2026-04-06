@@ -186,14 +186,14 @@ export default function StudentAdmission() {
             <ul className="text-xs text-gold-800 space-y-1 list-disc list-inside">
               <li>Initial screening starts within 1-3 business days.</li>
               <li>Status is usually finalized within 5-10 business days.</li>
-              <li>Use your tracking ID anytime to check progress.</li>
+              <li>Check your dashboard anytime to view application progress.</li>
             </ul>
           </div>
           <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-            <Link to="/student/track" className="inline-flex items-center gap-1.5 border border-forest-200 text-forest-700 px-5 py-2 rounded-lg font-semibold hover:bg-forest-50">
-              <Icon name="search" className="w-4 h-4" /> Track Application
+            <Link to="/student/dashboard" className="inline-flex items-center gap-1.5 border border-forest-200 text-forest-700 px-5 py-2 rounded-lg font-semibold hover:bg-forest-50">
+              <Icon name="dashboard" className="w-4 h-4" /> View Status in Dashboard
             </Link>
-            <Link to="/student/dashboard" className="inline-block bg-forest-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-forest-600">Go to Dashboard</Link>
+            <Link to="/student/results" className="inline-block bg-forest-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-forest-600">Go to Results</Link>
           </div>
         </div>
       </Modal>

@@ -29,7 +29,7 @@ export function StudentLayout() {
     const handleAdmissionStatus = (payload: { status?: string; trackingId?: string }) => {
       const statusLabel = payload?.status || 'updated';
       const trackingLabel = payload?.trackingId ? ` (${payload.trackingId})` : '';
-      showToast(`Admission status ${statusLabel}${trackingLabel}. Check Track Application for details.`, 'info');
+      showToast(`Admission status ${statusLabel}${trackingLabel}. Check Dashboard for details.`, 'info');
     };
     socket.on('admission_status_updated', handleAdmissionStatus);
     return () => {

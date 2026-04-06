@@ -17,7 +17,6 @@ const studentLinks: LinkItem[] = [
   { to: '/student', icon: 'dashboard', label: 'Dashboard', end: true },
   { to: '/student/exam', icon: 'exam', label: 'Online Exam' },
   { to: '/student/admission', icon: 'admissions', label: 'My Admission' },
-  { to: '/student/track', icon: 'search', label: 'Track Application' },
   { to: '/student/results', icon: 'trophy', label: 'My Results' },
 ];
 

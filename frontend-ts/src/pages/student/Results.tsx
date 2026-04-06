@@ -183,13 +183,13 @@ export default function StudentResults() {
         {passed && (
           <div className="mt-4 rounded-lg border border-forest-200 bg-white px-4 py-3 text-sm">
             <p className="font-semibold text-forest-700">Next admission step</p>
-            <p className="text-gray-600 mb-2">Since you passed, proceed to admission submission or track your existing application.</p>
+            <p className="text-gray-600 mb-2">Since you passed, proceed to admission submission or monitor your application from the dashboard.</p>
             <div className="flex flex-wrap gap-2">
               <Link to="/student/admission" className="inline-flex items-center gap-1.5 rounded-lg border border-forest-200 px-3 py-1.5 text-forest-700 hover:bg-forest-50">
                 <Icon name="admissions" className="w-4 h-4" /> My Admission
               </Link>
-              <Link to="/student/track" className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-gray-700 hover:bg-gray-50">
-                <Icon name="search" className="w-4 h-4" /> Track Status
+              <Link to="/student/dashboard" className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-gray-700 hover:bg-gray-50">
+                <Icon name="dashboard" className="w-4 h-4" /> View Dashboard
               </Link>
             </div>
           </div>

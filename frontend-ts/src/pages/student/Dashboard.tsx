@@ -257,10 +257,6 @@ export default function StudentDashboard() {
             <Icon name="results" className="w-4 h-4" />
             View Results
           </Link>
-          <Link to="/student/track" className="gk-btn-secondary inline-flex items-center gap-2 px-5 py-2.5 text-sm">
-            <Icon name="search" className="w-4 h-4" />
-            Track Application
-          </Link>
         </div>
       </div>
     </div>
