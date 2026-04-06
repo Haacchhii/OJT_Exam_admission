@@ -23,6 +23,8 @@ interface EssayParams {
 
 interface EmployeeResultsSummaryParams {
   limit?: number;
+  includeResults?: boolean;
+  includeEssays?: boolean;
 }
 
 const DEFAULT_RESULTS_PAGE = 1;
@@ -65,7 +67,11 @@ export interface EmployeeResultsSummary {
     returnedResults: number;
     totalEssays: number;
     returnedEssays: number;
+    totalPendingEssays: number;
+    totalScoredEssays: number;
     summaryLimit: number;
+    includeResults: boolean;
+    includeEssays: boolean;
     capped: boolean;
   };
 }

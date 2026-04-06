@@ -5,6 +5,14 @@ import { cached } from '../utils/cache.js';
 const EMPLOYEE_SUMMARY_DEFAULT_LIMIT = 500;
 const EMPLOYEE_SUMMARY_MAX_LIMIT = 1200;
 
+function parseBooleanQuery(value, fallback) {
+  if (value === undefined || value === null || value === '') return fallback;
+  const normalized = String(value).toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+  return fallback;
+}
+
 // Re-export submission and essay scoring controllers so routes/results.js keeps working
 export { submitExam } from './examSubmission.js';
 export { getEssayAnswers, scoreEssay } from './essayScoring.js';
@@ -303,11 +311,15 @@ export async function getEmployeeSummary(req, res, next) {
       ? Math.min(Math.floor(requestedLimit), EMPLOYEE_SUMMARY_MAX_LIMIT)
       : EMPLOYEE_SUMMARY_DEFAULT_LIMIT;
 
-    const cacheKey = `resultsEmployeeSummary:v3:${summaryLimit}`;
+    const includeResults = parseBooleanQuery(req.query?.includeResults, true);
+    const includeEssays = parseBooleanQuery(req.query?.includeEssays, true);
+
+    const cacheKey = `resultsEmployeeSummary:v4:${summaryLimit}:r${includeResults ? 1 : 0}:e${includeEssays ? 1 : 0}`;
     const summary = await cached(cacheKey, async () => {
       const [
         totalResults,
         totalEssays,
+        totalPendingEssays,
         results,
         essays,
         academicYears,
@@ -315,37 +327,42 @@ export async function getEmployeeSummary(req, res, next) {
       ] = await Promise.all([
         prisma.examResult.count(),
         prisma.essayAnswer.count(),
-        prisma.examResult.findMany({
-          orderBy: { createdAt: 'desc' },
-          take: summaryLimit,
-          select: {
-            id: true,
-            registrationId: true,
-            totalScore: true,
-            maxPossible: true,
-            percentage: true,
-            passed: true,
-            essayReviewed: true,
-            createdAt: true,
-          },
-        }),
-        prisma.essayAnswer.findMany({
-          orderBy: { createdAt: 'desc' },
-          take: summaryLimit,
-          select: {
-            id: true,
-            registrationId: true,
-            questionId: true,
-            essayResponse: true,
-            pointsAwarded: true,
-            maxPoints: true,
-            comment: true,
-            scored: true,
-            scoredById: true,
-            scoredAt: true,
-            question: { select: { questionText: true } },
-          },
-        }),
+        prisma.essayAnswer.count({ where: { scored: false } }),
+        includeResults
+          ? prisma.examResult.findMany({
+              orderBy: { createdAt: 'desc' },
+              take: summaryLimit,
+              select: {
+                id: true,
+                registrationId: true,
+                totalScore: true,
+                maxPossible: true,
+                percentage: true,
+                passed: true,
+                essayReviewed: true,
+                createdAt: true,
+              },
+            })
+          : Promise.resolve([]),
+        includeEssays
+          ? prisma.essayAnswer.findMany({
+              orderBy: { createdAt: 'desc' },
+              take: summaryLimit,
+              select: {
+                id: true,
+                registrationId: true,
+                questionId: true,
+                essayResponse: true,
+                pointsAwarded: true,
+                maxPoints: true,
+                comment: true,
+                scored: true,
+                scoredById: true,
+                scoredAt: true,
+                question: { select: { questionText: true } },
+              },
+            })
+          : Promise.resolve([]),
         prisma.academicYear.findMany({
           orderBy: { year: 'desc' },
           select: { id: true, year: true, isActive: true, startDate: true, endDate: true },
@@ -361,8 +378,12 @@ export async function getEmployeeSummary(req, res, next) {
         returnedResults: results.length,
         totalEssays,
         returnedEssays: essays.length,
+        totalPendingEssays,
+        totalScoredEssays: Math.max(0, totalEssays - totalPendingEssays),
         summaryLimit,
-        capped: totalResults > results.length || totalEssays > essays.length,
+        includeResults,
+        includeEssays,
+        capped: (includeResults && totalResults > results.length) || (includeEssays && totalEssays > essays.length),
       };
 
       const registrationIds = Array.from(new Set([

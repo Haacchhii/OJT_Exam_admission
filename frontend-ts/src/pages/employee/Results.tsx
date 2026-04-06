@@ -38,7 +38,11 @@ interface RawData {
     returnedResults: number;
     totalEssays: number;
     returnedEssays: number;
+    totalPendingEssays: number;
+    totalScoredEssays: number;
     summaryLimit: number;
+    includeResults: boolean;
+    includeEssays: boolean;
     capped: boolean;
   };
 }
@@ -99,9 +103,14 @@ export default function EmployeeResults() {
   const [essayRowsPage, setEssayRowsPage] = useState(1);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [selectedEssayExamId, setSelectedEssayExamId] = useState<number | null>(null);
+  const includeEssaysInSummary = tab === 'essays';
 
   const { data: rawData, loading, error, refetch } = useAsync<RawData>(async () => {
-    const summary = await getEmployeeResultsSummary({ limit: RESULTS_SUMMARY_LIMIT });
+    const summary = await getEmployeeResultsSummary({
+      limit: RESULTS_SUMMARY_LIMIT,
+      includeResults: true,
+      includeEssays: includeEssaysInSummary,
+    });
     return {
       results: summary.results as ExamResult[],
       regs: summary.regs as ExamRegistration[],
@@ -113,7 +122,7 @@ export default function EmployeeResults() {
       semesters: summary.semesters as Semester[],
       meta: summary.meta,
     } as RawData;
-  });
+  }, [includeEssaysInSummary]);
 
   const academicYears = rawData?.academicYears || [];
   const allSemesters = rawData?.semesters || [];
@@ -176,6 +185,7 @@ export default function EmployeeResults() {
   const avg = results.length > 0 ? (results.reduce((s, r) => s + r.percentage, 0) / results.length).toFixed(1) : 0;
   const pending = essays.filter(e => !e.scored);
   const scored = essays.filter(e => e.scored);
+  const pendingEssaysCount = summaryMeta?.totalPendingEssays ?? pending.length;
 
   const enrichedEssays: EnrichedEssay[] = useMemo(() => essays.map(e => {
     const reg = regsById.get(e.registrationId);
@@ -395,14 +405,18 @@ export default function EmployeeResults() {
       <div className="flex gap-2 mb-6 flex-wrap" role="tablist">
         <button role="tab" aria-selected={tab === 'results'} onClick={() => setTab('results')} className={`px-4 py-2 rounded-lg text-sm font-medium transition inline-flex items-center gap-1.5 ${tab === 'results' ? 'bg-forest-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}><Icon name="chartBar" className="w-4 h-4" /> All Results</button>
         {canScoreEssays && (
-          <button role="tab" aria-selected={tab === 'essays'} onClick={() => setTab('essays')} className={`px-4 py-2 rounded-lg text-sm font-medium transition inline-flex items-center gap-1.5 ${tab === 'essays' ? 'bg-forest-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}><Icon name="documentText" className="w-4 h-4" /> Essay Review ({pending.length})</button>
+          <button role="tab" aria-selected={tab === 'essays'} onClick={() => setTab('essays')} className={`px-4 py-2 rounded-lg text-sm font-medium transition inline-flex items-center gap-1.5 ${tab === 'essays' ? 'bg-forest-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}><Icon name="documentText" className="w-4 h-4" /> Essay Review ({pendingEssaysCount})</button>
         )}
         <button role="tab" aria-selected={tab === 'analytics'} onClick={() => setTab('analytics')} className={`px-4 py-2 rounded-lg text-sm font-medium transition inline-flex items-center gap-1.5 ${tab === 'analytics' ? 'bg-forest-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}><Icon name="arrowTrendUp" className="w-4 h-4" /> Analytics</button>
       </div>
 
       {summaryMeta?.capped && (
         <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          Showing the newest {summaryMeta.returnedResults} of {summaryMeta.totalResults} results and {summaryMeta.returnedEssays} of {summaryMeta.totalEssays} essays for performance. Use specific filters to review targeted records.
+          Showing the newest
+          {summaryMeta.includeResults ? ` ${summaryMeta.returnedResults} of ${summaryMeta.totalResults} results` : ''}
+          {summaryMeta.includeResults && summaryMeta.includeEssays ? ' and' : ''}
+          {summaryMeta.includeEssays ? ` ${summaryMeta.returnedEssays} of ${summaryMeta.totalEssays} essays` : ''}
+          {' '}for performance. Use specific filters to review targeted records.
         </div>
       )}
 
