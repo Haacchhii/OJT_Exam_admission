@@ -21,6 +21,17 @@ interface ExamReadinessParams {
   limit?: number;
 }
 
+const DEFAULT_LIST_PAGE = 1;
+const DEFAULT_LIST_LIMIT = 200;
+
+function withDefaultListParams<T extends { page?: number; limit?: number }>(params?: T): T {
+  return {
+    ...(params || {}),
+    page: params?.page ?? DEFAULT_LIST_PAGE,
+    limit: params?.limit ?? DEFAULT_LIST_LIMIT,
+  } as T;
+}
+
 export interface PagedApiResponse<T> {
   data: T[];
   pagination: {
@@ -47,7 +58,7 @@ export interface ExamSchedulePayload {
 export type UpdateExamSchedulePayload = Partial<Omit<ExamSchedulePayload, 'examId'>>;
 
 export async function getExams(params?: ExamParams) {
-  return client.get<Exam[]>(`/exams${qs(params)}`);
+  return client.get<Exam[]>(`/exams${qs(withDefaultListParams(params))}`);
 }
 
 export async function getExam(id: number) {
@@ -83,8 +94,9 @@ export async function cloneExam(id: number) {
 }
 
 export async function getExamSchedules(examId?: number, params?: ExamParams) {
+  const mergedParams = withDefaultListParams({ examId, ...(params || {}) });
   return client.get<ExamSchedule[]>(
-    `/exams/schedules${qs({ examId, ...params })}`
+    `/exams/schedules${qs(mergedParams)}`
   );
 }
 
@@ -115,8 +127,9 @@ export async function deleteExamSchedule(id: number) {
 }
 
 export async function getExamRegistrations(params?: ExamParams) {
+  const mergedParams = withDefaultListParams(params);
   return client.get<ExamRegistration[]>(
-    `/exams/registrations${qs(params)}`
+    `/exams/registrations${qs(mergedParams)}`
   );
 }
 
