@@ -5,7 +5,7 @@ import { paginate, paginatedResponse } from '../utils/pagination.js';
 export async function getAuditLogs(req, res, next) {
   try {
     const { action, entity, userId, from, to, search, page, limit } = req.query;
-    const pg = paginate(page, limit);
+    const pg = paginate(page ?? 1, limit ?? 100);
 
     const where = {};
     if (action) where.action = { contains: action, mode: 'insensitive' };

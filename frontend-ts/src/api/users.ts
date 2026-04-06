@@ -27,12 +27,23 @@ interface UserParams {
   limit?: number;
 }
 
+const DEFAULT_USERS_PAGE = 1;
+const DEFAULT_USERS_LIMIT = 50;
+
+function withDefaultUserListParams<T extends { page?: number; limit?: number }>(params?: T): T {
+  return {
+    ...(params || {}),
+    page: params?.page ?? DEFAULT_USERS_PAGE,
+    limit: params?.limit ?? DEFAULT_USERS_LIMIT,
+  } as T;
+}
+
 export async function getUsers(params?: UserParams) {
-  return client.get<User[]>(`/users${qs(params)}`);
+  return client.get<User[]>(`/users${qs(withDefaultUserListParams(params))}`);
 }
 
 export async function getUsersPage(params?: UserParams) {
-  return client.get<PagedApiResponse<User>>(`/users${qs(params)}`);
+  return client.get<PagedApiResponse<User>>(`/users${qs(withDefaultUserListParams(params))}`);
 }
 
 export async function getUserStats() {

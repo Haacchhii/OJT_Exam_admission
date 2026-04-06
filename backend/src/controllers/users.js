@@ -14,7 +14,7 @@ function safifyUser(user) {
 export async function getUsers(req, res, next) {
   try {
     const { search, role, status, page, limit } = req.query;
-    const pg = paginate(page, limit);
+    const pg = paginate(page ?? 1, limit ?? 50);
 
     const where = { deletedAt: null };
     if (role)   where.role = role;
