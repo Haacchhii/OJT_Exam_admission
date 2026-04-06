@@ -10,7 +10,8 @@ import { cached, invalidatePrefix } from '../utils/cache.js';
 import env from '../config/env.js';
 
 const ADMISSION_IN_PROGRESS = ['Submitted', 'Under Screening', 'Under Evaluation'];
-const REPORTS_MAX_ADMISSIONS = 1200;
+const REPORTS_DEFAULT_ADMISSIONS = 300;
+const REPORTS_MAX_ADMISSIONS = 400;
 
 function toIsoDay(d) {
   if (!d) return null;
@@ -319,7 +320,7 @@ export async function getReportsSummary(req, res, next) {
     const requestedLimit = Number(limit);
     const admissionLimit = Number.isFinite(requestedLimit) && requestedLimit > 0
       ? Math.min(Math.floor(requestedLimit), REPORTS_MAX_ADMISSIONS)
-      : REPORTS_MAX_ADMISSIONS;
+      : REPORTS_DEFAULT_ADMISSIONS;
 
     const admissionWhere = { deletedAt: null };
     if (status) admissionWhere.status = status;

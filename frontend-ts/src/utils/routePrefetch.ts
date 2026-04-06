@@ -79,7 +79,7 @@ export function prefetchLikelyRoutesForRole(role: UserRole | null, currentPath: 
     ? ['/student/admission', '/student/exam', '/student/results']
     : ['/employee/admissions', '/employee/exams', '/employee/results', '/employee/reports'];
 
-  const maxTargets = role === 'applicant' ? 2 : 3;
+  const maxTargets = 1;
   const targets = candidates.filter((path) => path !== normalizedCurrent).slice(0, maxTargets);
 
   // Stage prefetches so we avoid a sudden burst of network/parse work.

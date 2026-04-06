@@ -22,6 +22,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const CHART_FALLBACK_COLORS = ['#16a34a', '#0ea5e9', '#f59e0b', '#8b5cf6', '#ef4444', '#14b8a6'];
+const REPORTS_DEFAULT_LIMIT = 300;
 
 function DeferredChartSection({ children, minHeight = 320 }: { children: ReactNode; minHeight?: number }) {
   const [isReady, setIsReady] = useState(false);
@@ -114,7 +115,7 @@ const EMPTY_REPORT_DATA: ReportData = {
   meta: {
     admissionCountTotal: 0,
     admissionCountReturned: 0,
-    admissionLimit: 1200,
+    admissionLimit: REPORTS_DEFAULT_LIMIT,
     admissionsCapped: false,
   },
 };
@@ -141,7 +142,7 @@ export default function EmployeeReports() {
       dateTo?: string;
       limit: number;
     } = {
-      limit: 1200,
+      limit: REPORTS_DEFAULT_LIMIT,
     };
 
     if (statusFilter !== 'all') params.status = statusFilter;
