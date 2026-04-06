@@ -14,7 +14,9 @@ export default function StudentResults() {
 
   const { data: rawData, loading, error, refetch } = useAsync(async () => {
     const [myRegs, myResult, rawSchedules] = await Promise.all([
-      getMyRegistrations(), getMyResult(), getExamSchedules()
+      getMyRegistrations(),
+      getMyResult(),
+      getExamSchedules(undefined, { page: 1, limit: 100 })
     ]);
     const myReg = myRegs?.[0] || null;
     const schedules = asArray(rawSchedules);
