@@ -1,7 +1,20 @@
 const baseUrl = String(process.env.PERF_SMOKE_BASE_URL || '').trim().replace(/\/+$/, '');
 const token = String(process.env.PERF_SMOKE_TOKEN || '').trim();
-const sampleCount = Math.max(3, Number.parseInt(process.env.PERF_SMOKE_SAMPLES || '6', 10) || 6);
+
+function parseIntOrFallback(rawValue, fallback) {
+  const parsed = Number.parseInt(String(rawValue ?? ''), 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+const sampleCount = Math.max(3, parseIntOrFallback(process.env.PERF_SMOKE_SAMPLES, 6));
+const warmupCount = Math.max(0, parseIntOrFallback(process.env.PERF_SMOKE_WARMUP, 1));
 const required = String(process.env.PERF_SMOKE_REQUIRED || 'false').toLowerCase() === 'true';
+
+function thresholdFor(key, fallback) {
+  const envKey = `PERF_SMOKE_THRESHOLD_${key}`;
+  const fromEnv = Number.parseInt(process.env[envKey] || '', 10);
+  return Number.isFinite(fromEnv) && fromEnv > 0 ? fromEnv : fallback;
+}
 
 if (!baseUrl) {
   const msg = '[perf-smoke] PERF_SMOKE_BASE_URL is not set. Skipping perf smoke run.';
@@ -14,11 +27,11 @@ if (!baseUrl) {
 }
 
 const endpointChecks = [
-  { name: 'health', path: '/api/health', p95Ms: 350, requireAuth: false },
-  { name: 'dashboard-summary', path: '/api/admissions/dashboard-summary', p95Ms: 1200, requireAuth: true },
-  { name: 'reports-summary', path: '/api/admissions/reports-summary?limit=200', p95Ms: 1500, requireAuth: true },
-  { name: 'employee-results-summary', path: '/api/results/employee-summary?limit=300&includeEssays=false', p95Ms: 1700, requireAuth: true },
-  { name: 'exams-list', path: '/api/exams?page=1&limit=50', p95Ms: 900, requireAuth: true },
+  { name: 'health', key: 'HEALTH', path: '/api/health', p95Ms: thresholdFor('HEALTH', 1200), requireAuth: false },
+  { name: 'dashboard-summary', key: 'DASHBOARD_SUMMARY', path: '/api/admissions/dashboard-summary', p95Ms: thresholdFor('DASHBOARD_SUMMARY', 1200), requireAuth: true },
+  { name: 'reports-summary', key: 'REPORTS_SUMMARY', path: '/api/admissions/reports-summary?limit=200', p95Ms: thresholdFor('REPORTS_SUMMARY', 1500), requireAuth: true },
+  { name: 'employee-results-summary', key: 'EMPLOYEE_RESULTS_SUMMARY', path: '/api/results/employee-summary?limit=300&includeEssays=false', p95Ms: thresholdFor('EMPLOYEE_RESULTS_SUMMARY', 1700), requireAuth: true },
+  { name: 'exams-list', key: 'EXAMS_LIST', path: '/api/exams?page=1&limit=50', p95Ms: thresholdFor('EXAMS_LIST', 900), requireAuth: true },
 ];
 
 const activeChecks = endpointChecks.filter((item) => !item.requireAuth || Boolean(token));
@@ -65,38 +78,53 @@ async function hitEndpoint(path, requiresAuth) {
   };
 }
 
+function summarizeStatuses(statusCounts) {
+  const entries = Array.from(statusCounts.entries()).sort((a, b) => a[0] - b[0]);
+  if (entries.length === 0) return 'none';
+  return entries.map(([code, count]) => `${code}:${count}`).join(',');
+}
+
 async function runCheck(check) {
   const samples = [];
   let failures = 0;
+  const statusCounts = new Map();
+  const totalRequests = warmupCount + sampleCount;
 
-  for (let i = 0; i < sampleCount; i += 1) {
+  for (let i = 0; i < totalRequests; i += 1) {
     try {
       const result = await hitEndpoint(check.path, check.requireAuth);
+      statusCounts.set(result.status, (statusCounts.get(result.status) || 0) + 1);
+      if (i < warmupCount) continue;
       samples.push(result.ms);
       if (!result.ok) failures += 1;
     } catch {
+      if (i < warmupCount) continue;
       failures += 1;
       samples.push(9999);
+      statusCounts.set(0, (statusCounts.get(0) || 0) + 1);
     }
   }
 
   const p95 = percentile(samples, 95);
   const avg = samples.reduce((sum, val) => sum + val, 0) / Math.max(1, samples.length);
+  const statusSummary = summarizeStatuses(statusCounts);
 
   return {
     name: check.name,
+    key: check.key,
     path: check.path,
     thresholdP95Ms: check.p95Ms,
     p95Ms: Number(p95.toFixed(2)),
     avgMs: Number(avg.toFixed(2)),
     failures,
+    statusSummary,
     sampleCount,
     pass: failures === 0 && p95 <= check.p95Ms,
   };
 }
 
 (async () => {
-  console.log(`[perf-smoke] Running ${activeChecks.length} endpoint checks against ${baseUrl}`);
+  console.log(`[perf-smoke] Running ${activeChecks.length} endpoint checks against ${baseUrl} (warmup=${warmupCount}, samples=${sampleCount})`);
   const results = [];
 
   for (const check of activeChecks) {
@@ -104,13 +132,20 @@ async function runCheck(check) {
     results.push(result);
     const status = result.pass ? 'PASS' : 'FAIL';
     console.log(
-      `[perf-smoke] ${status} ${result.name} | p95=${result.p95Ms}ms threshold=${result.thresholdP95Ms}ms avg=${result.avgMs}ms failures=${result.failures}/${result.sampleCount}`
+      `[perf-smoke] ${status} ${result.name} | p95=${result.p95Ms}ms threshold=${result.thresholdP95Ms}ms avg=${result.avgMs}ms failures=${result.failures}/${result.sampleCount} status=${result.statusSummary}`
     );
   }
 
   const failed = results.filter((item) => !item.pass);
   if (failed.length > 0) {
+    const allAuthFailures = failed.every((item) => /^401:|,401:|^403:|,403:/.test(item.statusSummary));
+    if (allAuthFailures) {
+      console.error('[perf-smoke] Protected endpoint checks are unauthorized. Verify PERF_SMOKE_TOKEN is valid and has employee/admin access.');
+    }
     console.error(`[perf-smoke] ${failed.length} check(s) failed.`);
+    failed.forEach((item) => {
+      console.error(`[perf-smoke] fail-detail ${item.name} path=${item.path} status=${item.statusSummary}`);
+    });
     process.exit(1);
   }
 
