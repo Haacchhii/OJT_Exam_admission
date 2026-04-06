@@ -102,7 +102,7 @@ function inferLegacyGradeBucket(gradeLevel = '') {
 export async function getSchedules(req, res, next) {
   try {
     const { examId, search, page, limit } = req.query;
-    const pg = paginate(page, limit);
+    const pg = paginate(page ?? 1, limit ?? 200);
 
     const where = {};
     if (examId) where.examId = Number(examId);

@@ -72,7 +72,7 @@ function stripAnswers(exam) {
 export async function getExams(req, res, next) {
   try {
     const { search, grade, levelGroup, status, academicYearId, semesterId, page, limit } = req.query;
-    const pg = paginate(page, limit);
+    const pg = paginate(page ?? 1, limit ?? 200);
 
     const where = { deletedAt: null };
     if (grade)  where.gradeLevel = grade;

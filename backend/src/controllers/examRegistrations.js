@@ -57,7 +57,7 @@ function isWithinRegistrationWindow(schedule, todayIso) {
 export async function getRegistrations(req, res, next) {
   try {
     const { search, status, examId, page, limit } = req.query;
-    const pg = paginate(page, limit);
+    const pg = paginate(page ?? 1, limit ?? 200);
 
     const where = {};
     if (status) where.status = status;
