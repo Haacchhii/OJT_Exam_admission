@@ -2,14 +2,14 @@ import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useAsync } from '../../hooks/useAsync.js';
-import { getExams, getExamSchedules, getMyRegistrations, registerForExam, getExamForStudent, startExam as apiStartExam, getAvailableSchedules } from '../../api/exams.js';
+import { getMyRegistrations, registerForExam, getExamForStudent, startExam as apiStartExam, getAvailableSchedules } from '../../api/exams.js';
 import { getMyResult, submitExamAnswers } from '../../api/results.js';
 import { showToast } from '../../components/Toast.jsx';
 import Modal from '../../components/Modal.jsx';
 import { useConfirm } from '../../components/ConfirmDialog.jsx';
 import { PageHeader, SkeletonPage, ErrorAlert } from '../../components/UI.jsx';
 import Icon from '../../components/Icons.jsx';
-import { formatTime, asArray } from '../../utils/helpers.js';
+import { formatTime } from '../../utils/helpers.js';
 import { SCHEDULE_POLL_MS, REDIRECT_DELAY_MS } from '../../utils/constants.js';
 
 export default function StudentExam() {
@@ -52,10 +52,8 @@ export default function StudentExam() {
       let cancelled = false;
       (async () => {
         try {
-          const rawSched = await getExamSchedules();
-          if (cancelled) return;
-          const schedule = asArray(rawSched).find(s => s.id === myReg.scheduleId);
-          const exam = schedule ? await getExamForStudent(schedule.examId) : null;
+          const examId = myReg.schedule?.examId;
+          const exam = examId ? await getExamForStudent(examId) : null;
           if (!cancelled && exam) { setCurrentExam(exam); setView('exam'); }
         } catch (err) {
           // Network error during recovery — stay on schedule view
@@ -114,12 +112,9 @@ function ScheduleView({ myReg, myResult, onLobby, onRefresh, user }) {
   const [bookingSlotId, setBookingSlotId] = useState(null);
 
   const { data: schedData } = useAsync(async () => {
-    const [rawSched, rawExams, availableSchedules] = await Promise.all([getExamSchedules(), getExams(), getAvailableSchedules()]);
-    return { schedules: asArray(rawSched), exams: asArray(rawExams), availableSchedules };
+    const availableSchedules = await getAvailableSchedules();
+    return { availableSchedules: Array.isArray(availableSchedules) ? availableSchedules : [] };
   });
-
-  const schedules = schedData?.schedules || [];
-  const exams = schedData?.exams || [];
 
   if (myReg?.status === 'done') {
     return (
@@ -136,8 +131,8 @@ function ScheduleView({ myReg, myResult, onLobby, onRefresh, user }) {
   }
 
   if (myReg) {
-    const schedule = schedules.find(s => s.id === myReg.scheduleId);
-    const exam = schedule ? exams.find(e => e.id === schedule.examId) : null;
+    const schedule = myReg.schedule || null;
+    const exam = schedule?.exam || null;
     // Time gate: only allow starting exam when current time >= scheduled date+start time
     const [now, setNow] = useState(() => new Date());
     const schedStart = schedule ? new Date(`${schedule.scheduledDate}T${schedule.startTime}:00`) : null;
@@ -180,8 +175,8 @@ function ScheduleView({ myReg, myResult, onLobby, onRefresh, user }) {
   const available = schedData?.availableSchedules || [];
 
   const bookSlot = async (scheduleId) => {
-    const schedule = schedules.find(s => s.id === scheduleId);
-    const exam = schedule ? exams.find(e => e.id === schedule.examId) : null;
+    const schedule = available.find(s => s.id === scheduleId);
+    const exam = schedule?.exam || null;
     const ok = await confirm({
       title: 'Confirm Booking',
       message: `Book "${exam?.title || 'Exam'}" on ${schedule?.scheduledDate} at ${formatTime(schedule?.startTime)}?`,
@@ -219,7 +214,7 @@ function ScheduleView({ myReg, myResult, onLobby, onRefresh, user }) {
         {available.length > 0 ? (
           <div className="space-y-3">
             {available.map(s => {
-              const exam = exams.find(e => e.id === s.examId);
+              const exam = s.exam;
               const remaining = s.maxSlots - s.slotsTaken;
               const d = new Date(s.scheduledDate + 'T00:00:00');
               return (

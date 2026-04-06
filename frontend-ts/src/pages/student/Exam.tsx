@@ -1,13 +1,12 @@
 ﻿import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useAsync } from '../../hooks/useAsync';
-import { getExamSchedules, getMyRegistrations, startExam as apiStartExam, getExamForStudent } from '../../api/exams';
+import { getMyRegistrations, startExam as apiStartExam, getExamForStudent } from '../../api/exams';
 import { getMyResult } from '../../api/results';
 import { showToast } from '../../components/Toast';
 import { useConfirm } from '../../components/ConfirmDialog';
 import { SkeletonPage, ErrorAlert } from '../../components/UI';
 import Icon from '../../components/Icons';
-import { asArray } from '../../utils/helpers';
 import type { Exam, ExamSchedule, ExamRegistration, ExamResult } from '../../types';
 import ScheduleView from './exam/ScheduleView';
 import LiveExam from './exam/LiveExam';
@@ -64,10 +63,8 @@ export default function StudentExam() {
       let cancelled = false;
       (async () => {
         try {
-          const rawSchedules = await getExamSchedules();
-          if (cancelled) return;
-          const schedule = asArray<ExamSchedule>(rawSchedules).find((s: ExamSchedule) => s.id === myReg.scheduleId);
-          const exam = schedule ? await getExamForStudent(schedule.examId) : null;
+          const examId = myReg.schedule?.examId;
+          const exam = examId ? await getExamForStudent(examId) : null;
           if (!cancelled && exam) { setCurrentExam(exam); setView('exam'); }
         } catch (err) {
           console.error('Exam recovery failed:', err);

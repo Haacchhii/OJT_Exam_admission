@@ -1,9 +1,9 @@
 import { Link } from 'react-router-dom';
-import { getMyRegistrations, getExamSchedules, getExamForReview } from '../../api/exams.js';
+import { getMyRegistrations, getExamForReview } from '../../api/exams.js';
 import { getMyResult, getSubmittedAnswers } from '../../api/results.js';
 import { PageHeader, SkeletonPage, ErrorAlert } from '../../components/UI.jsx';
 import Icon from '../../components/Icons.jsx';
-import { formatDate, asArray } from '../../utils/helpers.js';
+import { formatDate } from '../../utils/helpers.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { showToast } from '../../components/Toast.jsx';
 import { useAsync } from '../../hooks/useAsync.js';
@@ -13,31 +13,39 @@ export default function StudentResults() {
   const { user } = useAuth();
 
   const { data: rawData, loading, error, refetch } = useAsync(async () => {
-    const [myRegs, myResult, rawSchedules] = await Promise.all([
+    const [myRegs, myResult] = await Promise.all([
       getMyRegistrations(),
-      getMyResult(),
-      getExamSchedules(undefined, { page: 1, limit: 100 })
+      getMyResult()
     ]);
     const myReg = myRegs?.[0] || null;
-    const schedules = asArray(rawSchedules);
-    const schedule = myReg ? schedules.find(s => s.id === myReg.scheduleId) : null;
+    const examId = myReg?.schedule?.examId;
     let exam = null;
     let storedAnswers = [];
-    if (schedule) {
-      try {
-        exam = await getExamForReview(schedule.examId);
-      } catch (err) {
-        showToast('Could not load exam review. Question breakdown may be incomplete.', 'error');
-        console.error('getExamForReview failed:', err);
-      }
-    }
+
     if (myReg) {
-      try {
-        storedAnswers = await getSubmittedAnswers(myReg.id);
-      } catch (err) {
-        showToast('Could not load your submitted answers.', 'error');
-        console.error('getSubmittedAnswers failed:', err);
-      }
+      const [loadedExam, loadedAnswers] = await Promise.all([
+        (async () => {
+          if (!examId) return null;
+          try {
+            return await getExamForReview(examId);
+          } catch (err) {
+            showToast('Could not load exam review. Question breakdown may be incomplete.', 'error');
+            console.error('getExamForReview failed:', err);
+            return null;
+          }
+        })(),
+        (async () => {
+          try {
+            return await getSubmittedAnswers(myReg.id);
+          } catch (err) {
+            showToast('Could not load your submitted answers.', 'error');
+            console.error('getSubmittedAnswers failed:', err);
+            return [];
+          }
+        })(),
+      ]);
+      exam = loadedExam;
+      storedAnswers = loadedAnswers;
     }
     // Derive essay answers from submitted answers (student cannot call getEssayAnswers)
     const essayAnswers = storedAnswers.filter(a => a.question?.questionType === 'essay').map(a => ({

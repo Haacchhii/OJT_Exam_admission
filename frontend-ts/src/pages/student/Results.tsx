@@ -1,5 +1,5 @@
 ﻿import { Link } from 'react-router-dom';
-import { getMyRegistrations, getExamSchedules, getExamForReview } from '../../api/exams';
+import { getMyRegistrations, getExamForReview } from '../../api/exams';
 import { getMyResult, getSubmittedAnswers } from '../../api/results';
 import { PageHeader, SkeletonPage, ErrorAlert } from '../../components/UI';
 import Icon from '../../components/Icons';
@@ -32,31 +32,39 @@ export default function StudentResults() {
   const { user } = useAuth();
 
   const { data: rawData, loading, error, refetch } = useAsync<ResultsData>(async () => {
-    const [myRegs, myResult, rawSchedules] = await Promise.all([
+    const [myRegs, myResult] = await Promise.all([
       getMyRegistrations(),
       getMyResult(),
-      getExamSchedules(undefined, { page: 1, limit: 100 }),
     ]);
     const myReg = myRegs?.[0] || null;
-    const schedules = asArray<{ id: number; examId: number }>(rawSchedules);
-    const schedule = myReg ? schedules.find(s => s.id === myReg.scheduleId) : null;
+    const examId = myReg?.schedule?.examId;
     let exam: Exam | null = null;
     let storedAnswers: SubmittedAnswer[] = [];
-    if (schedule) {
-      try {
-        exam = await getExamForReview(schedule.examId);
-      } catch (err) {
-        showToast('Could not load exam review. Question breakdown may be incomplete.', 'error');
-        console.error('getExamForReview failed:', err);
-      }
-    }
+
     if (myReg) {
-      try {
-        storedAnswers = asArray<SubmittedAnswer>(await getSubmittedAnswers(myReg.id));
-      } catch (err) {
-        showToast('Could not load your submitted answers.', 'error');
-        console.error('getSubmittedAnswers failed:', err);
-      }
+      const [loadedExam, loadedAnswers] = await Promise.all([
+        (async () => {
+          if (!examId) return null;
+          try {
+            return await getExamForReview(examId);
+          } catch (err) {
+            showToast('Could not load exam review. Question breakdown may be incomplete.', 'error');
+            console.error('getExamForReview failed:', err);
+            return null;
+          }
+        })(),
+        (async () => {
+          try {
+            return asArray<SubmittedAnswer>(await getSubmittedAnswers(myReg.id));
+          } catch (err) {
+            showToast('Could not load your submitted answers.', 'error');
+            console.error('getSubmittedAnswers failed:', err);
+            return [];
+          }
+        })(),
+      ]);
+      exam = loadedExam;
+      storedAnswers = loadedAnswers;
     }
     const essayAnswers: EssayAnswer[] = storedAnswers
       .filter((a: SubmittedAnswer) => a.question?.questionType === 'essay')

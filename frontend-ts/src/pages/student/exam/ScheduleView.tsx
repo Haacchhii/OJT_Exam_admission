@@ -1,18 +1,16 @@
 ﻿import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAsync } from '../../../hooks/useAsync';
-import { getExams, getExamSchedules, registerForExam, getAvailableSchedules, notifyNoExamSchedule, cancelExamRegistration } from '../../../api/exams';
+import { registerForExam, getAvailableSchedules, notifyNoExamSchedule, cancelExamRegistration } from '../../../api/exams';
 import { getActivePeriod } from '../../../api/academicYears';
 import { showToast } from '../../../components/Toast';
 import { useConfirm } from '../../../components/ConfirmDialog';
 import { PageHeader } from '../../../components/UI';
 import Icon from '../../../components/Icons';
-import { formatTime, asArray } from '../../../utils/helpers';
+import { formatTime } from '../../../utils/helpers';
 import type { Exam, ExamSchedule, ExamRegistration, ExamResult, User } from '../../../types';
 
 interface ScheduleData {
-  schedules: ExamSchedule[];
-  exams: Exam[];
   availableSchedules: ExamSchedule[];
 }
 
@@ -49,8 +47,8 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, user
   const [noticeSent, setNoticeSent] = useState(false);
 
   const { data: schedData } = useAsync<ScheduleData>(async () => {
-    const [rawSched, rawExm, rawAvail] = await Promise.all([getExamSchedules(), getExams(), getAvailableSchedules()]);
-    return { schedules: asArray<ExamSchedule>(rawSched), exams: asArray<Exam>(rawExm), availableSchedules: asArray<ExamSchedule>(rawAvail) };
+    const rawAvail = await getAvailableSchedules();
+    return { availableSchedules: Array.isArray(rawAvail) ? rawAvail : [] };
   });
   const { data: activePeriod } = useAsync(() => getActivePeriod());
 
@@ -59,9 +57,6 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, user
   const semStart = toIsoDay(activeSemester?.startDate || null);
   const semEnd = toIsoDay(activeSemester?.endDate || null);
   const isExamPeriodOpen = !!activeSemester && isWithinPeriod(todayIso, semStart, semEnd);
-
-  const schedules = schedData?.schedules || [];
-  const exams = schedData?.exams || [];
 
   if (myReg?.status === 'done') {
     return (
@@ -102,8 +97,6 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, user
     return (
       <ScheduledView
         myReg={myReg}
-        schedules={schedules}
-        exams={exams}
         onLobby={onLobby}
         onCancel={cancelSchedule}
         isCanceling={cancelingRegistrationId === myReg.id}
@@ -114,8 +107,8 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, user
   const available = schedData?.availableSchedules || [];
 
   const bookSlot = async (scheduleId: number) => {
-    const schedule = schedules.find((s: ExamSchedule) => s.id === scheduleId);
-    const exam = schedule ? exams.find((e: Exam) => e.id === schedule.examId) : null;
+    const schedule = available.find((s: ExamSchedule) => s.id === scheduleId);
+    const exam = schedule?.exam || null;
     const ok = await confirm({
       title: 'Confirm Booking',
       message: `Book "${exam?.title || 'Exam'}" on ${schedule?.scheduledDate} at ${formatTime(schedule?.startTime)}?`,
@@ -189,7 +182,7 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, user
         {available.length > 0 ? (
           <div className="space-y-3">
             {available.map((s: ExamSchedule) => {
-              const exam = exams.find((e: Exam) => e.id === s.examId);
+              const exam = s.exam;
               const remaining = s.maxSlots - s.slotsTaken;
               const d = new Date(s.scheduledDate + 'T00:00:00');
               return (
@@ -262,16 +255,14 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, user
 /* ===== Scheduled View ===== */
 interface ScheduledViewProps {
   myReg: ExamRegistration;
-  schedules: ExamSchedule[];
-  exams: Exam[];
   onLobby: (exam: Exam) => void;
   onCancel: (registrationId: number) => void;
   isCanceling: boolean;
 }
 
-function ScheduledView({ myReg, schedules, exams, onLobby, onCancel, isCanceling }: ScheduledViewProps) {
-  const schedule = schedules.find((s: ExamSchedule) => s.id === myReg.scheduleId);
-  const exam = schedule ? exams.find((e: Exam) => e.id === schedule.examId) : null;
+function ScheduledView({ myReg, onLobby, onCancel, isCanceling }: ScheduledViewProps) {
+  const schedule = myReg.schedule || null;
+  const exam = schedule?.exam || null;
   const canStart = !!exam;
 
   return (
