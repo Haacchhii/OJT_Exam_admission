@@ -12,11 +12,13 @@ import { useState, useEffect, useCallback, useRef } from 'react';
  *   // Or without signal (backward-compatible):
  *   const { data, loading, error, refetch } = useAsync(() => getAdmissions());
  */
-export function useAsync(asyncFn, deps = []) {
+export function useAsync(asyncFn, deps = [], options = {}) {
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null);
   const [refreshCount, setRefreshCount] = useState(0);
+
+  const { setLoadingOnReload = false } = options;
 
   // Stabilize the asyncFn reference to prevent infinite re-renders
   const fnRef = useRef(asyncFn);
@@ -27,8 +29,8 @@ export function useAsync(asyncFn, deps = []) {
   useEffect(() => {
     const controller = new AbortController();
 
-    // Stale-while-revalidate: only show loading spinner on initial fetch (no data yet)
-    setLoading(prev => data === null ? true : prev);
+    // Keep default stale-while-revalidate behavior unless explicit reload loading is requested.
+    setLoading(prev => (setLoadingOnReload || data === null) ? true : prev);
     setError(null);
 
     fnRef.current(controller.signal)
