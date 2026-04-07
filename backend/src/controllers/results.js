@@ -138,9 +138,19 @@ export async function getSubmittedAnswers(req, res, next) {
     }
     const answers = await prisma.submittedAnswer.findMany({
       where: { registrationId: regId },
-      include: {
-        question: { include: { choices: true } },
-        selectedChoice: true,
+      select: {
+        id: true,
+        registrationId: true,
+        questionId: true,
+        selectedChoiceId: true,
+        essayText: true,
+        question: {
+          select: {
+            id: true,
+            questionType: true,
+            points: true,
+          },
+        },
       },
     });
     // Attach essay scoring data (comment, pointsAwarded) from EssayAnswer records

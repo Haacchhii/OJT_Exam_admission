@@ -2,7 +2,7 @@
 import { useAuth } from '../../context/AuthContext';
 import { useAsync } from '../../hooks/useAsync';
 import { getMyAdmission } from '../../api/admissions';
-import { getMyRegistrations } from '../../api/exams';
+import { getMyRegistrationSummary } from '../../api/exams';
 import { getMyResult } from '../../api/results';
 import { StatCard, PageHeader, SkeletonPage, ErrorAlert } from '../../components/UI';
 import { formatDate, formatTime } from '../../utils/helpers';
@@ -25,12 +25,11 @@ export default function StudentDashboard() {
   const [hasAdmissionDraft, setHasAdmissionDraft] = useState(false);
 
   const { data: rawData, loading, error, refetch } = useAsync<DashboardData>(async () => {
-    const [myApp, myRegs, myResult] = await Promise.all([
-      getMyAdmission(), getMyRegistrations(), getMyResult()
+    const [myApp, regSummary, myResult] = await Promise.all([
+      getMyAdmission(), getMyRegistrationSummary(), getMyResult()
     ]);
-    const registrations = Array.isArray(myRegs) ? myRegs : [];
-    const myReg = registrations[0] || null;
-    const hasCompletedExam = registrations.some((reg: ExamRegistration) => reg.status === 'done');
+    const myReg = regSummary?.latest || null;
+    const hasCompletedExam = !!regSummary?.hasCompletedExam;
 
     let examText = 'Not Started', examIcon = 'clipboard', examColor = 'blue';
     if (myResult) { examText = myResult.passed ? 'Passed' : 'Failed'; examIcon = myResult.passed ? 'checkCircle' : 'xCircle'; examColor = myResult.passed ? 'emerald' : 'red'; }

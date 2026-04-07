@@ -2,12 +2,12 @@ import { useState, useMemo, useCallback, useEffect, type ChangeEvent } from 'rea
 import { useAuth } from '../../../context/AuthContext';
 import { useAsync } from '../../../hooks/useAsync';
 import { getMyAdmission, addAdmission, uploadAdmissionDocuments } from '../../../api/admissions';
-import { getMyRegistrations } from '../../../api/exams';
+import { getMyRegistrationSummary } from '../../../api/exams';
 import { showToast } from '../../../components/Toast';
 import { useConfirm } from '../../../components/ConfirmDialog';
 import { useUnsavedChanges } from '../../../hooks/useUnsavedChanges';
 import { DOC_REQUIREMENTS, DOC_OPTIONAL_REQUIREMENTS, DOC_SLOT_LABELS, ALLOWED_FILE_TYPES, MAX_FILE_SIZE, getCurrentSchoolYear } from '../../../utils/constants';
-import type { Admission, ExamRegistration } from '../../../types';
+import type { Admission } from '../../../types';
 import { validateStep1, validateStep2, validateStep3, checkAgeRequirement } from './admissionValidation';
 
 export { checkAgeRequirement };
@@ -86,11 +86,10 @@ export function useAdmissionWizard() {
   const confirmDialog = useConfirm();
 
   const { data: gateData, loading: gateLoading, error: gateError, refetch } = useAsync<GateData>(async () => {
-    const [existingApp, myRegs] = await Promise.all([
-      getMyAdmission(), getMyRegistrations()
+    const [existingApp, regSummary] = await Promise.all([
+      getMyAdmission(), getMyRegistrationSummary()
     ]);
-    const registrations = Array.isArray(myRegs) ? myRegs : [];
-    const examCompleted = registrations.some((reg: ExamRegistration) => reg.status === 'done');
+    const examCompleted = !!regSummary?.hasCompletedExam;
     return { existingApp, examCompleted };
   }, [user]);
 

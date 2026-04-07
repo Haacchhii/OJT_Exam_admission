@@ -3,6 +3,7 @@ import { paginate, paginatedResponse } from '../utils/pagination.js';
 import { generateTrackingId } from '../utils/tracking.js';
 import { sendExamBookingEmail } from '../utils/email.js';
 import { ROLES } from '../utils/constants.js';
+import { cached } from '../utils/cache.js';
 
 function getTodayLocalIso() {
   const now = new Date();
@@ -53,6 +54,35 @@ function isWithinRegistrationWindow(schedule, todayIso) {
   return opens && closes;
 }
 
+const myRegistrationInclude = {
+  schedule: {
+    select: {
+      id: true,
+      examId: true,
+      scheduledDate: true,
+      startTime: true,
+      endTime: true,
+      visibilityStartDate: true,
+      visibilityEndDate: true,
+      registrationOpenDate: true,
+      registrationCloseDate: true,
+      maxSlots: true,
+      slotsTaken: true,
+      venue: true,
+      exam: {
+        select: {
+          id: true,
+          title: true,
+          gradeLevel: true,
+          durationMinutes: true,
+          passingScore: true,
+          academicYearId: true,
+        },
+      },
+    },
+  },
+};
+
 // GET /api/exams/registrations/list?search=&status=&page=&limit=
 export async function getRegistrations(req, res, next) {
   try {
@@ -90,10 +120,42 @@ export async function getMyRegistrations(req, res, next) {
     }
     const registrations = await prisma.examRegistration.findMany({
       where,
-      include: { schedule: { include: { exam: { select: { title: true, gradeLevel: true, durationMinutes: true, academicYearId: true } } } } },
+      include: myRegistrationInclude,
       orderBy: { createdAt: 'desc' },
     });
     res.json(registrations);
+  } catch (err) { next(err); }
+}
+
+// GET /api/exams/registrations/mine-summary?academicYearId=
+export async function getMyRegistrationSummary(req, res, next) {
+  try {
+    const where = { userEmail: req.user.email };
+    const { academicYearId } = req.query;
+    if (academicYearId) {
+      where.schedule = { exam: { academicYearId: Number(academicYearId) } };
+    }
+
+    const cacheKey = `regs:mine-summary:${req.user.id}:${academicYearId || 'all'}`;
+    const summary = await cached(cacheKey, async () => {
+      const [latest, totalRegistrations, completedCount] = await Promise.all([
+        prisma.examRegistration.findFirst({
+          where,
+          include: myRegistrationInclude,
+          orderBy: { createdAt: 'desc' },
+        }),
+        prisma.examRegistration.count({ where }),
+        prisma.examRegistration.count({ where: { ...where, status: 'done' } }),
+      ]);
+
+      return {
+        latest: latest || null,
+        hasCompletedExam: completedCount > 0,
+        totalRegistrations,
+      };
+    }, 15_000);
+
+    res.json(summary);
   } catch (err) { next(err); }
 }
 

@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useAsync } from '../../hooks/useAsync.js';
 import { getMyAdmission, addAdmission, uploadAdmissionDocuments } from '../../api/admissions.js';
-import { getMyRegistrations } from '../../api/exams.js';
 import { getMyResult } from '../../api/results.js';
 import { showToast } from '../../components/Toast.jsx';
 import Modal from '../../components/Modal.jsx';
@@ -65,8 +64,8 @@ export default function StudentAdmission() {
   const confirmDialog = useConfirm();
 
   const { data: gateData, loading: gateLoading, error: gateError, refetch } = useAsync(async () => {
-    const [existingApp, myRegs, myResult] = await Promise.all([
-      getMyAdmission(), getMyRegistrations(), getMyResult()
+    const [existingApp, myResult] = await Promise.all([
+      getMyAdmission(), getMyResult()
     ]);
     const examPassed = myResult?.passed === true;
     return { existingApp, examPassed };

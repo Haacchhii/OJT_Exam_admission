@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useAsync } from '../../hooks/useAsync.js';
-import { getMyRegistrations, registerForExam, getExamForStudent, startExam as apiStartExam, getAvailableSchedules } from '../../api/exams.js';
+import { getMyRegistrationSummary, registerForExam, getExamForStudent, startExam as apiStartExam, getAvailableSchedules } from '../../api/exams.js';
 import { getMyResult, submitExamAnswers } from '../../api/results.js';
 import { showToast } from '../../components/Toast.jsx';
 import Modal from '../../components/Modal.jsx';
@@ -19,10 +19,10 @@ export default function StudentExam() {
 
   const { user } = useAuth();
   const { data: rawData, loading, error, refetch } = useAsync(async () => {
-    const [myRegs, myResult] = await Promise.all([
-      getMyRegistrations(), getMyResult()
+    const [regSummary, myResult] = await Promise.all([
+      getMyRegistrationSummary(), getMyResult()
     ]);
-    const myReg = myRegs?.[0] || null;
+    const myReg = regSummary?.latest || null;
     return { myReg, myResult };
   }, [user]);
 

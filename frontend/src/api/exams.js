@@ -74,6 +74,13 @@ export async function getMyRegistrations() {
   return client.get('/exams/registrations/mine');
 }
 
+/**
+ * Fetch lightweight registration summary for student pages.
+ */
+export async function getMyRegistrationSummary(params) {
+  return client.get(`/exams/registrations/mine-summary${qs(params || {})}`);
+}
+
 export async function registerForExam(userEmail, scheduleId) {
   return client.post('/exams/registrations', { userEmail, scheduleId });
 }

@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useAsync } from '../../hooks/useAsync.js';
 import { getMyAdmission } from '../../api/admissions.js';
-import { getMyRegistrations } from '../../api/exams.js';
+import { getMyRegistrationSummary } from '../../api/exams.js';
 import { getMyResult } from '../../api/results.js';
 import { StatCard, PageHeader, SkeletonPage, ErrorAlert } from '../../components/UI.jsx';
 import { formatDate } from '../../utils/helpers.js';
@@ -14,10 +14,10 @@ export default function StudentDashboard() {
   const { user } = useAuth();
 
   const { data: rawData, loading, error, refetch } = useAsync(async () => {
-    const [myApp, myRegs, myResult] = await Promise.all([
-      getMyAdmission(), getMyRegistrations(), getMyResult()
+    const [myApp, regSummary, myResult] = await Promise.all([
+      getMyAdmission(), getMyRegistrationSummary(), getMyResult()
     ]);
-    const myReg = myRegs?.[0] || null;
+    const myReg = regSummary?.latest || null;
 
     let examText = 'Not Started', examIcon = 'clipboard', examColor = 'blue';
     if (myResult) { examText = myResult.passed ? 'Passed' : 'Failed'; examIcon = myResult.passed ? 'checkCircle' : 'xCircle'; examColor = myResult.passed ? 'emerald' : 'red'; }

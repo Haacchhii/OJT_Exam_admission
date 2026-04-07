@@ -1,13 +1,13 @@
 ﻿import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useAsync } from '../../hooks/useAsync';
-import { getMyRegistrations, startExam as apiStartExam, getExamForStudent } from '../../api/exams';
+import { getMyRegistrationSummary, startExam as apiStartExam, getExamForStudent } from '../../api/exams';
 import { getMyResult } from '../../api/results';
 import { showToast } from '../../components/Toast';
 import { useConfirm } from '../../components/ConfirmDialog';
 import { SkeletonPage, ErrorAlert } from '../../components/UI';
 import Icon from '../../components/Icons';
-import type { Exam, ExamSchedule, ExamRegistration, ExamResult } from '../../types';
+import type { Exam, ExamRegistration, ExamResult } from '../../types';
 import ScheduleView from './exam/ScheduleView';
 import LiveExam from './exam/LiveExam';
 
@@ -23,10 +23,10 @@ export default function StudentExam() {
 
   const { user } = useAuth();
   const { data: rawData, loading, error, refetch } = useAsync<ExamData>(async () => {
-    const [myRegs, myResult] = await Promise.all([
-      getMyRegistrations(), getMyResult()
+    const [regSummary, myResult] = await Promise.all([
+      getMyRegistrationSummary(), getMyResult()
     ]);
-    const myReg = myRegs?.[0] || null;
+    const myReg = regSummary?.latest || null;
     return { myReg, myResult };
   }, [user]);
 

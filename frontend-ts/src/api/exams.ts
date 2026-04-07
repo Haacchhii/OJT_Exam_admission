@@ -154,6 +154,16 @@ export async function getMyRegistrations() {
   return client.get<ExamRegistration[]>('/exams/registrations/mine');
 }
 
+export interface MyRegistrationSummary {
+  latest: ExamRegistration | null;
+  hasCompletedExam: boolean;
+  totalRegistrations: number;
+}
+
+export async function getMyRegistrationSummary(params?: { academicYearId?: number }) {
+  return client.get<MyRegistrationSummary>(`/exams/registrations/mine-summary${qs(params)}`);
+}
+
 export async function registerForExam(userEmail: string, scheduleId: number) {
   return client.post<ExamRegistration>('/exams/registrations', {
     userEmail,

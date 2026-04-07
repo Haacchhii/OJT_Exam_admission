@@ -1,5 +1,5 @@
 ﻿import { Link } from 'react-router-dom';
-import { getMyRegistrations, getExamForReview } from '../../api/exams';
+import { getMyRegistrationSummary, getExamForReview } from '../../api/exams';
 import { getMyResult, getSubmittedAnswers } from '../../api/results';
 import { PageHeader, SkeletonPage, ErrorAlert } from '../../components/UI';
 import Icon from '../../components/Icons';
@@ -32,11 +32,11 @@ export default function StudentResults() {
   const { user } = useAuth();
 
   const { data: rawData, loading, error, refetch } = useAsync<ResultsData>(async () => {
-    const [myRegs, myResult] = await Promise.all([
-      getMyRegistrations(),
+    const [regSummary, myResult] = await Promise.all([
+      getMyRegistrationSummary(),
       getMyResult(),
     ]);
-    const myReg = myRegs?.[0] || null;
+    const myReg = regSummary?.latest || null;
     const examId = myReg?.schedule?.examId;
     let exam: Exam | null = null;
     let storedAnswers: SubmittedAnswer[] = [];
