@@ -130,7 +130,7 @@ export default function AuditLog() {
 
       {/* Logs Table */}
       <div className="gk-section-card overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto">
           <table className="gk-table">
             <thead>
               <tr>
@@ -146,9 +146,7 @@ export default function AuditLog() {
             <tbody className="divide-y divide-gray-100">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-gray-500 text-sm">
-                    Loading audit logs...
-                  </td>
+                  <td colSpan={7} className="px-4 py-10" />
                 </tr>
               ) : logs.length === 0 ? (
                 <tr>
@@ -188,6 +186,14 @@ export default function AuditLog() {
               ))}
             </tbody>
           </table>
+          {loading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-white/75 backdrop-blur-[1px] pointer-events-none">
+              <div className="inline-flex items-center gap-2 rounded-full border border-forest-100 bg-white px-3 py-1.5 text-xs font-semibold text-forest-600 shadow-sm">
+                <span className="h-3.5 w-3.5 rounded-full border-2 border-forest-200 border-t-forest-500 animate-spin" />
+                Loading audit logs...
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Pagination */}

@@ -157,7 +157,7 @@ export default function EmployeeDashboard() {
           </select>
         </div>
 
-        <div className="table-scroll">
+        <div className="relative table-scroll">
           <table className="gk-table">
             <thead>
               <tr>
@@ -172,7 +172,7 @@ export default function EmployeeDashboard() {
             </thead>
             <tbody>
               {admissionsLoading ? (
-                <tr><td colSpan={7} className="text-center text-gray-400 py-8">Loading admissions...</td></tr>
+                <tr><td colSpan={7} className="py-8" /></tr>
               ) : admissions.length === 0 ? (
                 <tr><td colSpan={7} className="text-center text-gray-400 py-8">No admissions match your filters.</td></tr>
               ) : admissions.map((a: Admission, i: number) => (
@@ -190,6 +190,14 @@ export default function EmployeeDashboard() {
               ))}
             </tbody>
           </table>
+          {admissionsLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-white/75 backdrop-blur-[1px] pointer-events-none">
+              <div className="inline-flex items-center gap-2 rounded-full border border-forest-100 bg-white px-3 py-1.5 text-xs font-semibold text-forest-600 shadow-sm">
+                <span className="h-3.5 w-3.5 rounded-full border-2 border-forest-200 border-t-forest-500 animate-spin" />
+                Loading admissions...
+              </div>
+            </div>
+          )}
         </div>
         <Pagination currentPage={admissionsPagination.page} totalPages={admissionsPagination.totalPages} onPageChange={setPage} totalItems={admissionsPagination.total} itemsPerPage={PER_PAGE} />
       </div>

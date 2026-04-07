@@ -299,13 +299,9 @@ export default function ScheduleManager() {
             {exams.map(e => <option key={e.id} value={String(e.id)}>{e.title}</option>)}
           </select>
         </div>
-        <div className="space-y-3">
-          {schedLoading ? (
-            <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-8 text-center text-gray-500 text-sm">
-              Loading schedules...
-            </div>
-          ) : (
-            paginatedScheds.map(s => {
+        <div className="relative min-h-[140px]">
+          <div className="space-y-3">
+            {!schedLoading && paginatedScheds.map(s => {
               const exam = exams.find(e => e.id === s.examId);
               const d = new Date(s.scheduledDate + 'T00:00:00');
               const remaining = s.maxSlots - s.slotsTaken;
@@ -339,9 +335,17 @@ export default function ScheduleManager() {
                   </div>
                 </div>
               );
-            })
+            })}
+            {!schedLoading && paginatedScheds.length === 0 && <EmptyState icon="calendar" title="No schedules" text={schedSearch ? `No schedules match "${schedSearch}"${schedExamFilter !== 'all' ? ' for the selected exam' : ''}.` : schedExamFilter !== 'all' ? 'No schedules for the selected exam.' : 'No schedules match your current filters.'} />}
+          </div>
+          {schedLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-white/75 backdrop-blur-[1px]">
+              <div className="inline-flex items-center gap-2 rounded-full border border-forest-100 bg-white px-3 py-1.5 text-xs font-semibold text-forest-600 shadow-sm">
+                <span className="h-3.5 w-3.5 rounded-full border-2 border-forest-200 border-t-forest-500 animate-spin" />
+                Loading schedules...
+              </div>
+            </div>
           )}
-          {!schedLoading && paginatedScheds.length === 0 && <EmptyState icon="calendar" title="No schedules" text={schedSearch ? `No schedules match "${schedSearch}"${schedExamFilter !== 'all' ? ' for the selected exam' : ''}.` : schedExamFilter !== 'all' ? 'No schedules for the selected exam.' : 'No schedules match your current filters.'} />}
         </div>
         <Pagination currentPage={schedSafePage} totalPages={schedTotalPages} onPageChange={setSchedPage} totalItems={schedTotal} itemsPerPage={SCHED_PER_PAGE} />
       </div>

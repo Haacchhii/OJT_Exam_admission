@@ -402,7 +402,7 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
         </div>
         {paginatedReadiness.length > 0 || readinessLoading ? (
           <>
-            <div className="table-scroll">
+            <div className="relative table-scroll">
               <table className="w-full text-sm">
                 <thead><tr className="border-b border-gray-200 text-left text-gray-400 uppercase text-xs bg-gray-50/95 sticky top-0 z-10 backdrop-blur-sm">
                   <th scope="col" className="py-3 px-2">Student</th><th scope="col" className="py-3 px-2">Exam</th><th scope="col" className="py-3 px-2">Registration Status</th><th scope="col" className="py-3 px-2">Score</th><th scope="col" className="py-3 px-2">Result</th>
@@ -410,9 +410,7 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
                 <tbody>
                   {readinessLoading ? (
                     <tr>
-                      <td colSpan={5} className="py-8 px-4 text-center text-gray-500 text-sm">
-                        Loading registrations...
-                      </td>
+                      <td colSpan={5} className="py-8 px-4" />
                     </tr>
                   ) : paginatedReadiness.map(r => (
                     <tr key={r.id} className="border-b border-gray-50">
@@ -425,6 +423,14 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
                   ))}
                 </tbody>
               </table>
+              {readinessLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-white/75 backdrop-blur-[1px] pointer-events-none">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-forest-100 bg-white px-3 py-1.5 text-xs font-semibold text-forest-600 shadow-sm">
+                    <span className="h-3.5 w-3.5 rounded-full border-2 border-forest-200 border-t-forest-500 animate-spin" />
+                    Loading registrations...
+                  </div>
+                </div>
+              )}
             </div>
             <Pagination currentPage={readSafePage} totalPages={readTotalPages} onPageChange={setReadPage} totalItems={readTotal} itemsPerPage={READINESS_PER_PAGE} />
           </>

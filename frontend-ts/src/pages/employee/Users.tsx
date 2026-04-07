@@ -272,7 +272,8 @@ export default function EmployeeUsers() {
       {users.length > 0 || loading ? (
         <>
         <BulkActionBar count={selectedCount} onDelete={handleBulkDelete} onClear={clearSelection} deleting={bulkDeleting} />
-        <div className="gk-section-card table-scroll">
+        <div className="gk-section-card">
+          <div className="relative table-scroll">
           <table className="w-full text-sm">
             <thead><tr className="border-b border-gray-200 text-left text-gray-400 uppercase text-xs bg-gray-50/95 sticky top-0 z-10 backdrop-blur-sm">
               <th scope="col" className="py-3 px-2 w-8"><input type="checkbox" checked={isAllSelected(users)} onChange={() => togglePage(users)} className="accent-forest-500 rounded" aria-label="Select all users" /></th>
@@ -281,9 +282,7 @@ export default function EmployeeUsers() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="py-8 px-4 text-center text-gray-500 text-sm">
-                    Loading users...
-                  </td>
+                  <td colSpan={6} className="py-8 px-4" />
                 </tr>
               ) : users.map(u => (
                 <tr key={u.id} className={`border-b border-gray-50 hover:bg-gray-50/50 ${selected.has(u.id) ? 'bg-gold-50/50' : ''}`}>
@@ -300,6 +299,15 @@ export default function EmployeeUsers() {
               ))}
             </tbody>
           </table>
+          {loading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-white/75 backdrop-blur-[1px] pointer-events-none">
+              <div className="inline-flex items-center gap-2 rounded-full border border-forest-100 bg-white px-3 py-1.5 text-xs font-semibold text-forest-600 shadow-sm">
+                <span className="h-3.5 w-3.5 rounded-full border-2 border-forest-200 border-t-forest-500 animate-spin" />
+                Loading users...
+              </div>
+            </div>
+          )}
+          </div>
           <div className="px-4">
             <Pagination currentPage={pagination.page} totalPages={pagination.totalPages} onPageChange={setPage} totalItems={pagination.total} itemsPerPage={USERS_PER_PAGE} />
           </div>

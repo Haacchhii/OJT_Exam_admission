@@ -389,7 +389,7 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
       <div className="gk-section-card p-4">
         {admissions.length > 0 || loading ? (
           <>
-            <div className="table-scroll">
+            <div className="relative table-scroll">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-200 text-left text-gray-400 uppercase text-xs">
@@ -402,9 +402,7 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={canManage ? 11 : 10} className="py-8 px-4 text-center text-gray-500 text-sm">
-                        Loading applications...
-                      </td>
+                      <td colSpan={canManage ? 11 : 10} className="py-8 px-4" />
                     </tr>
                   ) : admissions.map((a: Admission) => (
                     <tr key={a.id} onClick={() => onShowDetail(a.id)} className={`border-b border-gray-50 hover:bg-gray-50 cursor-pointer ${selected.has(a.id) ? 'bg-gold-50/50' : ''}`}>
@@ -425,6 +423,14 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
                   ))}
                 </tbody>
               </table>
+              {loading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-white/75 backdrop-blur-[1px] pointer-events-none">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-forest-100 bg-white px-3 py-1.5 text-xs font-semibold text-forest-600 shadow-sm">
+                    <span className="h-3.5 w-3.5 rounded-full border-2 border-forest-200 border-t-forest-500 animate-spin" />
+                    Loading applications...
+                  </div>
+                </div>
+              )}
             </div>
             <Pagination currentPage={pagination.page} totalPages={pagination.totalPages} onPageChange={setPage} totalItems={pagination.total} itemsPerPage={PER_PAGE} />
           </>
