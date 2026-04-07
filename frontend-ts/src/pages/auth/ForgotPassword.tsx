@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Link, useNavigate, Navigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { client } from '../../api/client';
 import { showToast } from '../../components/Toast';
@@ -9,17 +9,16 @@ export default function ForgotPassword() {
   const { user } = useAuth();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
+  const [submitted, setSubmitted] = useState(false);
   if (user) return <Navigate to={user.role === 'applicant' ? '/student' : '/employee'} replace />;
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await client.post<{ resetToken: string }>('/auth/forgot-password', { email });
-      sessionStorage.setItem('gk_reset_token', JSON.stringify({ resetToken: res.resetToken, email, expires: Date.now() + 15 * 60 * 1000 }));
-      showToast('You can now reset your password.', 'success');
-      navigate('/reset-password');
+      await client.post('/auth/forgot-password', { email });
+      setSubmitted(true);
+      showToast('If your email exists, a password reset link has been sent.', 'success');
     } catch (err: unknown) {
       showToast((err as Error).message || 'Something went wrong. Please try again.', 'error');
     } finally {
@@ -46,8 +45,14 @@ export default function ForgotPassword() {
               <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="gk-input pl-11" placeholder="your@email.com" />
             </div>
           </div>
-          <button type="submit" disabled={loading} className="gk-btn-primary w-full py-3 text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">{loading ? <><Icon name="spinner" className="w-4 h-4 animate-spin" />Verifying…</> : 'Verify Email'}</button>
+          <button type="submit" disabled={loading} className="gk-btn-primary w-full py-3 text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">{loading ? <><Icon name="spinner" className="w-4 h-4 animate-spin" />Sending…</> : 'Send Reset Link'}</button>
         </form>
+
+        {submitted && (
+          <div className="mt-4 rounded-lg border border-forest-200 bg-forest-50 px-4 py-3 text-xs text-forest-700">
+            Check your email for the reset link. For security, this message appears whether or not the account exists.
+          </div>
+        )}
 
         <p className="text-sm text-gray-500 text-center mt-6">Back to <Link to="/login" className="text-forest-500 hover:text-forest-600 font-semibold transition-colors">Sign in</Link></p>
       </div>

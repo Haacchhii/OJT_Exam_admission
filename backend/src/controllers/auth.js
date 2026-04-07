@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import prisma from '../config/db.js';
 import env from '../config/env.js';
-import { sendWelcomeEmail, sendVerificationEmail } from '../utils/email.js';
+import { sendWelcomeEmail, sendVerificationEmail, sendPasswordResetEmail } from '../utils/email.js';
 import { passwordSchema } from '../utils/schemas.js';
 import { logAudit } from '../utils/auditLog.js';
 import { ROLES, BCRYPT_ROUNDS, RESET_TOKEN_EXPIRY, EMAIL_VERIFY_EXPIRY_MS, getLevelGroup } from '../utils/constants.js';
@@ -23,8 +23,8 @@ function signToken(user) {
   });
 }
 
-function signResetToken(email) {
-  return jwt.sign({ email, purpose: 'password-reset' }, env.JWT_SECRET, { expiresIn: RESET_TOKEN_EXPIRY });
+function signResetToken(user) {
+  return jwt.sign({ sub: user.id, email: user.email, purpose: 'password-reset' }, env.JWT_SECRET, { expiresIn: RESET_TOKEN_EXPIRY });
 }
 
 function verifyResetToken(token) {
@@ -252,19 +252,25 @@ export async function resendVerification(req, res, next) {
 export async function forgotPassword(req, res, next) {
   try {
     const { email } = req.body;
+    const normalizedEmail = String(email || '').trim().toLowerCase();
     if (!email) {
       return res.status(400).json({ error: 'Email is required', code: 'VALIDATION_ERROR' });
     }
     // Always return success to prevent email enumeration
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) {
+    const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+    if (!user || user.deletedAt) {
       // Return same response shape even if user doesn't exist
       return res.json({ ok: true, message: 'If an account exists with this email, a reset link has been sent.' });
     }
-    // Generate a signed JWT reset token (15 min expiry)
-    const resetToken = signResetToken(email);
-    // In production: send this token via email. For now return it directly.
-    res.json({ ok: true, resetToken, message: 'If an account exists with this email, a reset link has been sent.' });
+    // Generate a signed JWT reset token and send by email only.
+    const resetToken = signResetToken(user);
+    await sendPasswordResetEmail({
+      to: user.email,
+      firstName: user.firstName,
+      resetToken,
+      expiresIn: RESET_TOKEN_EXPIRY,
+    });
+    res.json({ ok: true, message: 'If an account exists with this email, a reset link has been sent.' });
   } catch (err) { next(err); }
 }
 
@@ -285,7 +291,11 @@ export async function resetPassword(req, res, next) {
     if (!payload) {
       return res.status(400).json({ error: 'Invalid or expired reset token', code: 'VALIDATION_ERROR' });
     }
-    const user = await prisma.user.findUnique({ where: { email: payload.email } });
+    const userId = Number(payload.sub);
+    if (!userId) {
+      return res.status(400).json({ error: 'Invalid or expired reset token', code: 'VALIDATION_ERROR' });
+    }
+    const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
       return res.status(404).json({ error: 'User not found', code: 'NOT_FOUND' });
     }

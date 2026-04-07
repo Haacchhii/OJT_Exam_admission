@@ -1,5 +1,5 @@
 import { useState, useEffect, type FormEvent } from 'react';
-import { Link, useNavigate, Navigate } from 'react-router-dom';
+import { Link, useNavigate, Navigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { client } from '../../api/client';
 import { showToast } from '../../components/Toast';
@@ -12,24 +12,18 @@ export default function ResetPassword() {
   const [confirm, setConfirm] = useState('');
   const [resetToken, setResetToken] = useState('');
   const [loading, setLoading] = useState(false);
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
   useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem('gk_reset_token');
-      if (!raw) { navigate('/forgot-password'); return; }
-      const token = JSON.parse(raw);
-      if (!token.email || !token.expires || Date.now() > token.expires) {
-        sessionStorage.removeItem('gk_reset_token');
-        showToast('Reset link has expired. Please try again.', 'error');
-        navigate('/forgot-password');
-        return;
-      }
-      if (token.resetToken) setResetToken(token.resetToken);
-    } catch {
+    const token = searchParams.get('token');
+    if (!token) {
+      showToast('Reset link is missing or invalid. Please request a new one.', 'error');
       navigate('/forgot-password');
+      return;
     }
-  }, [navigate]);
+    setResetToken(token);
+  }, [navigate, searchParams]);
 
   if (authUser) return <Navigate to={authUser.role === 'applicant' ? '/student' : '/employee'} replace />;
 
@@ -43,7 +37,6 @@ export default function ResetPassword() {
     setLoading(true);
     try {
       await client.post('/auth/reset-password', { resetToken, password: pw });
-      sessionStorage.removeItem('gk_reset_token');
       showToast('Password updated successfully!', 'success');
       navigate('/login');
     } catch (err: unknown) {

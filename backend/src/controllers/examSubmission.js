@@ -28,6 +28,9 @@ export async function submitExam(req, res, next) {
     if (reg.status === 'done') {
       return res.status(400).json({ error: 'Exam already submitted', code: 'VALIDATION_ERROR' });
     }
+    if (reg.status !== 'started') {
+      return res.status(400).json({ error: 'Exam must be started before submission', code: 'VALIDATION_ERROR' });
+    }
 
     // Get exam questions with correct answers from DB (NEVER from client)
     const exam = await prisma.exam.findUnique({

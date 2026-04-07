@@ -202,7 +202,20 @@ export async function getExam(req, res, next) {
 // GET /api/exams/:id/student  (safe — no isCorrect)
 export async function getExamForStudent(req, res, next) {
   try {
-    const exam = await prisma.exam.findUnique({ where: { id: Number(req.params.id) }, include: examDetailInclude });
+    const examId = Number(req.params.id);
+    const activeRegistration = await prisma.examRegistration.findFirst({
+      where: {
+        userEmail: req.user.email,
+        status: 'started',
+        schedule: { examId },
+      },
+      select: { id: true },
+    });
+    if (!activeRegistration) {
+      return res.status(403).json({ error: 'Start your scheduled exam before viewing questions', code: 'FORBIDDEN' });
+    }
+
+    const exam = await prisma.exam.findUnique({ where: { id: examId }, include: examDetailInclude });
     if (!exam || exam.deletedAt) return res.status(404).json({ error: 'Exam not found', code: 'NOT_FOUND' });
     res.json(stripAnswers(shapeExam(exam)));
   } catch (err) { next(err); }

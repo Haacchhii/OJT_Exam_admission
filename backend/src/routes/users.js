@@ -12,9 +12,9 @@ const router = Router();
 // All user routes require auth
 router.use(authenticate);
 
-router.get('/',              authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), validateQuery(usersQuerySchema), ctrl.getUsers);
-router.get('/stats',         authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), ctrl.getUserStats);
-router.get('/by-email/:email', authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), ctrl.getUserByEmail);
+router.get('/',              authorize(ROLES.ADMIN, ROLES.REGISTRAR), validateQuery(usersQuerySchema), ctrl.getUsers);
+router.get('/stats',         authorize(ROLES.ADMIN, ROLES.REGISTRAR), ctrl.getUserStats);
+router.get('/by-email/:email', authorize(ROLES.ADMIN, ROLES.REGISTRAR), ctrl.getUserByEmail);
 router.post('/bulk-delete',  authorize(ROLES.ADMIN), validate(bulkDeleteSchema), ctrl.bulkDeleteUsers);
 router.get('/:id',          authorize(ROLES.ADMIN), ctrl.getUser);
 router.post('/',            authorize(ROLES.ADMIN), writeLimiter, validate(createUserSchema), ctrl.createUser);

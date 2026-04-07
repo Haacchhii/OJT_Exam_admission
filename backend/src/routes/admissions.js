@@ -12,9 +12,6 @@ import { ROLES } from '../utils/constants.js';
 
 const router = Router();
 
-// Document preview handles its own auth (Authorization header)
-router.get('/:id/documents/:docId/preview', previewDocument);
-
 router.use(authenticate);
 
 // Student scoped
@@ -27,12 +24,15 @@ router.get('/reports-summary', authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEA
 router.get('/track/:trackingId', ctrl.trackApplication);
 
 // CRUD
-router.get('/',      authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), validateQuery(admissionsQuerySchema), ctrl.getAdmissions);
+router.get('/',      authorize(ROLES.ADMIN, ROLES.REGISTRAR), validateQuery(admissionsQuerySchema), ctrl.getAdmissions);
 router.get('/:id',   authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.APPLICANT), ctrl.getAdmission);  // ownership checked in controller
 router.post('/',     authorize(ROLES.APPLICANT), writeLimiter, validate(createAdmissionSchema), ctrl.createAdmission);
 
 // Documents upload — ownership checked in controller
 router.post('/:id/documents', authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.APPLICANT), upload.array('documents', 10), verifyMime, ctrl.uploadDocuments);
+
+// Document preview — ownership checked in controller
+router.get('/:id/documents/:docId/preview', previewDocument);
 
 // Document download — ownership checked in controller
 router.get('/:id/documents/:docId/download', ctrl.downloadDocument);

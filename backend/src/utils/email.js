@@ -138,6 +138,27 @@ export function sendVerificationEmail({ to, firstName, verifyToken }) {
   });
 }
 
+// ─── 0.5 Password reset request ────────────────────────────────────────────
+export function sendPasswordResetEmail({ to, firstName, resetToken, expiresIn }) {
+  const resetUrl = `${appUrl}/#/reset-password?token=${encodeURIComponent(resetToken)}`;
+  return sendEmail({
+    to,
+    subject: `Reset Your Password — ${SCHOOL_NAME}`,
+    html: wrap(`
+      <h2 class="title">Reset Your Password 🔐</h2>
+      <p class="subtitle">A password reset request was received for your account.</p>
+      <p>Hi ${firstName}, click the button below to set a new password:</p>
+      <a class="btn" href="${resetUrl}">Reset Password</a>
+      <div class="highlight-box warning">
+        <strong>Security Notice</strong>
+        <span>This link expires in <b>${expiresIn}</b>. If you did not request this, you can ignore this email and your password will stay unchanged.</span>
+      </div>
+      <hr class="divider" />
+      <p style="font-size:12px;color:#9ca3af;">If the button doesn't work, copy and paste this link into your browser:<br/><a href="${resetUrl}" style="color:#1a3a2a;word-break:break-all;">${resetUrl}</a></p>
+    `),
+  });
+}
+
 // ─── 1. Welcome — on registration ─────────────────────────────────────────────
 export function sendWelcomeEmail({ to, firstName }) {
   return sendEmail({

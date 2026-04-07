@@ -2,7 +2,6 @@ import prisma from '../config/db.js';
 import path from 'path';
 import fs from 'fs/promises';
 import { existsSync } from 'fs';
-import jwt from 'jsonwebtoken';
 import env from '../config/env.js';
 import { ROLES, DOC_CACHE_MAX_AGE, MAX_KV_PAIRS } from '../utils/constants.js';
 
@@ -36,27 +35,6 @@ const EXT_MIME = {
   '.doc':  'application/msword',
   '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 };
-
-// ── Auth helper for preview (Authorization header only) ──
-async function authenticatePreview(req) {
-  // Try Authorization header first
-  let token = null;
-  const header = req.headers.authorization;
-  if (header?.startsWith('Bearer ')) {
-    token = header.split(' ')[1];
-  }
-  if (!token) return null;
-
-  try {
-    const payload = jwt.verify(token, env.JWT_SECRET);
-    const user = await prisma.user.findUnique({ where: { id: payload.sub } });
-    if (!user || user.status !== 'Active') return null;
-    const { passwordHash, ...safeUser } = user;
-    return safeUser;
-  } catch {
-    return null;
-  }
-}
 
 function generateJobId(docId) {
   return `extract_${docId}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -177,11 +155,10 @@ async function verifyAccess(user, admissionId) {
 
 // GET /api/admissions/:id/documents/:docId/preview
 // Serves the file inline so the browser can render it (PDF, images)
-// Supports auth via Authorization header
+// Requires shared authenticate middleware and ownership checks.
 export async function previewDocument(req, res, next) {
   try {
-    // Authenticate via header or query param
-    const user = req.user || await authenticatePreview(req);
+    const user = req.user;
     if (!user) return res.status(401).json({ error: 'Authentication required' });
 
     const admissionId = Number(req.params.id);

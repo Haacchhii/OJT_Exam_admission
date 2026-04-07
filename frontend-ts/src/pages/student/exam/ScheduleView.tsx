@@ -38,6 +38,13 @@ function isWithinPeriod(today: string, start: string | null, end: string | null)
   return true;
 }
 
+function formatDisplayDate(value: string | null | undefined): string {
+  if (!value) return 'Open';
+  const parsed = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T00:00:00`) : new Date(String(value));
+  if (Number.isNaN(parsed.getTime())) return String(value);
+  return parsed.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+}
+
 export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, user }: ScheduleViewProps) {
   const confirm = useConfirm();
   const [bookingSlotId, setBookingSlotId] = useState<number | null>(null);
@@ -56,6 +63,8 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, user
   const todayIso = toIsoDay(new Date()) || '';
   const semStart = toIsoDay(activeSemester?.startDate || null);
   const semEnd = toIsoDay(activeSemester?.endDate || null);
+  const semStartText = formatDisplayDate(semStart);
+  const semEndText = formatDisplayDate(semEnd);
   const isExamPeriodOpen = !!activeSemester && isWithinPeriod(todayIso, semStart, semEnd);
 
   if (myReg?.status === 'done') {
@@ -153,7 +162,7 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, user
       {activePeriod && (
         <div className={`mb-4 rounded-lg border px-4 py-3 text-sm ${isExamPeriodOpen ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
           <p className="font-semibold">Exam Period: {activePeriod.year} \u2014 {activeSemester?.name || 'N/A'}</p>
-          <p className="text-xs mt-1">Window: {semStart || 'Open'} to {semEnd || 'Open'}</p>
+          <p className="text-xs mt-1">Window: {semStartText} to {semEndText}</p>
         </div>
       )}
       <div className="gk-section-card p-4 mb-6">
@@ -196,12 +205,12 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, user
                     <p className="text-gray-500 text-sm">{formatTime(s.startTime)} - {formatTime(s.endTime)} | {remaining} slots left</p>
                     {(s.registrationOpenDate || s.registrationCloseDate) && (
                       <p className="text-gray-500 text-xs">
-                        Registration window: {s.registrationOpenDate || 'Anytime'} to {s.registrationCloseDate || 'Until exam date'}
+                        Registration window: {formatDisplayDate(s.registrationOpenDate || null)} to {formatDisplayDate(s.registrationCloseDate || null)}
                       </p>
                     )}
                     {(s.visibilityStartDate || s.visibilityEndDate) && (
                       <p className="text-gray-500 text-xs">
-                        Visible in portal: {s.visibilityStartDate || 'Now'} to {s.visibilityEndDate || 'No end date'}
+                        Visible in portal: {formatDisplayDate(s.visibilityStartDate || null)} to {formatDisplayDate(s.visibilityEndDate || null)}
                       </p>
                     )}
                     {(exam as any)?.gradeLevel && <span className="inline-block mt-1 text-xs bg-gold-100 text-gold-700 px-2 py-0.5 rounded-full font-medium">{(exam as any).gradeLevel}</span>}
@@ -279,7 +288,7 @@ function ScheduledView({ myReg, onLobby, onCancel, isCanceling }: ScheduledViewP
         )}
         <div className="grid grid-cols-2 gap-3 max-w-sm mx-auto text-left mb-6">
           <span className="text-xs text-gray-400">Exam</span><span className="text-sm font-medium">{exam?.title || 'N/A'}</span>
-          <span className="text-xs text-gray-400">Date</span><span className="text-sm font-medium">{schedule?.scheduledDate || 'N/A'}</span>
+          <span className="text-xs text-gray-400">Date</span><span className="text-sm font-medium">{formatDisplayDate(schedule?.scheduledDate || null)}</span>
           <span className="text-xs text-gray-400">Time</span><span className="text-sm font-medium">{schedule ? `${formatTime(schedule.startTime)} - ${formatTime(schedule.endTime)}` : 'N/A'}</span>
           <span className="text-xs text-gray-400">Duration</span><span className="text-sm font-medium">{exam ? `${exam.durationMinutes} minutes` : 'N/A'}</span>
         </div>
@@ -294,7 +303,7 @@ function ScheduledView({ myReg, onLobby, onCancel, isCanceling }: ScheduledViewP
         {canStart && exam ? (
           <button onClick={() => onLobby(exam)} className="bg-gradient-to-r from-forest-500 to-forest-400 text-white px-8 py-3 rounded-lg font-semibold hover:from-gold-500 hover:to-gold-600 shadow-md">Take Exam Now</button>
         ) : (
-          <p className="text-gray-400 text-sm flex items-center justify-center gap-1.5"><Icon name="clock" className="w-4 h-4" /> Exam will open on <strong>{schedule?.scheduledDate}</strong> at <strong>{formatTime(schedule?.startTime)}</strong></p>
+          <p className="text-gray-400 text-sm flex items-center justify-center gap-1.5"><Icon name="clock" className="w-4 h-4" /> Exam will open on <strong>{formatDisplayDate(schedule?.scheduledDate || null)}</strong> at <strong>{formatTime(schedule?.startTime)}</strong></p>
         )}
         {myReg.status === 'scheduled' && (
           <div className="mt-4">

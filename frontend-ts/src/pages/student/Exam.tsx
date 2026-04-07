@@ -96,7 +96,7 @@ export default function StudentExam() {
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-left mb-4">
             <h4 className="font-bold text-red-600 mb-2 flex items-center gap-2"><Icon name="exclamation" className="w-5 h-5" /> Critical Rules - Read Before Starting</h4>
             <ul className="text-red-700 text-sm space-y-1.5 list-disc pl-5">
-              <li><strong>After 3 tab switches, the exam will be automatically submitted.</strong> Do not switch tabs or apps.</li>
+              <li><strong>After 5 tab switches, the exam will be automatically submitted.</strong> Do not switch tabs or apps.</li>
               <li><strong>The exam will auto-submit when the timer reaches zero.</strong> Monitor your time.</li>
               <li>Right-click and copy/paste are disabled during the exam.</li>
             </ul>

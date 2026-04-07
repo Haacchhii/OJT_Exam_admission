@@ -927,8 +927,13 @@ export async function reviewDocument(req, res, next) {
       },
     });
 
-    await logAudit(req.user.id, 'document.review', 'AdmissionDocument', docId, {
-      admissionId, reviewStatus, reviewNote,
+    logAudit({
+      userId: req.user.id,
+      action: 'document.review',
+      entity: 'AdmissionDocument',
+      entityId: docId,
+      details: { admissionId, reviewStatus, reviewNote },
+      ipAddress: req.ip,
     });
 
     res.json({ id: updated.id, reviewStatus: updated.reviewStatus, reviewNote: updated.reviewNote, reviewedAt: updated.reviewedAt });

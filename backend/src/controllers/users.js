@@ -149,6 +149,9 @@ export async function updateUser(req, res, next) {
 export async function deleteUser(req, res, next) {
   try {
     const id = Number(req.params.id);
+    if (id === req.user.id) {
+      return res.status(400).json({ error: 'You cannot delete your own account.', code: 'VALIDATION_ERROR' });
+    }
     const user = await prisma.user.findUnique({ where: { id } });
     if (!user || user.deletedAt) return res.status(404).json({ error: 'User not found', code: 'NOT_FOUND' });
 
