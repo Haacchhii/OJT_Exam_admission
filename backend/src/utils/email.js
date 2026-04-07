@@ -41,7 +41,7 @@ const transporter = createTransporter();
 export async function sendEmail({ to, subject, html }) {
   if (!transporter) {
     if (env.NODE_ENV !== 'production') {
-      console.log(`\n[EMAIL — not configured, printing to console]\nTo: ${to}\nSubject: ${subject}\n`);
+      console.log(`\n[EMAIL — not configured, printing preview to console]\nTo: ${to}\nSubject: ${subject}\nHTML:\n${html}\n`);
     }
     return;
   }
