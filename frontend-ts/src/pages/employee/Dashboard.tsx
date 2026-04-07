@@ -54,7 +54,7 @@ export default function EmployeeDashboard() {
     if (search.trim()) params.search = search.trim();
 
     return getAdmissionsPage(params);
-  }, [statusFilter, levelGroupFilter, gradeFilter, search, page]);
+  }, [statusFilter, levelGroupFilter, gradeFilter, search, page], 0, { setLoadingOnReload: true });
 
 
   useEffect(() => {
@@ -171,7 +171,11 @@ export default function EmployeeDashboard() {
               </tr>
             </thead>
             <tbody>
-              {admissions.map((a: Admission, i: number) => (
+              {admissionsLoading ? (
+                <tr><td colSpan={7} className="text-center text-gray-400 py-8">Loading admissions...</td></tr>
+              ) : admissions.length === 0 ? (
+                <tr><td colSpan={7} className="text-center text-gray-400 py-8">No admissions match your filters.</td></tr>
+              ) : admissions.map((a: Admission, i: number) => (
                 <tr key={a.id}>
                   <td className="text-gray-400">{(admissionsPagination.page - 1) * PER_PAGE + i + 1}</td>
                   <td className="font-medium text-gray-800">{formatPersonName(a)}</td>
@@ -184,8 +188,6 @@ export default function EmployeeDashboard() {
                   <td><Link to={`/employee/admissions?id=${a.id}`} className="text-forest-500 hover:text-forest-600 text-xs font-semibold transition-colors">View</Link></td>
                 </tr>
               ))}
-              {admissionsLoading && admissions.length === 0 && <tr><td colSpan={7} className="text-center text-gray-400 py-8">Loading admissions...</td></tr>}
-              {!admissionsLoading && admissions.length === 0 && <tr><td colSpan={7} className="text-center text-gray-400 py-8">No admissions match your filters.</td></tr>}
             </tbody>
           </table>
         </div>

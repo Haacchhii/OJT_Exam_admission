@@ -98,7 +98,7 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
       getAdmissionsPage(admissionParams),
     ]);
     return { stats, admissionsPage };
-  }, [filter, levelGroupFilter, gradeFilter, yearFilter, semesterFilter, sortBy, search, staleOnly, page]);
+  }, [filter, levelGroupFilter, gradeFilter, yearFilter, semesterFilter, sortBy, search, staleOnly, page], 0, { setLoadingOnReload: true });
 
   const { data: stalePreview } = useAsync(async () => {
     if (!canManage) {
@@ -387,7 +387,7 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
       ) : null}
 
       <div className="gk-section-card p-4">
-        {admissions.length > 0 ? (
+        {admissions.length > 0 || loading ? (
           <>
             <div className="table-scroll">
               <table className="w-full text-sm">
@@ -400,7 +400,13 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
                   </tr>
                 </thead>
                 <tbody>
-                  {admissions.map((a: Admission) => (
+                  {loading ? (
+                    <tr>
+                      <td colSpan={canManage ? 11 : 10} className="py-8 px-4 text-center text-gray-500 text-sm">
+                        Loading applications...
+                      </td>
+                    </tr>
+                  ) : admissions.map((a: Admission) => (
                     <tr key={a.id} onClick={() => onShowDetail(a.id)} className={`border-b border-gray-50 hover:bg-gray-50 cursor-pointer ${selected.has(a.id) ? 'bg-gold-50/50' : ''}`}>
                       {canManage && <td className="py-3 px-2" onClick={e => e.stopPropagation()}><input type="checkbox" checked={selected.has(a.id)} onChange={() => toggleSelect(a.id)} className="accent-forest-500 rounded" /></td>}
                       <td className="py-3 px-2 text-gray-400">{a.id}</td>

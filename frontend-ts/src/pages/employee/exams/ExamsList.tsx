@@ -53,14 +53,14 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
     return { exams: asArray<Exam>(rawExm), schedules: asArray<ExamSchedule>(rawSched), regs: asArray<ExamRegistration>(rawRegs) };
   });
 
-  const { data: readinessPage } = useAsync(async () => {
+  const { data: readinessPage, loading: readinessLoading } = useAsync(async () => {
     return getExamReadinessPage({
       search: readSearch.trim() || undefined,
       status: readStatusFilter as 'all' | 'pending' | 'done' | 'passed' | 'failed',
       page: readPage,
       limit: READINESS_PER_PAGE,
     });
-  }, [readSearch, readStatusFilter, readPage]);
+  }, [readSearch, readStatusFilter, readPage], 0, { setLoadingOnReload: true });
 
   // Fetch full exam (with questions) when viewing detail
   const { data: fullExam, loading: examDetailLoading } = useAsync<Exam | null>(
@@ -400,7 +400,7 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
             <option value="failed">Failed</option>
           </select>
         </div>
-        {paginatedReadiness.length > 0 ? (
+        {paginatedReadiness.length > 0 || readinessLoading ? (
           <>
             <div className="table-scroll">
               <table className="w-full text-sm">
@@ -408,7 +408,13 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
                   <th scope="col" className="py-3 px-2">Student</th><th scope="col" className="py-3 px-2">Exam</th><th scope="col" className="py-3 px-2">Registration Status</th><th scope="col" className="py-3 px-2">Score</th><th scope="col" className="py-3 px-2">Result</th>
                 </tr></thead>
                 <tbody>
-                  {paginatedReadiness.map(r => (
+                  {readinessLoading ? (
+                    <tr>
+                      <td colSpan={5} className="py-8 px-4 text-center text-gray-500 text-sm">
+                        Loading registrations...
+                      </td>
+                    </tr>
+                  ) : paginatedReadiness.map(r => (
                     <tr key={r.id} className="border-b border-gray-50">
                       <td className="py-3 px-2 font-medium">{r.user ? formatPersonName(r.user) : r.userEmail}</td>
                       <td className="py-3 px-2">{r.schedule?.exam?.title || 'N/A'}</td>

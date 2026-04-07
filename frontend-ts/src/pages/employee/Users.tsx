@@ -53,7 +53,7 @@ export default function EmployeeUsers() {
       page,
       limit: USERS_PER_PAGE,
     });
-  }, [search, roleFilter, statusFilter, page]);
+  }, [search, roleFilter, statusFilter, page], 0, { setLoadingOnReload: true });
 
   const { data: stats, refetch: refetchStats } = useAsync<UserStats>(() => getUserStats());
 
@@ -269,7 +269,7 @@ export default function EmployeeUsers() {
         </select>
       </div>
 
-      {users.length > 0 ? (
+      {users.length > 0 || loading ? (
         <>
         <BulkActionBar count={selectedCount} onDelete={handleBulkDelete} onClear={clearSelection} deleting={bulkDeleting} />
         <div className="gk-section-card table-scroll">
@@ -279,7 +279,13 @@ export default function EmployeeUsers() {
               <th scope="col" className="py-3 px-4">Name</th><th scope="col" className="py-3 px-4">Email</th><th scope="col" className="py-3 px-4">Role</th><th scope="col" className="py-3 px-4">Status</th><th scope="col" className="py-3 px-4 text-right">Actions</th>
             </tr></thead>
             <tbody>
-              {users.map(u => (
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="py-8 px-4 text-center text-gray-500 text-sm">
+                    Loading users...
+                  </td>
+                </tr>
+              ) : users.map(u => (
                 <tr key={u.id} className={`border-b border-gray-50 hover:bg-gray-50/50 ${selected.has(u.id) ? 'bg-gold-50/50' : ''}`}>
                   <td className="py-3 px-2"><input type="checkbox" checked={selected.has(u.id)} onChange={() => toggle(u.id)} className="accent-forest-500 rounded" aria-label={`Select ${formatPersonName(u)}`} /></td>
                   <td className="py-3 px-4 font-medium text-forest-500">{formatPersonName(u)}</td>

@@ -84,7 +84,7 @@ export default function ScheduleManager() {
       exams: asArray<Exam>(rawExm),
       schedulesPage,
     };
-  }, [schedExamFilter, schedSearch, schedPage]);
+  }, [schedExamFilter, schedSearch, schedPage], 0, { setLoadingOnReload: true });
 
   const exams: Exam[] = schedData?.exams || [];
   const schedulesPage = schedData?.schedulesPage || { data: [] as ExamSchedule[], pagination: { page: 1, limit: SCHED_PER_PAGE, total: 0, totalPages: 1 } };
@@ -217,7 +217,7 @@ export default function ScheduleManager() {
     setSelectedExamIds([]);
   };
 
-  if (schedLoading) return <SkeletonPage />;
+  if (schedLoading && !schedData) return <SkeletonPage />;
   if (schedError) return <div className="gk-section-card p-8 text-center"><p className="text-red-600 font-medium">Failed to load schedules.</p><button onClick={schedRefetch} className="mt-2 text-forest-500 underline text-sm">Retry</button></div>;
 
   return (
@@ -300,42 +300,48 @@ export default function ScheduleManager() {
           </select>
         </div>
         <div className="space-y-3">
-          {paginatedScheds.map(s => {
-            const exam = exams.find(e => e.id === s.examId);
-            const d = new Date(s.scheduledDate + 'T00:00:00');
-            const remaining = s.maxSlots - s.slotsTaken;
-            return (
-              <div key={s.id} className="flex items-center gap-4 bg-gray-50 rounded-lg p-4">
-                <div className="text-center bg-forest-500 text-white rounded-lg px-3 py-2 min-w-[60px]">
-                  <div className="text-xs uppercase">{d.toLocaleString('en-US', { month: 'short' })}</div>
-                  <div className="text-xl font-bold">{d.getDate()}</div>
-                </div>
-                <div className="flex-1">
-                  <h4 className="font-semibold text-forest-500">{exam?.title || 'Unknown Exam'}</h4>
-                  <p className="text-gray-500 text-sm">{formatTime(s.startTime)} - {formatTime(s.endTime)}</p>
-                  {(s.registrationOpenDate || s.registrationCloseDate) && (
-                    <p className="text-gray-500 text-xs">
-                      Registration window: {s.registrationOpenDate || 'Anytime'} to {s.registrationCloseDate || 'Until exam date'}
-                    </p>
-                  )}
-                  {(s.visibilityStartDate || s.visibilityEndDate) && (
-                    <p className="text-gray-500 text-xs">
-                      Visible to students: {s.visibilityStartDate || 'Now'} to {s.visibilityEndDate || 'No end date'}
-                    </p>
-                  )}
-                  <div className="flex gap-2 mt-1">
-                    <Badge className="gk-badge gk-badge-info">{s.slotsTaken} / {s.maxSlots} booked</Badge>
-                    <Badge className={remaining > 0 ? 'gk-badge gk-badge-active' : 'gk-badge gk-badge-danger'}>{remaining > 0 ? `${remaining} slots left` : 'Full'}</Badge>
+          {schedLoading ? (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-8 text-center text-gray-500 text-sm">
+              Loading schedules...
+            </div>
+          ) : (
+            paginatedScheds.map(s => {
+              const exam = exams.find(e => e.id === s.examId);
+              const d = new Date(s.scheduledDate + 'T00:00:00');
+              const remaining = s.maxSlots - s.slotsTaken;
+              return (
+                <div key={s.id} className="flex items-center gap-4 bg-gray-50 rounded-lg p-4">
+                  <div className="text-center bg-forest-500 text-white rounded-lg px-3 py-2 min-w-[60px]">
+                    <div className="text-xs uppercase">{d.toLocaleString('en-US', { month: 'short' })}</div>
+                    <div className="text-xl font-bold">{d.getDate()}</div>
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-forest-500">{exam?.title || 'Unknown Exam'}</h4>
+                    <p className="text-gray-500 text-sm">{formatTime(s.startTime)} - {formatTime(s.endTime)}</p>
+                    {(s.registrationOpenDate || s.registrationCloseDate) && (
+                      <p className="text-gray-500 text-xs">
+                        Registration window: {s.registrationOpenDate || 'Anytime'} to {s.registrationCloseDate || 'Until exam date'}
+                      </p>
+                    )}
+                    {(s.visibilityStartDate || s.visibilityEndDate) && (
+                      <p className="text-gray-500 text-xs">
+                        Visible to students: {s.visibilityStartDate || 'Now'} to {s.visibilityEndDate || 'No end date'}
+                      </p>
+                    )}
+                    <div className="flex gap-2 mt-1">
+                      <Badge className="gk-badge gk-badge-info">{s.slotsTaken} / {s.maxSlots} booked</Badge>
+                      <Badge className={remaining > 0 ? 'gk-badge gk-badge-active' : 'gk-badge gk-badge-danger'}>{remaining > 0 ? `${remaining} slots left` : 'Full'}</Badge>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => editSched(s)} className="text-forest-500 hover:underline text-xs inline-flex items-center gap-0.5"><Icon name="edit" className="w-3 h-3" /> Edit</button>
+                    <button onClick={async () => { if (await confirm({ title: 'Delete Schedule', message: 'Are you sure you want to delete this schedule?', confirmLabel: 'Delete', variant: 'danger' })) { try { await deleteExamSchedule(s.id); schedRefetch(); } catch { showToast('Failed to delete schedule.', 'error'); } } }} className="text-red-500 hover:underline text-xs inline-flex items-center gap-0.5"><Icon name="trash" className="w-3 h-3" /> Delete</button>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <button onClick={() => editSched(s)} className="text-forest-500 hover:underline text-xs inline-flex items-center gap-0.5"><Icon name="edit" className="w-3 h-3" /> Edit</button>
-                  <button onClick={async () => { if (await confirm({ title: 'Delete Schedule', message: 'Are you sure you want to delete this schedule?', confirmLabel: 'Delete', variant: 'danger' })) { try { await deleteExamSchedule(s.id); schedRefetch(); } catch { showToast('Failed to delete schedule.', 'error'); } } }} className="text-red-500 hover:underline text-xs inline-flex items-center gap-0.5"><Icon name="trash" className="w-3 h-3" /> Delete</button>
-                </div>
-              </div>
-            );
-          })}
-          {paginatedScheds.length === 0 && <EmptyState icon="calendar" title="No schedules" text={schedSearch ? `No schedules match "${schedSearch}"${schedExamFilter !== 'all' ? ' for the selected exam' : ''}.` : schedExamFilter !== 'all' ? 'No schedules for the selected exam.' : 'No schedules match your current filters.'} />}
+              );
+            })
+          )}
+          {!schedLoading && paginatedScheds.length === 0 && <EmptyState icon="calendar" title="No schedules" text={schedSearch ? `No schedules match "${schedSearch}"${schedExamFilter !== 'all' ? ' for the selected exam' : ''}.` : schedExamFilter !== 'all' ? 'No schedules for the selected exam.' : 'No schedules match your current filters.'} />}
         </div>
         <Pagination currentPage={schedSafePage} totalPages={schedTotalPages} onPageChange={setSchedPage} totalItems={schedTotal} itemsPerPage={SCHED_PER_PAGE} />
       </div>

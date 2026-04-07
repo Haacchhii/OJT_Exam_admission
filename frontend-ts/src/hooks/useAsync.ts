@@ -11,6 +11,7 @@ interface UseAsyncOptions {
   autoRefreshOnDataChange?: boolean;
   autoRefreshOnFocus?: boolean;
   resourcePrefixes?: string[];
+  setLoadingOnReload?: boolean;
 }
 
 interface DataChangedDetail {
@@ -38,6 +39,7 @@ export function useAsync<T>(
     autoRefreshOnDataChange = false,
     autoRefreshOnFocus = false,
     resourcePrefixes,
+    setLoadingOnReload = false,
   } = options;
 
   const fnRef = useRef(asyncFn);
@@ -59,7 +61,7 @@ export function useAsync<T>(
   useEffect(() => {
     let cancelled = false;
     
-    if (isFirstLoad.current || !data) {
+    if (setLoadingOnReload || isFirstLoad.current || !data) {
       setLoading(true);
     }
     setError(null);

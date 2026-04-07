@@ -67,7 +67,12 @@ export default function AuditLog() {
     return auditApi.list(params as any);
   }, [page, search, entity, dateFrom, dateTo]);
 
-  const { data, loading, error, refetch } = useAsync<PaginatedAuditResponse>(fetchLogs, [fetchLogs]);
+  const { data, loading, error, refetch } = useAsync<PaginatedAuditResponse>(
+    fetchLogs,
+    [fetchLogs],
+    0,
+    { setLoadingOnReload: true }
+  );
 
   const logs = data?.data || [];
   const totalPages = data?.pagination?.totalPages || data?.totalPages || 1;
@@ -139,7 +144,13 @@ export default function AuditLog() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {logs.length === 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-10 text-center text-gray-500 text-sm">
+                    Loading audit logs...
+                  </td>
+                </tr>
+              ) : logs.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
                     <Icon name="shieldCheck" className="w-10 h-10 mx-auto mb-3 text-gray-600" />
