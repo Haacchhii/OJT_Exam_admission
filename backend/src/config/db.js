@@ -1,12 +1,12 @@
 import { PrismaClient } from '../../generated/prisma-client/index.js';
 import env from './env.js';
+import { observeDbQuery } from '../utils/perfStore.js';
+import { getRequestContext } from '../utils/requestContext.js';
 
 const logLevel = [
   { emit: 'stdout', level: 'error' },
   { emit: 'stdout', level: 'warn' },
-  ...(env.NODE_ENV === 'production' && !env.PRISMA_LOG_QUERIES
-    ? []
-    : [{ emit: 'event', level: 'query' }]),
+  { emit: 'event', level: 'query' },
 ];
 
 const isServerless = Boolean(process.env.VERCEL);
@@ -27,16 +27,25 @@ const prisma = new PrismaClient({
   },
 });
 
-if (env.NODE_ENV !== 'production' || env.PRISMA_LOG_QUERIES) {
-  prisma.$on('query', (event) => {
+prisma.$on('query', (event) => {
+  const context = getRequestContext();
+  observeDbQuery({
+    method: context?.method,
+    routePath: context?.path,
+    target: event.target,
+    durationMs: event.duration,
+    query: event.query,
+  });
+
+  if (env.NODE_ENV !== 'production' || env.PRISMA_LOG_QUERIES) {
     if (event.duration < env.DB_SLOW_QUERY_MS) return;
-    const requestPath = globalThis.__gkRequestPath || 'unknown';
+    const requestPath = context?.path || 'unknown';
     const compactQuery = String(event.query || '').replace(/\s+/g, ' ').trim().slice(0, 220);
     console.warn(
       `[db-slow] ${event.duration}ms route=${requestPath} target=${event.target || 'db'} query=${compactQuery}`
     );
-  });
-}
+  }
+});
 
 /** Append connection pool params to DATABASE_URL if not already present */
 function appendPoolParams(url, size, timeout) {

@@ -2,6 +2,8 @@ name: Performance Smoke
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 */4 * * *'
   pull_request:
     paths:
       - backend/src/**
@@ -31,6 +33,8 @@ jobs:
         run: npm ci
 
       - name: Run Perf Smoke Checks
+        id: smoke
+        continue-on-error: true
         working-directory: backend
         env:
           PERF_SMOKE_BASE_URL: ${{ secrets.PERF_SMOKE_BASE_URL }}
@@ -46,3 +50,68 @@ jobs:
           PERF_SMOKE_THRESHOLD_EMPLOYEE_RESULTS_SUMMARY: ${{ vars.PERF_SMOKE_THRESHOLD_EMPLOYEE_RESULTS_SUMMARY }}
           PERF_SMOKE_THRESHOLD_EXAMS_LIST: ${{ vars.PERF_SMOKE_THRESHOLD_EXAMS_LIST }}
         run: npm run perf:smoke
+
+      - name: Check Perf SLO Summary
+        id: slo
+        continue-on-error: true
+        working-directory: backend
+        env:
+          PERF_SMOKE_BASE_URL: ${{ secrets.PERF_SMOKE_BASE_URL }}
+          PERF_MONITOR_KEY: ${{ secrets.PERF_MONITOR_KEY }}
+          PERF_SLO_REQUIRED: ${{ vars.PERF_SLO_REQUIRED }}
+          PERF_SLO_WINDOW_MINUTES: ${{ vars.PERF_SLO_WINDOW_MINUTES }}
+        run: |
+          node <<'NODE'
+          (async () => {
+            const baseUrl = String(process.env.PERF_SMOKE_BASE_URL || '').trim().replace(/\/+$/, '');
+            const monitorKey = String(process.env.PERF_MONITOR_KEY || '').trim();
+            const required = String(process.env.PERF_SLO_REQUIRED || 'false').toLowerCase() === 'true';
+            const minutes = Math.max(5, Number.parseInt(process.env.PERF_SLO_WINDOW_MINUTES || '180', 10) || 180);
+
+            if (!baseUrl || !monitorKey) {
+              if (required) {
+                console.error('[perf-slo] PERF_SLO_REQUIRED=true but PERF_SMOKE_BASE_URL/PERF_MONITOR_KEY is missing.');
+                process.exit(1);
+              }
+              console.log('[perf-slo] Monitor key/base URL missing. Skipping SLO summary gate.');
+              process.exit(0);
+            }
+
+            const response = await fetch(`${baseUrl}/api/perf/summary?minutes=${minutes}&limit=25`, {
+              headers: { 'x-perf-key': monitorKey },
+            });
+            if (!response.ok) {
+              console.error(`[perf-slo] Unable to read /api/perf/summary: ${response.status}`);
+              process.exit(1);
+            }
+
+            const summary = await response.json();
+            const breaches = Array.isArray(summary?.slo?.breaches) ? summary.slo.breaches : [];
+            const targets = Array.isArray(summary?.slo?.targets) ? summary.slo.targets : [];
+            console.log(`[perf-slo] Evaluated ${targets.length} SLO target(s). Breaches: ${breaches.length}.`);
+            if (breaches.length > 0) {
+              breaches.forEach((item) => {
+                console.error(`[perf-slo] breach ${item.key} observed=${item.observedP95Ms}ms threshold=${item.thresholdP95Ms}ms`);
+              });
+              process.exit(1);
+            }
+          })().catch((err) => {
+            console.error('[perf-slo] Unexpected error:', err?.message || err);
+            process.exit(1);
+          });
+          NODE
+
+      - name: Send Perf Alert
+        if: ${{ always() && (steps.smoke.outcome == 'failure' || steps.slo.outcome == 'failure') && secrets.PERF_ALERT_WEBHOOK_URL != '' }}
+        env:
+          PERF_ALERT_WEBHOOK_URL: ${{ secrets.PERF_ALERT_WEBHOOK_URL }}
+        run: |
+          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          payload="{\"text\":\"[perf-alert] Workflow '${{ github.workflow }}' failed on '${{ github.ref_name }}'. Smoke=${{ steps.smoke.outcome }} SLO=${{ steps.slo.outcome }}. Run: ${run_url}\"}"
+          curl -sS -X POST -H "Content-Type: application/json" --data "$payload" "$PERF_ALERT_WEBHOOK_URL" >/dev/null
+
+      - name: Enforce Perf Gates
+        if: ${{ steps.smoke.outcome == 'failure' || steps.slo.outcome == 'failure' }}
+        run: |
+          echo "Performance gates failed. smoke=${{ steps.smoke.outcome }} slo=${{ steps.slo.outcome }}"
+          exit 1
