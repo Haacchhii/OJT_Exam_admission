@@ -2,7 +2,7 @@
 import { trackApplication } from '../../api/admissions';
 import { Badge } from '../../components/UI';
 import Icon from '../../components/Icons';
-import { formatDate, badgeClass, formatPersonName } from '../../utils/helpers';
+import { formatDate, formatDateRange, badgeClass, formatPersonName } from '../../utils/helpers';
 import { ADMISSION_PROGRESS_STEPS } from '../../utils/constants';
 
 interface TrackResult {
@@ -85,9 +85,10 @@ function AdmissionResult({ data, trackingId }: { data: Record<string, any>; trac
   const periodLabel = data.academicYear?.year && data.semester?.name
     ? `${data.academicYear.year} - ${data.semester.name}`
     : data.academicYear?.year || data.semester?.name || 'N/A';
-  const periodWindow = data.semester?.startDate || data.semester?.endDate
-    ? `${data.semester?.startDate || 'Open'} to ${data.semester?.endDate || 'Open'}`
-    : null;
+  const periodWindow = formatDateRange(data.semester?.startDate, data.semester?.endDate, {
+    openStartLabel: 'Open',
+    openEndLabel: 'Open',
+  });
 
   return (
     <div className="gk-section-card p-6">

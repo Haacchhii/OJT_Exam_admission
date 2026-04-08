@@ -6,7 +6,7 @@ import { PageHeader, SkeletonPage, ErrorAlert, Badge } from '../../components/UI
 import Icon from '../../components/Icons';
 import { showToast } from '../../components/Toast';
 import { ADMISSION_PROGRESS_STEPS, SCHOOL_PHONE } from '../../utils/constants';
-import { badgeClass, formatDate, formatPersonName } from '../../utils/helpers';
+import { badgeClass, formatDate, formatDateRange, formatPersonName } from '../../utils/helpers';
 
 interface TrackResult {
   type: 'admission' | 'exam';
@@ -227,9 +227,10 @@ function AdmissionStatusResult({ data, trackingId }: { data: Record<string, any>
   const periodLabel = data.academicYear?.year && data.semester?.name
     ? `${data.academicYear.year} - ${data.semester.name}`
     : data.academicYear?.year || data.semester?.name || 'N/A';
-  const periodWindow = data.semester?.startDate || data.semester?.endDate
-    ? `${data.semester?.startDate || 'Open'} to ${data.semester?.endDate || 'Open'}`
-    : null;
+  const periodWindow = formatDateRange(data.semester?.startDate, data.semester?.endDate, {
+    openStartLabel: 'Open',
+    openEndLabel: 'Open',
+  });
 
   return (
     <div className="gk-section-card p-6 mb-6">
@@ -290,6 +291,12 @@ function AdmissionStatusResult({ data, trackingId }: { data: Record<string, any>
 function ExamStatusResult({ data, trackingId }: { data: Record<string, any>; trackingId: string }) {
   const schedule = data.schedule;
   const scheduleDate = schedule?.scheduledDate ? formatDate(schedule.scheduledDate) : null;
+  const registrationWindow = schedule
+    ? formatDateRange(schedule.registrationOpenDate, schedule.registrationCloseDate, {
+      openStartLabel: 'Anytime',
+      openEndLabel: 'Until exam date',
+    }) || 'Anytime - Until exam date'
+    : 'N/A';
 
   return (
     <div className="gk-section-card p-6">
@@ -310,7 +317,7 @@ function ExamStatusResult({ data, trackingId }: { data: Record<string, any>; tra
         />
         <Field
           label="Registration Window"
-          value={schedule ? `${schedule.registrationOpenDate || 'Anytime'} to ${schedule.registrationCloseDate || 'Until exam date'}` : 'N/A'}
+          value={registrationWindow}
         />
         <Field label="Registration Status" value={data.status || 'N/A'} />
       </div>

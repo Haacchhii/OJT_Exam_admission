@@ -5,7 +5,7 @@ import { showToast } from '../../../components/Toast';
 import { useConfirm } from '../../../components/ConfirmDialog';
 import { PageHeader, Badge, EmptyState, Pagination, SkeletonPage } from '../../../components/UI';
 import Icon from '../../../components/Icons';
-import { formatTime, asArray } from '../../../utils/helpers';
+import { formatTime, formatDateRange, asArray } from '../../../utils/helpers';
 import { FormInput } from './ExamComponents';
 import type { Exam, ExamSchedule } from '../../../types';
 
@@ -305,6 +305,14 @@ export default function ScheduleManager() {
               const exam = exams.find(e => e.id === s.examId);
               const d = new Date(s.scheduledDate + 'T00:00:00');
               const remaining = s.maxSlots - s.slotsTaken;
+              const registrationWindow = formatDateRange(s.registrationOpenDate, s.registrationCloseDate, {
+                openStartLabel: 'Anytime',
+                openEndLabel: 'Until exam date',
+              });
+              const visibilityWindow = formatDateRange(s.visibilityStartDate, s.visibilityEndDate, {
+                openStartLabel: 'Now',
+                openEndLabel: 'No end date',
+              });
               return (
                 <div key={s.id} className="flex items-center gap-4 bg-gray-50 rounded-lg p-4">
                   <div className="text-center bg-forest-500 text-white rounded-lg px-3 py-2 min-w-[60px]">
@@ -314,14 +322,14 @@ export default function ScheduleManager() {
                   <div className="flex-1">
                     <h4 className="font-semibold text-forest-500">{exam?.title || 'Unknown Exam'}</h4>
                     <p className="text-gray-500 text-sm">{formatTime(s.startTime)} - {formatTime(s.endTime)}</p>
-                    {(s.registrationOpenDate || s.registrationCloseDate) && (
+                    {registrationWindow && (
                       <p className="text-gray-500 text-xs">
-                        Registration window: {s.registrationOpenDate || 'Anytime'} to {s.registrationCloseDate || 'Until exam date'}
+                        Registration window: {registrationWindow}
                       </p>
                     )}
-                    {(s.visibilityStartDate || s.visibilityEndDate) && (
+                    {visibilityWindow && (
                       <p className="text-gray-500 text-xs">
-                        Visible to students: {s.visibilityStartDate || 'Now'} to {s.visibilityEndDate || 'No end date'}
+                        Visible to students: {visibilityWindow}
                       </p>
                     )}
                     <div className="flex gap-2 mt-1">

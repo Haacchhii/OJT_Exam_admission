@@ -2,11 +2,10 @@
 import { useConfirm } from '../../../components/ConfirmDialog';
 import { getAdmission, updateAdmissionStatus, VALID_TRANSITIONS } from '../../../api/admissions';
 import { useAsync } from '../../../hooks/useAsync';
-import { formatPersonName } from '../../../utils/helpers';
+import { formatDate, formatDateRange, formatPersonName, badgeClass } from '../../../utils/helpers';
 import DocumentReview from '../../../components/DocumentReview';
 import { PageHeader, Badge, SkeletonPage } from '../../../components/UI';
 import Icon from '../../../components/Icons';
-import { formatDate, badgeClass } from '../../../utils/helpers';
 import { SCHOOL_NAME, SCHOOL_BRAND, SCHOOL_SUBTITLE, SCHOOL_ADDRESS, SCHOOL_PHONE } from '../../../utils/constants';
 import { useAuth } from '../../../context/AuthContext';
 import type { Admission } from '../../../types';
@@ -57,9 +56,10 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
   const periodLabel = adm.academicYear?.year && adm.semester?.name
     ? `${adm.academicYear.year} - ${adm.semester.name}`
     : adm.academicYear?.year || adm.semester?.name || 'N/A';
-  const periodWindow = adm.semester?.startDate || adm.semester?.endDate
-    ? `${adm.semester?.startDate || 'Open'} to ${adm.semester?.endDate || 'Open'}`
-    : null;
+  const periodWindow = formatDateRange(adm.semester?.startDate, adm.semester?.endDate, {
+    openStartLabel: 'Open',
+    openEndLabel: 'Open',
+  });
 
   const suggestedAction =
     currentStatus === 'Submitted'

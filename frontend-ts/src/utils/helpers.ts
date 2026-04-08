@@ -23,6 +23,29 @@ export function formatDate(isoString: string | null | undefined): string {
   return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
+interface FormatDateRangeOptions {
+  openStartLabel?: string;
+  openEndLabel?: string;
+  separator?: string;
+}
+
+export function formatDateRange(
+  startDate: string | null | undefined,
+  endDate: string | null | undefined,
+  options: FormatDateRangeOptions = {},
+): string | null {
+  if (!startDate && !endDate) return null;
+  const {
+    openStartLabel = 'Open',
+    openEndLabel = 'Open',
+    separator = ' - ',
+  } = options;
+
+  const startText = startDate ? formatDate(startDate) : openStartLabel;
+  const endText = endDate ? formatDate(endDate) : openEndLabel;
+  return `${startText}${separator}${endText}`;
+}
+
 export function formatTime(timeStr: string | null | undefined): string {
   if (!timeStr || typeof timeStr !== 'string' || !timeStr.includes(':')) return '—';
   const [h, m] = timeStr.split(':');
