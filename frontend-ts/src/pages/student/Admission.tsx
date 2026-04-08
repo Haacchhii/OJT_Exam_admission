@@ -66,7 +66,7 @@ export default function StudentAdmission() {
             Active period: <strong>{activePeriod.year}</strong> - <strong>{activeSemester?.name || 'N/A'}</strong>
           </p>
           <p className="text-gray-400 text-sm mb-6">
-            Window: <strong>{semStartText}</strong> to <strong>{semEndText}</strong>
+            Window: <strong>{semStartText}</strong> - <strong>{semEndText}</strong>
           </p>
           <Link to="/student/dashboard" className="inline-block bg-forest-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-forest-600">Back to Dashboard</Link>
         </div>
@@ -103,7 +103,7 @@ export default function StudentAdmission() {
       {activePeriod && (
         <div className={`mb-4 rounded-lg border px-4 py-3 text-sm ${isApplicationPeriodOpen ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
           <p className="font-semibold">Application Period: {activePeriod.year} - {activeSemester?.name || 'N/A'}</p>
-          <p className="text-xs mt-1">Window: {semStartText} to {semEndText}</p>
+          <p className="text-xs mt-1">Window: {semStartText} - {semEndText}</p>
         </div>
       )}
 

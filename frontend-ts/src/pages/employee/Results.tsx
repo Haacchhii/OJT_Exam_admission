@@ -20,7 +20,7 @@ const RESULTS_SUMMARY_LIMIT = 500;
 function semesterLabel(s: Semester) {
   const start = s.startDate ? formatDate(String(s.startDate)) : null;
   const end = s.endDate ? formatDate(String(s.endDate)) : null;
-  if (start || end) return `${s.name} (${start || 'open'} to ${end || 'open'})`;
+  if (start || end) return `${s.name} (${start || 'open'} - ${end || 'open'})`;
   return s.name;
 }
 

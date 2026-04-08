@@ -60,7 +60,7 @@ function getRegUserId(reg: ExamRegistration): number | null {
 function semesterLabel(s: Semester) {
   const start = s.startDate ? formatDate(String(s.startDate)) : null;
   const end = s.endDate ? formatDate(String(s.endDate)) : null;
-  if (start || end) return `${s.name} (${start || 'open'} to ${end || 'open'})`;
+  if (start || end) return `${s.name} (${start || 'open'} - ${end || 'open'})`;
   return s.name;
 }
 
@@ -81,7 +81,7 @@ function compactPeriod(a?: Admission) {
   const semName = a?.semester?.name || '';
   const base = [yearName, semName].filter(Boolean).join(' - ');
   if (!semStart && !semEnd) return base;
-  return `${base}${base ? ' ' : ''}(${semStart || 'Open'} to ${semEnd || 'Open'})`;
+  return `${base}${base ? ' ' : ''}(${semStart || 'Open'} - ${semEnd || 'Open'})`;
 }
 
 interface ReportData {

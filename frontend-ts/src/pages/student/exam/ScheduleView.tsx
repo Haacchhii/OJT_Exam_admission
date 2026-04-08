@@ -162,7 +162,7 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, user
       {activePeriod && (
         <div className={`mb-4 rounded-lg border px-4 py-3 text-sm ${isExamPeriodOpen ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
           <p className="font-semibold">Exam Period: {activePeriod.year} \u2014 {activeSemester?.name || 'N/A'}</p>
-          <p className="text-xs mt-1">Window: {semStartText} to {semEndText}</p>
+          <p className="text-xs mt-1">Window: {semStartText} - {semEndText}</p>
         </div>
       )}
       <div className="gk-section-card p-4 mb-6">
@@ -205,12 +205,12 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, user
                     <p className="text-gray-500 text-sm">{formatTime(s.startTime)} - {formatTime(s.endTime)} | {remaining} slots left</p>
                     {(s.registrationOpenDate || s.registrationCloseDate) && (
                       <p className="text-gray-500 text-xs">
-                        Registration window: {formatDisplayDate(s.registrationOpenDate || null)} to {formatDisplayDate(s.registrationCloseDate || null)}
+                        Registration window: {formatDisplayDate(s.registrationOpenDate || null)} - {formatDisplayDate(s.registrationCloseDate || null)}
                       </p>
                     )}
                     {(s.visibilityStartDate || s.visibilityEndDate) && (
                       <p className="text-gray-500 text-xs">
-                        Visible in portal: {formatDisplayDate(s.visibilityStartDate || null)} to {formatDisplayDate(s.visibilityEndDate || null)}
+                        Visible in portal: {formatDisplayDate(s.visibilityStartDate || null)} - {formatDisplayDate(s.visibilityEndDate || null)}
                       </p>
                     )}
                     {(exam as any)?.gradeLevel && <span className="inline-block mt-1 text-xs bg-gold-100 text-gold-700 px-2 py-0.5 rounded-full font-medium">{(exam as any).gradeLevel}</span>}
