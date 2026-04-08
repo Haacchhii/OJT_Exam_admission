@@ -15,7 +15,7 @@ export function asArray<T>(val: unknown): T[] {
 
 export function formatDate(isoString: string | null | undefined): string {
   if (!isoString) return '—';
-  const dateOnlyMatch = String(isoString).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const dateOnlyMatch = String(isoString).match(/^(\d{4})-(\d{2})-(\d{2})(?:$|T)/);
   const d = dateOnlyMatch
     ? new Date(Number(dateOnlyMatch[1]), Number(dateOnlyMatch[2]) - 1, Number(dateOnlyMatch[3]))
     : new Date(isoString);
