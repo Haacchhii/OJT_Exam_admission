@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import Modal from './Modal';
 import Icon from './Icons';
 import { getDocumentPreviewUrl, getDocumentDownloadUrl, extractDocumentData, reviewDocument, type ExtractedResult } from '../api/admissions';
@@ -44,8 +44,13 @@ export default function DocumentReview({ admissionId, documents, onReviewUpdate 
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewLoadError, setPreviewLoadError] = useState('');
+  const [displayDocuments, setDisplayDocuments] = useState<DocumentFile[]>(documents);
 
   const token = getToken();
+
+  useEffect(() => {
+    setDisplayDocuments(documents);
+  }, [documents]);
 
   const loadPreviewBlob = useCallback(async (doc: DocumentFile) => {
     const previewUrl = getDocumentPreviewUrl(admissionId, doc.id);
@@ -131,7 +136,15 @@ export default function DocumentReview({ admissionId, documents, onReviewUpdate 
 
     setReviewing(doc.id);
     try {
-      await reviewDocument(admissionId, doc.id, status);
+      const updated = await reviewDocument(admissionId, doc.id, status);
+      setDisplayDocuments(prev => prev.map(d => d.id === doc.id
+        ? {
+          ...d,
+          reviewStatus: updated.reviewStatus,
+          reviewNote: updated.reviewNote,
+          reviewedAt: updated.reviewedAt,
+        }
+        : d));
       showToast(`Document ${status}`, 'success');
       onReviewUpdate?.();
     } catch { showToast('Failed to update review', 'error'); }
@@ -141,7 +154,7 @@ export default function DocumentReview({ admissionId, documents, onReviewUpdate 
   return (
     <>
       <div className="space-y-2">
-        {documents.map((doc, i) => {
+        {displayDocuments.map((doc, i) => {
           const previewType = isPreviewable(doc.name);
           const canOpenFile = !!doc.filePath && doc.id > 0;
           return (
