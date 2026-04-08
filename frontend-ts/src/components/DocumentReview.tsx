@@ -49,7 +49,28 @@ export default function DocumentReview({ admissionId, documents, onReviewUpdate 
   const token = getToken();
 
   useEffect(() => {
-    setDisplayDocuments(documents);
+    setDisplayDocuments(prev => {
+      const prevById = new Map(prev.map(doc => [doc.id, doc]));
+      return documents.map(incoming => {
+        const local = prevById.get(incoming.id);
+        if (!local) return incoming;
+
+        const incomingStatus = incoming.reviewStatus || 'pending';
+        const localStatus = local.reviewStatus || 'pending';
+
+        // Keep local accepted/rejected state if parent refetch briefly returns a stale pending snapshot.
+        if ((localStatus === 'accepted' || localStatus === 'rejected') && incomingStatus === 'pending') {
+          return {
+            ...incoming,
+            reviewStatus: localStatus,
+            reviewNote: local.reviewNote ?? incoming.reviewNote,
+            reviewedAt: local.reviewedAt ?? incoming.reviewedAt,
+          };
+        }
+
+        return incoming;
+      });
+    });
   }, [documents]);
 
   const loadPreviewBlob = useCallback(async (doc: DocumentFile) => {
@@ -191,9 +212,9 @@ export default function DocumentReview({ admissionId, documents, onReviewUpdate 
                   <span className="text-xs text-gray-400">No file available</span>
                 )}
                 <span className="gk-badge gk-badge-submitted">
-                  {doc.reviewStatus === 'accepted' ? '✓ Accepted' : doc.reviewStatus === 'rejected' ? '✗ Rejected' : 'Pending'}
+                  {doc.reviewStatus === 'accepted' ? '✓ Accepted' : doc.reviewStatus === 'rejected' ? '✗ Rejected' : canOpenFile ? 'Pending' : 'Pending Upload'}
                 </span>
-                {canReview && doc.reviewStatus === 'pending' && (
+                {canReview && canOpenFile && doc.reviewStatus === 'pending' && (
                   <>
                     <button disabled={reviewing === doc.id} onClick={() => handleReview(doc, 'accepted')} className="text-emerald-600 hover:text-emerald-800 text-xs font-medium">Accept</button>
                     <button disabled={reviewing === doc.id} onClick={() => handleReview(doc, 'rejected')} className="text-red-600 hover:text-red-800 text-xs font-medium">Reject</button>

@@ -14,6 +14,7 @@ import { RATE_LIMITS, BODY_SIZE_LIMIT } from './utils/constants.js';
 import { cachePublic, cachePrivate, noStore } from './middleware/cache.js';
 import { observeApiRequest } from './utils/perfStore.js';
 import { runWithRequestContext } from './utils/requestContext.js';
+import { getUploadBaseDir } from './utils/uploadPaths.js';
 
 // Route imports
 import authRoutes          from './routes/auth.js';
@@ -147,9 +148,7 @@ const bulkOpLimiter = rateLimit({
 });
 
 // Serve uploaded files — require authentication
-const uploadStaticDir = env.NODE_ENV === 'production' && !path.isAbsolute(env.UPLOAD_DIR)
-  ? path.posix.join('/tmp', env.UPLOAD_DIR)
-  : path.resolve(env.UPLOAD_DIR);
+const uploadStaticDir = getUploadBaseDir();
 app.use('/uploads', authenticate, express.static(uploadStaticDir));
 
 // Apply specific rate limiters to sensitive operations (must be mounted before routes)

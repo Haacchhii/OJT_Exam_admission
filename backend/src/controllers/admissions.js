@@ -8,6 +8,7 @@ import { getIo } from '../utils/socket.js';
 import { sendAdmissionSubmittedEmail, sendAdmissionStatusEmail } from '../utils/email.js';
 import { cached, invalidatePrefix } from '../utils/cache.js';
 import env from '../config/env.js';
+import { resolveUploadedFilePath } from '../utils/uploadPaths.js';
 
 const ADMISSION_IN_PROGRESS = ['Submitted', 'Under Screening', 'Under Evaluation'];
 const REPORTS_DEFAULT_ADMISSIONS = 300;
@@ -920,7 +921,7 @@ export async function downloadDocument(req, res, next) {
       return res.status(404).json({ error: 'File not available', code: 'NOT_FOUND' });
     }
 
-    const filePath = path.resolve(env.UPLOAD_DIR, doc.filePath);
+    const filePath = resolveUploadedFilePath(doc.filePath);
     res.download(filePath, doc.documentName);
   } catch (err) { next(err); }
 }

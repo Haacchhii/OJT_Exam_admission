@@ -4,6 +4,7 @@ import fs from 'fs/promises';
 import { existsSync } from 'fs';
 import env from '../config/env.js';
 import { ROLES, DOC_CACHE_MAX_AGE, MAX_KV_PAIRS } from '../utils/constants.js';
+import { resolveUploadedFilePath } from '../utils/uploadPaths.js';
 
 // Lazy-loaded heavy modules
 let Tesseract = null;
@@ -78,7 +79,7 @@ async function extractTextFromFile(filePath, ext) {
 }
 
 async function performDocumentExtraction(doc) {
-  const filePath = path.resolve(env.UPLOAD_DIR, doc.filePath);
+  const filePath = resolveUploadedFilePath(doc.filePath);
   if (!existsSync(filePath)) {
     throw new Error('File not found on server');
   }
@@ -175,7 +176,7 @@ export async function previewDocument(req, res, next) {
       return res.status(404).json({ error: 'File not available', code: 'NOT_FOUND' });
     }
 
-    const filePath = path.resolve(env.UPLOAD_DIR, doc.filePath);
+    const filePath = resolveUploadedFilePath(doc.filePath);
     if (!existsSync(filePath)) {
       return res.status(404).json({ error: 'File not found on server', code: 'NOT_FOUND' });
     }
