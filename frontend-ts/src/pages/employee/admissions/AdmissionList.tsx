@@ -1,4 +1,5 @@
 ﻿import { useState, useMemo, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useAsync } from '../../../hooks/useAsync';
 import { getAdmissionsPage, getStats, bulkUpdateStatus, bulkDeleteAdmissions, VALID_TRANSITIONS } from '../../../api/admissions';
 import { getAcademicYears, getSemesters } from '../../../api/academicYears';
@@ -255,6 +256,11 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
     { key: 'Rejected', label: 'Rejected', count: rawData?.stats?.rejected || 0 },
   ];
 
+  const registeredApplicants = rawData?.stats?.registeredApplicants || 0;
+  const applicantsWithoutAdmissions = rawData?.stats?.applicantsWithoutAdmissions || 0;
+  const unverifiedApplicants = rawData?.stats?.unverifiedApplicants || 0;
+  const inactiveApplicants = rawData?.stats?.inactiveApplicants || 0;
+
   return (
     <div>
               <PageHeader title="All Admission Applications">
@@ -342,6 +348,38 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
           >
             Review Now
           </button>
+        </div>
+      )}
+
+      {canManage && (
+        <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+          <p className="font-semibold">Applicant account visibility</p>
+          <p className="mt-1 text-blue-700">
+            Accounts created through registration do not appear in this table until they submit an admission application.
+          </p>
+          <div className="mt-2 grid grid-cols-1 md:grid-cols-4 gap-2 text-xs">
+            <div className="rounded-md border border-blue-100 bg-white px-2.5 py-2">
+              <p className="text-blue-600">Registered applicants</p>
+              <p className="font-bold text-blue-900">{registeredApplicants}</p>
+            </div>
+            <div className="rounded-md border border-blue-100 bg-white px-2.5 py-2">
+              <p className="text-blue-600">No submission yet</p>
+              <p className="font-bold text-blue-900">{applicantsWithoutAdmissions}</p>
+            </div>
+            <div className="rounded-md border border-blue-100 bg-white px-2.5 py-2">
+              <p className="text-blue-600">Unverified emails</p>
+              <p className="font-bold text-blue-900">{unverifiedApplicants}</p>
+            </div>
+            <div className="rounded-md border border-blue-100 bg-white px-2.5 py-2">
+              <p className="text-blue-600">Inactive applicant accounts</p>
+              <p className="font-bold text-blue-900">{inactiveApplicants}</p>
+            </div>
+          </div>
+          <div className="mt-2">
+            <Link to="/employee/users" className="text-xs font-semibold underline hover:no-underline">
+              Open Users page to inspect registered applicant accounts
+            </Link>
+          </div>
         </div>
       )}
 
@@ -435,7 +473,7 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
             <Pagination currentPage={pagination.page} totalPages={pagination.totalPages} onPageChange={setPage} totalItems={pagination.total} itemsPerPage={PER_PAGE} />
           </>
         ) : (
-          <EmptyState icon="inbox" title="No applications found" text={search ? `No applications match "${search}"${filter !== 'all' ? ` with status "${filter}"` : ''}.` : filter !== 'all' ? `No applications with status "${filter}".` : 'No admission applications match your current filters.'} />
+          <EmptyState icon="inbox" title="No applications found" text={search ? `No applications match "${search}"${filter !== 'all' ? ` with status "${filter}"` : ''}. Registered accounts with no submission: ${applicantsWithoutAdmissions}.` : filter !== 'all' ? `No applications with status "${filter}". Registered accounts with no submission: ${applicantsWithoutAdmissions}.` : `No admission applications match your current filters. Registered accounts with no submission: ${applicantsWithoutAdmissions}.`} />
         )}
       </div>
     </div>

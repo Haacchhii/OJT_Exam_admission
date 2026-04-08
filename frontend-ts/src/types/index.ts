@@ -101,6 +101,10 @@ export interface AdmissionStats {
   underEvaluation: number;
   accepted: number;
   rejected: number;
+  registeredApplicants?: number;
+  applicantsWithoutAdmissions?: number;
+  unverifiedApplicants?: number;
+  inactiveApplicants?: number;
 }
 
 // ─── Exams ──────────────────────────────────────────

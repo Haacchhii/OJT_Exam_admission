@@ -129,9 +129,19 @@ export async function getStats(req, res, next) {
 
     const cacheKey = `admStats:${JSON.stringify(where)}`;
     const counts = await cached(cacheKey, async () => {
-      const [total, grouped] = await Promise.all([
+      const applicantWhere = { deletedAt: null, role: ROLES.APPLICANT };
+      const [total, grouped, registeredApplicants, applicantsWithoutAdmissions, unverifiedApplicants, inactiveApplicants] = await Promise.all([
         prisma.admission.count({ where }),
         prisma.admission.groupBy({ by: ['status'], _count: { _all: true }, where }),
+        prisma.user.count({ where: applicantWhere }),
+        prisma.user.count({
+          where: {
+            ...applicantWhere,
+            admissions: { none: { deletedAt: null } },
+          },
+        }),
+        prisma.user.count({ where: { ...applicantWhere, emailVerified: false } }),
+        prisma.user.count({ where: { ...applicantWhere, status: 'Inactive' } }),
       ]);
       const statusMap = Object.fromEntries(grouped.map(g => [g.status, g._count._all]));
       return {
@@ -141,6 +151,10 @@ export async function getStats(req, res, next) {
         underEvaluation:  statusMap['Under Evaluation'] || 0,
         accepted:         statusMap['Accepted'] || 0,
         rejected:         statusMap['Rejected'] || 0,
+        registeredApplicants,
+        applicantsWithoutAdmissions,
+        unverifiedApplicants,
+        inactiveApplicants,
       };
     }, 15_000);
 
