@@ -85,6 +85,37 @@
     outline-offset: 2px;
     border-radius: 4px;
   }
+
+  button,
+  [role='button'],
+  .clickable,
+  [data-clickable='true'] {
+    cursor: pointer;
+    transition: transform 160ms ease, box-shadow 160ms ease, background-color 160ms ease, border-color 160ms ease, color 160ms ease, filter 160ms ease;
+  }
+
+  button:hover:not(:disabled):not([aria-disabled='true']),
+  [role='button']:hover:not([aria-disabled='true']),
+  .clickable:hover,
+  [data-clickable='true']:hover {
+    transform: translateY(-1px);
+  }
+
+  button:active:not(:disabled):not([aria-disabled='true']),
+  [role='button']:active:not([aria-disabled='true']),
+  .clickable:active,
+  [data-clickable='true']:active {
+    transform: translateY(0);
+  }
+
+  button:disabled,
+  button[aria-disabled='true'],
+  [role='button'][aria-disabled='true'],
+  .clickable[aria-disabled='true'],
+  [data-clickable='true'][aria-disabled='true'] {
+    cursor: not-allowed;
+    transform: none;
+  }
 }
 
 @layer components {
