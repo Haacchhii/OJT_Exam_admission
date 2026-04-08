@@ -10,6 +10,7 @@ import { useConfirm } from '../../components/ConfirmDialog';
 import BulkActionBar from '../../components/BulkActionBar';
 import { useSelection } from '../../hooks/useSelection';
 import { CSVUploader } from '../../components/CSVUploader';
+import { getPasswordRequirementChecks, isPasswordCompliant } from '../../utils/passwordStrength';
 import { USER_ROLE_OPTIONS } from '../../utils/constants';
 import { exportToCSV, formatPersonName } from '../../utils/helpers';
 import type { User } from '../../types';
@@ -44,6 +45,20 @@ export default function EmployeeUsers() {
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const confirm = useConfirm();
   const { selected, toggle, togglePage, clear: clearSelection, isAllSelected, count: selectedCount } = useSelection();
+  const passwordChecks = getPasswordRequirementChecks(form.password);
+
+  const firstPasswordRequirementMessage = (password: string): string => {
+    const unmet = getPasswordRequirementChecks(password).find(rule => !rule.met);
+    if (!unmet) return '';
+    const messages: Record<string, string> = {
+      minLength: 'Min 8 characters',
+      uppercase: 'Must contain uppercase letter',
+      lowercase: 'Must contain lowercase letter',
+      digit: 'Must contain number',
+      special: 'Must contain special character',
+    };
+    return messages[unmet.key] || 'Password does not meet requirements';
+  };
 
   const { data: usersPage, loading, error, refetch } = useAsync(async () => {
     return getUsersPage({
@@ -81,11 +96,7 @@ export default function EmployeeUsers() {
     }
     if (!editId && !form.password.trim()) e.password = 'Required for new users';
     else if (form.password) {
-      if (form.password.length < 8) e.password = 'Min 8 characters';
-      else if (!/[A-Z]/.test(form.password)) e.password = 'Must contain uppercase letter';
-      else if (!/[a-z]/.test(form.password)) e.password = 'Must contain lowercase letter';
-      else if (!/[0-9]/.test(form.password)) e.password = 'Must contain number';
-      else if (!/[^A-Za-z0-9]/.test(form.password)) e.password = 'Must contain special character';
+      if (!isPasswordCompliant(form.password)) e.password = firstPasswordRequirementMessage(form.password);
     }
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -361,6 +372,16 @@ export default function EmployeeUsers() {
             <label className="block text-sm font-medium text-gray-700 mb-1">{editId ? 'New Password (leave blank to keep)' : 'Password'}</label>
             <input type="password" value={form.password} onChange={e => set('password', e.target.value)} aria-describedby={errors.password ? 'password-error' : undefined} className={`w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-forest-500/20 ${errors.password ? 'border-red-400' : 'border-gray-200'}`} />
             {errors.password && <p id="password-error" className="text-red-500 text-xs mt-1" role="alert">{errors.password}</p>}
+            {form.password && (
+              <div className="mt-2 rounded-lg border border-gray-200 bg-gray-50 p-2.5 space-y-1.5">
+                {passwordChecks.map(rule => (
+                  <p key={rule.key} className={`text-xs flex items-center gap-1.5 ${rule.met ? 'text-emerald-700' : 'text-gray-500'}`}>
+                    <Icon name={rule.met ? 'checkCircle' : 'xCircle'} className="w-3.5 h-3.5" />
+                    {rule.label}
+                  </p>
+                ))}
+              </div>
+            )}
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <button onClick={() => setShowModal(false)} className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>

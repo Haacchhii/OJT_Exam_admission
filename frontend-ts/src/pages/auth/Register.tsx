@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { showToast } from '../../components/Toast';
-import { getPasswordStrength } from '../../utils/passwordStrength';
+import { getPasswordStrength, getPasswordRequirementChecks, isPasswordCompliant } from '../../utils/passwordStrength';
 import Icon from '../../components/Icons';
 import { SCHOOL_NAME, SCHOOL_BRAND, SCHOOL_SUBTITLE, GRADE_OPTIONS } from '../../utils/constants';
 
@@ -23,11 +23,11 @@ export default function Register() {
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm(f => ({ ...f, [k]: e.target.value }));
 
   const strength = getPasswordStrength(form.password);
+  const passwordChecks = getPasswordRequirementChecks(form.password);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (form.password.length < 8) { showToast('Password must be at least 8 characters.', 'error'); return; }
-    if (strength.score < 3) { showToast('Password is too weak. Include uppercase, numbers, or symbols.', 'error'); return; }
+    if (!isPasswordCompliant(form.password)) { showToast('Password does not meet all requirements.', 'error'); return; }
     if (form.password !== form.confirmPassword) { showToast('Passwords do not match', 'error'); return; }
     if (!/\S+@\S+\.\S+/.test(form.email)) { showToast('Please enter a valid email address.', 'error'); return; }
     if (!form.gradeLevel) { showToast('Please select your grade level.', 'error'); return; }
@@ -180,10 +180,20 @@ export default function Register() {
                   </button>
                 </div>
                 {form.password && (
-                  <div className="mt-2 flex items-center gap-2">
-                    <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className={`h-full ${strength.color} transition-all rounded-full`} style={{ width: strength.width }} /></div>
-                    <span className="text-xs text-gray-500 font-medium">{strength.text}</span>
-                  </div>
+                  <>
+                    <div className="mt-2 flex items-center gap-2">
+                      <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className={`h-full ${strength.color} transition-all rounded-full`} style={{ width: strength.width }} /></div>
+                      <span className="text-xs text-gray-500 font-medium">{strength.text}</span>
+                    </div>
+                    <div className="mt-2 rounded-lg border border-gray-200 bg-gray-50 p-2.5 space-y-1.5">
+                      {passwordChecks.map(rule => (
+                        <p key={rule.key} className={`text-xs flex items-center gap-1.5 ${rule.met ? 'text-emerald-700' : 'text-gray-500'}`}>
+                          <Icon name={rule.met ? 'checkCircle' : 'xCircle'} className="w-3.5 h-3.5" />
+                          {rule.label}
+                        </p>
+                      ))}
+                    </div>
+                  </>
                 )}
               </div>
               <div>
