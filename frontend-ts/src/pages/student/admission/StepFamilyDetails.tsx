@@ -63,6 +63,14 @@ export default function StepFamilyDetails({ form, set, goTo, errors = {} }: Prop
             error={errors.guardian}
           />
         </div>
+        <Input
+          label="Guardian Relationship"
+          value={form.guardianRelation}
+          onChange={set('guardianRelation')}
+          placeholder={form.guardian?.trim() ? 'e.g. Aunt, Uncle, Grandparent' : 'Required only if guardian name is provided'}
+          maxLength={100}
+          error={errors.guardianRelation}
+        />
       </div>
       <div className="flex justify-between">
         <button onClick={() => goTo(2)} className="border border-gray-300 text-gray-700 px-5 py-2.5 rounded-lg hover:bg-gray-50">Back</button>

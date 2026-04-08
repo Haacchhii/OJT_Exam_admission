@@ -75,13 +75,23 @@ export const createAdmissionSchema = z.object({
   schoolYear: z.string().min(1),
   lrn: z.string().max(20).optional().nullable(),
   applicantType: z.enum(['New', 'Transferee', 'Returning', 'Continuing']).default('New'),
-  guardian: z.string().min(1),
-  guardianRelation: z.string().min(1),
+  guardian: z.string().max(200).optional().nullable().or(z.literal('')),
+  guardianRelation: z.string().max(100).optional().nullable().or(z.literal('')),
   guardianPhone: z.string().max(20).optional().nullable(),
   guardianEmail: z.string().email().optional().nullable().or(z.literal('')),
   academicYearId: z.number().int().positive().optional().nullable(),
   semesterId: z.number().int().positive().optional().nullable(),
   notes: z.string().max(1000).optional().nullable(),
+}).superRefine((data, ctx) => {
+  const hasGuardian = Boolean(String(data.guardian || '').trim());
+  const hasRelation = Boolean(String(data.guardianRelation || '').trim());
+  if (hasGuardian && !hasRelation) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['guardianRelation'],
+      message: 'Guardian relationship is required when guardian name is provided',
+    });
+  }
 });
 
 export const updateStatusSchema = z.object({

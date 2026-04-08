@@ -147,6 +147,9 @@ export function validateStep3(form: AdmissionForm): AdmissionErrors {
   else if (form.motherOccupation.length > 120) e.motherOccupation = 'Max 120 characters';
 
   if (form.guardian?.trim() && form.guardian.length > 200) e.guardian = 'Max 200 characters';
+  if (form.guardian?.trim() && !form.guardianRelation?.trim()) {
+    e.guardianRelation = 'Relationship is required when guardian name is provided';
+  }
 
   return e;
 }

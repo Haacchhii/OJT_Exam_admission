@@ -567,9 +567,18 @@ export async function createAdmission(req, res, next) {
         ))
       : [];
 
+    const guardianName = String(guardian || '').trim();
+    const guardianRel = String(guardianRelation || '').trim();
+
     // Validate required fields
-    if (!firstName || !lastName || !email || !dob || !gender || !address || !gradeLevel || !schoolYear || !guardian || !guardianRelation) {
+    if (!firstName || !lastName || !email || !dob || !gender || !address || !gradeLevel || !schoolYear) {
       return res.status(400).json({ error: 'Missing required fields', code: 'VALIDATION_ERROR' });
+    }
+    if (guardianName && !guardianRel) {
+      return res.status(400).json({
+        error: 'Guardian relationship is required when guardian name is provided',
+        code: 'VALIDATION_ERROR',
+      });
     }
 
     const trackingId = await generateTrackingId('ADM');
@@ -611,7 +620,8 @@ export async function createAdmission(req, res, next) {
         gradeLevel, levelGroup: getLevelGroup(gradeLevel), prevSchool: prevSchool || null, schoolYear,
         lrn: lrn || null, applicantType: applicantType || 'New',
         studentNumber: studentNumber || null,
-        guardian, guardianRelation,
+        guardian: guardianName,
+        guardianRelation: guardianName ? guardianRel : '',
         guardianPhone: guardianPhone || null,
         guardianEmail: guardianEmail || null,
         ...(resolvedYearId && { academicYearId: resolvedYearId }),
