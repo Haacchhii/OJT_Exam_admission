@@ -9,11 +9,11 @@ const TEST_ACCOUNTS = {
   },
   registrar: {
     email: process.env.TEST_REGISTRAR_EMAIL || 'registrar@goldenkey.edu',
-    password: process.env.TEST_REGISTRAR_PASSWORD || 'admin123',
+    password: process.env.TEST_REGISTRAR_PASSWORD || 'Admin123!',
   },
   teacher: {
     email: process.env.TEST_TEACHER_EMAIL || 'teacher@goldenkey.edu',
-    password: process.env.TEST_TEACHER_PASSWORD || 'admin123',
+    password: process.env.TEST_TEACHER_PASSWORD || 'Admin123!',
   },
   applicant: {
     email: process.env.TEST_APPLICANT_EMAIL || 'joseirineo0418@gmail.com',

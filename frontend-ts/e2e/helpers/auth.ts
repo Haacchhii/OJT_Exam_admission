@@ -2,8 +2,8 @@ import { expect, type Page } from '@playwright/test';
 
 export const TEST_USERS = {
   admin: { email: 'admin@goldenkey.edu', password: 'admin123' },
-  registrar: { email: 'registrar@goldenkey.edu', password: 'admin123' },
-  teacher: { email: 'teacher@goldenkey.edu', password: 'admin123' },
+  registrar: { email: 'registrar@goldenkey.edu', password: 'Admin123!' },
+  teacher: { email: 'teacher@goldenkey.edu', password: 'Admin123!' },
   applicant: { email: 'joseirineo0418@gmail.com', password: 'Changeme123!' },
 } as const;
 

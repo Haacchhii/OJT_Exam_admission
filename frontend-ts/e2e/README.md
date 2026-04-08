@@ -14,8 +14,8 @@ These tests cover high-risk journeys:
 
 Default credentials used by tests:
 - admin@goldenkey.edu / admin123
-- teacher@goldenkey.edu / admin123
-- registrar@goldenkey.edu / admin123
+- teacher@goldenkey.edu / Admin123!
+- registrar@goldenkey.edu / Admin123!
 - joseirineo0418@gmail.com / Changeme123!
 
 ## Install
