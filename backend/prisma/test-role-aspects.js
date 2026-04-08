@@ -2,15 +2,32 @@ import fs from 'fs';
 import path from 'path';
 import app from '../src/app.js';
 
-const TEST_PASSWORD = process.env.TEST_ACCOUNTS_PASSWORD || 'Tester!123';
-
 const TEST_ACCOUNTS = {
-  administrator: process.env.TEST_ADMIN_EMAIL || 'qa.admin@goldenkey.local',
-  registrar: process.env.TEST_REGISTRAR_EMAIL || 'qa.registrar@goldenkey.local',
-  teacher: process.env.TEST_TEACHER_EMAIL || 'qa.teacher@goldenkey.local',
-  applicant: process.env.TEST_APPLICANT_EMAIL || 'qa.student.passed@goldenkey.local',
-  unverifiedApplicant: process.env.TEST_UNVERIFIED_EMAIL || 'qa.student.unverified@goldenkey.local',
-  inactiveApplicant: process.env.TEST_INACTIVE_EMAIL || 'qa.student.inactive@goldenkey.local',
+  administrator: {
+    email: process.env.TEST_ADMIN_EMAIL || 'admin@goldenkey.edu',
+    password: process.env.TEST_ADMIN_PASSWORD || 'admin123',
+  },
+  registrar: {
+    email: process.env.TEST_REGISTRAR_EMAIL || 'registrar@goldenkey.edu',
+    password: process.env.TEST_REGISTRAR_PASSWORD || 'admin123',
+  },
+  teacher: {
+    email: process.env.TEST_TEACHER_EMAIL || 'teacher@goldenkey.edu',
+    password: process.env.TEST_TEACHER_PASSWORD || 'admin123',
+  },
+  applicant: {
+    email: process.env.TEST_APPLICANT_EMAIL || 'joseirineo0418@gmail.com',
+    password: process.env.TEST_APPLICANT_PASSWORD || 'Changeme123!',
+  },
+  // Optional special-case accounts. Leave empty to skip these checks.
+  unverifiedApplicant: {
+    email: process.env.TEST_UNVERIFIED_EMAIL || '',
+    password: process.env.TEST_UNVERIFIED_PASSWORD || '',
+  },
+  inactiveApplicant: {
+    email: process.env.TEST_INACTIVE_EMAIL || '',
+    password: process.env.TEST_INACTIVE_PASSWORD || '',
+  },
 };
 
 const ROLE_ORDER = ['administrator', 'registrar', 'teacher', 'applicant'];
@@ -33,6 +50,18 @@ function isAllowedStatusForAuthorized(status) {
 function normalizeText(bodyText) {
   if (!bodyText) return '';
   return bodyText.replace(/\s+/g, ' ').trim().slice(0, 280);
+}
+
+function reportAccountMeta(accounts) {
+  return Object.fromEntries(
+    Object.entries(accounts).map(([name, account]) => [
+      name,
+      {
+        email: account.email,
+        hasPassword: Boolean(account.password),
+      },
+    ])
+  );
 }
 
 async function request(baseUrl, token, method, route, body) {
@@ -283,7 +312,7 @@ async function run() {
   const report = {
     generatedAt: new Date().toISOString(),
     baseUrl,
-    accounts: { ...TEST_ACCOUNTS, passwordHint: TEST_PASSWORD },
+    accounts: reportAccountMeta(TEST_ACCOUNTS),
     login: {},
     context: {},
     checks: [],
@@ -302,8 +331,9 @@ async function run() {
     const sessions = {};
 
     for (const role of ROLE_ORDER) {
-      const email = TEST_ACCOUNTS[role];
-      const loginRes = await login(baseUrl, email, TEST_PASSWORD);
+      const account = TEST_ACCOUNTS[role];
+      const email = account.email;
+      const loginRes = await login(baseUrl, email, account.password);
       report.login[role] = {
         email,
         status: loginRes.status,
@@ -323,25 +353,43 @@ async function run() {
     }
 
     // Special auth behavior checks
-    const inactiveRes = await login(baseUrl, TEST_ACCOUNTS.inactiveApplicant, TEST_PASSWORD);
-    report.specialAuthCases.push({
-      case: 'inactive-applicant-login',
-      email: TEST_ACCOUNTS.inactiveApplicant,
-      expectedStatus: 403,
-      actualStatus: inactiveRes.status,
-      pass: inactiveRes.status === 403,
-      message: inactiveRes.json?.error || normalizeText(inactiveRes.text),
-    });
+    const inactiveAccount = TEST_ACCOUNTS.inactiveApplicant;
+    if (inactiveAccount.email && inactiveAccount.password) {
+      const inactiveRes = await login(baseUrl, inactiveAccount.email, inactiveAccount.password);
+      report.specialAuthCases.push({
+        case: 'inactive-applicant-login',
+        email: inactiveAccount.email,
+        expectedStatus: 403,
+        actualStatus: inactiveRes.status,
+        pass: inactiveRes.status === 403,
+        message: inactiveRes.json?.error || normalizeText(inactiveRes.text),
+      });
+    } else {
+      report.specialAuthCases.push({
+        case: 'inactive-applicant-login',
+        skipped: true,
+        reason: 'TEST_INACTIVE_EMAIL and TEST_INACTIVE_PASSWORD are not configured.',
+      });
+    }
 
-    const unverifiedRes = await login(baseUrl, TEST_ACCOUNTS.unverifiedApplicant, TEST_PASSWORD);
-    report.specialAuthCases.push({
-      case: 'unverified-applicant-login',
-      email: TEST_ACCOUNTS.unverifiedApplicant,
-      expectedStatus: 200,
-      actualStatus: unverifiedRes.status,
-      pass: unverifiedRes.status === 200,
-      message: unverifiedRes.json?.error || normalizeText(unverifiedRes.text),
-    });
+    const unverifiedAccount = TEST_ACCOUNTS.unverifiedApplicant;
+    if (unverifiedAccount.email && unverifiedAccount.password) {
+      const unverifiedRes = await login(baseUrl, unverifiedAccount.email, unverifiedAccount.password);
+      report.specialAuthCases.push({
+        case: 'unverified-applicant-login',
+        email: unverifiedAccount.email,
+        expectedStatus: 200,
+        actualStatus: unverifiedRes.status,
+        pass: unverifiedRes.status === 200,
+        message: unverifiedRes.json?.error || normalizeText(unverifiedRes.text),
+      });
+    } else {
+      report.specialAuthCases.push({
+        case: 'unverified-applicant-login',
+        skipped: true,
+        reason: 'TEST_UNVERIFIED_EMAIL and TEST_UNVERIFIED_PASSWORD are not configured.',
+      });
+    }
 
     // Build context IDs from admin account so checks can hit concrete endpoints.
     const adminToken = sessions.administrator.token;

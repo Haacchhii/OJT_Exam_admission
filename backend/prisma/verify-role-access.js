@@ -1,5 +1,28 @@
 import app from '../src/app.js';
 
+const TEST_ACCOUNTS = [
+  {
+    name: 'admin',
+    email: process.env.TEST_ADMIN_EMAIL || 'admin@goldenkey.edu',
+    password: process.env.TEST_ADMIN_PASSWORD || 'admin123',
+  },
+  {
+    name: 'registrar',
+    email: process.env.TEST_REGISTRAR_EMAIL || 'registrar@goldenkey.edu',
+    password: process.env.TEST_REGISTRAR_PASSWORD || 'admin123',
+  },
+  {
+    name: 'teacher',
+    email: process.env.TEST_TEACHER_EMAIL || 'teacher@goldenkey.edu',
+    password: process.env.TEST_TEACHER_PASSWORD || 'admin123',
+  },
+  {
+    name: 'applicant',
+    email: process.env.TEST_APPLICANT_EMAIL || 'joseirineo0418@gmail.com',
+    password: process.env.TEST_APPLICANT_PASSWORD || 'Changeme123!',
+  },
+];
+
 async function parseBody(res) {
   const t = await res.text();
   try {
@@ -18,13 +41,6 @@ async function main() {
     const port = typeof addr === 'object' && addr ? addr.port : 3000;
     const base = `http://127.0.0.1:${port}/api`;
 
-    const accounts = [
-      ['admin', 'qa.admin@goldenkey.local'],
-      ['registrar', 'qa.registrar@goldenkey.local'],
-      ['teacher', 'qa.teacher@goldenkey.local'],
-      ['applicant', 'qa.student.passed@goldenkey.local'],
-    ];
-
     const tests = [
       ['GET', '/users?page=1&limit=1'],
       ['GET', '/admissions?page=1&limit=1'],
@@ -33,11 +49,13 @@ async function main() {
       ['GET', '/academic-years'],
     ];
 
-    for (const [name, email] of accounts) {
+    let loginFailures = 0;
+
+    for (const { name, email, password } of TEST_ACCOUNTS) {
       const loginRes = await fetch(`${base}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password: 'Tester!123' }),
+        body: JSON.stringify({ email, password }),
       });
       const loginBody = await parseBody(loginRes);
 
@@ -45,7 +63,10 @@ async function main() {
       const err = loginBody && typeof loginBody === 'object' && loginBody.error ? loginBody.error : null;
       console.log(`LOGIN ${name} ${loginRes.status} ${role || err || ''}`);
 
-      if (!loginRes.ok || !loginBody || typeof loginBody !== 'object' || !loginBody.token) continue;
+      if (!loginRes.ok || !loginBody || typeof loginBody !== 'object' || !loginBody.token) {
+        loginFailures += 1;
+        continue;
+      }
 
       for (const [method, route] of tests) {
         const res = await fetch(`${base}${route}`, {
@@ -57,6 +78,11 @@ async function main() {
         if (body && typeof body === 'object' && body.error) msg = body.error;
         console.log(`  ${name} ${method} ${route} => ${res.status} ${msg}`);
       }
+    }
+
+    if (loginFailures > 0) {
+      console.error(`Integration role access check failed: ${loginFailures} account login(s) were rejected.`);
+      process.exitCode = 1;
     }
   } finally {
     await new Promise((resolve, reject) => server.close((err) => (err ? reject(err) : resolve())));

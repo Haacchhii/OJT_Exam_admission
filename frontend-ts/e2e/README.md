@@ -10,7 +10,13 @@ These tests cover high-risk journeys:
 ## Pre-requisites
 1. Backend running (default `http://localhost:3000`)
 2. Frontend running (default `http://127.0.0.1:5173`)
-3. Seeded test data in backend (`admin@goldenkey.edu`, `teacher@goldenkey.edu`, `registrar@goldenkey.edu`, `ana.reyes@email.com`)
+3. Seeded test data in backend (`admin@goldenkey.edu`, `teacher@goldenkey.edu`, `registrar@goldenkey.edu`, `joseirineo0418@gmail.com`)
+
+Default credentials used by tests:
+- admin@goldenkey.edu / admin123
+- teacher@goldenkey.edu / admin123
+- registrar@goldenkey.edu / admin123
+- joseirineo0418@gmail.com / Changeme123!
 
 ## Install
 - `npm install`
