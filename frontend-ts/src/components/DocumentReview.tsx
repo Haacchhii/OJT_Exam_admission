@@ -172,6 +172,48 @@ export default function DocumentReview({ admissionId, documents, onReviewUpdate 
     finally { setReviewing(null); }
   }, [admissionId, onReviewUpdate, confirm]);
 
+  const handleDownload = useCallback(async (doc: DocumentFile) => {
+    if (!token) {
+      showToast('You are not logged in. Please log in and try again.', 'error');
+      return;
+    }
+
+    try {
+      const res = await fetch(getDocumentDownloadUrl(admissionId, doc.id), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!res.ok) {
+        let msg = 'Failed to download document';
+        try {
+          const contentType = res.headers.get('content-type') || '';
+          const payload = contentType.includes('json') ? await res.json() : await res.text();
+          if (typeof payload === 'string' && payload.trim()) msg = payload;
+          else if (payload && typeof payload === 'object') {
+            const p = payload as { message?: string; error?: string };
+            if (typeof p.message === 'string' && p.message.trim()) msg = p.message;
+            else if (typeof p.error === 'string' && p.error.trim()) msg = p.error;
+          }
+        } catch {
+          // Keep default message when payload parsing fails.
+        }
+        throw new Error(msg);
+      }
+
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = doc.name || 'document';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+    } catch (err: any) {
+      showToast(err.message || 'Failed to download document', 'error');
+    }
+  }, [admissionId, token]);
+
   return (
     <>
       <div className="space-y-2">
@@ -198,15 +240,14 @@ export default function DocumentReview({ admissionId, documents, onReviewUpdate 
                     ) : (
                       <span className="text-xs text-gray-400">Preview unavailable</span>
                     )}
-                    <a
-                      href={getDocumentDownloadUrl(admissionId, doc.id)}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <button
+                      type="button"
+                      onClick={() => void handleDownload(doc)}
                       className="text-gray-500 hover:text-gray-700 text-xs font-medium hover:underline"
                       title="Download document"
                     >
                       Download
-                    </a>
+                    </button>
                   </>
                 ) : (
                   <span className="text-xs text-gray-400">No file available</span>
@@ -393,14 +434,13 @@ export default function DocumentReview({ admissionId, documents, onReviewUpdate 
 
             {/* Action Bar */}
             <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
-              <a
-                href={getDocumentDownloadUrl(admissionId, previewDoc.id)}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                type="button"
+                onClick={() => void handleDownload(previewDoc)}
                 className="inline-flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-800 hover:underline"
               >
                 Download Original
-              </a>
+              </button>
               <button
                 onClick={closePreview}
                 className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 bg-gray-100 hover:bg-gray-200 rounded-lg transition"

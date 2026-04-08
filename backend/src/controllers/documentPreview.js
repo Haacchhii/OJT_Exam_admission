@@ -37,6 +37,43 @@ const EXT_MIME = {
   '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 };
 
+async function resolveStoredDocumentPath(doc) {
+  const candidates = [];
+  if (doc.filePath) candidates.push(doc.filePath);
+
+  const latestSubmission = await prisma.admissionDocumentSubmission.findFirst({
+    where: {
+      OR: [
+        { admissionDocumentId: doc.id },
+        { admissionId: doc.admissionId, originalFileName: doc.documentName },
+      ],
+    },
+    orderBy: { uploadedAt: 'desc' },
+    select: { storedFilePath: true },
+  });
+
+  if (latestSubmission?.storedFilePath) {
+    candidates.push(latestSubmission.storedFilePath);
+  }
+
+  const uniqueCandidates = [...new Set(candidates.filter(Boolean))];
+  for (const candidate of uniqueCandidates) {
+    const resolvedPath = resolveUploadedFilePath(candidate);
+    if (resolvedPath && existsSync(resolvedPath)) {
+      return { resolvedPath, storedPath: candidate };
+    }
+  }
+
+  if (uniqueCandidates.length > 0) {
+    return {
+      resolvedPath: resolveUploadedFilePath(uniqueCandidates[0]),
+      storedPath: uniqueCandidates[0],
+    };
+  }
+
+  return { resolvedPath: '', storedPath: '' };
+}
+
 function generateJobId(docId) {
   return `extract_${docId}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -79,12 +116,12 @@ async function extractTextFromFile(filePath, ext) {
 }
 
 async function performDocumentExtraction(doc) {
-  const filePath = resolveUploadedFilePath(doc.filePath);
-  if (!existsSync(filePath)) {
+  const { resolvedPath: filePath, storedPath } = await resolveStoredDocumentPath(doc);
+  if (!filePath || !existsSync(filePath)) {
     throw new Error('File not found on server');
   }
 
-  const ext = path.extname(doc.filePath).toLowerCase();
+  const ext = path.extname(storedPath || doc.filePath || doc.documentName || '').toLowerCase();
   const extractedText = await extractTextFromFile(filePath, ext);
   const parsedData = parseDocumentFields(extractedText, doc.documentName);
   const extractedAt = new Date();
@@ -121,7 +158,7 @@ async function processExtractionQueue() {
 
       try {
         const doc = await prisma.admissionDocument.findUnique({ where: { id: job.docId } });
-        if (!doc || doc.admissionId !== job.admissionId || !doc.filePath) {
+        if (!doc || doc.admissionId !== job.admissionId) {
           throw new Error('Document not found');
         }
 
@@ -172,16 +209,13 @@ export async function previewDocument(req, res, next) {
     if (!doc || doc.admissionId !== admissionId) {
       return res.status(404).json({ error: 'Document not found', code: 'NOT_FOUND' });
     }
-    if (!doc.filePath) {
-      return res.status(404).json({ error: 'File not available', code: 'NOT_FOUND' });
-    }
 
-    const filePath = resolveUploadedFilePath(doc.filePath);
-    if (!existsSync(filePath)) {
+    const { resolvedPath: filePath, storedPath } = await resolveStoredDocumentPath(doc);
+    if (!filePath || !existsSync(filePath)) {
       return res.status(404).json({ error: 'File not found on server', code: 'NOT_FOUND' });
     }
 
-    const ext = path.extname(doc.filePath).toLowerCase();
+    const ext = path.extname(storedPath || doc.filePath || doc.documentName || '').toLowerCase();
     const mime = EXT_MIME[ext] || 'application/octet-stream';
 
     res.setHeader('Content-Type', mime);
@@ -209,8 +243,10 @@ export async function extractDocument(req, res, next) {
     if (!doc || doc.admissionId !== admissionId) {
       return res.status(404).json({ error: 'Document not found', code: 'NOT_FOUND' });
     }
-    if (!doc.filePath) {
-      return res.status(404).json({ error: 'File not available', code: 'NOT_FOUND' });
+
+    const { resolvedPath: filePath } = await resolveStoredDocumentPath(doc);
+    if (!filePath || !existsSync(filePath)) {
+      return res.status(404).json({ error: 'File not found on server', code: 'NOT_FOUND' });
     }
 
     // Return cached extraction if available

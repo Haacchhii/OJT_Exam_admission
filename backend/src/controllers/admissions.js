@@ -1,5 +1,6 @@
 ﻿import prisma from '../config/db.js';
 import path from 'path';
+import { existsSync } from 'fs';
 import { paginate, paginatedResponse } from '../utils/pagination.js';
 import { VALID_TRANSITIONS, ROLES, MAX_BULK_OPERATIONS, getLevelGroup } from '../utils/constants.js';
 import { generateTrackingId, generateStudentNumber } from '../utils/tracking.js';
@@ -28,6 +29,36 @@ function isWithinPeriod(day, start, end) {
   if (start && day < start) return false;
   if (end && day > end) return false;
   return true;
+}
+
+async function resolveStoredDocumentPath(doc) {
+  const candidates = [];
+  if (doc.filePath) candidates.push(doc.filePath);
+
+  const latestSubmission = await prisma.admissionDocumentSubmission.findFirst({
+    where: {
+      OR: [
+        { admissionDocumentId: doc.id },
+        { admissionId: doc.admissionId, originalFileName: doc.documentName },
+      ],
+    },
+    orderBy: { uploadedAt: 'desc' },
+    select: { storedFilePath: true },
+  });
+
+  if (latestSubmission?.storedFilePath) {
+    candidates.push(latestSubmission.storedFilePath);
+  }
+
+  const uniqueCandidates = [...new Set(candidates.filter(Boolean))];
+  for (const candidate of uniqueCandidates) {
+    const resolvedPath = resolveUploadedFilePath(candidate);
+    if (resolvedPath && existsSync(resolvedPath)) {
+      return resolvedPath;
+    }
+  }
+
+  return uniqueCandidates.length > 0 ? resolveUploadedFilePath(uniqueCandidates[0]) : '';
 }
 
 // Helper: shape admission for API response (include document names and file paths)
@@ -917,11 +948,11 @@ export async function downloadDocument(req, res, next) {
       }
     }
 
-    if (!doc.filePath) {
-      return res.status(404).json({ error: 'File not available', code: 'NOT_FOUND' });
+    const filePath = await resolveStoredDocumentPath(doc);
+    if (!filePath || !existsSync(filePath)) {
+      return res.status(404).json({ error: 'File not found on server', code: 'NOT_FOUND' });
     }
 
-    const filePath = resolveUploadedFilePath(doc.filePath);
     res.download(filePath, doc.documentName);
   } catch (err) { next(err); }
 }
