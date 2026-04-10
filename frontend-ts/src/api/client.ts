@@ -105,9 +105,10 @@ const MAX_RETRIES = 2;
 const RETRY_BASE_MS = 500;
 const RETRYABLE_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
 const GET_BURST_CACHE_MS = 15000;
+let cacheEpoch = 0;
 
 const inflightGetRequests = new Map<string, Promise<unknown>>();
-const recentGetResponses = new Map<string, { data: unknown; expiresAt: number }>();
+const recentGetResponses = new Map<string, { data: unknown; expiresAt: number; epoch: number }>();
 
 export type RequestOptions = {
   signal?: AbortSignal;
@@ -125,6 +126,7 @@ function toResourcePrefix(path: string): string {
 }
 
 function invalidateGetCache(prefixes?: string[]) {
+  cacheEpoch += 1;
   if (!prefixes || prefixes.length === 0) {
     inflightGetRequests.clear();
     recentGetResponses.clear();
@@ -273,7 +275,7 @@ export const client = {
 
     const key = makeRequestKey(path);
     const cached = recentGetResponses.get(key);
-    if (cached && cached.expiresAt > Date.now()) {
+    if (cached && cached.expiresAt > Date.now() && cached.epoch === cacheEpoch) {
       emitRequestTiming(path, 'GET', 0, 200, true);
       return Promise.resolve(cached.data as T);
     }
@@ -281,11 +283,28 @@ export const client = {
     const inFlight = inflightGetRequests.get(key);
     if (inFlight) return inFlight as Promise<T>;
 
+    const requestEpoch = cacheEpoch;
     const req = withRetry(() => request<T>('GET', path))
-      .then((data) => {
+      .then(async (data) => {
+        // If a mutation invalidated caches while this GET was in-flight,
+        // fetch once more so callers do not receive a stale snapshot.
+        if (requestEpoch !== cacheEpoch) {
+          const freshRequestEpoch = cacheEpoch;
+          const freshData = await withRetry(() => request<T>('GET', path));
+          if (freshRequestEpoch === cacheEpoch) {
+            recentGetResponses.set(key, {
+              data: freshData,
+              expiresAt: Date.now() + GET_BURST_CACHE_MS,
+              epoch: freshRequestEpoch,
+            });
+          }
+          return freshData;
+        }
+
         recentGetResponses.set(key, {
           data,
           expiresAt: Date.now() + GET_BURST_CACHE_MS,
+          epoch: requestEpoch,
         });
         return data;
       })

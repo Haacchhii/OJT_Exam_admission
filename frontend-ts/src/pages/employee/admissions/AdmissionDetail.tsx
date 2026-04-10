@@ -9,7 +9,7 @@ import Icon from '../../../components/Icons';
 import { SCHOOL_NAME, SCHOOL_BRAND, SCHOOL_SUBTITLE, SCHOOL_ADDRESS, SCHOOL_PHONE } from '../../../utils/constants';
 import { useAuth } from '../../../context/AuthContext';
 import type { Admission } from '../../../types';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 interface DProps {
   label: string;
@@ -29,25 +29,26 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
   const { user } = useAuth();
   const canManage = user?.role === 'administrator' || user?.role === 'registrar';
   const confirm = useConfirm();
-  const { data: adm, loading, refetch } = useAsync<Admission | null>(async () => {
+  const { data: fetchedAdm, loading, refetch } = useAsync<Admission | null>(async () => {
     try {
       return await getAdmission(admissionId);
     } catch {
       return null;
     }
-  }, [admissionId]);
+  }, [admissionId], 0, { autoRefreshOnDataChange: true, resourcePrefixes: ['/admissions'] });
+
+  const [adm, setAdm] = useState<Admission | null>(null);
 
   const [statusVal, setStatusVal] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
-  const [initialized, setInitialized] = useState(false);
 
-  // Sync state from fetched data once loaded
-  if (adm && !initialized) {
-    setStatusVal(adm.status);
-    setNotes(adm.notes || '');
-    setInitialized(true);
-  }
+  useEffect(() => {
+    if (!fetchedAdm) return;
+    setAdm(fetchedAdm);
+    setStatusVal(fetchedAdm.status);
+    setNotes(fetchedAdm.notes || '');
+  }, [fetchedAdm?.id, fetchedAdm?.status, fetchedAdm?.notes]);
 
   if (loading && !adm) return <SkeletonPage />;
   if (!adm) return <p className="text-gray-500 p-4">Application not found.</p>;
@@ -158,7 +159,10 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
     }
     setSaving(true);
     try {
-      await updateAdmissionStatus(adm.id, statusVal, notes);
+      const updated = await updateAdmissionStatus(adm.id, statusVal, notes);
+      setAdm(updated);
+      setStatusVal(updated.status);
+      setNotes(updated.notes || '');
       showToast(`Application ${statusVal.toLowerCase()} successfully!`, 'success');
       refetch();
     } catch (err: any) {

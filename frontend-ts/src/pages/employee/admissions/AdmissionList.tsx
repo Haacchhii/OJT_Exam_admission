@@ -99,7 +99,11 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
       getAdmissionsPage(admissionParams),
     ]);
     return { stats, admissionsPage };
-  }, [filter, levelGroupFilter, gradeFilter, yearFilter, semesterFilter, sortBy, search, staleOnly, page], 0, { setLoadingOnReload: true });
+  }, [filter, levelGroupFilter, gradeFilter, yearFilter, semesterFilter, sortBy, search, staleOnly, page], 0, {
+    setLoadingOnReload: true,
+    autoRefreshOnDataChange: true,
+    resourcePrefixes: ['/admissions'],
+  });
 
   const { data: stalePreview } = useAsync(async () => {
     if (!canManage) {
