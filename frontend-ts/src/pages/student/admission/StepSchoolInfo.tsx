@@ -1,5 +1,6 @@
 ﻿import type { ChangeEvent } from 'react';
 import Icon from '../../../components/Icons';
+import { ActionButton } from '../../../components/UI';
 import { Input, Select, TextArea } from './AdmissionFormFields';
 import { checkAgeRequirement } from './admissionValidation';
 import { GRADE_OPTIONS, DOC_SLOT_LABELS, APPLICANT_TYPES, SCHOOL_NAME } from '../../../utils/constants';
@@ -96,8 +97,8 @@ export default function StepSchoolInfo({ form, set, setForm, goTo, requiredDocs,
         </div>
       )}
       <div className="flex justify-between">
-        <button onClick={() => goTo(1)} className="border border-gray-300 text-gray-700 px-5 py-2.5 rounded-lg hover:bg-gray-50">Back</button>
-        <button onClick={() => goTo(3)} className="bg-gradient-to-r from-forest-500 to-forest-400 text-white px-6 py-2.5 rounded-lg font-semibold hover:from-gold-500 hover:to-gold-600">Next: Family Details</button>
+        <ActionButton variant="secondary" onClick={() => goTo(1)} className="px-5 py-2.5">Back</ActionButton>
+        <ActionButton onClick={() => goTo(3)} className="px-6 py-2.5 bg-gradient-to-r from-forest-500 to-forest-400 hover:from-gold-500 hover:to-gold-600">Next: Family Details</ActionButton>
       </div>
     </div>
   );

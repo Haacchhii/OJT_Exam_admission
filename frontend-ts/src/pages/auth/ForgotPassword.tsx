@@ -3,6 +3,7 @@ import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { client } from '../../api/client';
 import { showToast } from '../../components/Toast';
+import { ActionButton } from '../../components/UI';
 import Icon from '../../components/Icons';
 
 export default function ForgotPassword() {
@@ -45,7 +46,7 @@ export default function ForgotPassword() {
               <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="gk-input pl-11" placeholder="your@email.com" />
             </div>
           </div>
-          <button type="submit" disabled={loading} className="gk-btn-primary w-full py-3 text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">{loading ? <><Icon name="spinner" className="w-4 h-4 animate-spin" />Sending…</> : 'Send Reset Link'}</button>
+          <ActionButton type="submit" loading={loading} className="w-full py-3 text-sm">{loading ? 'Sending...' : 'Send Reset Link'}</ActionButton>
         </form>
 
         {submitted && (

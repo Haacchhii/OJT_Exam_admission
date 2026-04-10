@@ -1,5 +1,6 @@
 ﻿import type { ChangeEvent } from 'react';
 import Icon from '../../../components/Icons';
+import { ActionButton } from '../../../components/UI';
 import { Input, Select } from './AdmissionFormFields';
 import { GENDER_OPTIONS } from '../../../utils/constants';
 import type { AdmissionForm } from './useAdmissionWizard';
@@ -63,7 +64,7 @@ export default function StepPersonalInfo({ form, set, setForm, goTo, errors = {}
         <Input label="ZIP Code (Optional)" value={form.addressZipCode} onChange={(e: ChangeEvent<HTMLInputElement>) => { const v = e.target.value.replace(/\D/g, ''); setForm(f => ({ ...f, addressZipCode: v })); clearError?.('addressZipCode'); }} placeholder="4211" maxLength={10} inputMode="numeric" pattern="[0-9]*" error={errors.addressZipCode} className="md:col-span-2" />
       </div>
       <div className="flex justify-end">
-        <button onClick={() => goTo(2)} className="bg-gradient-to-r from-forest-500 to-forest-400 text-white px-6 py-2.5 rounded-lg font-semibold hover:from-gold-500 hover:to-gold-600">Next: School Info</button>
+        <ActionButton onClick={() => goTo(2)} className="px-6 py-2.5 bg-gradient-to-r from-forest-500 to-forest-400 hover:from-gold-500 hover:to-gold-600">Next: School Info</ActionButton>
       </div>
     </div>
   );

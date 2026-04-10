@@ -5,7 +5,7 @@ import { getMyRegistrationSummary, startExam as apiStartExam, getExamForStudent 
 import { getMyResult } from '../../api/results';
 import { showToast } from '../../components/Toast';
 import { useConfirm } from '../../components/ConfirmDialog';
-import { SkeletonPage, ErrorAlert } from '../../components/UI';
+import { SkeletonPage, ErrorAlert, ActionButton } from '../../components/UI';
 import Icon from '../../components/Icons';
 import type { Exam, ExamRegistration, ExamResult } from '../../types';
 import ScheduleView from './exam/ScheduleView';
@@ -109,9 +109,9 @@ export default function StudentExam() {
               <li>Your answers are saved automatically as you go.</li>
             </ul>
           </div>
-          <button onClick={handleStartExam} disabled={startingExam} className="bg-gradient-to-r from-forest-500 to-forest-400 text-white px-8 py-3 rounded-lg font-semibold text-lg hover:from-gold-500 hover:to-gold-600 shadow-md inline-flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed">
-            {startingExam ? <><span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Starting...</> : <><Icon name="exam" className="w-5 h-5" /> Start Exam</>}
-          </button>
+          <ActionButton onClick={handleStartExam} disabled={startingExam} className="px-8 py-3 text-lg bg-gradient-to-r from-forest-500 to-forest-400 hover:from-gold-500 hover:to-gold-600 shadow-md" icon={<Icon name="exam" className="w-5 h-5" />}>
+            {startingExam ? 'Starting...' : 'Start Exam'}
+          </ActionButton>
         </div>
       </div>
     );

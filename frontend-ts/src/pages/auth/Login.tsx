@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { client } from '../../api/client';
 import { showToast } from '../../components/Toast';
+import { ActionButton } from '../../components/UI';
 import Icon from '../../components/Icons';
 import { SCHOOL_NAME, SCHOOL_BRAND, SCHOOL_SUBTITLE } from '../../utils/constants';
 
@@ -162,15 +163,17 @@ export default function Login() {
               <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
                 <p className="text-sm text-amber-900 font-medium">Your email is not verified yet.</p>
                 <p className="text-xs text-amber-800 mt-1">Please verify your email to continue. If you did not receive the email, request a new link below.</p>
-                <button
+                <ActionButton
                   type="button"
+                  variant="secondary"
+                  size="sm"
                   onClick={handleResendVerification}
                   disabled={resendingVerification}
-                  className="mt-3 inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-60"
+                  className="mt-3 border-amber-300 text-amber-900 hover:bg-amber-100"
+                  icon={resendingVerification ? <Icon name="spinner" className="w-3.5 h-3.5 animate-spin" /> : <Icon name="mail" className="w-3.5 h-3.5" />}
                 >
-                  {resendingVerification ? <Icon name="spinner" className="w-3.5 h-3.5 animate-spin" /> : <Icon name="mail" className="w-3.5 h-3.5" />}
                   {resendingVerification ? 'Sending...' : 'Resend verification email'}
-                </button>
+                </ActionButton>
               </div>
             )}
 
@@ -210,16 +213,9 @@ export default function Login() {
                 <Link to="/forgot-password" className="text-forest-500 hover:text-forest-600 font-medium transition-colors">Forgot password?</Link>
               </div>
 
-              <button type="submit" disabled={loading}
-                data-testid="login-submit"
-                className="gk-btn-primary w-full py-3 text-sm flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
-                {loading ? (
-                  <>
-                    <Icon name="spinner" className="w-4 h-4 animate-spin" />
-                    Signing In…
-                  </>
-                ) : 'Sign In'}
-              </button>
+              <ActionButton type="submit" loading={loading} data-testid="login-submit" className="w-full py-3 text-sm">
+                {loading ? 'Signing In...' : 'Sign In'}
+              </ActionButton>
             </form>
 
             <div className="mt-6 rounded-2xl border-2 border-forest-100 bg-forest-50/60 p-5 text-center space-y-3">

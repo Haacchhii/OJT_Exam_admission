@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { showToast } from '../../components/Toast';
 import { getPasswordStrength, getPasswordRequirementChecks, isPasswordCompliant } from '../../utils/passwordStrength';
+import { ActionButton } from '../../components/UI';
 import Icon from '../../components/Icons';
 import { SCHOOL_NAME, SCHOOL_BRAND, SCHOOL_SUBTITLE, GRADE_OPTIONS } from '../../utils/constants';
 
@@ -211,11 +212,9 @@ export default function Register() {
                   <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1"><Icon name="exclamation" className="w-3.5 h-3.5" />Passwords do not match</p>
                 )}
               </div>
-              <button type="submit" disabled={loading} data-testid="register-submit" className="gk-btn-primary w-full py-3 text-sm flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
-                {loading ? (
-                  <><Icon name="spinner" className="w-4 h-4 animate-spin" />Creating Account…</>
-                ) : 'Create Account'}
-              </button>
+              <ActionButton type="submit" loading={loading} data-testid="register-submit" className="w-full py-3 text-sm">
+                {loading ? 'Creating Account...' : 'Create Account'}
+              </ActionButton>
             </form>
             <p className="text-sm text-gray-500 text-center mt-6">Already have an account? <Link to="/login" className="text-forest-500 hover:text-forest-600 font-semibold transition-colors">Sign in</Link></p>
           </div>

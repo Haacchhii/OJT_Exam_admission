@@ -1,4 +1,5 @@
 ﻿import Icon from '../../../components/Icons';
+import { ActionButton } from '../../../components/UI';
 import { UploadSlot } from './AdmissionFormFields';
 import { DOC_SLOT_LABELS } from '../../../utils/constants';
 import type { SlotFiles } from './useAdmissionWizard';
@@ -71,8 +72,8 @@ export default function StepDocuments({ form, requiredDocs, optionalDocs, slotFi
         </div>
       )}
       <div className="flex justify-between mt-6">
-        <button onClick={() => goTo(3)} className="border border-gray-300 text-gray-700 px-5 py-2.5 rounded-lg hover:bg-gray-50">Back</button>
-        <button onClick={() => goTo(5)} className="bg-gradient-to-r from-forest-500 to-forest-400 text-white px-6 py-2.5 rounded-lg font-semibold hover:from-gold-500 hover:to-gold-600">Next: Review</button>
+        <ActionButton variant="secondary" onClick={() => goTo(3)} className="px-5 py-2.5">Back</ActionButton>
+        <ActionButton onClick={() => goTo(5)} className="px-6 py-2.5 bg-gradient-to-r from-forest-500 to-forest-400 hover:from-gold-500 hover:to-gold-600">Next: Review</ActionButton>
       </div>
     </div>
   );

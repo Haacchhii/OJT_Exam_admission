@@ -1,7 +1,7 @@
 ﻿import { Link } from 'react-router-dom';
 import { getMyRegistrationSummary, getExamForReview } from '../../api/exams';
 import { getMyResult, getSubmittedAnswers } from '../../api/results';
-import { PageHeader, SkeletonPage, ErrorAlert } from '../../components/UI';
+import { PageHeader, SkeletonPage, ErrorAlert, ActionButton } from '../../components/UI';
 import Icon from '../../components/Icons';
 import { formatDate, asArray, formatPersonName } from '../../utils/helpers';
 import { SCHOOL_NAME, SCHOOL_BRAND, SCHOOL_SUBTITLE, SCHOOL_ADDRESS, SCHOOL_PHONE } from '../../utils/constants';
@@ -155,7 +155,7 @@ export default function StudentResults() {
   return (
     <div>
       <PageHeader title="Exam Results" subtitle="View your entrance examination score and results.">
-        <button onClick={handlePrint} className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 text-sm inline-flex items-center gap-1.5" aria-label="Print exam result"><Icon name="document" className="w-4 h-4" /> Print / Export PDF</button>
+        <ActionButton variant="secondary" onClick={handlePrint} icon={<Icon name="document" className="w-4 h-4" />} aria-label="Print exam result">Print / Export PDF</ActionButton>
       </PageHeader>
 
       <div className={`rounded-xl border-2 p-6 mb-6 ${passed ? 'bg-forest-50 border-forest-200' : 'bg-red-50 border-red-200'}`}>

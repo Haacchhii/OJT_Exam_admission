@@ -1,4 +1,5 @@
 ﻿import Icon from '../../../components/Icons';
+import { ActionButton } from '../../../components/UI';
 import { Detail, ReviewSection } from './AdmissionFormFields';
 import { DOC_SLOT_LABELS, SCHOOL_NAME } from '../../../utils/constants';
 import type { AdmissionForm, SlotFiles } from './useAdmissionWizard';
@@ -71,8 +72,8 @@ export default function StepReview({ form, slotFiles, extraFiles, requiredDocs, 
         <span><Icon name="lock" className="w-4 h-4 inline shrink-0 mr-1" /> By submitting this application, I consent to the collection and processing of my personal information in accordance with the Data Privacy Act of 2012 (RA 10173) and {SCHOOL_NAME}'s privacy policies. Personal data shall not be disclosed without consent, except as required by law.</span>
       </label>
       <div className="flex justify-between">
-        <button onClick={() => goTo(4)} className="border border-gray-300 text-gray-700 px-5 py-2.5 rounded-lg hover:bg-gray-50">Back</button>
-        <button onClick={handleSubmit} disabled={saving} className="bg-forest-500 text-white px-8 py-2.5 rounded-lg font-semibold hover:bg-forest-600 shadow-md text-lg disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2">{saving ? <><Icon name="spinner" className="w-4 h-4 animate-spin" /> Submitting...</> : <><Icon name="check" className="w-5 h-5" /> Submit Application</>}</button>
+        <ActionButton variant="secondary" onClick={() => goTo(4)} className="px-5 py-2.5">Back</ActionButton>
+        <ActionButton onClick={handleSubmit} loading={saving} icon={!saving ? <Icon name="check" className="w-5 h-5" /> : undefined} className="px-8 py-2.5 text-lg shadow-md">{saving ? 'Submitting...' : 'Submit Application'}</ActionButton>
       </div>
     </div>
   );

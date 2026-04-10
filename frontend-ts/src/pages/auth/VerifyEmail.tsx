@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { client } from '../../api/client';
 import { showToast } from '../../components/Toast';
+import { ActionButton } from '../../components/UI';
 import Icon from '../../components/Icons';
 
 type VerifyState = 'verifying' | 'success' | 'error';
@@ -104,14 +105,16 @@ export default function VerifyEmail() {
                     placeholder="your@email.com"
                     className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-forest-500/20 outline-none"
                   />
-                  <button
+                  <ActionButton
                     type="button"
+                    variant="secondary"
+                    size="sm"
                     onClick={handleResend}
                     disabled={resending}
-                    className="border border-forest-300 text-forest-700 px-3 py-2 rounded-lg text-sm hover:bg-forest-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="border-forest-300 text-forest-700 hover:bg-forest-50"
                   >
                     {resending ? 'Sending...' : 'Resend'}
-                  </button>
+                  </ActionButton>
                 </div>
               </div>
             </>

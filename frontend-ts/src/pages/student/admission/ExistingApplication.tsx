@@ -1,5 +1,5 @@
 ﻿import DocumentReview from '../../../components/DocumentReview';
-import { PageHeader, Badge } from '../../../components/UI';
+import { PageHeader, Badge, ActionButton } from '../../../components/UI';
 import Icon from '../../../components/Icons';
 import { Detail } from './AdmissionFormFields';
 import { formatDate, badgeClass } from '../../../utils/helpers';
@@ -52,17 +52,19 @@ export default function ExistingApplication({ existingApp, onNewApplication }: P
           <div className="mb-4 bg-forest-50 border border-forest-200 rounded-lg px-4 py-3 inline-flex items-center gap-2">
             <span className="text-xs text-gray-500">Tracking ID: </span>
             <span className="font-mono font-bold text-forest-700">{existingApp.trackingId}</span>
-            <button
+            <ActionButton
               type="button"
               onClick={() => {
                 navigator.clipboard.writeText(existingApp.trackingId);
                 showToast('Tracking ID copied to clipboard!', 'success');
               }}
-              className="p-1 rounded-lg hover:bg-forest-100 text-forest-500 transition-colors"
+              variant="ghost"
+              size="sm"
+              className="p-1 text-forest-500 hover:bg-forest-100"
               title="Copy to clipboard"
             >
               <Icon name="clipboard" className="w-3.5 h-3.5" />
-            </button>
+            </ActionButton>
           </div>
         )}
 
@@ -101,7 +103,7 @@ export default function ExistingApplication({ existingApp, onNewApplication }: P
           {existingApp.notes && <div className="md:col-span-2"><Detail label="Notes from Registrar" value={existingApp.notes} /></div>}
         </div>
         {existingApp.status === 'Rejected' ? (
-          <button onClick={onNewApplication} className="mt-4 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50">Submit New Application</button>
+          <ActionButton variant="secondary" onClick={onNewApplication} className="mt-4">Submit New Application</ActionButton>
         ) : existingApp.status === 'Accepted' ? (
           <div className="mt-6 bg-forest-50 border border-forest-200 rounded-xl p-5">
             <h4 className="font-bold text-forest-700 mb-3 flex items-center gap-2"><Icon name="trophy" className="w-5 h-5 text-gold-500" /> Congratulations! Your application has been accepted.</h4>

@@ -6,7 +6,7 @@ import {
   createSemester, updateSemester, deleteSemester,
 } from '../../api/academicYears';
 import { showToast } from '../../components/Toast';
-import { PageHeader, Badge, EmptyState, ErrorAlert } from '../../components/UI';
+import { PageHeader, Badge, EmptyState, ErrorAlert, ActionButton } from '../../components/UI';
 import Icon from '../../components/Icons';
 import Modal from '../../components/Modal';
 import { useConfirm } from '../../components/ConfirmDialog';
@@ -215,9 +215,7 @@ export default function EmployeeSettings() {
             <h2 className="font-semibold text-gray-800">School Years</h2>
             <span className="text-xs text-gray-400 bg-gray-100 rounded-full px-2 py-0.5">{years.length}</span>
           </div>
-          <button onClick={openAddYear} className="flex items-center gap-1.5 text-sm font-medium text-white bg-forest-600 hover:bg-forest-700 px-3 py-1.5 rounded-lg transition-colors">
-            <Icon name="plus" className="w-4 h-4" /> Add Year
-          </button>
+          <ActionButton onClick={openAddYear} size="sm" icon={<Icon name="plus" className="w-4 h-4" />}>Add Year</ActionButton>
         </div>
 
         {years.length === 0 ? (
@@ -284,13 +282,14 @@ export default function EmployeeSettings() {
                 {years.map(y => <option key={y.id} value={y.id}>{y.year}</option>)}
               </select>
             )}
-            <button
+            <ActionButton
               onClick={() => openAddSem(selectedYearId || (years[0]?.id ?? ''))}
               disabled={years.length === 0}
-              className="flex items-center gap-1.5 text-sm font-medium text-white bg-forest-600 hover:bg-forest-700 disabled:opacity-50 px-3 py-1.5 rounded-lg transition-colors"
+              size="sm"
+              icon={<Icon name="plus" className="w-4 h-4" />}
             >
-              <Icon name="plus" className="w-4 h-4" /> Add Semester
-            </button>
+              Add Semester
+            </ActionButton>
           </div>
         </div>
 
@@ -341,10 +340,8 @@ export default function EmployeeSettings() {
         title={editYearId ? 'Edit School Year' : 'Add School Year'}
         footer={
           <div className="flex justify-end gap-3">
-            <button onClick={() => setShowYearModal(false)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-200 rounded-lg">Cancel</button>
-            <button onClick={handleSaveYear} disabled={savingYear} className="px-4 py-2 text-sm font-medium text-white bg-forest-600 hover:bg-forest-700 disabled:opacity-50 rounded-lg">
-              {savingYear ? 'Saving…' : (editYearId ? 'Save Changes' : 'Create')}
-            </button>
+            <ActionButton variant="secondary" onClick={() => setShowYearModal(false)}>Cancel</ActionButton>
+            <ActionButton onClick={handleSaveYear} loading={savingYear}>{savingYear ? 'Saving...' : (editYearId ? 'Save Changes' : 'Create')}</ActionButton>
           </div>
         }
       >
@@ -380,10 +377,8 @@ export default function EmployeeSettings() {
         title={editSemId ? 'Edit Semester' : 'Add Semester'}
         footer={
           <div className="flex justify-end gap-3">
-            <button onClick={() => setShowSemModal(false)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-200 rounded-lg">Cancel</button>
-            <button onClick={handleSaveSem} disabled={savingSem} className="px-4 py-2 text-sm font-medium text-white bg-forest-600 hover:bg-forest-700 disabled:opacity-50 rounded-lg">
-              {savingSem ? 'Saving…' : (editSemId ? 'Save Changes' : 'Create')}
-            </button>
+            <ActionButton variant="secondary" onClick={() => setShowSemModal(false)}>Cancel</ActionButton>
+            <ActionButton onClick={handleSaveSem} loading={savingSem}>{savingSem ? 'Saving...' : (editSemId ? 'Save Changes' : 'Create')}</ActionButton>
           </div>
         }
       >

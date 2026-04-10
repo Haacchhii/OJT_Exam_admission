@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { trackApplication, getMyAdmission } from '../../api/admissions';
 import { useAsync } from '../../hooks/useAsync';
-import { PageHeader, SkeletonPage, ErrorAlert, Badge } from '../../components/UI';
+import { PageHeader, SkeletonPage, ErrorAlert, Badge, ActionButton, SearchInput } from '../../components/UI';
 import Icon from '../../components/Icons';
 import { showToast } from '../../components/Toast';
 import { ADMISSION_PROGRESS_STEPS, SCHOOL_PHONE } from '../../utils/constants';
@@ -114,39 +114,35 @@ export default function StudentApplicationTracker() {
             <p className="text-xs text-gray-500">Detected from your account</p>
             <div className="mt-1 flex flex-wrap items-center gap-2">
               <span className="font-mono text-sm font-bold tracking-wide text-forest-700">{suggestedId}</span>
-              <button
+              <ActionButton
                 type="button"
+                variant="secondary"
+                size="sm"
                 onClick={() => setTrackingId(suggestedId)}
-                className="text-xs rounded-md border border-forest-200 px-2 py-1 text-forest-600 hover:bg-forest-100"
+                className="text-xs border-forest-200 text-forest-600 hover:bg-forest-100"
               >
                 Use this ID
-              </button>
+              </ActionButton>
             </div>
           </div>
         )}
 
         <form onSubmit={search} className="flex flex-col sm:flex-row gap-3">
-          <input
+          <SearchInput
             value={trackingId}
-            onChange={(e) => setTrackingId(e.target.value.toUpperCase())}
+            onChange={(value) => setTrackingId(value.toUpperCase())}
             placeholder="e.g. GK-ADM-2026-00001"
-            className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm font-mono tracking-wider uppercase"
+            ariaLabel="Search tracking ID"
+            className="flex-1"
           />
-          <button
+          <ActionButton
             type="submit"
             disabled={loading || !trackingId.trim()}
-            className="bg-forest-500 text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-forest-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm inline-flex items-center justify-center gap-1.5"
+            className="px-6 py-2.5 text-sm"
+            icon={!loading ? <Icon name="search" className="w-4 h-4" /> : undefined}
           >
-            {loading ? (
-              <>
-                <Icon name="spinner" className="w-4 h-4 animate-spin" /> Searching...
-              </>
-            ) : (
-              <>
-                <Icon name="search" className="w-4 h-4" /> Search
-              </>
-            )}
-          </button>
+            {loading ? 'Searching...' : 'Search'}
+          </ActionButton>
         </form>
       </div>
 
@@ -170,13 +166,14 @@ export default function StudentApplicationTracker() {
             Use this to create a prefilled support request with your tracking details.
           </p>
           <div className="flex flex-wrap items-center gap-2">
-            <button
+            <ActionButton
               type="button"
               onClick={contactSupport}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              variant="secondary"
+              icon={<Icon name="mail" className="w-4 h-4" />}
             >
-              <Icon name="mail" className="w-4 h-4" /> I Need Help
-            </button>
+              I Need Help
+            </ActionButton>
             <span className="text-xs text-gray-400">
               Registrar contact: {SCHOOL_PHONE}
               {supportEmail ? ` | ${supportEmail}` : ' | support email not configured'}

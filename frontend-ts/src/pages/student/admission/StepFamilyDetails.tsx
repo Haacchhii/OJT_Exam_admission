@@ -1,5 +1,6 @@
 ﻿import type { ChangeEvent } from 'react';
 import Icon from '../../../components/Icons';
+import { ActionButton } from '../../../components/UI';
 import { Input } from './AdmissionFormFields';
 import type { AdmissionForm } from './useAdmissionWizard';
 
@@ -73,8 +74,8 @@ export default function StepFamilyDetails({ form, set, goTo, errors = {} }: Prop
         />
       </div>
       <div className="flex justify-between">
-        <button onClick={() => goTo(2)} className="border border-gray-300 text-gray-700 px-5 py-2.5 rounded-lg hover:bg-gray-50">Back</button>
-        <button onClick={() => goTo(4)} className="bg-gradient-to-r from-forest-500 to-forest-400 text-white px-6 py-2.5 rounded-lg font-semibold hover:from-gold-500 hover:to-gold-600">Next: Documents</button>
+        <ActionButton variant="secondary" onClick={() => goTo(2)} className="px-5 py-2.5">Back</ActionButton>
+        <ActionButton onClick={() => goTo(4)} className="px-6 py-2.5 bg-gradient-to-r from-forest-500 to-forest-400 hover:from-gold-500 hover:to-gold-600">Next: Documents</ActionButton>
       </div>
     </div>
   );

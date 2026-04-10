@@ -5,7 +5,7 @@ import { registerForExam, getAvailableSchedules, notifyNoExamSchedule, cancelExa
 import { getActivePeriod } from '../../../api/academicYears';
 import { showToast } from '../../../components/Toast';
 import { useConfirm } from '../../../components/ConfirmDialog';
-import { PageHeader } from '../../../components/UI';
+import { PageHeader, ActionButton } from '../../../components/UI';
 import Icon from '../../../components/Icons';
 import { formatTime } from '../../../utils/helpers';
 import type { Exam, ExamSchedule, ExamRegistration, ExamResult, User } from '../../../types';
@@ -215,13 +215,14 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, user
                     )}
                     {(exam as any)?.gradeLevel && <span className="inline-block mt-1 text-xs bg-gold-100 text-gold-700 px-2 py-0.5 rounded-full font-medium">{(exam as any).gradeLevel}</span>}
                   </div>
-                  <button
+                  <ActionButton
                     onClick={() => bookSlot(s.id)}
                     disabled={bookingSlotId === s.id}
-                    className="bg-forest-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-forest-600 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+                    className="px-4 py-2 text-sm"
+                    icon={bookingSlotId !== s.id ? <Icon name="calendar" className="w-4 h-4" /> : undefined}
                   >
-                    {bookingSlotId === s.id ? <><span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Booking...</> : 'Book This Slot'}
-                  </button>
+                    {bookingSlotId === s.id ? 'Booking...' : 'Book This Slot'}
+                  </ActionButton>
                 </div>
               );
             })}
@@ -244,14 +245,15 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, user
               />
               <div className="mt-2 flex flex-wrap items-center gap-2 justify-between">
                 <span className="text-xs text-gray-400">{noticeMessage.length}/500</span>
-                <button
+                <ActionButton
                   type="button"
                   onClick={sendNoScheduleNotice}
                   disabled={sendingNotice || noticeSent}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold bg-forest-500 text-white hover:bg-forest-600 disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="px-4 py-2 text-sm"
+                  icon={!sendingNotice ? <Icon name="mail" className="w-4 h-4" /> : undefined}
                 >
-                  {sendingNotice ? <><span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Sending...</> : <><Icon name="mail" className="w-4 h-4" /> {noticeSent ? 'Notice Sent' : 'Notify Teachers / Staff'}</>}
-                </button>
+                  {sendingNotice ? 'Sending...' : (noticeSent ? 'Notice Sent' : 'Notify Teachers / Staff')}
+                </ActionButton>
               </div>
             </div>
           </div>
@@ -301,22 +303,22 @@ function ScheduledView({ myReg, onLobby, onCancel, isCanceling }: ScheduledViewP
           </ul>
         </div>
         {canStart && exam ? (
-          <button onClick={() => onLobby(exam)} className="bg-gradient-to-r from-forest-500 to-forest-400 text-white px-8 py-3 rounded-lg font-semibold hover:from-gold-500 hover:to-gold-600 shadow-md">Take Exam Now</button>
+          <ActionButton onClick={() => onLobby(exam)} className="px-8 py-3 bg-gradient-to-r from-forest-500 to-forest-400 hover:from-gold-500 hover:to-gold-600 shadow-md">Take Exam Now</ActionButton>
         ) : (
           <p className="text-gray-400 text-sm flex items-center justify-center gap-1.5"><Icon name="clock" className="w-4 h-4" /> Exam will open on <strong>{formatDisplayDate(schedule?.scheduledDate || null)}</strong> at <strong>{formatTime(schedule?.startTime)}</strong></p>
         )}
         {myReg.status === 'scheduled' && (
           <div className="mt-4">
-            <button
+            <ActionButton
               type="button"
               onClick={() => onCancel(myReg.id)}
               disabled={isCanceling}
-              className="inline-flex items-center gap-1.5 border border-red-300 text-red-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-red-50 disabled:opacity-60 disabled:cursor-not-allowed"
+              variant="secondary"
+              className="border-red-300 text-red-600 hover:bg-red-50 px-4 py-2 text-sm"
+              icon={!isCanceling ? <Icon name="trash" className="w-4 h-4" /> : undefined}
             >
-              {isCanceling
-                ? <><span className="w-3.5 h-3.5 border-2 border-red-500 border-t-transparent rounded-full animate-spin" /> Cancelling...</>
-                : <><Icon name="trash" className="w-4 h-4" /> Cancel Schedule</>}
-            </button>
+              {isCanceling ? 'Cancelling...' : 'Cancel Schedule'}
+            </ActionButton>
           </div>
         )}
       </div>

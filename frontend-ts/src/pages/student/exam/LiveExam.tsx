@@ -4,6 +4,7 @@ import { submitExamAnswers } from '../../../api/results';
 import { saveDraftAnswers } from '../../../api/exams';
 import { showToast } from '../../../components/Toast';
 import Modal from '../../../components/Modal';
+import { ActionButton } from '../../../components/UI';
 import Icon from '../../../components/Icons';
 import type { Exam, ExamRegistration, ExamQuestion, QuestionChoice } from '../../../types';
 
@@ -160,13 +161,14 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
           <p className="text-gray-500 mt-2">
             This exam currently has no questions available. Please contact support and try again.
           </p>
-          <button
+          <ActionButton
             type="button"
+            variant="secondary"
             onClick={() => navigate(-1)}
-            className="mt-4 border border-gray-300 text-gray-700 px-5 py-2 rounded-lg hover:bg-gray-50"
+            className="mt-4"
           >
             Go Back
-          </button>
+          </ActionButton>
         </div>
       </div>
     );
@@ -246,9 +248,9 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
         </div>
 
         <div className="flex items-center justify-between">
-          <button onClick={() => setCurrentQ(c => Math.max(0, c - 1))} disabled={currentQ === 0} className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg disabled:opacity-40 hover:bg-gray-50 inline-flex items-center gap-1.5"><Icon name="chevronLeft" className="w-4 h-4" /> Previous</button>
-          <button onClick={() => setShowSubmitModal(true)} className="bg-forest-500 text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-forest-600 shadow-md inline-flex items-center gap-2"><Icon name="check" className="w-4 h-4" /> Submit Exam</button>
-          <button onClick={() => setCurrentQ(c => Math.min(questions.length - 1, c + 1))} disabled={currentQ === questions.length - 1} className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg disabled:opacity-40 hover:bg-gray-50 inline-flex items-center gap-1.5">Next <Icon name="chevronRight" className="w-4 h-4" /></button>
+          <ActionButton variant="secondary" onClick={() => setCurrentQ(c => Math.max(0, c - 1))} disabled={currentQ === 0} icon={<Icon name="chevronLeft" className="w-4 h-4" />}>Previous</ActionButton>
+          <ActionButton onClick={() => setShowSubmitModal(true)} icon={<Icon name="check" className="w-4 h-4" />} className="px-6 py-2.5 shadow-md">Submit Exam</ActionButton>
+          <ActionButton variant="secondary" onClick={() => setCurrentQ(c => Math.min(questions.length - 1, c + 1))} disabled={currentQ === questions.length - 1} icon={<Icon name="chevronRight" className="w-4 h-4" />}>Next</ActionButton>
         </div>
       </div>
 
@@ -258,8 +260,8 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
           <h3 className="text-xl font-bold text-forest-500">Submit Your Exam?</h3>
           <p className="text-gray-500 mt-2">You have answered {answered} out of {questions.length} questions.</p>
           <div className="flex gap-3 justify-center mt-4">
-            <button onClick={() => { setShowSubmitModal(false); doSubmit(null, null); }} className="bg-forest-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-forest-600">Yes, Submit</button>
-            <button onClick={() => setShowSubmitModal(false)} className="border border-gray-300 text-gray-700 px-5 py-2 rounded-lg hover:bg-gray-50">Go Back</button>
+            <ActionButton onClick={() => { setShowSubmitModal(false); doSubmit(null, null); }} className="px-5 py-2">Yes, Submit</ActionButton>
+            <ActionButton variant="secondary" onClick={() => setShowSubmitModal(false)} className="px-5 py-2">Go Back</ActionButton>
           </div>
         </div>
       </Modal>
@@ -269,7 +271,7 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
           <div className="w-14 h-14 rounded-2xl bg-gold-50 flex items-center justify-center mx-auto mb-3"><Icon name="clock" className="w-7 h-7 text-gold-500" /></div>
           <h3 className="text-xl font-bold text-forest-500">{autoModal?.title}</h3>
           <p className="text-gray-500 mt-2">{autoModal?.msg}</p>
-          <button onClick={() => navigate('/student/results')} className="mt-4 bg-forest-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-forest-600">View Results</button>
+          <ActionButton onClick={() => navigate('/student/results')} className="mt-4 px-6 py-2">View Results</ActionButton>
         </div>
       </Modal>
     </div>

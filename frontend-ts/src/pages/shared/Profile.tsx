@@ -2,7 +2,7 @@
 import { useAuth } from '../../context/AuthContext';
 import { showToast } from '../../components/Toast';
 import Icon from '../../components/Icons';
-import { PageHeader } from '../../components/UI';
+import { PageHeader, ActionButton } from '../../components/UI';
 import { client } from '../../api/client';
 import { formatPersonName, personInitials } from '../../utils/helpers';
 
@@ -230,9 +230,9 @@ export default function Profile() {
               <p className="text-xs text-gray-400 mt-0.5">Email cannot be changed.</p>
             </div>
           </div>
-          <button onClick={handleSaveProfile} disabled={saving} className="bg-forest-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-forest-600 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5 text-sm">
-            {saving ? <><Icon name="spinner" className="w-4 h-4 animate-spin" /> Saving...</> : 'Save Changes'}
-          </button>
+          <ActionButton onClick={handleSaveProfile} loading={saving} className="text-sm">
+            {saving ? 'Saving...' : 'Save Changes'}
+          </ActionButton>
         </div>
 
         {/* Change Password */}
@@ -258,9 +258,9 @@ export default function Profile() {
               {errors.confirmPassword && <p className="text-xs text-red-600 mt-1">{errors.confirmPassword}</p>}
             </div>
           </div>
-          <button onClick={handleChangePassword} disabled={changingPassword} className="bg-forest-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-forest-600 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5 text-sm">
-            {changingPassword ? <><Icon name="spinner" className="w-4 h-4 animate-spin" /> Changing...</> : 'Change Password'}
-          </button>
+          <ActionButton onClick={handleChangePassword} loading={changingPassword} className="text-sm">
+            {changingPassword ? 'Changing...' : 'Change Password'}
+          </ActionButton>
         </div>
       </div>
     </div>
