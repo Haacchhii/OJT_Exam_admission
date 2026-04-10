@@ -1,25 +1,43 @@
-import { useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Icon from '../../components/Icons';
 import ApplicationTracker from './ApplicationTracker';
 import AdmissionDetail from './admissions/AdmissionDetail';
 import AdmissionList from './admissions/AdmissionList';
 
 export default function EmployeeAdmissions() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const directId = searchParams.get('id');
-  const directStatus = searchParams.get('status');
-  const [detailId, setDetailId] = useState<number | null>(directId ? parseInt(directId) : null);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const hashParams = useMemo(() => {
+    const hash = window.location.hash || '';
+    const queryIndex = hash.indexOf('?');
+    const query = queryIndex >= 0 ? hash.slice(queryIndex + 1) : '';
+    return new URLSearchParams(query);
+  }, [location.key]);
+
+  const directStatus = hashParams.get('status');
+  const routeDetailIdRaw = hashParams.get('id');
+  const routeDetailId = routeDetailIdRaw ? Number.parseInt(routeDetailIdRaw, 10) : null;
+
+  const [activeDetailId, setActiveDetailId] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<'applications' | 'track'>('applications');
 
+  const detailId = activeDetailId ?? routeDetailId;
+  const hasDetailId = Number.isFinite(detailId) && (detailId as number) > 0;
+
   const showDetail = (id: number) => {
-    setDetailId(id);
-    setSearchParams({ id: String(id) });
+    setActiveDetailId(id);
+    const next = new URLSearchParams(hashParams);
+    next.set('id', String(id));
+    navigate(`${location.pathname}?${next.toString()}`, { replace: false });
   };
 
   const backToList = () => {
-    setDetailId(null);
-    setSearchParams({});
+    setActiveDetailId(null);
+    const next = new URLSearchParams(hashParams);
+    next.delete('id');
+    navigate(next.toString() ? `${location.pathname}?${next.toString()}` : location.pathname, { replace: false });
   };
 
   const viewTabs = (
@@ -49,8 +67,8 @@ export default function EmployeeAdmissions() {
   );
 
   // Detail view
-  if (detailId) {
-    return <AdmissionDetail admissionId={detailId} onBack={backToList} />;
+  if (hasDetailId) {
+    return <AdmissionDetail admissionId={detailId as number} onBack={backToList} />;
   }
 
   return (

@@ -130,7 +130,7 @@ test.describe('Stakeholder Navigation Coverage', () => {
       marker: { role: 'heading', name: /All Admission Applications/i },
     });
 
-    const viewButtons = page.getByRole('button', { name: 'View' });
+    const viewButtons = page.locator('tbody').getByRole('button', { name: 'View' });
     if (await viewButtons.count()) {
       await viewButtons.first().click();
       await expect(page.getByRole('heading', { name: /Application Details/i })).toBeVisible();
@@ -178,7 +178,7 @@ test.describe('Stakeholder Navigation Coverage', () => {
       marker: { role: 'heading', name: /All Admission Applications/i },
     });
 
-    const viewButtons = page.getByRole('button', { name: 'View' });
+    const viewButtons = page.locator('tbody').getByRole('button', { name: 'View' });
     if (await viewButtons.count()) {
       await viewButtons.first().click();
       await expect(page.getByRole('heading', { name: /Application Details/i })).toBeVisible();
