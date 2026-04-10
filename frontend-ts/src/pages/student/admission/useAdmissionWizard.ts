@@ -99,6 +99,12 @@ export function useAdmissionWizard() {
   const isDirty = !!(form.firstName || form.middleName || form.lastName || form.email);
   const { restore, clear } = useUnsavedChanges(isDirty, 'gk_admission_draft', form);
 
+  const getFriendlySubmitError = (err: unknown, fallback: string) => {
+    const message = err instanceof Error ? err.message?.trim() : '';
+    if (message) return message;
+    return `${fallback} If this keeps happening, please contact the developers or support team.`;
+  };
+
   useEffect(() => {
     if (!existingApp && user) {
       setForm(f => {
@@ -192,7 +198,9 @@ export function useAdmissionWizard() {
       const allFiles = [...Object.values(slotFiles).filter(Boolean) as File[], ...extraFiles];
       if (allFiles.length > 0 && result?.id) {
         try { await uploadAdmissionDocuments(result.id, allFiles); }
-        catch { showToast('Application submitted but some documents failed to upload. Please contact the registrar.', 'warning'); }
+        catch {
+          showToast('Your application was submitted, but some documents did not upload. Please try uploading again from your tracker. If this keeps happening, please contact the developers or support team.', 'warning');
+        }
       }
       if (result?.trackingId) setSubmittedTrackingId(result.trackingId);
       clear();
@@ -200,7 +208,7 @@ export function useAdmissionWizard() {
       refetch();
       setSuccessOpen(true);
     } catch (err: unknown) {
-      showToast('Submission failed: ' + ((err as Error).message || 'Unknown error'), 'error');
+      showToast(getFriendlySubmitError(err, 'We could not submit your application right now.'), 'error');
     } finally {
       setSaving(false);
     }

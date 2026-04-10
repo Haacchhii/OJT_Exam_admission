@@ -23,6 +23,14 @@ interface Props {
   onReviewUpdate?: () => void;
 }
 
+const SUPPORT_HINT = 'If this keeps happening, please contact the developers or support team.';
+
+function friendlySystemError(err: unknown, fallback: string): string {
+  const message = err instanceof Error ? err.message?.trim() : '';
+  if (message) return message;
+  return `${fallback} ${SUPPORT_HINT}`;
+}
+
 // Determine if a file is previewable in the browser
 function isPreviewable(name: string): 'pdf' | 'image' | null {
   const lower = name.toLowerCase();
@@ -84,7 +92,7 @@ export default function DocumentReview({ admissionId, documents, onReviewUpdate 
     try {
       const res = await fetch(previewUrl, { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) {
-        let msg = 'Failed to load document preview';
+        let msg = `We could not load the document preview right now. ${SUPPORT_HINT}`;
         try {
           const contentType = res.headers.get('content-type') || '';
           const payload = contentType.includes('json') ? await res.json() : await res.text();
@@ -104,8 +112,8 @@ export default function DocumentReview({ admissionId, documents, onReviewUpdate 
         if (prev) URL.revokeObjectURL(prev);
         return URL.createObjectURL(blob);
       });
-    } catch (err: any) {
-      setPreviewLoadError(err.message || 'Failed to load document preview');
+    } catch (err: unknown) {
+      setPreviewLoadError(friendlySystemError(err, 'We could not load the document preview right now.'));
     } finally {
       setPreviewLoading(false);
     }
@@ -127,8 +135,8 @@ export default function DocumentReview({ admissionId, documents, onReviewUpdate 
       const result = await extractDocumentData(admissionId, doc.id);
       setExtraction(result);
       setActiveTab('extracted');
-    } catch (err: any) {
-      setExtractError(err.message || 'Extraction failed');
+    } catch (err: unknown) {
+      setExtractError(friendlySystemError(err, 'We could not extract document details right now.'));
     } finally {
       setExtracting(false);
     }
@@ -168,7 +176,7 @@ export default function DocumentReview({ admissionId, documents, onReviewUpdate 
         : d));
       showToast(`Document ${status}`, 'success');
       onReviewUpdate?.();
-    } catch { showToast('Failed to update review', 'error'); }
+    } catch (err) { showToast(friendlySystemError(err, 'We could not update the document review right now.'), 'error'); }
     finally { setReviewing(null); }
   }, [admissionId, onReviewUpdate, confirm]);
 
@@ -184,7 +192,7 @@ export default function DocumentReview({ admissionId, documents, onReviewUpdate 
       });
 
       if (!res.ok) {
-        let msg = 'Failed to download document';
+        let msg = `We could not download this document right now. ${SUPPORT_HINT}`;
         try {
           const contentType = res.headers.get('content-type') || '';
           const payload = contentType.includes('json') ? await res.json() : await res.text();
@@ -209,8 +217,8 @@ export default function DocumentReview({ admissionId, documents, onReviewUpdate 
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(blobUrl);
-    } catch (err: any) {
-      showToast(err.message || 'Failed to download document', 'error');
+    } catch (err: unknown) {
+      showToast(friendlySystemError(err, 'We could not download this document right now.'), 'error');
     }
   }, [admissionId, token]);
 

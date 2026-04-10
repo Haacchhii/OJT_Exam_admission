@@ -18,6 +18,12 @@ import type { User } from '../../types';
 const USERS_PER_PAGE = 10;
 const ROLES = USER_ROLE_OPTIONS;
 
+function friendlyActionError(err: unknown, fallback: string): string {
+  const message = err instanceof Error ? err.message?.trim() : '';
+  if (message) return message;
+  return `${fallback} If this keeps happening, please contact the developers or support team.`;
+}
+
 interface UserForm {
   firstName: string;
   middleName: string;
@@ -157,8 +163,8 @@ export default function EmployeeUsers() {
       refetch();
       refetchStats();
       setShowModal(false);
-    } catch {
-      showToast('Failed to save user.', 'error');
+    } catch (err) {
+      showToast(friendlyActionError(err, 'We could not save this user right now.'), 'error');
     } finally {
       setSaving(false);
     }
@@ -181,8 +187,8 @@ export default function EmployeeUsers() {
         refetch();
         refetchStats();
         showToast('User deleted.', 'info');
-      } catch {
-        showToast('Failed to delete user.', 'error');
+      } catch (err) {
+        showToast(friendlyActionError(err, 'We could not delete this user right now.'), 'error');
       }
     }
   };
@@ -210,8 +216,8 @@ export default function EmployeeUsers() {
       clearSelection();
       refetch();
       refetchStats();
-    } catch {
-      showToast('Failed to delete users.', 'error');
+    } catch (err) {
+      showToast(friendlyActionError(err, 'We could not delete the selected users right now.'), 'error');
     } finally {
       setBulkDeleting(false);
     }
