@@ -6,7 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { showToast } from '../../components/Toast';
 import { useConfirm } from '../../components/ConfirmDialog';
 import Modal from '../../components/Modal';
-import { PageHeader, StatCard, Badge, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert } from '../../components/UI';
+import { PageHeader, StatCard, Badge, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert, ActionButton, SearchInput } from '../../components/UI';
 import Icon from '../../components/Icons';
 import { formatDate, exportToCSV, formatPersonName } from '../../utils/helpers';
 import type { ExamResult, EssayAnswer, ExamRegistration, ExamSchedule, Exam, User, AcademicYear, Semester } from '../../types';
@@ -423,7 +423,8 @@ export default function EmployeeResults() {
       {tab === 'results' && (
         <div>
                     <PageHeader title="Exam Results" subtitle="View all applicant exam scores and pass/fail status.">
-            <button 
+                      <ActionButton
+                        variant="secondary"
               onClick={() => exportToCSV(filtered.map(r => ({
                 'First Name': r.student?.firstName || '',
                 'Middle Name': r.student?.middleName || '',
@@ -435,11 +436,11 @@ export default function EmployeeResults() {
                 'Pass/fail': r.passed ? 'Pass' : 'Fail',
                 'Date': formatDate(r.createdAt)
               })), 'Results_Export.csv')}
-              className="bg-white text-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 flex items-center gap-2 border border-gray-300"
+                        icon={<Icon name="download" className="w-4 h-4" />}
               title="Download results as CSV"
             >
-              <Icon name="download" className="w-5 h-5" /> Export
-            </button>
+                        Export
+                      </ActionButton>
           </PageHeader>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <StatCard icon="chartBar" value={results.length} label="Total Results" color="blue" />
@@ -450,7 +451,13 @@ export default function EmployeeResults() {
 
           <div className="gk-section-card p-4">
             <div className="flex flex-col lg:flex-row gap-3 mb-3">
-              <input value={search} onChange={e => { setSearch(e.target.value); resetResultsPage(); }} placeholder="Search by student or exam name…" aria-label="Search results" className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm" />
+              <SearchInput
+                value={search}
+                onChange={(value) => { setSearch(value); resetResultsPage(); }}
+                placeholder="Search by student or exam name..."
+                ariaLabel="Search results"
+                className="flex-1"
+              />
               <select value={filter} onChange={e => { setFilter(e.target.value); resetResultsPage(); }} aria-label="Filter by result" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm min-w-[160px]">
                 <option value="all">All Results</option>
                 <option value="passed">Passed</option>
@@ -460,13 +467,13 @@ export default function EmployeeResults() {
                 <option value="all">All Exams</option>
                 {exams.map(ex => <option key={ex.id} value={String(ex.id)}>{ex.title}</option>)}
               </select>
-              <button
+              <ActionButton
+                variant="secondary"
                 onClick={() => setShowAdvancedFilters(v => !v)}
-                className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 inline-flex items-center gap-1.5"
+                icon={<Icon name="filter" className="w-4 h-4" />}
               >
-                <Icon name="filter" className="w-4 h-4" />
                 {showAdvancedFilters ? 'Hide Advanced' : 'More Filters'}
-              </button>
+              </ActionButton>
             </div>
 
             {showAdvancedFilters && (
@@ -489,12 +496,14 @@ export default function EmployeeResults() {
 
             {(filter !== 'all' || examFilter !== 'all' || yearFilter !== 'all' || semesterFilter !== 'all' || essayStatusFilter !== 'all') && (
               <div className="mb-4">
-                <button
+                <ActionButton
+                  variant="ghost"
+                  size="sm"
                   onClick={() => { setFilter('all'); setExamFilter('all'); setYearFilter('all'); setSemesterFilter('all'); setEssayStatusFilter('all'); resetResultsPage(); }}
-                  className="text-xs text-gray-600 hover:text-gray-800 underline"
+                  className="underline"
                 >
                   Reset all filters
-                </button>
+                </ActionButton>
               </div>
             )}
             {paginatedResults.length > 0 ? (
@@ -818,8 +827,8 @@ export default function EmployeeResults() {
               <textarea value={commentVal} onChange={e => setCommentVal(e.target.value)} rows={3} placeholder="Add feedback for the student..." className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm resize-none" />
             </div>
             <div className="flex gap-3">
-              <button onClick={handleScore} disabled={saving} className="bg-forest-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-forest-600 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5">{saving ? <><Icon name="spinner" className="w-4 h-4 animate-spin" /> Saving...</> : 'Save Score'}</button>
-              <button onClick={() => setScoreModal(null)} className="border border-gray-300 text-gray-700 px-5 py-2 rounded-lg hover:bg-gray-50">Cancel</button>
+              <ActionButton onClick={handleScore} loading={saving}>Save Score</ActionButton>
+              <ActionButton variant="secondary" onClick={() => setScoreModal(null)}>Cancel</ActionButton>
             </div>
           </>
         )}

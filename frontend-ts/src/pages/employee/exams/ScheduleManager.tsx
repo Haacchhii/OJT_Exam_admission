@@ -3,7 +3,7 @@ import { useAsync } from '../../../hooks/useAsync';
 import { getExams, getExamSchedulesPage, addExamSchedule, updateExamSchedule, deleteExamSchedule } from '../../../api/exams';
 import { showToast } from '../../../components/Toast';
 import { useConfirm } from '../../../components/ConfirmDialog';
-import { PageHeader, Badge, EmptyState, Pagination, SkeletonPage } from '../../../components/UI';
+import { PageHeader, Badge, EmptyState, Pagination, SkeletonPage, ActionButton, SearchInput } from '../../../components/UI';
 import Icon from '../../../components/Icons';
 import { formatTime, formatDateRange, asArray } from '../../../utils/helpers';
 import { FormInput } from './ExamComponents';
@@ -218,7 +218,7 @@ export default function ScheduleManager() {
   };
 
   if (schedLoading && !schedData) return <SkeletonPage />;
-  if (schedError) return <div className="gk-section-card p-8 text-center"><p className="text-red-600 font-medium">Failed to load schedules.</p><button onClick={schedRefetch} className="mt-2 text-forest-500 underline text-sm">Retry</button></div>;
+  if (schedError) return <div className="gk-section-card p-8 text-center"><p className="text-red-600 font-medium">Failed to load schedules.</p><div className="mt-3"><ActionButton variant="secondary" size="sm" onClick={schedRefetch}>Retry</ActionButton></div></div>;
 
   return (
     <div>
@@ -227,10 +227,10 @@ export default function ScheduleManager() {
         <h3 className="text-lg font-bold text-forest-500 mb-4">{editId ? 'Edit Schedule' : 'Add New Schedule'}</h3>
         <div className="mb-4 flex flex-wrap items-center gap-2 text-xs">
           <span className="text-gray-500 font-medium">Quick setup:</span>
-          <button type="button" onClick={() => setQuickDate(1)} className="px-2.5 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50">Tomorrow</button>
-          <button type="button" onClick={() => setQuickDate(3)} className="px-2.5 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50">+3 days</button>
-          <button type="button" onClick={() => setQuickDate(7)} className="px-2.5 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50">+7 days</button>
-          <button type="button" onClick={() => applyDefaults()} className="px-2.5 py-1.5 rounded-md border border-forest-300 text-forest-700 hover:bg-forest-50">Auto-fill from selected date</button>
+          <ActionButton type="button" variant="secondary" size="sm" onClick={() => setQuickDate(1)}>Tomorrow</ActionButton>
+          <ActionButton type="button" variant="secondary" size="sm" onClick={() => setQuickDate(3)}>+3 days</ActionButton>
+          <ActionButton type="button" variant="secondary" size="sm" onClick={() => setQuickDate(7)}>+7 days</ActionButton>
+          <ActionButton type="button" variant="secondary" size="sm" className="border-forest-300 text-forest-700 hover:bg-forest-50" onClick={() => applyDefaults()}>Auto-fill from selected date</ActionButton>
         </div>
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
@@ -248,9 +248,9 @@ export default function ScheduleManager() {
               <div className="flex items-center justify-between mb-2">
                 <label className="block text-sm font-medium text-gray-700">Bulk Exam Multi-Select</label>
                 <div className="flex items-center gap-2">
-                  <button type="button" onClick={() => setSelectedExamIds(exams.map(e => e.id))} className="text-xs text-forest-600 hover:underline">Select all</button>
+                  <ActionButton type="button" variant="ghost" size="sm" className="text-forest-600" onClick={() => setSelectedExamIds(exams.map(e => e.id))}>Select all</ActionButton>
                   <span className="text-gray-300">|</span>
-                  <button type="button" onClick={() => setSelectedExamIds([])} className="text-xs text-gray-500 hover:underline">Clear</button>
+                  <ActionButton type="button" variant="ghost" size="sm" className="text-gray-500" onClick={() => setSelectedExamIds([])}>Clear</ActionButton>
                 </div>
               </div>
               <div className="flex flex-wrap gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2.5 max-h-36 overflow-y-auto">
@@ -283,9 +283,7 @@ export default function ScheduleManager() {
             Tip: use quick setup and auto-fill to generate time, registration, and visibility windows instantly.
           </div>
           <div className="flex items-end">
-            <button type="submit" disabled={isSavingSched} className="bg-forest-500 text-white px-5 py-2.5 rounded-lg font-semibold hover:bg-forest-600 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-2">
-              {isSavingSched ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Saving...</> : (editId ? 'Update Schedule' : 'Add Schedule')}
-            </button>
+            <ActionButton type="submit" loading={isSavingSched}>{editId ? 'Update Schedule' : 'Add Schedule'}</ActionButton>
           </div>
         </form>
       </div>
@@ -293,7 +291,7 @@ export default function ScheduleManager() {
       <div className="gk-section-card p-6">
         <h3 className="text-lg font-bold text-forest-500 mb-4">Current Schedules</h3>
         <div className="flex flex-col sm:flex-row gap-3 mb-4">
-          <input value={schedSearch} onChange={e => { setSchedSearch(e.target.value); resetSchedPage(); }} placeholder="Search by exam or date..." className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm" />
+          <SearchInput value={schedSearch} onChange={(value) => { setSchedSearch(value); resetSchedPage(); }} placeholder="Search by exam or date..." ariaLabel="Search schedules" className="flex-1" />
           <select value={schedExamFilter} onChange={e => { setSchedExamFilter(e.target.value); resetSchedPage(); }} className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
             <option value="all">All Exams</option>
             {exams.map(e => <option key={e.id} value={String(e.id)}>{e.title}</option>)}

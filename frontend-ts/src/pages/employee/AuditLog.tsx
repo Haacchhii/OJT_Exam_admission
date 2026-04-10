@@ -1,7 +1,7 @@
 ﻿import { useState, useCallback, useEffect } from 'react';
 import { useAsync } from '../../hooks/useAsync';
 import { auditApi } from '../../api/auditLog';
-import { PageHeader, SkeletonPage, ErrorAlert } from '../../components/UI';
+import { PageHeader, SkeletonPage, ErrorAlert, ActionButton, SearchInput } from '../../components/UI';
 import Icon from '../../components/Icons';
 import { DEFAULT_PAGE_SIZE } from '../../utils/constants';
 import type { AuditLog as AuditLogType } from '../../types';
@@ -83,24 +83,20 @@ export default function AuditLog() {
   return (
     <div className="space-y-6">
       <PageHeader title="Audit Trail" subtitle="Track all system actions and changes">
-        <button onClick={refetch} className="border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50" title="Refresh" aria-label="Refresh audit log">
-          <Icon name="refresh" className="w-4 h-4" />
-        </button>
+        <ActionButton variant="secondary" icon={<Icon name="refresh" className="w-4 h-4" />} onClick={refetch} title="Refresh" aria-label="Refresh audit log">
+          Refresh
+        </ActionButton>
       </PageHeader>
 
       {/* Filters */}
       <div className="gk-section-card p-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <div className="relative">
-            <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search actions, entities, details..."
-              value={searchInput}
-              onChange={e => { setSearchInput(e.target.value); setPage(1); }}
-              className="gk-input pl-10 w-full"
-            />
-          </div>
+          <SearchInput
+            value={searchInput}
+            onChange={(value) => { setSearchInput(value); setPage(1); }}
+            placeholder="Search actions, entities, details..."
+            ariaLabel="Search audit logs"
+          />
           <select
             value={entity}
             onChange={e => { setEntity(e.target.value); setPage(1); }}
@@ -203,20 +199,22 @@ export default function AuditLog() {
               Page {page} of {totalPages} ({(data as any)?.total || 0} total)
             </p>
             <div className="flex gap-1">
-              <button
+              <ActionButton
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page <= 1}
-                className="border border-gray-300 text-gray-700 px-2 py-1 rounded hover:bg-gray-50 text-xs disabled:opacity-30"
+                variant="secondary"
+                size="sm"
               >
                 <Icon name="chevronLeft" className="w-3 h-3" />
-              </button>
-              <button
+              </ActionButton>
+              <ActionButton
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
-                className="border border-gray-300 text-gray-700 px-2 py-1 rounded hover:bg-gray-50 text-xs disabled:opacity-30"
+                variant="secondary"
+                size="sm"
               >
                 <Icon name="chevronRight" className="w-3 h-3" />
-              </button>
+              </ActionButton>
             </div>
           </div>
         )}

@@ -3,7 +3,7 @@ import { useAsync } from '../../hooks/useAsync';
 import { getUsersPage, getUserStats, addUser, updateUser, deleteUser, getUserByEmail, bulkDeleteUsers, type UserStats } from '../../api/users';
 import { useAuth } from '../../context/AuthContext';
 import { showToast } from '../../components/Toast';
-import { PageHeader, StatCard, Badge, EmptyState, Pagination, SkeletonPage, ErrorAlert } from '../../components/UI';
+import { PageHeader, StatCard, Badge, EmptyState, Pagination, SkeletonPage, ErrorAlert, ActionButton, SearchInput } from '../../components/UI';
 import Icon from '../../components/Icons';
 import Modal from '../../components/Modal';
 import { useConfirm } from '../../components/ConfirmDialog';
@@ -242,7 +242,8 @@ export default function EmployeeUsers() {
     <div>
       <PageHeader title="User Management" subtitle="Manage system user accounts.">
         <div className="flex gap-2">
-            <button 
+            <ActionButton
+              variant="secondary"
               onClick={() => exportToCSV(users.map(u => ({
                 'First Name': u.firstName,
                 'Middle Name': u.middleName || '',
@@ -251,18 +252,18 @@ export default function EmployeeUsers() {
                 'Role': u.role,
                 'Status': u.status
               })), 'Users_Export.csv')}
-              className="bg-white text-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 flex items-center gap-2 border border-gray-300"
+              icon={<Icon name="download" className="w-4 h-4" />}
               title="Download current page as CSV"
             >
-              <Icon name="download" className="w-5 h-5" /> Export
-            </button>
+              Export
+            </ActionButton>
             <CSVUploader title="Bulk Import Users" isOpen={showBulkImport} onClose={() => setShowBulkImport(false)} onImport={handleBulkImportUsers} templateHeaders={['firstName', 'middleName', 'lastName', 'email', 'role', 'status', 'password']} />
-            <button onClick={() => setShowBulkImport(true)} className="bg-white text-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 flex items-center gap-2 border border-gray-300">
+            <ActionButton variant="secondary" onClick={() => setShowBulkImport(true)}>
               <span>&#8690;</span> Import Users
-            </button>
-            <button onClick={openAdd} className="bg-forest-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-forest-600 flex items-center gap-2">
-            <span>&#65291;</span> Add User
-            </button>
+            </ActionButton>
+            <ActionButton onClick={openAdd}>
+              <span>&#65291;</span> Add User
+            </ActionButton>
           </div>
         </PageHeader>
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
@@ -274,7 +275,13 @@ export default function EmployeeUsers() {
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
-        <input value={search} onChange={e => { setSearch(e.target.value); resetPage(); }} placeholder="Search users..." aria-label="Search users" className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-forest-500/20 outline-none" />
+        <SearchInput
+          value={search}
+          onChange={(value) => { setSearch(value); resetPage(); }}
+          placeholder="Search users..."
+          ariaLabel="Search users"
+          className="flex-1"
+        />
         <select value={roleFilter} onChange={e => { setRoleFilter(e.target.value); resetPage(); }} aria-label="Filter by role" className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-forest-500/20 outline-none">
           <option value="all">All Roles</option>
           {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
@@ -390,8 +397,8 @@ export default function EmployeeUsers() {
             )}
           </div>
           <div className="flex justify-end gap-3 pt-2">
-            <button onClick={() => setShowModal(false)} className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>
-            <button onClick={handleSave} disabled={saving} className="px-4 py-2 text-sm bg-forest-500 text-white rounded-lg font-semibold hover:bg-forest-600 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5">{saving ? <><Icon name="spinner" className="w-4 h-4 animate-spin" /> Saving...</> : (editId ? 'Save Changes' : 'Add User')}</button>
+            <ActionButton variant="secondary" onClick={() => setShowModal(false)}>Cancel</ActionButton>
+            <ActionButton onClick={handleSave} loading={saving}>{editId ? 'Save Changes' : 'Add User'}</ActionButton>
           </div>
         </div>
       </Modal>

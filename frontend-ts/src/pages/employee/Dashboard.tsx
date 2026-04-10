@@ -5,7 +5,7 @@ import { useSocket } from '../../context/SocketContext';
 import { useAsync } from '../../hooks/useAsync';
 import { invalidateResourceCache } from '../../api/client';
 import { getAdmissionsPage, getDashboardSummary, type EmployeeDashboardSummary } from '../../api/admissions';
-import { StatCard, PageHeader, Badge, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert } from '../../components/UI';
+import { StatCard, PageHeader, Badge, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert, SearchInput } from '../../components/UI';
 import { formatDate, badgeClass, formatPersonName } from '../../utils/helpers';
 import { ADMISSION_IN_PROGRESS, GRADE_OPTIONS, ALL_GRADE_LEVELS } from '../../utils/constants';
 import Icon from '../../components/Icons';
@@ -133,16 +133,13 @@ export default function EmployeeDashboard() {
         </h3>
 
         <div className="flex flex-col sm:flex-row gap-3 mb-5">
-          <div className="flex-1 relative">
-            <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400">
-              <Icon name="search" className="w-4 h-4" />
-            </div>
-            <input
-              value={search} onChange={e => handleSearch(e.target.value)}
-              placeholder="Search by name or email…"
-              className="gk-input pl-10 w-full"
-            />
-          </div>
+          <SearchInput
+            value={search}
+            onChange={handleSearch}
+            placeholder="Search by name or email..."
+            ariaLabel="Search admissions"
+            className="flex-1"
+          />
           <select value={statusFilter} onChange={e => handleStatus(e.target.value)} className="gk-input bg-white">
             <option value="all">All Status</option>
             <option value="Submitted">Submitted</option>

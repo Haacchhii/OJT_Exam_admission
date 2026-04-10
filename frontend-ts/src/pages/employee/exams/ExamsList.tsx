@@ -6,7 +6,7 @@ import { showToast } from '../../../components/Toast';
 import { useConfirm } from '../../../components/ConfirmDialog';
 import { useSelection } from '../../../hooks/useSelection';
 import BulkActionBar from '../../../components/BulkActionBar';
-import { PageHeader, StatCard, Badge, EmptyState, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert } from '../../../components/UI';
+import { PageHeader, StatCard, Badge, EmptyState, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert, ActionButton, SearchInput } from '../../../components/UI';
 import Icon from '../../../components/Icons';
 import { formatTime, badgeClass, asArray, exportToCSV, formatPersonName, formatDate } from '../../../utils/helpers';
 import { DetailField, QuestionCard } from './ExamComponents';
@@ -223,7 +223,7 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
 
     return (
       <div>
-        <button onClick={() => setDetailId(null)} className="mb-4 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 text-sm">Back to Exam List</button>
+        <ActionButton variant="secondary" onClick={() => setDetailId(null)} className="mb-4">Back to Exam List</ActionButton>
         <div className="gk-section-card p-6 mb-4">
           <div className="flex justify-between items-start mb-4">
             <div>
@@ -231,10 +231,10 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
               <Badge className={exam.isActive ? 'gk-badge gk-badge-active' : 'gk-badge gk-badge-inactive'}>{exam.isActive ? 'Active' : 'Inactive'}</Badge>
             </div>
             <div className="flex gap-2">
-              <button onClick={() => setPreviewExam(fullExam || exam)} className="border border-forest-300 text-forest-600 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-forest-50 inline-flex items-center gap-1"><Icon name="eye" className="w-3.5 h-3.5" /> Preview</button>
+              <ActionButton variant="secondary" size="sm" icon={<Icon name="eye" className="w-3.5 h-3.5" />} onClick={() => setPreviewExam(fullExam || exam)}>Preview</ActionButton>
               {canManageExams && <>
-                <button onClick={() => onEdit!(fullExam || exam)} className="bg-forest-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-forest-600 inline-flex items-center gap-1"><Icon name="edit" className="w-3.5 h-3.5" /> Edit</button>
-                <button onClick={async () => { const action = exam.isActive ? 'Deactivate' : 'Activate'; const ok = await confirm({ title: `${action} Exam`, message: `Are you sure you want to ${action.toLowerCase()} "${exam.title}"?`, confirmLabel: action, variant: exam.isActive ? 'danger' : 'info' }); if (!ok) return; try { await updateExam(exam.id, { isActive: !exam.isActive }); showToast(`Exam ${action.toLowerCase()}d!`, 'success'); refetch(); } catch { showToast('Failed to update exam.', 'error'); } }} className="border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-sm hover:bg-gray-50">{exam.isActive ? 'Deactivate' : 'Activate'}</button>
+                <ActionButton size="sm" icon={<Icon name="edit" className="w-3.5 h-3.5" />} onClick={() => onEdit!(fullExam || exam)}>Edit</ActionButton>
+                <ActionButton variant="secondary" size="sm" onClick={async () => { const action = exam.isActive ? 'Deactivate' : 'Activate'; const ok = await confirm({ title: `${action} Exam`, message: `Are you sure you want to ${action.toLowerCase()} "${exam.title}"?`, confirmLabel: action, variant: exam.isActive ? 'danger' : 'info' }); if (!ok) return; try { await updateExam(exam.id, { isActive: !exam.isActive }); showToast(`Exam ${action.toLowerCase()}d!`, 'success'); refetch(); } catch { showToast('Failed to update exam.', 'error'); } }}>{exam.isActive ? 'Deactivate' : 'Activate'}</ActionButton>
               </>}
             </div>
           </div>
@@ -293,7 +293,8 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
   return (
     <div>
       <PageHeader title="All Exams" subtitle="View and manage created exams.">
-        <div className="flex gap-2">          <button onClick={() => {
+        <div className="flex gap-2">
+          <ActionButton variant="secondary" onClick={() => {
             const exportData = exams.map(e => ({
               ID: e.id,
               Title: e.title,
@@ -303,12 +304,13 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
               Status: e.isActive ? 'Active' : 'Inactive'
             }));
             exportToCSV(exportData, 'exams_export.csv');
-          }} className="bg-white text-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 flex items-center gap-2 border border-gray-300">
+          }}>
             Export
-          </button>          <CSVUploader title="Bulk Import Exams" isOpen={showBulkImport} onClose={() => setShowBulkImport(false)} onImport={handleBulkImportExams} templateHeaders={['title', 'gradeLevel', 'durationMinutes', 'passingScore', 'isActive']} allowMultiple />
-          <button onClick={() => setShowBulkImport(true)} className="bg-white text-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 flex items-center gap-2 border border-gray-300">
-            <Icon name="upload" className="w-4 h-4" /> Import Exams
-          </button>
+          </ActionButton>
+          <CSVUploader title="Bulk Import Exams" isOpen={showBulkImport} onClose={() => setShowBulkImport(false)} onImport={handleBulkImportExams} templateHeaders={['title', 'gradeLevel', 'durationMinutes', 'passingScore', 'isActive']} allowMultiple />
+          <ActionButton variant="secondary" onClick={() => setShowBulkImport(true)} icon={<Icon name="upload" className="w-4 h-4" />}>
+            Import Exams
+          </ActionButton>
         </div>
       </PageHeader>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -319,7 +321,8 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
-        <input value={searchExam} onChange={e => { setSearchExam(e.target.value); resetExamPage(); }} placeholder="Search exams..." className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm" />          <select value={levelGroupFilterExam} onChange={e => { setLevelGroupFilterExam(e.target.value); setGradeFilterExam('all'); resetExamPage(); }} className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
+        <SearchInput value={searchExam} onChange={(value) => { setSearchExam(value); resetExamPage(); }} placeholder="Search exams..." ariaLabel="Search exams" className="flex-1" />
+        <select value={levelGroupFilterExam} onChange={e => { setLevelGroupFilterExam(e.target.value); setGradeFilterExam('all'); resetExamPage(); }} className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
             <option value="all">All Level Groups</option>
             {GRADE_OPTIONS.map(g => <option key={g.group} value={g.group}>{g.group}</option>)}
           </select>        <select value={gradeFilterExam} onChange={e => { setGradeFilterExam(e.target.value); resetExamPage(); }} className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
@@ -391,7 +394,7 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
       <div className="gk-section-card p-6">
         <h3 className="text-lg font-bold text-forest-500 mb-4">Exam Registrations & Results</h3>
         <div className="flex flex-col sm:flex-row gap-3 mb-4">
-          <input value={readSearch} onChange={e => { setReadSearch(e.target.value); resetReadPage(); }} placeholder="Search student..." className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm" />
+          <SearchInput value={readSearch} onChange={(value) => { setReadSearch(value); resetReadPage(); }} placeholder="Search student..." ariaLabel="Search exam registrations" className="flex-1" />
           <select value={readStatusFilter} onChange={e => { setReadStatusFilter(e.target.value); resetReadPage(); }} className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
             <option value="all">All</option>
             <option value="pending">Scheduled / In Progress</option>

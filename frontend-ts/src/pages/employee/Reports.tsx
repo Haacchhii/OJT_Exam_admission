@@ -3,7 +3,7 @@ import { useAsync } from '../../hooks/useAsync';
 import { getReportsSummary } from '../../api/admissions';
 import { formatPersonName, formatDate } from '../../utils/helpers';
 import { showToast } from '../../components/Toast';
-import { PageHeader, SkeletonPage, ErrorAlert } from '../../components/UI';
+import { PageHeader, SkeletonPage, ErrorAlert, ActionButton } from '../../components/UI';
 import Icon from '../../components/Icons';
 import { lazyWithRetry, LazyLoadingFallback } from '../../components/lazyWithRetry';
 import { ADMISSION_STATUSES, GRADE_OPTIONS, ALL_GRADE_LEVELS } from '../../utils/constants';
@@ -474,7 +474,7 @@ export default function EmployeeReports() {
       <PageHeader title="Reports & Exports" subtitle="Generate and download reports for admissions and exam results." />
 
       <div className="flex justify-end mb-4">
-        <button onClick={refetch} className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 flex items-center gap-2"><Icon name="refresh" className="w-4 h-4" /> Refresh Data</button>
+        <ActionButton variant="secondary" icon={<Icon name="refresh" className="w-4 h-4" />} onClick={refetch}>Refresh Data</ActionButton>
       </div>
 
       {/* Filters */}
@@ -533,9 +533,9 @@ export default function EmployeeReports() {
 
           {(statusFilter !== 'all' || levelGroupFilter !== 'all' || gradeFilter !== 'all' || yearFilter !== 'all' || semesterFilter !== 'all' || dateFrom || dateTo) && (
             <div className="flex items-end">
-              <button onClick={() => { setStatusFilter('all'); setLevelGroupFilter('all'); setGradeFilter('all'); setYearFilter('all'); setSemesterFilter('all'); setDateFrom(''); setDateTo(''); }} className="w-full xl:w-auto px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+              <ActionButton variant="secondary" className="w-full xl:w-auto" onClick={() => { setStatusFilter('all'); setLevelGroupFilter('all'); setGradeFilter('all'); setYearFilter('all'); setSemesterFilter('all'); setDateFrom(''); setDateTo(''); }}>
                 Clear Filters
-              </button>
+              </ActionButton>
             </div>
           )}
         </div>
@@ -569,8 +569,8 @@ export default function EmployeeReports() {
             <h3 className="font-bold text-lg mb-1" style={{ color: titleColor }}>{c.title}</h3>
             <p className="text-gray-600 text-sm mb-4 font-medium">{c.desc}</p>
             <div className="flex gap-2 justify-center flex-wrap">
-              <button onClick={c.onCSV} className={`${btn1Color} text-white px-4 py-2.5 rounded-lg font-bold inline-flex items-center gap-1.5 text-sm shadow-md transition-all`}><Icon name="document" className="w-4 h-4" /> CSV</button>
-              <button onClick={c.onPDF} className={`${btn2Color} text-white px-4 py-2.5 rounded-lg font-bold inline-flex items-center gap-1.5 text-sm shadow-md transition-all`}><Icon name="document" className="w-4 h-4" /> PDF</button>
+              <ActionButton variant="primary" className={`${btn1Color} font-bold shadow-md`} icon={<Icon name="document" className="w-4 h-4" />} onClick={c.onCSV}>CSV</ActionButton>
+              <ActionButton variant="primary" className={`${btn2Color} font-bold shadow-md`} icon={<Icon name="document" className="w-4 h-4" />} onClick={c.onPDF}>PDF</ActionButton>
             </div>
           </div>
         );
