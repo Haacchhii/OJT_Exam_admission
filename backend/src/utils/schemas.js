@@ -22,7 +22,7 @@ const isoDateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2})?/, '
 // Common query param schema for paginated list endpoints
 const paginationQuery = {
   page:   z.coerce.number().int().positive().optional(),
-  limit:  z.coerce.number().int().min(1).max(100).optional(),
+  limit:  z.coerce.number().int().min(1, 'Please enter 1 or higher for limit.').max(100, 'Please enter 100 or less for limit.').optional(),
   search: z.string().max(200).optional(),
 };
 

@@ -83,6 +83,15 @@ async function parseResponseBody(res: Response): Promise<unknown> {
   }
 }
 
+function withSupportHint(message: string): string {
+  const clean = String(message || '').trim();
+  const hint = 'If this keeps happening, please contact the developers or support team.';
+  if (!clean) return hint;
+  if (clean.toLowerCase().includes('contact the developers')) return clean;
+  if (clean.toLowerCase().includes('support team')) return clean;
+  return `${clean} ${hint}`;
+}
+
 // ---- Query string builder ----
 export function qs(params: Record<string, any> = {}): string {
   const entries = Object.entries(params)
@@ -239,7 +248,9 @@ async function request<T = unknown>(
   }
 
   if (!res.ok) {
-    const message = serverMessage || `Request failed (${res.status})`;
+    const message = res.status >= 500
+      ? withSupportHint(serverMessage || 'Something went wrong on our side. Please try again in a moment.')
+      : (serverMessage || `Request failed (${res.status})`);
     throw new ApiError(message, res.status, data);
   }
 
