@@ -524,7 +524,9 @@ export default function EmployeeResults() {
                           <td className="py-3 px-2"><Badge className={r.passed ? 'gk-badge gk-badge-passed' : 'gk-badge gk-badge-failed'}>{r.passed ? 'Passed' : 'Failed'}</Badge></td>
                           <td className="py-3 px-2"><Badge className={r.essayReviewed ? 'gk-badge gk-badge-reviewed' : 'gk-badge gk-badge-pending'}>{r.essayReviewed ? 'Reviewed' : 'Pending'}</Badge></td>
                           <td className="py-3 px-2 text-gray-500">{formatDate(r.createdAt)}</td>
-                          <td className="py-3 px-2 text-right"><button onClick={() => handlePrintResult(r)} className="text-forest-500 hover:bg-forest-50 px-2 py-1 rounded text-xs font-medium inline-flex items-center gap-1" aria-label="Print result"><Icon name="document" className="w-3.5 h-3.5" /> Print</button></td>
+                          <td className="py-3 px-2 text-right">
+                            <ActionButton size="sm" variant="ghost" onClick={() => handlePrintResult(r)} icon={<Icon name="document" className="w-3.5 h-3.5" />} className="text-forest-600" aria-label="Print result">Print</ActionButton>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -590,16 +592,18 @@ export default function EmployeeResults() {
                                   <span className="text-[11px] text-gray-500">{row.completionRate}%</span>
                                 </td>
                                 <td className="py-3 px-2 text-right">
-                                  <button
+                                  <ActionButton
                                     type="button"
+                                    size="sm"
+                                    variant={active ? 'secondary' : 'primary'}
                                     onClick={() => {
                                       setSelectedEssayExamId(active ? null : row.examId);
                                       setEssayRowsPage(1);
                                     }}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${active ? 'border border-gray-300 text-gray-700 hover:bg-gray-50' : 'bg-forest-500 text-white hover:bg-forest-600'}`}
+                                    className="px-3 py-1.5 text-xs"
                                   >
                                     {active ? 'Hide Students' : 'View Students'}
-                                  </button>
+                                  </ActionButton>
                                 </td>
                               </tr>
                               {active && (
@@ -634,15 +638,17 @@ export default function EmployeeResults() {
                                                 <td className="py-2 px-2">{e.scored ? `${e.pointsAwarded ?? 0} / ${e.maxPoints}` : `- / ${e.maxPoints}`}</td>
                                                 <td className="py-2 px-2 max-w-[220px] truncate" title={e.comment || ''}>{e.comment || '-'}</td>
                                                 <td className="py-2 px-2 text-right">
-                                                  <button
+                                                  <ActionButton
+                                                    size="sm"
+                                                    variant={e.scored ? 'secondary' : 'primary'}
                                                     onClick={() => e.scored
                                                       ? openScoreModal(e, { scoreVal: String(e.pointsAwarded ?? ''), commentVal: e.comment || '' })
                                                       : openScoreModal(e)}
-                                                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 ${e.scored ? 'border border-forest-300 text-forest-700 hover:bg-forest-50' : 'bg-forest-500 text-white hover:bg-forest-600'}`}
+                                                    icon={<Icon name={e.scored ? 'edit' : 'check'} className="w-3.5 h-3.5" />}
+                                                    className={e.scored ? 'px-3 py-1.5 text-xs border-forest-300 text-forest-700 hover:bg-forest-50' : 'px-3 py-1.5 text-xs'}
                                                   >
-                                                    <Icon name={e.scored ? 'edit' : 'check'} className="w-3.5 h-3.5" />
                                                     {e.scored ? 'Edit' : 'Score'}
-                                                  </button>
+                                                  </ActionButton>
                                                 </td>
                                               </tr>
                                             ))}

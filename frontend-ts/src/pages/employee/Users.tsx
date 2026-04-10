@@ -315,9 +315,11 @@ export default function EmployeeUsers() {
                   <td className="py-3 px-4 text-gray-500">{u.email}</td>
                   <td className="py-3 px-4"><Badge variant="info">{roleLabel(u.role)}</Badge></td>
                   <td className="py-3 px-4"><Badge variant={u.status === 'Active' ? 'success' : 'danger'}>{u.status}</Badge></td>
-                  <td className="py-3 px-4 text-right space-x-1">
-                    <button onClick={() => openEdit(u)} className="text-forest-500 hover:bg-forest-50 px-2 py-1 rounded text-xs font-medium inline-flex items-center gap-0.5"><Icon name="edit" className="w-3.5 h-3.5" /> Edit</button>
-                    <button onClick={() => confirmDelete(u.id)} className="text-red-600 hover:bg-red-50 px-2 py-1 rounded text-xs font-medium inline-flex items-center gap-0.5"><Icon name="trash" className="w-3.5 h-3.5" /> Delete</button>
+                  <td className="py-3 px-4 text-right">
+                    <div className="inline-flex items-center gap-1">
+                      <ActionButton size="sm" variant="ghost" onClick={() => openEdit(u)} icon={<Icon name="edit" className="w-3.5 h-3.5" />} className="text-forest-600 hover:bg-forest-50">Edit</ActionButton>
+                      <ActionButton size="sm" variant="ghost" onClick={() => confirmDelete(u.id)} icon={<Icon name="trash" className="w-3.5 h-3.5" />} className="text-red-600 hover:bg-red-50">Delete</ActionButton>
+                    </div>
                   </td>
                 </tr>
               ))}

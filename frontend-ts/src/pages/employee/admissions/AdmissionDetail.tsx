@@ -232,27 +232,33 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
               <p className="text-xs font-semibold text-gold-800 mb-1">Reviewer next action</p>
               <p className="text-sm text-gold-800">{suggestedAction}</p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                <button
+                <ActionButton
                   type="button"
+                  size="sm"
+                  variant="ghost"
                   onClick={() => addNoteTemplate('Document check completed. All required files are present and readable.')}
-                  className="px-2.5 py-1 rounded-md text-xs border border-gold-300 bg-white text-gold-800 hover:bg-gold-100"
+                  className="text-gold-800 border border-gold-300 bg-white hover:bg-gold-100"
                 >
                   + Add Doc Check Note
-                </button>
-                <button
+                </ActionButton>
+                <ActionButton
                   type="button"
+                  size="sm"
+                  variant="ghost"
                   onClick={() => addNoteTemplate('Missing requirement follow-up sent to applicant. Awaiting submission/compliance.')}
-                  className="px-2.5 py-1 rounded-md text-xs border border-gold-300 bg-white text-gold-800 hover:bg-gold-100"
+                  className="text-gold-800 border border-gold-300 bg-white hover:bg-gold-100"
                 >
                   + Add Follow-up Note
-                </button>
-                <button
+                </ActionButton>
+                <ActionButton
                   type="button"
+                  size="sm"
+                  variant="ghost"
                   onClick={() => addNoteTemplate('Decision rationale: Applicant meets evaluation criteria based on records and screening results.')}
-                  className="px-2.5 py-1 rounded-md text-xs border border-gold-300 bg-white text-gold-800 hover:bg-gold-100"
+                  className="text-gold-800 border border-gold-300 bg-white hover:bg-gold-100"
                 >
                   + Add Decision Note
-                </button>
+                </ActionButton>
               </div>
             </div>
 

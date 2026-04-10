@@ -336,8 +336,8 @@ export default function ScheduleManager() {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => editSched(s)} className="text-forest-500 hover:underline text-xs inline-flex items-center gap-0.5"><Icon name="edit" className="w-3 h-3" /> Edit</button>
-                    <button onClick={async () => { if (await confirm({ title: 'Delete Schedule', message: 'Are you sure you want to delete this schedule?', confirmLabel: 'Delete', variant: 'danger' })) { try { await deleteExamSchedule(s.id); schedRefetch(); } catch { showToast('Failed to delete schedule.', 'error'); } } }} className="text-red-500 hover:underline text-xs inline-flex items-center gap-0.5"><Icon name="trash" className="w-3 h-3" /> Delete</button>
+                    <ActionButton size="sm" variant="ghost" onClick={() => editSched(s)} icon={<Icon name="edit" className="w-3 h-3" />} className="text-forest-600">Edit</ActionButton>
+                    <ActionButton size="sm" variant="ghost" onClick={async () => { if (await confirm({ title: 'Delete Schedule', message: 'Are you sure you want to delete this schedule?', confirmLabel: 'Delete', variant: 'danger' })) { try { await deleteExamSchedule(s.id); schedRefetch(); } catch { showToast('Failed to delete schedule.', 'error'); } } }} icon={<Icon name="trash" className="w-3 h-3" />} className="text-red-600">Delete</ActionButton>
                   </div>
                 </div>
               );

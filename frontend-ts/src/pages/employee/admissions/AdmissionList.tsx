@@ -365,12 +365,14 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex flex-wrap items-center gap-2">
           <Icon name="exclamation" className="w-4 h-4" />
           <span>{staleCount} application(s) are over SLA ({SLA_DAYS}+ days in progress).</span>
-          <button
+          <ActionButton
+            size="sm"
+            variant="ghost"
             onClick={() => { setStaleOnly(true); resetPage(); }}
-            className="ml-auto text-xs font-semibold underline hover:no-underline"
+            className="ml-auto text-red-700 underline"
           >
             Review Now
-          </button>
+          </ActionButton>
         </div>
       )}
 
@@ -479,7 +481,16 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
                       <td className="py-3 px-2">{(ADMISSION_IN_PROGRESS as readonly string[]).includes(a.status) ? (
                         <span className={`text-xs font-semibold ${daysPending(a.submittedAt) > SLA_DAYS ? 'text-red-600' : daysPending(a.submittedAt) > 5 ? 'text-amber-600' : 'text-gray-500'}`}>{daysPending(a.submittedAt)}d</span>
                       ) : <span className="text-gray-400">-</span>}</td>
-                      <td className="py-3 px-2"><button onClick={(e) => { e.stopPropagation(); onShowDetail(a.id); }} className="text-forest-500 hover:underline text-xs font-medium">View</button></td>
+                      <td className="py-3 px-2">
+                        <ActionButton
+                          size="sm"
+                          variant="ghost"
+                          onClick={(e) => { e.stopPropagation(); onShowDetail(a.id); }}
+                          className="text-forest-600"
+                        >
+                          View
+                        </ActionButton>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

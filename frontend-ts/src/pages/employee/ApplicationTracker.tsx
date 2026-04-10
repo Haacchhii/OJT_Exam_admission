@@ -1,6 +1,6 @@
 ﻿import { useState } from 'react';
 import { trackApplication } from '../../api/admissions';
-import { Badge } from '../../components/UI';
+import { Badge, ActionButton, SearchInput } from '../../components/UI';
 import Icon from '../../components/Icons';
 import { formatDate, formatDateRange, badgeClass, formatPersonName } from '../../utils/helpers';
 import { ADMISSION_PROGRESS_STEPS } from '../../utils/constants';
@@ -50,19 +50,8 @@ export default function ApplicationTracker() {
           <span className="text-xs text-gray-400">Format: GK-ADM-YYYY-XXXXX (admission) or GK-EXM-YYYY-XXXXX (exam)</span>
         </p>
         <form onSubmit={handleSearch} className="flex gap-3">
-          <input
-            value={trackingId}
-            onChange={e => setTrackingId(e.target.value.toUpperCase())}
-            placeholder="e.g. GK-ADM-2026-00001"
-            className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm font-mono tracking-wider uppercase"
-          />
-          <button
-            type="submit"
-            disabled={loading || !trackingId.trim()}
-            className="bg-forest-500 text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-forest-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm inline-flex items-center gap-1.5"
-          >
-            {loading ? <><Icon name="spinner" className="w-4 h-4 animate-spin" /> Searching...</> : <><Icon name="search" className="w-4 h-4" /> Search</>}
-          </button>
+          <SearchInput value={trackingId} onChange={(value) => setTrackingId(value.toUpperCase())} placeholder="e.g. GK-ADM-2026-00001" ariaLabel="Search tracking ID" className="flex-1" />
+          <ActionButton type="submit" disabled={loading || !trackingId.trim()} icon={!loading ? <Icon name="search" className="w-4 h-4" /> : undefined} className="px-6 py-2.5 text-sm">{loading ? 'Searching...' : 'Search'}</ActionButton>
         </form>
       </div>
 
