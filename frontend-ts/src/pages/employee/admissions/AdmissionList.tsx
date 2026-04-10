@@ -6,7 +6,7 @@ import { invalidateResourceCache } from '../../../api/client';
 import { getAcademicYears, getSemesters } from '../../../api/academicYears';
 import { showToast } from '../../../components/Toast';
 import { useConfirm } from '../../../components/ConfirmDialog';
-import { PageHeader, Badge, EmptyState, Pagination, SkeletonPage, ErrorAlert } from '../../../components/UI';
+import { PageHeader, Badge, EmptyState, Pagination, SkeletonPage, ErrorAlert, ActionButton, SearchInput } from '../../../components/UI';
 import Icon from '../../../components/Icons';
 import { formatDate, badgeClass, exportToCSV, formatPersonName } from '../../../utils/helpers';
 import { ADMISSION_STATUSES, ADMISSION_IN_PROGRESS, GRADE_OPTIONS, ALL_GRADE_LEVELS } from '../../../utils/constants';
@@ -277,7 +277,9 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
   return (
     <div>
               <PageHeader title="All Admission Applications">
-          <button 
+          <ActionButton
+            variant="secondary"
+            icon={<Icon name="download" className="w-4 h-4" />}
             onClick={() => exportToCSV(admissions.map(a => ({
               'System ID': a.id,
               'First Name': a.firstName,
@@ -288,16 +290,21 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
               'Status': a.status,
               'Submitted At': formatDate(a.submittedAt)
             })), 'Admissions_Export.csv')}
-            className="bg-white text-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 flex items-center gap-2 border border-gray-300"
             title="Download full list as CSV"
           >
-            <Icon name="download" className="w-5 h-5" /> Export
-          </button>
+            Export
+          </ActionButton>
         </PageHeader>
 
       {/* Filter bar */}
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
-        <input type="text" value={searchInput} onChange={e => { setSearchInput(e.target.value); resetPage(); }} placeholder="Search by name or email..." aria-label="Search applications" className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none" />
+        <SearchInput
+          className="flex-1"
+          value={searchInput}
+          onChange={(value) => { setSearchInput(value); resetPage(); }}
+          placeholder="Search by name or email..."
+          ariaLabel="Search applications"
+        />
         <select value={filter} onChange={e => { setFilter(e.target.value); resetPage(); }} aria-label="Filter by status" className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white">
           <option value="all">All Status</option>
           {ADMISSION_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
@@ -335,19 +342,22 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
 
       {canManage && (
         <div className="mb-4 flex flex-wrap items-center gap-2">
-          <button
+          <ActionButton
+            size="sm"
+            variant={staleOnly ? 'danger' : 'secondary'}
             onClick={() => { setStaleOnly(v => !v); resetPage(); }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${staleOnly ? 'bg-red-50 text-red-700 border-red-200' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
           >
             {staleOnly ? 'Showing Over-SLA Only' : `Show Over-SLA Only (${staleCount})`}
-          </button>
-          <button
+          </ActionButton>
+          <ActionButton
+            size="sm"
+            variant="secondary"
+            icon={<Icon name="clipboard" className="w-3.5 h-3.5" />}
             onClick={copyEscalationDraft}
             disabled={staleCount === 0}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
           >
-            <Icon name="clipboard" className="w-3.5 h-3.5" /> Copy Escalation Draft
-          </button>
+            Copy Escalation Draft
+          </ActionButton>
         </div>
       )}
 
@@ -426,9 +436,9 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
           <select value={bulkStatus} onChange={e => setBulkStatus(e.target.value)} className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-forest-500/20 outline-none">
             {ADMISSION_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
-          <button onClick={handleBulkAction} disabled={saving} className="bg-forest-500 text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-forest-600 transition disabled:opacity-50 disabled:cursor-not-allowed">{saving ? 'Applying...' : 'Apply Status'}</button>
-          <button onClick={handleBulkDelete} disabled={bulkDeleting} className="bg-red-600 text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"><Icon name="trash" className="w-3.5 h-3.5" />{bulkDeleting ? 'Deleting...' : 'Delete Selected'}</button>
-          <button onClick={() => setSelected(new Set())} className="text-gray-500 text-sm hover:underline ml-auto">Clear selection</button>
+          <ActionButton onClick={handleBulkAction} loading={saving} className="min-w-[120px]">{saving ? 'Applying...' : 'Apply Status'}</ActionButton>
+          <ActionButton onClick={handleBulkDelete} loading={bulkDeleting} variant="danger" icon={!bulkDeleting ? <Icon name="trash" className="w-3.5 h-3.5" /> : undefined} className="min-w-[140px]">{bulkDeleting ? 'Deleting...' : 'Delete Selected'}</ActionButton>
+          <ActionButton onClick={() => setSelected(new Set())} variant="ghost" className="ml-auto">Clear selection</ActionButton>
         </div>
       ) : canManage ? (
         <div className="flex items-center gap-2 mb-4 text-xs text-gray-400">

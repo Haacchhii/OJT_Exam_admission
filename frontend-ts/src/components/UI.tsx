@@ -1,5 +1,139 @@
-import type { ReactNode } from 'react';
+import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import Icon from './Icons';
+
+/* ===== ActionButton ===== */
+interface ActionButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
+  size?: 'sm' | 'md';
+  loading?: boolean;
+  icon?: ReactNode;
+}
+
+export function ActionButton({
+  variant = 'primary',
+  size = 'md',
+  loading = false,
+  icon,
+  children,
+  className = '',
+  disabled,
+  type = 'button',
+  ...props
+}: ActionButtonProps) {
+  const base = 'inline-flex items-center justify-center gap-2 rounded-lg font-semibold transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed';
+  const sizes: Record<string, string> = {
+    sm: 'px-3.5 py-1.5 text-xs',
+    md: 'px-4 py-2 text-sm',
+  };
+  const variants: Record<string, string> = {
+    primary: 'text-white bg-forest-500 hover:bg-forest-600 border border-forest-500',
+    secondary: 'text-gray-700 bg-white hover:bg-gray-50 border border-gray-300',
+    danger: 'text-white bg-red-600 hover:bg-red-700 border border-red-600',
+    ghost: 'text-gray-600 bg-transparent hover:bg-gray-100 border border-transparent',
+  };
+
+  return (
+    <button
+      type={type}
+      className={`${base} ${sizes[size]} ${variants[variant]} ${className}`}
+      disabled={disabled || loading}
+      {...props}
+    >
+      {loading ? <span className="h-3.5 w-3.5 rounded-full border-2 border-white/60 border-t-white animate-spin" /> : icon}
+      <span>{children}</span>
+    </button>
+  );
+}
+
+/* ===== SearchInput ===== */
+interface SearchInputProps {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  ariaLabel?: string;
+  className?: string;
+}
+
+export function SearchInput({
+  value,
+  onChange,
+  placeholder = 'Search...',
+  ariaLabel = 'Search',
+  className = '',
+}: SearchInputProps) {
+  return (
+    <div className={`relative ${className}`}>
+      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+        <Icon name="search" className="w-4 h-4" />
+      </span>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        aria-label={ariaLabel}
+        className="w-full h-11 pl-10 pr-3 rounded-xl border border-gray-300 bg-white text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-forest-500/15 focus:border-forest-500"
+      />
+    </div>
+  );
+}
+
+/* ===== StatusStepper ===== */
+interface StatusStep {
+  key: string;
+  label: string;
+  hint?: string;
+}
+
+interface StatusStepperProps {
+  steps: StatusStep[];
+  currentKey: string;
+  className?: string;
+}
+
+export function StatusStepper({ steps, currentKey, className = '' }: StatusStepperProps) {
+  const currentIndex = Math.max(steps.findIndex((step) => step.key === currentKey), 0);
+
+  return (
+    <div className={`grid gap-3 sm:grid-cols-2 lg:grid-cols-3 ${className}`}>
+      {steps.map((step, index) => {
+        const completed = index < currentIndex;
+        const current = index === currentIndex;
+
+        return (
+          <div
+            key={step.key}
+            className={`rounded-lg border px-3 py-2.5 transition-colors ${
+              current
+                ? 'border-forest-300 bg-forest-50'
+                : completed
+                  ? 'border-emerald-200 bg-emerald-50'
+                  : 'border-gray-200 bg-white'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <span
+                className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
+                  current
+                    ? 'bg-forest-500 text-white'
+                    : completed
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-gray-100 text-gray-500'
+                }`}
+              >
+                {completed ? '✓' : index + 1}
+              </span>
+              <span className={`text-sm font-semibold ${current ? 'text-forest-700' : completed ? 'text-emerald-700' : 'text-gray-600'}`}>
+                {step.label}
+              </span>
+            </div>
+            {step.hint && <p className="mt-1 text-xs text-gray-500">{step.hint}</p>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 /* ===== ErrorAlert ===== */
 export function ErrorAlert({ error, onRetry }: { error?: Error | null; onRetry?: () => void }) {

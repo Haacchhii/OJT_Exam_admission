@@ -4,7 +4,7 @@ import { getAdmission, updateAdmissionStatus, VALID_TRANSITIONS } from '../../..
 import { useAsync } from '../../../hooks/useAsync';
 import { formatDate, formatDateRange, formatPersonName, badgeClass } from '../../../utils/helpers';
 import DocumentReview from '../../../components/DocumentReview';
-import { PageHeader, Badge, SkeletonPage } from '../../../components/UI';
+import { PageHeader, Badge, SkeletonPage, ActionButton, StatusStepper } from '../../../components/UI';
 import Icon from '../../../components/Icons';
 import { SCHOOL_NAME, SCHOOL_BRAND, SCHOOL_SUBTITLE, SCHOOL_ADDRESS, SCHOOL_PHONE } from '../../../utils/constants';
 import { useAuth } from '../../../context/AuthContext';
@@ -24,6 +24,14 @@ interface Props {
   admissionId: number;
   onBack: () => void;
 }
+
+const STATUS_STEPS = [
+  { key: 'Submitted', label: 'Submitted', hint: 'Application received and queued.' },
+  { key: 'Under Screening', label: 'Screening', hint: 'Documents and profile checks in progress.' },
+  { key: 'Under Evaluation', label: 'Evaluation', hint: 'Academic and final review in progress.' },
+  { key: 'Accepted', label: 'Accepted', hint: 'Ready for enrollment handoff.' },
+  { key: 'Rejected', label: 'Rejected', hint: 'Decision finalized with notes.' },
+];
 
 export default function AdmissionDetail({ admissionId, onBack }: Props) {
   const { user } = useAuth();
@@ -175,8 +183,8 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
   return (
     <div>
       <div className="flex items-center gap-2 mb-4">
-        <button onClick={onBack} className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 text-sm">Back to List</button>
-        <button onClick={handlePrint} className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 text-sm ml-auto inline-flex items-center gap-1.5"><Icon name="document" className="w-4 h-4" /> Print / Export PDF</button>
+        <ActionButton variant="secondary" onClick={onBack}>Back to List</ActionButton>
+        <ActionButton variant="secondary" onClick={handlePrint} className="ml-auto" icon={<Icon name="document" className="w-4 h-4" />}>Print / Export PDF</ActionButton>
       </div>
       <PageHeader title="Application Details" />
 
@@ -217,6 +225,7 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
       <div className="gk-section-card p-6">
         <h3 className="text-lg font-bold text-forest-500 mb-4">Application Status</h3>
         <div className="mb-4">Current Status: <Badge className={badgeClass(adm.status)}>{adm.status}</Badge></div>
+        <StatusStepper steps={STATUS_STEPS} currentKey={currentStatus} className="mb-4" />
         {canManage ? (
           <>
             <div className="mb-4 rounded-lg border border-gold-200 bg-gold-50 px-4 py-3">
@@ -265,8 +274,8 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
               </div>
             </div>
             <div className="flex gap-3">
-              <button onClick={saveStatus} disabled={saving} className="bg-forest-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-forest-600 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5">{saving ? <><Icon name="spinner" className="w-4 h-4 animate-spin" /> Saving...</> : <><Icon name="check" className="w-4 h-4" /> Save Changes</>}</button>
-              <button onClick={onBack} className="border border-gray-300 text-gray-700 px-5 py-2 rounded-lg hover:bg-gray-50">Cancel</button>
+              <ActionButton onClick={saveStatus} loading={saving} icon={!saving ? <Icon name="check" className="w-4 h-4" /> : undefined}>{saving ? 'Saving...' : 'Save Changes'}</ActionButton>
+              <ActionButton onClick={onBack} variant="secondary">Cancel</ActionButton>
             </div>
           </>
         ) : (
