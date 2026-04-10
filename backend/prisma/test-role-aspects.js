@@ -136,7 +136,7 @@ function buildChecks(ctx) {
       id: 'admissions.list',
       method: 'GET',
       route: '/admissions?page=1&limit=5',
-      allowedRoles: ['administrator', 'registrar', 'teacher'],
+      allowedRoles: ['administrator', 'registrar'],
       area: 'admissions',
     },
     {
@@ -249,7 +249,7 @@ function buildChecks(ctx) {
       id: 'users.list',
       method: 'GET',
       route: '/users?page=1&limit=5',
-      allowedRoles: ['administrator', 'registrar', 'teacher'],
+      allowedRoles: ['administrator', 'registrar'],
       area: 'users',
     },
     {
@@ -412,8 +412,18 @@ async function run() {
     const essayId = extractArray(essayList.json)[0]?.id || 1;
     const applicantRegistrationId = extractArray(applicantRegList.json)[0]?.id || null;
     const applicantExamId = extractArray(applicantRegList.json)[0]?.schedule?.exam?.id || null;
+    const applicantRegistrationStatus = extractArray(applicantRegList.json)[0]?.status || null;
 
-    report.context = { admissionId, examId, registrationId, userId, essayId, applicantRegistrationId, applicantExamId };
+    report.context = {
+      admissionId,
+      examId,
+      registrationId,
+      userId,
+      essayId,
+      applicantRegistrationId,
+      applicantExamId,
+      applicantRegistrationStatus,
+    };
 
     const checks = buildChecks(report.context);
 
@@ -422,7 +432,17 @@ async function run() {
 
       for (const check of checks) {
         const res = await request(baseUrl, token, check.method, check.route, check.body);
-        const shouldAllow = check.allowedRoles.includes(role);
+        let shouldAllow = check.allowedRoles.includes(role);
+
+        // Student exam view is stateful: it is only allowed once the exam is started.
+        if (
+          check.id === 'exams.studentView' &&
+          role === 'applicant' &&
+          report.context.applicantRegistrationStatus !== 'started'
+        ) {
+          shouldAllow = false;
+        }
+
         if (!report.summary.byRole[role]) {
           report.summary.byRole[role] = {
             expectedAllowed: 0,
@@ -443,7 +463,11 @@ async function run() {
           expectation = 'authorized (not 401/403)';
           pass = isAllowedStatusForAuthorized(res.status);
         } else {
-          expectation = 'forbidden (403)';
+          if (check.id === 'exams.studentView' && role === 'applicant') {
+            expectation = `forbidden (403) until exam is started; current status=${report.context.applicantRegistrationStatus || 'none'}`;
+          } else {
+            expectation = 'forbidden (403)';
+          }
           pass = res.status === 403;
         }
 
