@@ -136,10 +136,10 @@ export async function getAdmission(req, res, next) {
       where: { id: Number(req.params.id) },
       include: { documents: true, academicYear: true, semester: true },
     });
-    if (!admission || admission.deletedAt) return res.status(404).json({ error: 'Admission not found', code: 'NOT_FOUND' });
+    if (!admission || admission.deletedAt) return res.status(404).json({ error: 'We could not find this admission record.', code: 'NOT_FOUND' });
     // Ownership: applicants can only view their own admission
     if (req.user.role === 'applicant' && admission.userId !== req.user.id) {
-      return res.status(403).json({ error: 'Access denied', code: 'FORBIDDEN' });
+      return res.status(403).json({ error: 'You do not have permission to view this admission record.', code: 'FORBIDDEN' });
     }
     res.json(shapeAdmission(admission));
   } catch (err) { next(err); }
@@ -604,7 +604,7 @@ export async function createAdmission(req, res, next) {
 
     // Validate required fields
     if (!firstName || !lastName || !email || !dob || !gender || !address || !gradeLevel || !schoolYear) {
-      return res.status(400).json({ error: 'Missing required fields', code: 'VALIDATION_ERROR' });
+      return res.status(400).json({ error: 'Please complete all required fields before submitting.', code: 'VALIDATION_ERROR' });
     }
     if (guardianName && !guardianRel) {
       return res.status(400).json({
@@ -619,7 +619,7 @@ export async function createAdmission(req, res, next) {
     // Also enforce that admissions can only be submitted during the active period window.
     const activeYear = await prisma.academicYear.findFirst({ where: { isActive: true } });
     if (!activeYear) {
-      return res.status(400).json({ error: 'No active academic year. Admissions are currently closed.', code: 'VALIDATION_ERROR' });
+      return res.status(400).json({ error: 'Admissions are currently closed because there is no active academic year yet.', code: 'VALIDATION_ERROR' });
     }
 
     const activeSemester = await prisma.semester.findFirst({
@@ -627,7 +627,7 @@ export async function createAdmission(req, res, next) {
       orderBy: { id: 'asc' },
     });
     if (!activeSemester) {
-      return res.status(400).json({ error: 'No active application period. Admissions are currently closed.', code: 'VALIDATION_ERROR' });
+      return res.status(400).json({ error: 'Admissions are currently closed because no active application period is set.', code: 'VALIDATION_ERROR' });
     }
 
     const today = toIsoDay(new Date());
@@ -687,13 +687,13 @@ export async function uploadDocuments(req, res, next) {
     const admissionId = Number(req.params.id);
     // Ownership check
     const admission = await prisma.admission.findUnique({ where: { id: admissionId } });
-    if (!admission) return res.status(404).json({ error: 'Admission not found', code: 'NOT_FOUND' });
+    if (!admission) return res.status(404).json({ error: 'We could not find this admission record.', code: 'NOT_FOUND' });
     if (req.user.role === ROLES.APPLICANT && admission.userId !== req.user.id) {
-      return res.status(403).json({ error: 'Access denied', code: 'FORBIDDEN' });
+      return res.status(403).json({ error: 'You do not have permission to upload documents for this admission.', code: 'FORBIDDEN' });
     }
     const files = req.files;
     if (!files?.length) {
-      return res.status(400).json({ error: 'No files uploaded', code: 'VALIDATION_ERROR' });
+      return res.status(400).json({ error: 'Please upload at least one file before continuing.', code: 'VALIDATION_ERROR' });
     }
 
     const docs = await Promise.all(
@@ -733,13 +733,13 @@ export async function updateStatus(req, res, next) {
     const id = Number(req.params.id);
 
     const admission = await prisma.admission.findUnique({ where: { id }, include: { documents: true, academicYear: true, semester: true } });
-    if (!admission || admission.deletedAt) return res.status(404).json({ error: 'Admission not found', code: 'NOT_FOUND' });
+    if (!admission || admission.deletedAt) return res.status(404).json({ error: 'We could not find this admission record.', code: 'NOT_FOUND' });
 
     // Validate transition
     const allowed = VALID_TRANSITIONS[admission.status] || [];
     if (!allowed.includes(status)) {
       return res.status(400).json({
-        error: `Cannot transition from "${admission.status}" to "${status}"`,
+        error: `This status change is not allowed: "${admission.status}" to "${status}".`,
         code: 'VALIDATION_ERROR',
       });
     }
@@ -793,10 +793,10 @@ export async function bulkUpdateStatus(req, res, next) {
   try {
     const { ids, status } = req.body;
     if (!ids?.length || !status) {
-      return res.status(400).json({ error: 'ids and status are required', code: 'VALIDATION_ERROR' });
+      return res.status(400).json({ error: 'Please select at least one admission and choose a target status.', code: 'VALIDATION_ERROR' });
     }
     if (ids.length > MAX_BULK_OPERATIONS) {
-      return res.status(400).json({ error: `Cannot process more than ${MAX_BULK_OPERATIONS} records at once`, code: 'VALIDATION_ERROR' });
+      return res.status(400).json({ error: `Please select ${MAX_BULK_OPERATIONS} admissions or fewer per bulk update.`, code: 'VALIDATION_ERROR' });
     }
 
     // Validate each admission's transition
@@ -805,7 +805,7 @@ export async function bulkUpdateStatus(req, res, next) {
       const allowed = VALID_TRANSITIONS[adm.status] || [];
       if (!allowed.includes(status)) {
         return res.status(400).json({
-          error: `Admission #${adm.id} cannot transition from "${adm.status}" to "${status}"`,
+          error: `Admission #${adm.id} cannot be moved from "${adm.status}" to "${status}".`,
           code: 'VALIDATION_ERROR',
         });
       }
@@ -837,7 +837,7 @@ export async function trackApplication(req, res, next) {
   try {
     const { trackingId } = req.params;
     if (!trackingId) {
-      return res.status(400).json({ error: 'Tracking ID is required', code: 'VALIDATION_ERROR' });
+      return res.status(400).json({ error: 'Please enter a tracking ID.', code: 'VALIDATION_ERROR' });
     }
 
     const upper = trackingId.toUpperCase();
@@ -852,7 +852,7 @@ export async function trackApplication(req, res, next) {
       if (admission && !admission.deletedAt) {
         // Ownership: applicants can only view their own tracking data
         if (req.user.role === ROLES.APPLICANT && admission.userId !== req.user.id) {
-          return res.status(403).json({ error: 'Access denied', code: 'FORBIDDEN' });
+          return res.status(403).json({ error: 'You do not have permission to view this tracking record.', code: 'FORBIDDEN' });
         }
         results.type = 'admission';
         results.trackingId = admission.trackingId;
@@ -872,7 +872,7 @@ export async function trackApplication(req, res, next) {
       if (registration) {
         // Ownership: applicants can only view their own tracking data
         if (req.user.role === ROLES.APPLICANT && registration.userEmail !== req.user.email) {
-          return res.status(403).json({ error: 'Access denied', code: 'FORBIDDEN' });
+          return res.status(403).json({ error: 'You do not have permission to view this tracking record.', code: 'FORBIDDEN' });
         }
         results.type = 'exam';
         results.trackingId = registration.trackingId;
@@ -907,7 +907,7 @@ export async function trackApplication(req, res, next) {
     }
 
     if (!results.type) {
-      return res.status(404).json({ error: 'No application or exam found with this tracking ID', code: 'NOT_FOUND' });
+      return res.status(404).json({ error: 'We could not find an admission or exam using that tracking ID.', code: 'NOT_FOUND' });
     }
 
     res.json(results);
@@ -937,20 +937,20 @@ export async function downloadDocument(req, res, next) {
 
     const doc = await prisma.admissionDocument.findUnique({ where: { id: docId } });
     if (!doc || doc.admissionId !== admissionId) {
-      return res.status(404).json({ error: 'Document not found', code: 'NOT_FOUND' });
+      return res.status(404).json({ error: 'We could not find this document.', code: 'NOT_FOUND' });
     }
 
     // Ownership check
     if (req.user.role === ROLES.APPLICANT) {
       const admission = await prisma.admission.findUnique({ where: { id: admissionId } });
       if (!admission || admission.userId !== req.user.id) {
-        return res.status(403).json({ error: 'Access denied', code: 'FORBIDDEN' });
+        return res.status(403).json({ error: 'You do not have permission to download this document.', code: 'FORBIDDEN' });
       }
     }
 
     const filePath = await resolveStoredDocumentPath(doc);
     if (!filePath || !existsSync(filePath)) {
-      return res.status(404).json({ error: 'File not found on server', code: 'NOT_FOUND' });
+      return res.status(404).json({ error: 'We could not access this file on the server. Please try again. If this keeps happening, please contact the developers or support team.', code: 'NOT_FOUND' });
     }
 
     res.download(filePath, doc.documentName);
@@ -965,12 +965,12 @@ export async function reviewDocument(req, res, next) {
     const { reviewStatus, reviewNote } = req.body;
 
     if (!['accepted', 'rejected'].includes(reviewStatus)) {
-      return res.status(400).json({ error: 'reviewStatus must be "accepted" or "rejected"', code: 'VALIDATION_ERROR' });
+      return res.status(400).json({ error: 'Please choose a valid review status: accepted or rejected.', code: 'VALIDATION_ERROR' });
     }
 
     const doc = await prisma.admissionDocument.findUnique({ where: { id: docId } });
     if (!doc || doc.admissionId !== admissionId) {
-      return res.status(404).json({ error: 'Document not found', code: 'NOT_FOUND' });
+      return res.status(404).json({ error: 'We could not find this document.', code: 'NOT_FOUND' });
     }
 
     const updated = await prisma.admissionDocument.update({

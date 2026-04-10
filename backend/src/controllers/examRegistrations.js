@@ -164,13 +164,13 @@ export async function createRegistration(req, res, next) {
   try {
     const { userEmail, scheduleId } = req.body;
     if (!scheduleId) {
-      return res.status(400).json({ error: 'scheduleId is required', code: 'VALIDATION_ERROR' });
+      return res.status(400).json({ error: 'Please select an exam schedule.', code: 'VALIDATION_ERROR' });
     }
 
     // For applicants, always use their authenticated email to prevent impersonation
     const email = req.user.role === ROLES.APPLICANT ? req.user.email : userEmail;
     if (!email) {
-      return res.status(400).json({ error: 'userEmail is required', code: 'VALIDATION_ERROR' });
+      return res.status(400).json({ error: 'Please provide the student email address.', code: 'VALIDATION_ERROR' });
     }
 
     // Check for existing active registration for this specific schedule's exam
@@ -185,39 +185,39 @@ export async function createRegistration(req, res, next) {
         },
       },
     });
-    if (!schedule) return res.status(404).json({ error: 'Schedule not found', code: 'NOT_FOUND' });
+    if (!schedule) return res.status(404).json({ error: 'We could not find the selected exam schedule.', code: 'NOT_FOUND' });
     if (schedule.exam?.academicYear && !schedule.exam.academicYear.isActive) {
-      return res.status(400).json({ error: 'Registration is only allowed for exams in the active academic year', code: 'VALIDATION_ERROR' });
+      return res.status(400).json({ error: 'Registration is only available for exams in the active academic year.', code: 'VALIDATION_ERROR' });
     }
 
     const today = getTodayLocalIso();
     const activePeriod = await getActiveAcademicPeriod();
     if (!activePeriod?.activeSemester) {
-      return res.status(400).json({ error: 'Exam booking is currently closed. No active exam period is configured.', code: 'VALIDATION_ERROR' });
+      return res.status(400).json({ error: 'Exam booking is currently closed because no active exam period is configured.', code: 'VALIDATION_ERROR' });
     }
 
     const semStartIso = toIsoDay(activePeriod.activeSemester.startDate);
     const semEndIso = toIsoDay(activePeriod.activeSemester.endDate);
 
     if (!isWithinPeriod(today, semStartIso, semEndIso)) {
-      return res.status(400).json({ error: 'Exam booking is outside the active exam period.', code: 'VALIDATION_ERROR' });
+      return res.status(400).json({ error: 'Exam booking is currently outside the active exam period.', code: 'VALIDATION_ERROR' });
     }
 
     if (schedule.exam?.academicYear?.id && schedule.exam.academicYear.id !== activePeriod.activeYear.id) {
-      return res.status(400).json({ error: 'Registration is only allowed for exams in the active academic year', code: 'VALIDATION_ERROR' });
+      return res.status(400).json({ error: 'Registration is only available for exams in the active academic year.', code: 'VALIDATION_ERROR' });
     }
 
     if (schedule.scheduledDate < today) {
-      return res.status(400).json({ error: 'This schedule is no longer available', code: 'VALIDATION_ERROR' });
+      return res.status(400).json({ error: 'This exam schedule is no longer available.', code: 'VALIDATION_ERROR' });
     }
     if (schedule.visibilityStartDate && today < schedule.visibilityStartDate) {
-      return res.status(400).json({ error: 'This schedule is not yet visible', code: 'VALIDATION_ERROR' });
+      return res.status(400).json({ error: 'This exam schedule is not visible yet.', code: 'VALIDATION_ERROR' });
     }
     if (schedule.visibilityEndDate && today > schedule.visibilityEndDate) {
-      return res.status(400).json({ error: 'This schedule is no longer visible', code: 'VALIDATION_ERROR' });
+      return res.status(400).json({ error: 'This exam schedule is no longer visible.', code: 'VALIDATION_ERROR' });
     }
     if (!isWithinRegistrationWindow(schedule, today)) {
-      return res.status(400).json({ error: 'Registration for this schedule is currently closed', code: 'VALIDATION_ERROR' });
+      return res.status(400).json({ error: 'Registration for this schedule is currently closed.', code: 'VALIDATION_ERROR' });
     }
 
     const existing = await prisma.examRegistration.findFirst({
@@ -228,7 +228,7 @@ export async function createRegistration(req, res, next) {
       },
     });
     if (existing) {
-      return res.status(409).json({ error: 'Student already has an active registration for this exam', code: 'CONFLICT' });
+      return res.status(409).json({ error: 'You already have an active registration for this exam.', code: 'CONFLICT' });
     }
 
     // Atomic slot booking: check + increment inside an interactive transaction
@@ -244,7 +244,7 @@ export async function createRegistration(req, res, next) {
         freshSchedule.slotsTaken = freshSchedule.slots_taken ?? freshSchedule.slotsTaken;
       }
       if (!freshSchedule || freshSchedule.slotsTaken >= freshSchedule.maxSlots) {
-        throw Object.assign(new Error('Schedule is full'), { statusCode: 400, code: 'VALIDATION_ERROR' });
+        throw Object.assign(new Error('This schedule is already full. Please choose another schedule.'), { statusCode: 400, code: 'VALIDATION_ERROR' });
       }
       const reg = await tx.examRegistration.create({
         data: { trackingId, userEmail: email, userId: req.user.id, scheduleId, status: 'scheduled' },
@@ -306,31 +306,31 @@ export async function startExam(req, res, next) {
         },
       },
     });
-    if (!reg) return res.status(404).json({ error: 'Registration not found', code: 'NOT_FOUND' });
+    if (!reg) return res.status(404).json({ error: 'We could not find this exam registration.', code: 'NOT_FOUND' });
 
     // Ownership check: only the registered student can start their own exam
     if (reg.userEmail !== req.user.email) {
-      return res.status(403).json({ error: 'You can only start your own exam', code: 'FORBIDDEN' });
+      return res.status(403).json({ error: 'You can only start exams assigned to your account.', code: 'FORBIDDEN' });
     }
 
     if (reg.status !== 'scheduled') {
-      return res.status(400).json({ error: 'Exam already started or completed', code: 'VALIDATION_ERROR' });
+      return res.status(400).json({ error: 'This exam has already been started or completed.', code: 'VALIDATION_ERROR' });
     }
 
     const activePeriod = await getActiveAcademicPeriod();
     if (!activePeriod?.activeSemester) {
-      return res.status(400).json({ error: 'Exams are currently closed. No active exam period is configured.', code: 'VALIDATION_ERROR' });
+      return res.status(400).json({ error: 'Exams are currently unavailable because no active exam period is configured.', code: 'VALIDATION_ERROR' });
     }
 
     const today = getTodayLocalIso();
     const semStartIso = toIsoDay(activePeriod.activeSemester.startDate);
     const semEndIso = toIsoDay(activePeriod.activeSemester.endDate);
     if (!isWithinPeriod(today, semStartIso, semEndIso)) {
-      return res.status(400).json({ error: 'Exams are outside the active exam period.', code: 'VALIDATION_ERROR' });
+      return res.status(400).json({ error: 'Exams are currently outside the active exam period.', code: 'VALIDATION_ERROR' });
     }
 
     if (reg.schedule?.exam?.academicYearId && reg.schedule.exam.academicYearId !== activePeriod.activeYear.id) {
-      return res.status(400).json({ error: 'Exams can only be started in the active academic year.', code: 'VALIDATION_ERROR' });
+      return res.status(400).json({ error: 'This exam can only be started during the active academic year.', code: 'VALIDATION_ERROR' });
     }
 
     const nowTime = getNowLocalTime();
@@ -358,14 +358,14 @@ export async function saveDraftAnswers(req, res, next) {
   try {
     const id = Number(req.params.id);
     const reg = await prisma.examRegistration.findUnique({ where: { id } });
-    if (!reg) return res.status(404).json({ error: 'Registration not found', code: 'NOT_FOUND' });
+    if (!reg) return res.status(404).json({ error: 'We could not find this exam registration.', code: 'NOT_FOUND' });
 
     if (reg.userEmail !== req.user.email) {
-      return res.status(403).json({ error: 'You can only save answers for your own exam', code: 'FORBIDDEN' });
+      return res.status(403).json({ error: 'You can only save answers for exams assigned to your account.', code: 'FORBIDDEN' });
     }
 
     if (reg.status !== 'started') {
-      return res.status(400).json({ error: 'Exam is not in progress', code: 'VALIDATION_ERROR' });
+      return res.status(400).json({ error: 'You can save answers only while the exam is in progress.', code: 'VALIDATION_ERROR' });
     }
 
     const { answers } = req.body;
@@ -383,14 +383,14 @@ export async function cancelRegistration(req, res, next) {
   try {
     const id = Number(req.params.id);
     const reg = await prisma.examRegistration.findUnique({ where: { id } });
-    if (!reg) return res.status(404).json({ error: 'Registration not found', code: 'NOT_FOUND' });
+    if (!reg) return res.status(404).json({ error: 'We could not find this exam registration.', code: 'NOT_FOUND' });
 
     if (reg.userEmail !== req.user.email) {
-      return res.status(403).json({ error: 'You can only cancel your own registration', code: 'FORBIDDEN' });
+      return res.status(403).json({ error: 'You can only cancel registrations assigned to your account.', code: 'FORBIDDEN' });
     }
 
     if (reg.status !== 'scheduled') {
-      return res.status(400).json({ error: 'Only scheduled exams can be cancelled', code: 'VALIDATION_ERROR' });
+      return res.status(400).json({ error: 'Only registrations with a scheduled status can be cancelled.', code: 'VALIDATION_ERROR' });
     }
 
     await prisma.$transaction(async (tx) => {

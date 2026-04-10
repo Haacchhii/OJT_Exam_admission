@@ -194,7 +194,7 @@ export async function getReadiness(req, res, next) {
 export async function getExam(req, res, next) {
   try {
     const exam = await prisma.exam.findUnique({ where: { id: Number(req.params.id) }, include: examDetailInclude });
-    if (!exam || exam.deletedAt) return res.status(404).json({ error: 'Exam not found', code: 'NOT_FOUND' });
+    if (!exam || exam.deletedAt) return res.status(404).json({ error: 'We could not find this exam.', code: 'NOT_FOUND' });
     res.json(shapeExam(exam));
   } catch (err) { next(err); }
 }
@@ -212,11 +212,11 @@ export async function getExamForStudent(req, res, next) {
       select: { id: true },
     });
     if (!activeRegistration) {
-      return res.status(403).json({ error: 'Start your scheduled exam before viewing questions', code: 'FORBIDDEN' });
+      return res.status(403).json({ error: 'Please start your scheduled exam before viewing questions.', code: 'FORBIDDEN' });
     }
 
     const exam = await prisma.exam.findUnique({ where: { id: examId }, include: examDetailInclude });
-    if (!exam || exam.deletedAt) return res.status(404).json({ error: 'Exam not found', code: 'NOT_FOUND' });
+    if (!exam || exam.deletedAt) return res.status(404).json({ error: 'We could not find this exam.', code: 'NOT_FOUND' });
     res.json(stripAnswers(shapeExam(exam)));
   } catch (err) { next(err); }
 }
@@ -234,10 +234,10 @@ export async function getExamForReview(req, res, next) {
       },
     });
     if (!reg) {
-      return res.status(403).json({ error: 'You must complete this exam before viewing the review', code: 'FORBIDDEN' });
+      return res.status(403).json({ error: 'Please complete this exam before viewing the review.', code: 'FORBIDDEN' });
     }
     const exam = await prisma.exam.findUnique({ where: { id: examId }, include: examDetailInclude });
-    if (!exam) return res.status(404).json({ error: 'Exam not found', code: 'NOT_FOUND' });
+    if (!exam) return res.status(404).json({ error: 'We could not find this exam.', code: 'NOT_FOUND' });
     res.json(shapeExam(exam)); // full exam with correct answers
   } catch (err) { next(err); }
 }
@@ -247,7 +247,7 @@ export async function createExam(req, res, next) {
   try {
     const { title, gradeLevel, durationMinutes, passingScore, isActive, academicYearId, semesterId, questions } = req.body;
     if (!title || !gradeLevel || !durationMinutes || passingScore == null) {
-      return res.status(400).json({ error: 'title, gradeLevel, durationMinutes, passingScore are required', code: 'VALIDATION_ERROR' });
+      return res.status(400).json({ error: 'Please provide title, grade level, duration, and passing score.', code: 'VALIDATION_ERROR' });
     }
 
     const exam = await prisma.exam.create({
@@ -373,7 +373,7 @@ export async function cloneExam(req, res, next) {
   try {
     const sourceId = Number(req.params.id);
     const source = await prisma.exam.findUnique({ where: { id: sourceId }, include: examDetailInclude });
-    if (!source || source.deletedAt) return res.status(404).json({ error: 'Exam not found', code: 'NOT_FOUND' });
+    if (!source || source.deletedAt) return res.status(404).json({ error: 'We could not find this exam.', code: 'NOT_FOUND' });
 
     const clone = await prisma.exam.create({
       data: {

@@ -66,7 +66,7 @@ export async function getUserStats(req, res, next) {
 export async function getUser(req, res, next) {
   try {
     const user = await prisma.user.findUnique({ where: { id: Number(req.params.id) } });
-    if (!user || user.deletedAt) return res.status(404).json({ error: 'User not found', code: 'NOT_FOUND' });
+    if (!user || user.deletedAt) return res.status(404).json({ error: 'We could not find this user.', code: 'NOT_FOUND' });
     res.json(safifyUser(user));
   } catch (err) { next(err); }
 }
@@ -75,7 +75,7 @@ export async function getUser(req, res, next) {
 export async function getUserByEmail(req, res, next) {
   try {
     const user = await prisma.user.findUnique({ where: { email: req.params.email } });
-    if (!user || user.deletedAt) return res.status(404).json({ error: 'User not found', code: 'NOT_FOUND' });
+    if (!user || user.deletedAt) return res.status(404).json({ error: 'We could not find this user.', code: 'NOT_FOUND' });
     res.json(safifyUser(user));
   } catch (err) { next(err); }
 }
@@ -85,7 +85,7 @@ export async function createUser(req, res, next) {
   try {
     const { firstName, middleName, lastName, email, role, status, password } = req.body;
     if (!firstName || !middleName || !lastName || !email || !password) {
-      return res.status(400).json({ error: 'firstName, middleName, lastName, email, and password are required', code: 'VALIDATION_ERROR' });
+      return res.status(400).json({ error: 'Please provide first name, middle name, last name, email, and password.', code: 'VALIDATION_ERROR' });
     }
 
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
@@ -107,7 +107,7 @@ export async function updateUser(req, res, next) {
 
     // Only administrators can assign the administrator role
     if (role === ROLES.ADMIN && req.user.role !== ROLES.ADMIN) {
-      return res.status(403).json({ error: 'Only administrators can assign the administrator role', code: 'FORBIDDEN' });
+      return res.status(403).json({ error: 'Only administrators can assign the administrator role.', code: 'FORBIDDEN' });
     }
 
     const data = {};
@@ -153,7 +153,7 @@ export async function deleteUser(req, res, next) {
       return res.status(400).json({ error: 'You cannot delete your own account.', code: 'VALIDATION_ERROR' });
     }
     const user = await prisma.user.findUnique({ where: { id } });
-    if (!user || user.deletedAt) return res.status(404).json({ error: 'User not found', code: 'NOT_FOUND' });
+    if (!user || user.deletedAt) return res.status(404).json({ error: 'We could not find this user.', code: 'NOT_FOUND' });
 
     await prisma.user.update({ where: { id }, data: { deletedAt: new Date() } });
 
@@ -170,7 +170,7 @@ export async function bulkDeleteUsers(req, res, next) {
     // Prevent self-deletion
     const safeIds = ids.filter(id => id !== req.user.id);
     if (safeIds.length === 0) {
-      return res.status(400).json({ error: 'No valid users to delete (you cannot delete yourself).', code: 'VALIDATION_ERROR' });
+      return res.status(400).json({ error: 'No eligible users were selected. You cannot delete your own account.', code: 'VALIDATION_ERROR' });
     }
 
     const users = await prisma.user.findMany({ where: { id: { in: safeIds }, deletedAt: null } });
