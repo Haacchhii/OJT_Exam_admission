@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
 import { useAsync } from '../../hooks/useAsync';
+import { invalidateResourceCache } from '../../api/client';
 import { getAdmissionsPage, getDashboardSummary, type EmployeeDashboardSummary } from '../../api/admissions';
 import { StatCard, PageHeader, Badge, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert } from '../../components/UI';
 import { formatDate, badgeClass, formatPersonName } from '../../utils/helpers';
@@ -64,13 +65,16 @@ export default function EmployeeDashboard() {
       if (refetchTimer) return;
       refetchTimer = setTimeout(() => {
         refetchTimer = null;
+        invalidateResourceCache(['/admissions']);
         refetch();
         refetchAdmissions();
       }, 350);
     };
     socket.on('admission_status_updated', handleUpdate);
+    socket.on('admission_bulk_status_updated', handleUpdate);
     return () => {
       socket.off('admission_status_updated', handleUpdate);
+      socket.off('admission_bulk_status_updated', handleUpdate);
       if (refetchTimer) clearTimeout(refetchTimer);
     };
   }, [socket, isConnected, refetch, refetchAdmissions]);

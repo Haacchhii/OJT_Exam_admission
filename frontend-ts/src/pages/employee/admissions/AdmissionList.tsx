@@ -2,6 +2,7 @@
 import { Link } from 'react-router-dom';
 import { useAsync } from '../../../hooks/useAsync';
 import { getAdmissionsPage, getStats, bulkUpdateStatus, bulkDeleteAdmissions, VALID_TRANSITIONS } from '../../../api/admissions';
+import { invalidateResourceCache } from '../../../api/client';
 import { getAcademicYears, getSemesters } from '../../../api/academicYears';
 import { showToast } from '../../../components/Toast';
 import { useConfirm } from '../../../components/ConfirmDialog';
@@ -105,12 +106,12 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
     resourcePrefixes: ['/admissions'],
   });
 
-  const { data: stalePreview } = useAsync(async () => {
+  const { data: stalePreview, refetch: refetchStalePreview } = useAsync(async () => {
     if (!canManage) {
       return { data: [] as Admission[], pagination: { page: 1, limit: 20, total: 0, totalPages: 1 } };
     }
     return getAdmissionsPage({ staleOnly: true, slaDays: SLA_DAYS, page: 1, limit: 20 });
-  }, [canManage]);
+  }, [canManage], 0, { autoRefreshOnDataChange: true, resourcePrefixes: ['/admissions'] });
 
 
   useEffect(() => {
@@ -120,15 +121,21 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
       if (refetchTimer) return;
       refetchTimer = setTimeout(() => {
         refetchTimer = null;
+        invalidateResourceCache(['/admissions']);
         refetch();
+        refetchStalePreview();
       }, 350);
     };
+
     socket.on('admission_status_updated', handleStatusUpdate);
+    socket.on('admission_bulk_status_updated', handleStatusUpdate);
+
     return () => {
       socket.off('admission_status_updated', handleStatusUpdate);
+      socket.off('admission_bulk_status_updated', handleStatusUpdate);
       if (refetchTimer) clearTimeout(refetchTimer);
     };
-  }, [socket, isConnected, refetch]);
+  }, [socket, isConnected, refetch, refetchStalePreview]);
 
   const { data: academicYears } = useAsync<AcademicYear[]>(() => getAcademicYears());
   const { data: allSemesters } = useAsync<Semester[]>(() => getSemesters());
@@ -198,6 +205,7 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
       showToast(`${validIds.length} application(s) updated to ${bulkStatus}.${skippedIds.length ? ` ${skippedIds.length} skipped.` : ''}`, 'success');
       setSelected(new Set());
       refetch();
+      refetchStalePreview();
     } catch (err: any) {
       showToast('Bulk update failed: ' + (err.message || 'Unknown error'), 'error');
     } finally {
@@ -221,6 +229,7 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
       showToast(`${ids.length} application(s) deleted.`, 'info');
       setSelected(new Set());
       refetch();
+      refetchStalePreview();
     } catch {
       showToast('Failed to delete applications.', 'error');
     } finally {

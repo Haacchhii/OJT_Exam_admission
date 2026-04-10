@@ -152,6 +152,10 @@ function invalidateGetCache(prefixes?: string[]) {
   }
 }
 
+export function invalidateResourceCache(prefixes?: string[]) {
+  invalidateGetCache(prefixes);
+}
+
 function emitRequestTiming(path: string, method: string, durationMs: number, status: number, fromCache = false): void {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('gk:request-timing', {
