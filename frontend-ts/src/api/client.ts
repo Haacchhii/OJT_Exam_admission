@@ -6,12 +6,23 @@ const BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
 
 // ---- Token management ----
 let authToken: string | null = null;
-try { authToken = localStorage.getItem('gk_auth_token'); } catch { /* SSR safe */ }
+try {
+  authToken = sessionStorage.getItem('gk_auth_token');
+  // Remove legacy persistent token to enforce browser-close logout by default.
+  localStorage.removeItem('gk_auth_token');
+} catch {
+  /* SSR safe */
+}
 
 export function setToken(token: string | null): void {
   authToken = token;
-  if (token) localStorage.setItem('gk_auth_token', token);
-  else localStorage.removeItem('gk_auth_token');
+  try {
+    if (token) sessionStorage.setItem('gk_auth_token', token);
+    else sessionStorage.removeItem('gk_auth_token');
+    localStorage.removeItem('gk_auth_token');
+  } catch {
+    // Ignore storage access issues and keep in-memory token.
+  }
   invalidateGetCache();
 }
 

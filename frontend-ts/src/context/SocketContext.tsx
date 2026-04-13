@@ -25,7 +25,12 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   })();
 
   useEffect(() => {
-    const token = localStorage.getItem('gk_auth_token');
+    let token: string | null = null;
+    try {
+      token = sessionStorage.getItem('gk_auth_token');
+    } catch {
+      token = null;
+    }
 
     if (!socketEnabled) {
       if (socket) {

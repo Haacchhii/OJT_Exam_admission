@@ -40,6 +40,11 @@ export function save(data: DefaultData): void {
 
 export function resetData(): void {
   _cache = null;
+  sessionStorage.removeItem('gk_current_user');
+  sessionStorage.removeItem('gk_user_hash');
+  sessionStorage.removeItem('gk_auth_token');
   localStorage.removeItem('gk_current_user');
+  localStorage.removeItem('gk_user_hash');
+  localStorage.removeItem('gk_auth_token');
   save(JSON.parse(JSON.stringify(defaultData)) as DefaultData);
 }

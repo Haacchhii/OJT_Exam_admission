@@ -41,7 +41,14 @@ const Profile = lazyWithRetry(() => import('./pages/shared/Profile'));
 
 /* Route guard: redirects to /employee if user doesn't have permission for the page */
 function RoleGuard({ page, children }: { page: Permission; children: ReactNode }) {
-  const { user } = useAuth();
+  const { user, authReady } = useAuth();
+  if (!authReady) {
+    return (
+      <div className="min-h-screen grid place-items-center gk-mesh-bg">
+        <LoadingSpinner />
+      </div>
+    );
+  }
   if (!user) return <Navigate to="/login" replace />;
   if (user.role === 'applicant') return <Navigate to="/student" replace />;
   const perms = ROLE_PERMISSIONS[user.role] || [];
@@ -61,7 +68,14 @@ function RoleGuard({ page, children }: { page: Permission; children: ReactNode }
 
 /* Route guard: ensures only applicants can access student routes */
 function StudentGuard({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { user, authReady } = useAuth();
+  if (!authReady) {
+    return (
+      <div className="min-h-screen grid place-items-center gk-mesh-bg">
+        <LoadingSpinner />
+      </div>
+    );
+  }
   if (!user) return <Navigate to="/login" replace />;
   if (user.role !== 'applicant') return <Navigate to="/employee" replace />;
   return <>{children}</>;
@@ -80,7 +94,7 @@ export default function App() {
 
   useEffect(() => {
     try {
-      const raw = localStorage.getItem('gk_current_user');
+      const raw = sessionStorage.getItem('gk_current_user');
       const parsed = raw ? (JSON.parse(raw) as { role?: string }) : null;
       const role = parsed?.role || null;
       const currentPath = window.location.hash ? window.location.hash.slice(1) : '/';

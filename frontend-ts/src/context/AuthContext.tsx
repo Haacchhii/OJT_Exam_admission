@@ -7,8 +7,11 @@ import {
   useMemo,
   type ReactNode,
 } from 'react';
-import { client, setToken, setAuthErrorHandler } from '../api/client';
+import { client, setToken, setAuthErrorHandler, ApiError } from '../api/client';
 import type { User, UserRole, AuthResponse } from '../types';
+
+const USER_KEY = 'gk_current_user';
+const USER_HASH_KEY = 'gk_user_hash';
 
 /* ===== Role-Based Access Control ===== */
 type Permission =
@@ -61,6 +64,7 @@ interface LoginOpts {
 
 interface AuthContextValue {
   user: User | null;
+  authReady: boolean;
   login: (email: string, password: string, opts?: LoginOpts) => Promise<LoginResult>;
   logout: () => void;
   refreshUser: () => Promise<void>;
@@ -74,13 +78,13 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
     try {
-      const saved = localStorage.getItem('gk_current_user');
+      const saved = sessionStorage.getItem(USER_KEY);
       if (!saved) return null;
       const parsed = JSON.parse(saved) as User;
-      const storedHash = localStorage.getItem('gk_user_hash');
+      const storedHash = sessionStorage.getItem(USER_HASH_KEY);
       if (storedHash && computeHash(parsed) !== storedHash) {
-        localStorage.removeItem('gk_current_user');
-        localStorage.removeItem('gk_user_hash');
+        sessionStorage.removeItem(USER_KEY);
+        sessionStorage.removeItem(USER_HASH_KEY);
         return null;
       }
       return parsed;
@@ -88,12 +92,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return null;
     }
   });
+  const [authReady, setAuthReady] = useState<boolean>(() => user == null);
 
   const logout = useCallback(() => {
-    localStorage.removeItem('gk_current_user');
-    localStorage.removeItem('gk_user_hash');
+    sessionStorage.removeItem(USER_KEY);
+    sessionStorage.removeItem(USER_HASH_KEY);
+    // Clear legacy persistent auth values from older builds.
+    localStorage.removeItem(USER_KEY);
+    localStorage.removeItem(USER_HASH_KEY);
     setToken(null);
     setUser(null);
+    setAuthReady(true);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    async function validateStartupSession() {
+      // Enforce browser-close logout by clearing legacy persistent auth values.
+      localStorage.removeItem(USER_KEY);
+      localStorage.removeItem(USER_HASH_KEY);
+
+      if (!user) {
+        if (active) setAuthReady(true);
+        return;
+      }
+
+      try {
+        const res = await client.get<User & { status?: string }>('/auth/me');
+        if (!res || res.status === 'Inactive') {
+          logout();
+          return;
+        }
+        sessionStorage.setItem(USER_KEY, JSON.stringify(res));
+        sessionStorage.setItem(USER_HASH_KEY, computeHash(res));
+        setUser(res);
+      } catch (err) {
+        // Keep current session on network-only failures while offline.
+        if (!(err instanceof ApiError) || err.status !== 0) {
+          logout();
+        }
+      } finally {
+        if (active) setAuthReady(true);
+      }
+    }
+
+    validateStartupSession();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -107,8 +155,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         : await client.post<AuthResponse>('/auth/login', { email, password });
       if (res.emailVerificationRequired) {
         setToken(null);
-        localStorage.removeItem('gk_current_user');
-        localStorage.removeItem('gk_user_hash');
+        sessionStorage.removeItem(USER_KEY);
+        sessionStorage.removeItem(USER_HASH_KEY);
+        localStorage.removeItem(USER_KEY);
+        localStorage.removeItem(USER_HASH_KEY);
         setUser(null);
         return {
           ok: false,
@@ -121,9 +171,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       setToken(res.token);
-      localStorage.setItem('gk_current_user', JSON.stringify(res.user));
-      localStorage.setItem('gk_user_hash', computeHash(res.user));
+      sessionStorage.setItem(USER_KEY, JSON.stringify(res.user));
+      sessionStorage.setItem(USER_HASH_KEY, computeHash(res.user));
       setUser(res.user);
+      setAuthReady(true);
       return { ok: true, user: res.user };
     } catch (err) {
       return { ok: false, msg: (err as Error).message || 'Login failed.' };
@@ -138,8 +189,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         logout();
         return;
       }
-      localStorage.setItem('gk_current_user', JSON.stringify(res));
-      localStorage.setItem('gk_user_hash', computeHash(res));
+      sessionStorage.setItem(USER_KEY, JSON.stringify(res));
+      sessionStorage.setItem(USER_HASH_KEY, computeHash(res));
       setUser(res);
     } catch {
       // Network error during refresh — keep current session
@@ -162,7 +213,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Session inactivity timeout — logout after 60 minutes of no interaction
   useEffect(() => {
     if (!user) return;
-    const INACTIVITY_MS = 60 * 60 * 1000;
+    const INACTIVITY_MS = 30 * 60 * 1000;
     let timer: ReturnType<typeof setTimeout>;
     const reset = () => {
       clearTimeout(timer);
@@ -185,8 +236,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user, refreshUser]);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, login, logout, refreshUser, isEmployee, canAccess, roleLabel }),
-    [user, login, logout, refreshUser, isEmployee, canAccess, roleLabel]
+    () => ({ user, authReady, login, logout, refreshUser, isEmployee, canAccess, roleLabel }),
+    [user, authReady, login, logout, refreshUser, isEmployee, canAccess, roleLabel]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

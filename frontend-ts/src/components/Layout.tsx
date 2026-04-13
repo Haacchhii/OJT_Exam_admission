@@ -7,6 +7,7 @@ import Topbar from './Topbar';
 import Breadcrumbs from './Breadcrumbs';
 import { KeyboardShortcutsProvider } from './KeyboardShortcuts';
 import { showToast } from './Toast';
+import { LoadingSpinner } from './UI';
 
 const SIDEBAR_KEY = 'gk_sidebar_collapsed';
 function useSidebarCollapsed(): [boolean, React.Dispatch<React.SetStateAction<boolean>>] {
@@ -18,7 +19,7 @@ function useSidebarCollapsed(): [boolean, React.Dispatch<React.SetStateAction<bo
 }
 
 export function StudentLayout() {
-  const { user } = useAuth();
+  const { user, authReady } = useAuth();
   const { socket, isConnected } = useSocket();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -36,6 +37,14 @@ export function StudentLayout() {
       socket.off('admission_status_updated', handleAdmissionStatus);
     };
   }, [socket, isConnected]);
+
+  if (!authReady) {
+    return (
+      <div className="min-h-screen grid place-items-center gk-mesh-bg">
+        <LoadingSpinner />
+      </div>
+    );
+  }
 
   if (!user) return <Navigate to="/login" replace />;
   if (user.role !== 'applicant') return <Navigate to="/employee" replace />;
@@ -60,10 +69,18 @@ export function StudentLayout() {
 }
 
 export function EmployeeLayout() {
-  const { user } = useAuth();
+  const { user, authReady } = useAuth();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useSidebarCollapsed();
+
+  if (!authReady) {
+    return (
+      <div className="min-h-screen grid place-items-center gk-mesh-bg">
+        <LoadingSpinner />
+      </div>
+    );
+  }
 
   if (!user) return <Navigate to="/login" replace />;
   if (user.role === 'applicant') return <Navigate to="/student" replace />;
