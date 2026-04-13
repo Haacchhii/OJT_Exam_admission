@@ -45,6 +45,14 @@ export const forgotPasswordSchema = z.object({
   email: z.string().email('Invalid email format'),
 });
 
+export const verifyEmailSchema = z.object({
+  token: z.string().min(1, 'Verification token is required').max(512),
+});
+
+export const resendVerificationSchema = z.object({
+  email: z.string().email('Invalid email format'),
+});
+
 export const resetPasswordSchema = z.object({
   resetToken: z.string().min(1, 'Reset token is required'),
   password: passwordSchema,
@@ -58,6 +66,61 @@ export const updateProfileSchema = z.object({
   address: z.string().max(500).optional().nullable(),
   currentPassword: z.string().min(1, 'Current password is required').optional(),
   newPassword: passwordSchema.optional(),
+});
+
+// ─── Academic Year / Semester Schemas ────────────────
+const yearRegex = /^\d{4}-\d{4}$/;
+const isoDateFlexible = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d{1,3})?(Z|[+-]\d{2}:\d{2})?)?$/;
+
+export const createAcademicYearSchema = z.object({
+  year: z.string().regex(yearRegex, 'Year must be in format YYYY-YYYY (e.g. 2026-2027)'),
+  isActive: z.boolean().optional(),
+  startDate: z.string().regex(isoDateFlexible, 'Invalid date format').optional().nullable(),
+  endDate: z.string().regex(isoDateFlexible, 'Invalid date format').optional().nullable(),
+});
+
+export const updateAcademicYearSchema = z.object({
+  year: z.string().regex(yearRegex, 'Year must be in format YYYY-YYYY (e.g. 2026-2027)').optional(),
+  isActive: z.boolean().optional(),
+  startDate: z.string().regex(isoDateFlexible, 'Invalid date format').optional().nullable(),
+  endDate: z.string().regex(isoDateFlexible, 'Invalid date format').optional().nullable(),
+});
+
+export const createSemesterSchema = z.object({
+  name: z.string().min(1).max(100),
+  academicYearId: z.number().int().positive(),
+  isActive: z.boolean().optional(),
+  startDate: z.string().regex(isoDateFlexible, 'Invalid date format').optional().nullable(),
+  endDate: z.string().regex(isoDateFlexible, 'Invalid date format').optional().nullable(),
+});
+
+export const updateSemesterSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  isActive: z.boolean().optional(),
+  startDate: z.string().regex(isoDateFlexible, 'Invalid date format').optional().nullable(),
+  endDate: z.string().regex(isoDateFlexible, 'Invalid date format').optional().nullable(),
+});
+
+export const semestersQuerySchema = z.object({
+  yearId: coerceOptionalInt,
+});
+
+// ─── Perf Monitoring Schemas ─────────────────────────
+export const perfVitalSchema = z.object({
+  metric: z.string().min(1).max(64),
+  value: z.number().finite(),
+  rating: z.string().max(32).optional(),
+  id: z.string().max(200).optional().nullable(),
+  page: z.string().max(500).optional().nullable(),
+  timestamp: z.number().int().positive().optional(),
+  navigationType: z.string().max(64).optional().nullable(),
+  userAgent: z.string().max(500).optional().nullable(),
+});
+
+export const perfSummaryQuerySchema = z.object({
+  key: z.string().max(200).optional(),
+  minutes: z.coerce.number().int().min(1).max(24 * 60).optional(),
+  limit: z.coerce.number().int().min(1).max(1000).optional(),
 });
 
 // ─── Admission Schemas ────────────────────────────────
@@ -280,6 +343,18 @@ export const saveDraftSchema = z.object({
   ]).or(z.null())).refine(
     (value) => Object.keys(value).length <= 1000,
     'Cannot save more than 1000 questions'
+  ),
+});
+
+export const submitExamSchema = z.object({
+  registrationId: z.number().int().positive(),
+  answers: z.record(z.union([
+    z.number().int().positive(),
+    z.string().max(5000),
+    z.null(),
+  ])).refine(
+    (value) => Object.keys(value).length <= 1000,
+    'Cannot submit more than 1000 questions'
   ),
 });
 

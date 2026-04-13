@@ -138,6 +138,24 @@ const examSubmitLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+const resultSubmitLimiter = rateLimit({
+  windowMs: RATE_LIMITS.RESULT_SUBMIT.windowMs,
+  max: RATE_LIMITS.RESULT_SUBMIT.max,
+  skip: (req) => req.method === 'OPTIONS' || req.method === 'GET' || req.method === 'HEAD',
+  message: { error: 'Too many result submissions, please try again later.', code: 'RATE_LIMIT' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const perfIngestLimiter = rateLimit({
+  windowMs: RATE_LIMITS.PERF_INGEST.windowMs,
+  max: RATE_LIMITS.PERF_INGEST.max,
+  skip: (req) => req.method === 'OPTIONS' || req.method === 'GET' || req.method === 'HEAD',
+  message: { error: 'Too many performance ingestion requests, please try again later.', code: 'RATE_LIMIT' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 const bulkOpLimiter = rateLimit({
   windowMs: RATE_LIMITS.BULK.windowMs,
   max: RATE_LIMITS.BULK.max,
@@ -155,6 +173,8 @@ app.use('/uploads', authenticate, express.static(uploadStaticDir));
 app.use('/api/admissions/bulk-status', bulkOpLimiter);
 app.use('/api/admissions/:id/documents', uploadLimiter);
 app.use('/api/exams/registrations', examSubmitLimiter);
+app.use('/api/results/submit', resultSubmitLimiter);
+app.use('/api/perf/vitals', perfIngestLimiter);
 
 // Root route for platform checks and direct browser visits.
 app.get('/', (_req, res) => {

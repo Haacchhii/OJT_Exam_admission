@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import env from '../config/env.js';
+import { validate, validateQuery } from '../middleware/validate.js';
+import { perfVitalSchema, perfSummaryQuerySchema } from '../utils/schemas.js';
 import { getPerfSummary, observeVitalMetric } from '../utils/perfStore.js';
 
 const router = Router();
@@ -11,7 +13,7 @@ function hasSummaryAccess(req) {
 }
 
 // Lightweight endpoint for browser-side Web Vitals ingestion.
-router.post('/vitals', (req, res) => {
+router.post('/vitals', validate(perfVitalSchema), (req, res) => {
   if (!env.PERF_INGEST_ENABLED) {
     return res.status(202).json({ ok: true, ignored: true });
   }
@@ -26,10 +28,6 @@ router.post('/vitals', (req, res) => {
     navigationType,
     userAgent,
   } = req.body || {};
-
-  if (!metric || typeof value !== 'number') {
-    return res.status(400).json({ error: 'Invalid vitals payload', code: 'VALIDATION_ERROR' });
-  }
 
   const payload = {
     metric,
@@ -48,7 +46,7 @@ router.post('/vitals', (req, res) => {
   return res.status(202).json({ ok: true });
 });
 
-router.get('/summary', (req, res) => {
+router.get('/summary', validateQuery(perfSummaryQuerySchema), (req, res) => {
   if (!hasSummaryAccess(req)) {
     return res.status(403).json({ error: 'Performance summary access denied', code: 'FORBIDDEN' });
   }

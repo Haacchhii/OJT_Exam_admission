@@ -37,6 +37,8 @@ export const RATE_LIMITS = {
   AUTH:        { windowMs: 15 * 60 * 1000, max: 20   },
   UPLOAD:      { windowMs: 60 * 60 * 1000, max: 30   },
   EXAM_SUBMIT: { windowMs: 60 * 60 * 1000, max: 10   },
+  RESULT_SUBMIT:{ windowMs: 60 * 60 * 1000, max: 10  },
+  PERF_INGEST: { windowMs: 60 * 1000,      max: 120  },
   BULK:        { windowMs: 15 * 60 * 1000, max: 10   },
   WRITE:       { windowMs: 15 * 60 * 1000, max: 30   },
 };
