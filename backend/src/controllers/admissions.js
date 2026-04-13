@@ -613,6 +613,24 @@ export async function createAdmission(req, res, next) {
       });
     }
 
+    // Enforce exam-completion gate on the backend as well (frontend already gates this).
+    const completedExam = await prisma.examRegistration.findFirst({
+      where: {
+        status: 'done',
+        OR: [
+          { userId: req.user.id },
+          { userEmail: req.user.email },
+        ],
+      },
+      select: { id: true },
+    });
+    if (!completedExam) {
+      return res.status(400).json({
+        error: 'Please complete your entrance exam before submitting an admission application.',
+        code: 'VALIDATION_ERROR',
+      });
+    }
+
     const trackingId = await generateTrackingId('ADM');
 
     // Auto-link to active academic year/semester when not provided by client.

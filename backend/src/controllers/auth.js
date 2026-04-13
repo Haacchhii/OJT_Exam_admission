@@ -99,7 +99,7 @@ export async function login(req, res, next) {
     const token = signToken(user);
     logAudit({ userId: user.id, action: 'auth.login', entity: 'user', entityId: user.id, ipAddress: req.ip });
     const response = { user: safeUser(user), token };
-    if (user.role === ROLES.APPLICANT && !user.emailVerified) {
+    if (env.EMAIL_VERIFICATION_REQUIRED && user.role === ROLES.APPLICANT && !user.emailVerified) {
       response.emailVerificationRequired = true;
     }
     res.json(response);
@@ -124,10 +124,12 @@ export async function register(req, res, next) {
       return res.status(400).json({ error: pwErr, code: 'VALIDATION_ERROR' });
     }
 
+    const shouldRequireEmailVerification = env.EMAIL_VERIFICATION_REQUIRED;
+
     // Check duplicate
     const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
     if (existing) {
-      if (!existing.deletedAt && !existing.emailVerified) {
+      if (shouldRequireEmailVerification && !existing.deletedAt && !existing.emailVerified) {
         const verifyToken = crypto.randomBytes(32).toString('hex');
         await prisma.user.update({
           where: { id: existing.id },
@@ -147,16 +149,16 @@ export async function register(req, res, next) {
     }
 
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
-    const verifyToken = crypto.randomBytes(32).toString('hex');
+    const verifyToken = shouldRequireEmailVerification ? crypto.randomBytes(32).toString('hex') : null;
     const applicantPeriodOpen = await isApplicantPeriodOpen();
     const user = await prisma.user.create({
       data: {
         firstName, middleName, lastName, email: normalizedEmail, passwordHash,
         role: ROLES.APPLICANT,
         status: applicantPeriodOpen ? 'Active' : 'Inactive',
-        emailVerified: false,
+        emailVerified: !shouldRequireEmailVerification,
         emailVerifyToken: verifyToken,
-        emailVerifyExpires: new Date(Date.now() + EMAIL_VERIFY_EXPIRY_MS),
+        emailVerifyExpires: shouldRequireEmailVerification ? new Date(Date.now() + EMAIL_VERIFY_EXPIRY_MS) : null,
       },
     });
 
@@ -169,12 +171,19 @@ export async function register(req, res, next) {
       include: { applicantProfile: true },
     });
 
-    // Send verification email
-    await sendVerificationEmail({ to: user.email, firstName: user.firstName, verifyToken });
+    if (shouldRequireEmailVerification && verifyToken) {
+      await sendVerificationEmail({ to: user.email, firstName: user.firstName, verifyToken });
+    } else {
+      await sendWelcomeEmail({ to: user.email, firstName: user.firstName });
+    }
 
     const token = signToken(user);
     logAudit({ userId: user.id, action: 'auth.register', entity: 'user', entityId: user.id, ipAddress: req.ip });
-    res.status(201).json({ user: safeUser(fullUser), token, emailVerificationRequired: true });
+    const response = { user: safeUser(fullUser), token };
+    if (shouldRequireEmailVerification) {
+      response.emailVerificationRequired = true;
+    }
+    res.status(201).json(response);
   } catch (err) { next(err); }
 }
 
