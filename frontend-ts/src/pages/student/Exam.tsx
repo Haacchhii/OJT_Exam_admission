@@ -20,6 +20,7 @@ export default function StudentExam() {
   const confirm = useConfirm();
   const [view, setView] = useState<'schedule' | 'lobby' | 'exam'>('schedule');
   const [currentExam, setCurrentExam] = useState<Exam | null>(null);
+  const [optimisticReg, setOptimisticReg] = useState<ExamRegistration | null>(null);
   const [recoveringExam, setRecoveringExam] = useState(false);
 
   const { user } = useAuth();
@@ -32,14 +33,15 @@ export default function StudentExam() {
   }, [user], 0, { setLoadingOnReload: true });
 
   const myReg = rawData?.myReg || null;
+  const activeReg = myReg || optimisticReg;
   const myResult = rawData?.myResult || null;
 
   const [startingExam, setStartingExam] = useState(false);
 
   const showLobby = (exam: Exam) => { setCurrentExam(exam); setView('lobby'); };
   const handleStartExam = async () => {
-    if (startingExam || !myReg) return;
-    const examId = myReg.schedule?.examId;
+    if (startingExam || !activeReg) return;
+    const examId = activeReg.schedule?.examId;
     if (!examId) {
       showToast('Exam details are missing for this registration. Please refresh and try again.', 'error');
       return;
@@ -55,7 +57,7 @@ export default function StudentExam() {
 
     setStartingExam(true);
     try {
-      await apiStartExam(myReg.id);
+      await apiStartExam(activeReg.id);
       const loadedExam = await getExamForStudent(examId);
       setCurrentExam(loadedExam);
       setView('exam');
@@ -68,12 +70,12 @@ export default function StudentExam() {
   };
 
   useEffect(() => {
-    if (myReg?.status === 'started') {
+    if (activeReg?.status === 'started') {
       let cancelled = false;
       setRecoveringExam(true);
       (async () => {
         try {
-          const examId = myReg.schedule?.examId;
+          const examId = activeReg.schedule?.examId;
           const exam = examId ? await getExamForStudent(examId) : null;
           if (!cancelled && exam) {
             setCurrentExam(exam);
@@ -92,14 +94,20 @@ export default function StudentExam() {
     }
 
     setRecoveringExam(false);
-  }, [myReg]);
+  }, [activeReg]);
+
+  useEffect(() => {
+    if (myReg && optimisticReg) {
+      setOptimisticReg(null);
+    }
+  }, [myReg, optimisticReg]);
 
   if (loading && !rawData) return <SkeletonPage />;
   if (recoveringExam && view !== 'exam') return <SkeletonPage />;
   if (error) return <ErrorAlert error={error} onRetry={refetch} />;
 
-  if (view === 'exam' && currentExam && myReg) {
-    return <LiveExam exam={currentExam} registration={myReg} />;
+  if (view === 'exam' && currentExam && activeReg) {
+    return <LiveExam exam={currentExam} registration={activeReg} />;
   }
 
   if (view === 'lobby' && currentExam) {
@@ -110,9 +118,9 @@ export default function StudentExam() {
           <h2 className="text-2xl font-bold text-forest-500 mb-2">Ready to Begin</h2>
           <p className="text-gray-500 mb-6 leading-relaxed">
             You are about to start the <strong>{currentExam.title}</strong>.<br />
-            Duration: <strong>{currentExam.durationMinutes}</strong> minutes<br />
+            Duration: <strong>{typeof currentExam.durationMinutes === 'number' ? currentExam.durationMinutes : 'N/A'}</strong> minutes<br />
             Total Questions: <strong>{currentExam.questionCount ?? currentExam.questions?.length ?? 0}</strong><br />
-            Passing Score: <strong>{currentExam.passingScore}%</strong>
+            Passing Score: <strong>{typeof currentExam.passingScore === 'number' ? `${currentExam.passingScore}%` : 'N/A'}</strong>
           </p>
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-left mb-4">
             <h4 className="font-bold text-red-600 mb-2 flex items-center gap-2"><Icon name="exclamation" className="w-5 h-5" /> Critical Rules - Read Before Starting</h4>
@@ -138,5 +146,14 @@ export default function StudentExam() {
     );
   }
 
-  return <ScheduleView myReg={myReg} myResult={myResult} onLobby={showLobby} onRefresh={refetch} user={user} />;
+  return (
+    <ScheduleView
+      myReg={activeReg}
+      myResult={myResult}
+      onLobby={showLobby}
+      onRefresh={refetch}
+      onBookedRegistration={setOptimisticReg}
+      user={user}
+    />
+  );
 }

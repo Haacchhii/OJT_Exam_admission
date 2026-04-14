@@ -19,6 +19,7 @@ interface ScheduleViewProps {
   myResult: ExamResult | null;
   onLobby: (exam: Exam) => void;
   onRefresh: () => void;
+  onBookedRegistration: (registration: ExamRegistration) => void;
   user: User | null;
 }
 
@@ -45,7 +46,7 @@ function formatDisplayDate(value: string | null | undefined): string {
   return parsed.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
-export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, user }: ScheduleViewProps) {
+export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, onBookedRegistration, user }: ScheduleViewProps) {
   const confirm = useConfirm();
   const [bookingSlotId, setBookingSlotId] = useState<number | null>(null);
   const [cancelingRegistrationId, setCancelingRegistrationId] = useState<number | null>(null);
@@ -151,6 +152,11 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, user
     try {
       const reg = await registerForExam(user?.email || '', scheduleId);
       if (reg) {
+        const optimisticReg: ExamRegistration = {
+          ...reg,
+          schedule: schedule || reg.schedule,
+        };
+        onBookedRegistration(optimisticReg);
         const trackMsg = reg.trackingId ? ` Your tracking ID: ${reg.trackingId}` : '';
         showToast(`Exam slot booked successfully!${trackMsg}`, 'success');
         onRefresh();
@@ -314,7 +320,7 @@ function ScheduledView({ myReg, onLobby, onCancel, isCanceling }: ScheduledViewP
           <span className="text-xs text-gray-400">Exam</span><span className="text-sm font-medium">{exam?.title || 'N/A'}</span>
           <span className="text-xs text-gray-400">Date</span><span className="text-sm font-medium">{formatDisplayDate(schedule?.scheduledDate || null)}</span>
           <span className="text-xs text-gray-400">Time</span><span className="text-sm font-medium">{schedule ? `${formatTime(schedule.startTime)} - ${formatTime(schedule.endTime)}` : 'N/A'}</span>
-          <span className="text-xs text-gray-400">Duration</span><span className="text-sm font-medium">{exam ? `${exam.durationMinutes} minutes` : 'N/A'}</span>
+          <span className="text-xs text-gray-400">Duration</span><span className="text-sm font-medium">{exam && typeof exam.durationMinutes === 'number' ? `${exam.durationMinutes} minutes` : 'N/A'}</span>
         </div>
         <div className="max-w-xl mx-auto text-left rounded-lg border border-gold-200 bg-gold-50 px-4 py-3 mb-5">
           <p className="text-xs font-semibold text-gold-800 mb-1">Exam-day checklist</p>
