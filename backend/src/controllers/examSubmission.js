@@ -2,6 +2,17 @@ import prisma from '../config/db.js';
 import { logAudit } from '../utils/auditLog.js';
 import { sendExamResultEmail } from '../utils/email.js';
 import { EXAM_GRACE_MINUTES } from '../utils/constants.js';
+import { invalidatePrefix } from '../utils/cache.js';
+
+function normalizeEmail(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function registrationBelongsToUser(registration, user) {
+  if (!registration || !user) return false;
+  if (registration.userId != null && registration.userId === user.id) return true;
+  return normalizeEmail(registration.userEmail) === normalizeEmail(user.email);
+}
 
 // ═══════════════════════════════════════════════════════
 // POST /api/results/submit
@@ -22,7 +33,7 @@ export async function submitExam(req, res, next) {
     });
     if (!reg) return res.status(404).json({ error: 'Registration not found', code: 'NOT_FOUND' });
     // Ownership check: only the registered student can submit
-    if (reg.userEmail !== req.user.email) {
+    if (!registrationBelongsToUser(reg, req.user)) {
       return res.status(403).json({ error: 'You can only submit your own exam', code: 'FORBIDDEN' });
     }
     if (reg.status === 'done') {
@@ -130,6 +141,8 @@ export async function submitExam(req, res, next) {
         data: { status: 'done', submittedAt: new Date() },
       }),
     ]);
+
+    invalidatePrefix(`regs:mine-summary:${req.user.id}:`);
 
     res.json({ totalScore, maxPossible, percentage, passed: hasEssays ? false : passed });
 

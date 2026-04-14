@@ -20,6 +20,7 @@ export default function StudentExam() {
   const confirm = useConfirm();
   const [view, setView] = useState<'schedule' | 'lobby' | 'exam'>('schedule');
   const [currentExam, setCurrentExam] = useState<Exam | null>(null);
+  const [recoveringExam, setRecoveringExam] = useState(false);
 
   const { user } = useAuth();
   const { data: rawData, loading, error, refetch } = useAsync<ExamData>(async () => {
@@ -28,7 +29,7 @@ export default function StudentExam() {
     ]);
     const myReg = regSummary?.latest || null;
     return { myReg, myResult };
-  }, [user]);
+  }, [user], 0, { setLoadingOnReload: true });
 
   const myReg = rawData?.myReg || null;
   const myResult = rawData?.myResult || null;
@@ -38,6 +39,12 @@ export default function StudentExam() {
   const showLobby = (exam: Exam) => { setCurrentExam(exam); setView('lobby'); };
   const handleStartExam = async () => {
     if (startingExam || !myReg) return;
+    const examId = myReg.schedule?.examId;
+    if (!examId) {
+      showToast('Exam details are missing for this registration. Please refresh and try again.', 'error');
+      return;
+    }
+
     const ok = await confirm({
       title: 'Start Exam Now?',
       message: 'You are about to begin the exam. You cannot pause or restart once it starts. Continue?',
@@ -49,8 +56,10 @@ export default function StudentExam() {
     setStartingExam(true);
     try {
       await apiStartExam(myReg.id);
-      refetch();
+      const loadedExam = await getExamForStudent(examId);
+      setCurrentExam(loadedExam);
       setView('exam');
+      refetch();
     } catch (err: unknown) {
       showToast((err as Error).message || 'Failed to start exam. Please try again.', 'error');
     } finally {
@@ -61,20 +70,32 @@ export default function StudentExam() {
   useEffect(() => {
     if (myReg?.status === 'started') {
       let cancelled = false;
+      setRecoveringExam(true);
       (async () => {
         try {
           const examId = myReg.schedule?.examId;
           const exam = examId ? await getExamForStudent(examId) : null;
-          if (!cancelled && exam) { setCurrentExam(exam); setView('exam'); }
-        } catch (err) {
+          if (!cancelled && exam) {
+            setCurrentExam(exam);
+            setView('exam');
+          }
+        } catch (err: unknown) {
+          if (!cancelled) {
+            showToast((err as Error).message || 'Could not restore your in-progress exam.', 'error');
+          }
           console.error('Exam recovery failed:', err);
+        } finally {
+          if (!cancelled) setRecoveringExam(false);
         }
       })();
       return () => { cancelled = true; };
     }
+
+    setRecoveringExam(false);
   }, [myReg]);
 
   if (loading && !rawData) return <SkeletonPage />;
+  if (recoveringExam && view !== 'exam') return <SkeletonPage />;
   if (error) return <ErrorAlert error={error} onRetry={refetch} />;
 
   if (view === 'exam' && currentExam && myReg) {

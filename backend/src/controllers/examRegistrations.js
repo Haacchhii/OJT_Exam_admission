@@ -3,7 +3,32 @@ import { paginate, paginatedResponse } from '../utils/pagination.js';
 import { generateTrackingId } from '../utils/tracking.js';
 import { sendExamBookingEmail } from '../utils/email.js';
 import { ROLES } from '../utils/constants.js';
-import { cached } from '../utils/cache.js';
+import { cached, invalidatePrefix } from '../utils/cache.js';
+
+function normalizeEmail(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function ownershipWhereForUser(user) {
+  const email = normalizeEmail(user?.email);
+  return {
+    OR: [
+      { userId: user.id },
+      { userEmail: { equals: email, mode: 'insensitive' } },
+    ],
+  };
+}
+
+function registrationBelongsToUser(registration, user) {
+  if (!registration || !user) return false;
+  if (registration.userId != null && registration.userId === user.id) return true;
+  return normalizeEmail(registration.userEmail) === normalizeEmail(user.email);
+}
+
+function invalidateMyRegistrationSummary(userId) {
+  if (!userId) return;
+  invalidatePrefix(`regs:mine-summary:${userId}:`);
+}
 
 function getTodayLocalIso() {
   const now = new Date();
@@ -113,7 +138,7 @@ export async function getRegistrations(req, res, next) {
 // GET /api/exams/registrations/mine?academicYearId=
 export async function getMyRegistrations(req, res, next) {
   try {
-    const where = { userEmail: req.user.email };
+    const where = ownershipWhereForUser(req.user);
     const { academicYearId } = req.query;
     if (academicYearId) {
       where.schedule = { exam: { academicYearId: Number(academicYearId) } };
@@ -130,7 +155,7 @@ export async function getMyRegistrations(req, res, next) {
 // GET /api/exams/registrations/mine-summary?academicYearId=
 export async function getMyRegistrationSummary(req, res, next) {
   try {
-    const where = { userEmail: req.user.email };
+    const where = ownershipWhereForUser(req.user);
     const { academicYearId } = req.query;
     if (academicYearId) {
       where.schedule = { exam: { academicYearId: Number(academicYearId) } };
@@ -167,11 +192,39 @@ export async function createRegistration(req, res, next) {
       return res.status(400).json({ error: 'Please select an exam schedule.', code: 'VALIDATION_ERROR' });
     }
 
-    // For applicants, always use their authenticated email to prevent impersonation
-    const email = req.user.role === ROLES.APPLICANT ? req.user.email : userEmail;
+    // For applicants, always use their authenticated email to prevent impersonation.
+    const requestedEmail = req.user.role === ROLES.APPLICANT ? req.user.email : userEmail;
+    const email = normalizeEmail(requestedEmail);
     if (!email) {
       return res.status(400).json({ error: 'Please provide the student email address.', code: 'VALIDATION_ERROR' });
     }
+
+    let targetUser = null;
+    if (req.user.role === ROLES.APPLICANT) {
+      targetUser = {
+        id: req.user.id,
+        email,
+        role: req.user.role,
+        status: req.user.status || 'Active',
+        firstName: req.user.firstName || null,
+      };
+    } else {
+      targetUser = await prisma.user.findFirst({
+        where: { email: { equals: email, mode: 'insensitive' } },
+        select: { id: true, email: true, role: true, status: true, firstName: true },
+      });
+      if (!targetUser) {
+        return res.status(404).json({ error: 'The selected student account was not found.', code: 'NOT_FOUND' });
+      }
+      if (targetUser.role !== ROLES.APPLICANT) {
+        return res.status(400).json({ error: 'Exam registrations can only be created for applicant accounts.', code: 'VALIDATION_ERROR' });
+      }
+      if (targetUser.status === 'Inactive') {
+        return res.status(400).json({ error: 'Cannot create registration for an inactive applicant account.', code: 'VALIDATION_ERROR' });
+      }
+    }
+
+    const targetUserId = targetUser.id;
 
     // Check for existing active registration for this specific schedule's exam
     const schedule = await prisma.examSchedule.findUnique({
@@ -222,7 +275,10 @@ export async function createRegistration(req, res, next) {
 
     const existing = await prisma.examRegistration.findFirst({
       where: {
-        userEmail: email,
+        OR: [
+          { userId: targetUserId },
+          { userEmail: { equals: email, mode: 'insensitive' } },
+        ],
         status: { not: 'done' },
         schedule: { examId: schedule.examId },
       },
@@ -247,7 +303,7 @@ export async function createRegistration(req, res, next) {
         throw Object.assign(new Error('This schedule is already full. Please choose another schedule.'), { statusCode: 400, code: 'VALIDATION_ERROR' });
       }
       const reg = await tx.examRegistration.create({
-        data: { trackingId, userEmail: email, userId: req.user.id, scheduleId, status: 'scheduled' },
+        data: { trackingId, userEmail: email, userId: targetUserId, scheduleId, status: 'scheduled' },
       });
       await tx.examSchedule.update({
         where: { id: scheduleId },
@@ -257,38 +313,37 @@ export async function createRegistration(req, res, next) {
     });
 
     res.status(201).json(registration);
+    invalidateMyRegistrationSummary(targetUserId);
 
     // Fire-and-forget booking confirmation email
-    prisma.user.findUnique({ where: { id: req.user.id }, select: { firstName: true, email: true } })
-      .then(async (student) => {
-        const sched = await prisma.examSchedule.findUnique({
-          where: { id: scheduleId },
-          include: { exam: { select: { title: true } } },
-        });
-        if (!student || !sched) return;
-        let dateStr = 'TBD';
-        if (sched.scheduledDate) {
-          const [year, month, day] = String(sched.scheduledDate).split('-').map(Number);
-          if (year && month && day) {
-            const scheduleDate = new Date(Date.UTC(year, month - 1, day));
-            dateStr = scheduleDate.toLocaleDateString('en-PH', {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-              timeZone: 'UTC',
-            });
-          }
+    prisma.examSchedule.findUnique({
+      where: { id: scheduleId },
+      include: { exam: { select: { title: true } } },
+    }).then((sched) => {
+      if (!sched) return;
+      let dateStr = 'TBD';
+      if (sched.scheduledDate) {
+        const [year, month, day] = String(sched.scheduledDate).split('-').map(Number);
+        if (year && month && day) {
+          const scheduleDate = new Date(Date.UTC(year, month - 1, day));
+          dateStr = scheduleDate.toLocaleDateString('en-PH', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            timeZone: 'UTC',
+          });
         }
-        const timeStr = sched.startTime && sched.endTime ? `${sched.startTime} - ${sched.endTime}` : 'See portal for details';
-        sendExamBookingEmail({
-          to: student.email,
-          firstName: student.firstName,
-          examTitle: sched.exam?.title || 'Entrance Exam',
-          scheduleDate: dateStr,
-          scheduleTime: timeStr,
-          trackingId: registration.trackingId,
-        });
-      }).catch(() => {});
+      }
+      const timeStr = sched.startTime && sched.endTime ? `${sched.startTime} - ${sched.endTime}` : 'See portal for details';
+      sendExamBookingEmail({
+        to: targetUser.email,
+        firstName: targetUser.firstName,
+        examTitle: sched.exam?.title || 'Entrance Exam',
+        scheduleDate: dateStr,
+        scheduleTime: timeStr,
+        trackingId: registration.trackingId,
+      });
+    }).catch(() => {});
   } catch (err) { next(err); }
 }
 
@@ -309,7 +364,7 @@ export async function startExam(req, res, next) {
     if (!reg) return res.status(404).json({ error: 'We could not find this exam registration.', code: 'NOT_FOUND' });
 
     // Ownership check: only the registered student can start their own exam
-    if (reg.userEmail !== req.user.email) {
+    if (!registrationBelongsToUser(reg, req.user)) {
       return res.status(403).json({ error: 'You can only start exams assigned to your account.', code: 'FORBIDDEN' });
     }
 
@@ -344,11 +399,20 @@ export async function startExam(req, res, next) {
       return res.status(400).json({ error: 'This exam has not started yet.', code: 'VALIDATION_ERROR' });
     }
 
+    const questionCount = await prisma.examQuestion.count({ where: { examId: reg.schedule.examId } });
+    if (questionCount === 0) {
+      return res.status(400).json({
+        error: 'This exam is not ready yet because no questions were published. Please contact staff.',
+        code: 'VALIDATION_ERROR',
+      });
+    }
+
     const updated = await prisma.examRegistration.update({
       where: { id },
       data: { status: 'started', startedAt: new Date() },
     });
 
+    invalidateMyRegistrationSummary(req.user.id);
     res.json(updated);
   } catch (err) { next(err); }
 }
@@ -360,7 +424,7 @@ export async function saveDraftAnswers(req, res, next) {
     const reg = await prisma.examRegistration.findUnique({ where: { id } });
     if (!reg) return res.status(404).json({ error: 'We could not find this exam registration.', code: 'NOT_FOUND' });
 
-    if (reg.userEmail !== req.user.email) {
+    if (!registrationBelongsToUser(reg, req.user)) {
       return res.status(403).json({ error: 'You can only save answers for exams assigned to your account.', code: 'FORBIDDEN' });
     }
 
@@ -385,7 +449,7 @@ export async function cancelRegistration(req, res, next) {
     const reg = await prisma.examRegistration.findUnique({ where: { id } });
     if (!reg) return res.status(404).json({ error: 'We could not find this exam registration.', code: 'NOT_FOUND' });
 
-    if (reg.userEmail !== req.user.email) {
+    if (!registrationBelongsToUser(reg, req.user)) {
       return res.status(403).json({ error: 'You can only cancel registrations assigned to your account.', code: 'FORBIDDEN' });
     }
 
@@ -401,6 +465,7 @@ export async function cancelRegistration(req, res, next) {
       });
     });
 
+    invalidateMyRegistrationSummary(req.user.id);
     res.status(204).end();
   } catch (err) { next(err); }
 }

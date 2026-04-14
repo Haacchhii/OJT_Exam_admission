@@ -5,7 +5,7 @@ import { registerForExam, getAvailableSchedules, notifyNoExamSchedule, cancelExa
 import { getActivePeriod } from '../../../api/academicYears';
 import { showToast } from '../../../components/Toast';
 import { useConfirm } from '../../../components/ConfirmDialog';
-import { PageHeader, ActionButton } from '../../../components/UI';
+import { PageHeader, ActionButton, SkeletonPage, ErrorAlert } from '../../../components/UI';
 import Icon from '../../../components/Icons';
 import { formatTime } from '../../../utils/helpers';
 import type { Exam, ExamSchedule, ExamRegistration, ExamResult, User } from '../../../types';
@@ -53,7 +53,7 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, user
   const [sendingNotice, setSendingNotice] = useState(false);
   const [noticeSent, setNoticeSent] = useState(false);
 
-  const { data: schedData } = useAsync<ScheduleData>(async () => {
+  const { data: schedData, loading: schedLoading, error: schedError, refetch: refetchSchedules } = useAsync<ScheduleData>(async () => {
     const rawAvail = await getAvailableSchedules();
     return { availableSchedules: Array.isArray(rawAvail) ? rawAvail : [] };
   });
@@ -79,6 +79,28 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, user
         </div>
       </div>
     );
+  }
+
+  if (!myReg && myResult) {
+    return (
+      <div>
+        <PageHeader title="Entrance Examination" subtitle="Select an available exam slot and confirm your booking." />
+        <div className="gk-section-card p-8 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-forest-50 flex items-center justify-center mx-auto mb-3"><Icon name="checkCircle" className="w-7 h-7 text-forest-500" /></div>
+          <h3 className="font-bold text-forest-500 mb-1">Exam Completed</h3>
+          <p className="text-gray-500 text-sm mb-4">You have already completed your entrance exam. View your result details below.</p>
+          <Link to="/student/results" className="inline-block bg-forest-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-forest-600">View Results</Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!myReg && schedLoading && !schedData) {
+    return <SkeletonPage />;
+  }
+
+  if (!myReg && schedError) {
+    return <ErrorAlert error={schedError} onRetry={refetchSchedules} />;
   }
 
   const cancelSchedule = async (registrationId: number) => {

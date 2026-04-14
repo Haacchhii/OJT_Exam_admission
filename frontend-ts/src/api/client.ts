@@ -123,6 +123,7 @@ const recentGetResponses = new Map<string, { data: unknown; expiresAt: number; e
 
 export type RequestOptions = {
   signal?: AbortSignal;
+  noCache?: boolean;
 };
 
 function getPathFromKey(key: string): string {
@@ -275,11 +276,12 @@ async function request<T = unknown>(
 export const client = {
   get:    <T = unknown>(path: string, options?: RequestOptions) => {
     clearExpiredGetCache();
+    const shouldBypassCache = Boolean(options?.signal || options?.noCache);
 
     // If this request is caller-cancellable, do not dedupe it with shared in-flight requests.
     // This avoids accidental cross-cancellation between unrelated UI interactions.
-    if (options?.signal) {
-      return withRetry(() => request<T>('GET', path, undefined, { signal: options.signal }));
+    if (shouldBypassCache) {
+      return withRetry(() => request<T>('GET', path, undefined, { signal: options?.signal }));
     }
 
     const key = makeRequestKey(path);

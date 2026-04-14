@@ -13,6 +13,25 @@ function parseBooleanQuery(value, fallback) {
   return fallback;
 }
 
+function normalizeEmail(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function ownershipWhereForUser(user) {
+  return {
+    OR: [
+      { userId: user.id },
+      { userEmail: { equals: normalizeEmail(user.email), mode: 'insensitive' } },
+    ],
+  };
+}
+
+function registrationBelongsToUser(registration, user) {
+  if (!registration || !user) return false;
+  if (registration.userId != null && registration.userId === user.id) return true;
+  return normalizeEmail(registration.userEmail) === normalizeEmail(user.email);
+}
+
 // Re-export submission and essay scoring controllers so routes/results.js keeps working
 export { submitExam } from './examSubmission.js';
 export { getEssayAnswers, scoreEssay } from './essayScoring.js';
@@ -66,7 +85,7 @@ export async function getResults(req, res, next) {
 // ═══════════════════════════════════════════════════════
 export async function getMyResult(req, res, next) {
   try {
-    const where = { registration: { userEmail: req.user.email } };
+    const where = { registration: ownershipWhereForUser(req.user) };
     const { academicYearId } = req.query;
     if (academicYearId) {
       where.registration = { ...where.registration, schedule: { exam: { academicYearId: Number(academicYearId) } } };
@@ -116,7 +135,7 @@ export async function getResult(req, res, next) {
     });
     if (!result) return res.status(404).json({ error: 'Result not found', code: 'NOT_FOUND' });
     // Ownership: applicants can only view their own result
-    if (req.user.role === 'applicant' && result.registration.userEmail !== req.user.email) {
+    if (req.user.role === 'applicant' && !registrationBelongsToUser(result.registration, req.user)) {
       return res.status(403).json({ error: 'Access denied', code: 'FORBIDDEN' });
     }
     res.json(result);
@@ -132,7 +151,7 @@ export async function getSubmittedAnswers(req, res, next) {
     // Ownership check for applicants
     if (req.user.role === 'applicant') {
       const reg = await prisma.examRegistration.findUnique({ where: { id: regId } });
-      if (!reg || reg.userEmail !== req.user.email) {
+      if (!reg || !registrationBelongsToUser(reg, req.user)) {
         return res.status(403).json({ error: 'Access denied', code: 'FORBIDDEN' });
       }
     }

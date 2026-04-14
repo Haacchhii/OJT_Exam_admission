@@ -33,6 +33,19 @@ const examListInclude = {
   _count: { select: { questions: true, schedules: true } },
 };
 
+function normalizeEmail(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function ownershipWhereForUser(user) {
+  return {
+    OR: [
+      { userId: user.id },
+      { userEmail: { equals: normalizeEmail(user.email), mode: 'insensitive' } },
+    ],
+  };
+}
+
 function shapeExam(exam) {
   if (!exam) return null;
   const { createdBy: creator, createdById, academicYear, semester, _count, ...rest } = exam;
@@ -205,7 +218,7 @@ export async function getExamForStudent(req, res, next) {
     const examId = Number(req.params.id);
     const activeRegistration = await prisma.examRegistration.findFirst({
       where: {
-        userEmail: req.user.email,
+        ...ownershipWhereForUser(req.user),
         status: 'started',
         schedule: { examId },
       },
@@ -217,6 +230,12 @@ export async function getExamForStudent(req, res, next) {
 
     const exam = await prisma.exam.findUnique({ where: { id: examId }, include: examDetailInclude });
     if (!exam || exam.deletedAt) return res.status(404).json({ error: 'We could not find this exam.', code: 'NOT_FOUND' });
+    if (!exam.questions?.length) {
+      return res.status(400).json({
+        error: 'This exam is not ready yet because no questions were published. Please contact staff.',
+        code: 'VALIDATION_ERROR',
+      });
+    }
     res.json(stripAnswers(shapeExam(exam)));
   } catch (err) { next(err); }
 }
@@ -228,7 +247,7 @@ export async function getExamForReview(req, res, next) {
     // Verify the student has a 'done' registration for this exam
     const reg = await prisma.examRegistration.findFirst({
       where: {
-        userEmail: req.user.email,
+        ...ownershipWhereForUser(req.user),
         status: 'done',
         schedule: { examId },
       },

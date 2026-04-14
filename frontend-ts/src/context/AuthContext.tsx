@@ -95,6 +95,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authReady, setAuthReady] = useState<boolean>(() => user == null);
 
   const logout = useCallback(() => {
+    try {
+      const sessionKeysToRemove: string[] = [];
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i);
+        if (key && key.startsWith('gk_exam_answers_')) {
+          sessionKeysToRemove.push(key);
+        }
+      }
+      for (const key of sessionKeysToRemove) {
+        sessionStorage.removeItem(key);
+      }
+      localStorage.removeItem('gk_admission_step');
+      localStorage.removeItem('gk_admission_draft');
+    } catch {
+      // Ignore storage cleanup issues and continue logout.
+    }
+
     sessionStorage.removeItem(USER_KEY);
     sessionStorage.removeItem(USER_HASH_KEY);
     // Clear legacy persistent auth values from older builds.

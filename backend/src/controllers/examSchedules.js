@@ -197,6 +197,24 @@ export async function createSchedule(req, res, next) {
       return res.status(400).json({ error: 'examId, scheduledDate, startTime, endTime, maxSlots required', code: 'VALIDATION_ERROR' });
     }
 
+    const exam = await prisma.exam.findUnique({
+      where: { id: Number(examId) },
+      select: {
+        id: true,
+        deletedAt: true,
+        _count: { select: { questions: true } },
+      },
+    });
+    if (!exam || exam.deletedAt) {
+      return res.status(404).json({ error: 'We could not find this exam.', code: 'NOT_FOUND' });
+    }
+    if (exam._count.questions === 0) {
+      return res.status(400).json({
+        error: 'Cannot create a schedule for an exam with no questions.',
+        code: 'VALIDATION_ERROR',
+      });
+    }
+
     const validationError = validateScheduleFields({ scheduledDate, startTime, endTime }, { checkPastDate: true });
     if (validationError) {
       return res.status(400).json({ error: validationError, code: 'VALIDATION_ERROR' });

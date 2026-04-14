@@ -1,5 +1,5 @@
 ﻿import { Link } from 'react-router-dom';
-import { getMyRegistrationSummary, getExamForReview } from '../../api/exams';
+import { getMyRegistrationSummary, getExamForReview, getMyRegistrations } from '../../api/exams';
 import { getMyResult, getSubmittedAnswers } from '../../api/results';
 import { PageHeader, SkeletonPage, ErrorAlert, ActionButton } from '../../components/UI';
 import Icon from '../../components/Icons';
@@ -32,16 +32,23 @@ export default function StudentResults() {
   const { user } = useAuth();
 
   const { data: rawData, loading, error, refetch } = useAsync<ResultsData>(async () => {
-    const [regSummary, myResult] = await Promise.all([
+    const [regSummary, myResult, registrations] = await Promise.all([
       getMyRegistrationSummary(),
       getMyResult(),
+      getMyRegistrations(),
     ]);
-    const myReg = regSummary?.latest || null;
+    const regs = asArray<ExamRegistration>(registrations);
+    const regFromResult = myResult?.registrationId
+      ? (regs.find((r) => r.id === myResult.registrationId) || null)
+      : null;
+    const myReg = regFromResult || regSummary?.latest || null;
+    const targetRegistrationId = myResult?.registrationId || myReg?.id || null;
     const examId = myReg?.schedule?.examId;
+
     let exam: Exam | null = null;
     let storedAnswers: SubmittedAnswer[] = [];
 
-    if (myReg) {
+    if (targetRegistrationId) {
       const [loadedExam, loadedAnswers] = await Promise.all([
         (async () => {
           if (!examId) return null;
@@ -55,7 +62,7 @@ export default function StudentResults() {
         })(),
         (async () => {
           try {
-            return asArray<SubmittedAnswer>(await getSubmittedAnswers(myReg.id));
+            return asArray<SubmittedAnswer>(await getSubmittedAnswers(targetRegistrationId));
           } catch (err) {
             showToast('Could not load your submitted answers.', 'error');
             console.error('getSubmittedAnswers failed:', err);
@@ -78,7 +85,7 @@ export default function StudentResults() {
         comment: a.essayComment ?? null,
       }));
     return { myResult, myReg, exam, essayAnswers, storedAnswers };
-  }, [user]);
+  }, [user], 0, { setLoadingOnReload: true });
 
   if (loading && !rawData) return <SkeletonPage />;
   if (error) return <ErrorAlert error={error} onRetry={refetch} />;
