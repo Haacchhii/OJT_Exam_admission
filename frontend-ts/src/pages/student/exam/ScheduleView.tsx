@@ -20,6 +20,7 @@ interface ScheduleViewProps {
   onLobby: (exam: Exam) => void;
   onRefresh: () => void;
   onBookedRegistration: (registration: ExamRegistration) => void;
+  showBookedSuccess: boolean;
   user: User | null;
 }
 
@@ -46,7 +47,7 @@ function formatDisplayDate(value: string | null | undefined): string {
   return parsed.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
-export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, onBookedRegistration, user }: ScheduleViewProps) {
+export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, onBookedRegistration, showBookedSuccess, user }: ScheduleViewProps) {
   const confirm = useConfirm();
   const [bookingSlotId, setBookingSlotId] = useState<number | null>(null);
   const [cancelingRegistrationId, setCancelingRegistrationId] = useState<number | null>(null);
@@ -132,8 +133,13 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, onBo
         onLobby={onLobby}
         onCancel={cancelSchedule}
         isCanceling={cancelingRegistrationId === myReg.id}
+        showBookedSuccess={showBookedSuccess}
       />
     );
+  }
+
+  if (bookingSlotId !== null) {
+    return <BookingInProgressView />;
   }
 
   const available = schedData?.availableSchedules || [];
@@ -297,9 +303,10 @@ interface ScheduledViewProps {
   onLobby: (exam: Exam) => void;
   onCancel: (registrationId: number) => void;
   isCanceling: boolean;
+  showBookedSuccess: boolean;
 }
 
-function ScheduledView({ myReg, onLobby, onCancel, isCanceling }: ScheduledViewProps) {
+function ScheduledView({ myReg, onLobby, onCancel, isCanceling, showBookedSuccess }: ScheduledViewProps) {
   const schedule = myReg.schedule || null;
   const exam = schedule?.exam || null;
   const canStart = !!exam;
@@ -308,6 +315,15 @@ function ScheduledView({ myReg, onLobby, onCancel, isCanceling }: ScheduledViewP
     <div>
       <PageHeader title="Entrance Examination" subtitle="Select an available exam slot and confirm your booking." />
       <div className="gk-section-card p-8 text-center">
+        {showBookedSuccess && (
+          <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-left">
+            <p className="text-sm font-semibold text-emerald-700 flex items-center gap-2">
+              <Icon name="checkCircle" className="w-4 h-4" />
+              Booking confirmed. Your exam slot is secured.
+            </p>
+            <p className="text-xs text-emerald-700/80 mt-1">You can now review schedule details below and start when ready.</p>
+          </div>
+        )}
         <div className="w-14 h-14 rounded-2xl bg-forest-50 flex items-center justify-center mx-auto mb-3"><Icon name="calendar" className="w-7 h-7 text-forest-500" /></div>
         <h3 className="font-bold text-forest-500 mb-2">Exam Scheduled</h3>
         {myReg.trackingId && (
@@ -349,6 +365,21 @@ function ScheduledView({ myReg, onLobby, onCancel, isCanceling }: ScheduledViewP
             </ActionButton>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function BookingInProgressView() {
+  return (
+    <div>
+      <PageHeader title="Entrance Examination" subtitle="Please wait while we finalize your booking." />
+      <div className="gk-section-card p-10 text-center">
+        <div className="mx-auto mb-4 w-14 h-14 rounded-2xl bg-forest-50 flex items-center justify-center">
+          <span className="h-6 w-6 rounded-full border-2 border-forest-300 border-t-forest-600 animate-spin" />
+        </div>
+        <h3 className="text-lg font-bold text-forest-600">Booking Your Exam Slot...</h3>
+        <p className="text-gray-500 text-sm mt-2">Your request is being processed. This page will update automatically once confirmed.</p>
       </div>
     </div>
   );

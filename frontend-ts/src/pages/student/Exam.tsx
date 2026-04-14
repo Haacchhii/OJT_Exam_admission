@@ -21,6 +21,7 @@ export default function StudentExam() {
   const [view, setView] = useState<'schedule' | 'lobby' | 'exam'>('schedule');
   const [currentExam, setCurrentExam] = useState<Exam | null>(null);
   const [optimisticReg, setOptimisticReg] = useState<ExamRegistration | null>(null);
+  const [recentlyBooked, setRecentlyBooked] = useState(false);
   const [recoveringExam, setRecoveringExam] = useState(false);
 
   const { user } = useAuth();
@@ -102,6 +103,12 @@ export default function StudentExam() {
     }
   }, [myReg, optimisticReg]);
 
+  useEffect(() => {
+    if (!recentlyBooked) return;
+    const timer = window.setTimeout(() => setRecentlyBooked(false), 7000);
+    return () => window.clearTimeout(timer);
+  }, [recentlyBooked]);
+
   if (loading && !rawData) return <SkeletonPage />;
   if (recoveringExam && view !== 'exam') return <SkeletonPage />;
   if (error) return <ErrorAlert error={error} onRetry={refetch} />;
@@ -152,7 +159,11 @@ export default function StudentExam() {
       myResult={myResult}
       onLobby={showLobby}
       onRefresh={refetch}
-      onBookedRegistration={setOptimisticReg}
+      onBookedRegistration={(registration) => {
+        setOptimisticReg(registration);
+        setRecentlyBooked(true);
+      }}
+      showBookedSuccess={recentlyBooked}
       user={user}
     />
   );
