@@ -36,7 +36,7 @@ export function useAsync<T>(
   const [refreshCount, setRefreshCount] = useState(0);
 
   const {
-    autoRefreshOnDataChange = false,
+    autoRefreshOnDataChange = true,
     autoRefreshOnFocus = false,
     resourcePrefixes,
     setLoadingOnReload = false,
@@ -47,11 +47,11 @@ export function useAsync<T>(
 
   const isFirstLoad = useRef(true);
   const lastAutoRefreshAt = useRef(0);
-  const AUTO_REFRESH_MIN_INTERVAL_MS = 8000;
+  const AUTO_REFRESH_MIN_INTERVAL_MS = 1000;
 
-  const triggerAutoRefresh = useCallback(() => {
+  const triggerAutoRefresh = useCallback((force = false) => {
     const now = Date.now();
-    if (now - lastAutoRefreshAt.current < AUTO_REFRESH_MIN_INTERVAL_MS) return;
+    if (!force && now - lastAutoRefreshAt.current < AUTO_REFRESH_MIN_INTERVAL_MS) return;
     lastAutoRefreshAt.current = now;
     setRefreshCount(c => c + 1);
   }, []);
@@ -101,11 +101,11 @@ export function useAsync<T>(
 
   useEffect(() => {
     if (!autoRefreshOnDataChange) return;
-    const onDataChanged = () => triggerAutoRefresh();
+    const onDataChanged = () => triggerAutoRefresh(true);
     const onScopedDataChanged = (evt: Event) => {
       const customEvt = evt as CustomEvent<DataChangedDetail>;
       if (shouldRefreshForPrefixes(resourcePrefixes, customEvt.detail?.prefixes)) {
-        triggerAutoRefresh();
+        triggerAutoRefresh(true);
       }
     };
     window.addEventListener('gk:data-changed', onDataChanged);

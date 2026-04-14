@@ -130,12 +130,6 @@ function getPathFromKey(key: string): string {
   return sep >= 0 ? key.slice(sep + 2) : key;
 }
 
-function toResourcePrefix(path: string): string {
-  const clean = String(path || '').split('?')[0];
-  const parts = clean.split('/').filter(Boolean);
-  return parts.length > 0 ? `/${parts[0]}` : '';
-}
-
 function invalidateGetCache(prefixes?: string[]) {
   cacheEpoch += 1;
   if (!prefixes || prefixes.length === 0) {
@@ -330,11 +324,11 @@ export const client = {
     inflightGetRequests.set(key, req as Promise<unknown>);
     return req;
   },
-  post:   <T = unknown>(path: string, body?: unknown, options?: RequestOptions) => request<T>('POST', path, body, { signal: options?.signal }).then((data) => { invalidateGetCache([toResourcePrefix(path)]); return data; }),
-  put:    <T = unknown>(path: string, body?: unknown, options?: RequestOptions) => request<T>('PUT', path, body, { signal: options?.signal }).then((data) => { invalidateGetCache([toResourcePrefix(path)]); return data; }),
-  patch:  <T = unknown>(path: string, body?: unknown, options?: RequestOptions) => request<T>('PATCH', path, body, { signal: options?.signal }).then((data) => { invalidateGetCache([toResourcePrefix(path)]); return data; }),
-  delete: <T = unknown>(path: string, options?: RequestOptions) => request<T>('DELETE', path, undefined, { signal: options?.signal }).then((data) => { invalidateGetCache([toResourcePrefix(path)]); return data; }),
-  upload: <T = unknown>(path: string, formData: FormData, options?: RequestOptions) => request<T>('POST', path, formData, { isFormData: true, signal: options?.signal }).then((data) => { invalidateGetCache([toResourcePrefix(path)]); return data; }),
+  post:   <T = unknown>(path: string, body?: unknown, options?: RequestOptions) => request<T>('POST', path, body, { signal: options?.signal }).then((data) => { invalidateGetCache(); return data; }),
+  put:    <T = unknown>(path: string, body?: unknown, options?: RequestOptions) => request<T>('PUT', path, body, { signal: options?.signal }).then((data) => { invalidateGetCache(); return data; }),
+  patch:  <T = unknown>(path: string, body?: unknown, options?: RequestOptions) => request<T>('PATCH', path, body, { signal: options?.signal }).then((data) => { invalidateGetCache(); return data; }),
+  delete: <T = unknown>(path: string, options?: RequestOptions) => request<T>('DELETE', path, undefined, { signal: options?.signal }).then((data) => { invalidateGetCache(); return data; }),
+  upload: <T = unknown>(path: string, formData: FormData, options?: RequestOptions) => request<T>('POST', path, formData, { isFormData: true, signal: options?.signal }).then((data) => { invalidateGetCache(); return data; }),
 };
 
 // Utility for filter/search UIs: cancel prior request before issuing the next one.
