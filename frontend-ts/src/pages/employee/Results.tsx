@@ -6,7 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { showToast } from '../../components/Toast';
 import { useConfirm } from '../../components/ConfirmDialog';
 import Modal from '../../components/Modal';
-import { PageHeader, StatCard, Badge, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert, ActionButton, SearchInput } from '../../components/UI';
+import { PageHeader, StatCard, Badge, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert, ActionButton, SearchInput, StatusBanner } from '../../components/UI';
 import Icon from '../../components/Icons';
 import { formatDate, exportToCSV, formatPersonName } from '../../utils/helpers';
 import type { ExamResult, EssayAnswer, ExamRegistration, ExamSchedule, Exam, User, AcademicYear, Semester } from '../../types';
@@ -103,7 +103,14 @@ export default function EmployeeResults() {
   const [essayRowsPage, setEssayRowsPage] = useState(1);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [selectedEssayExamId, setSelectedEssayExamId] = useState<number | null>(null);
+  const [scoreActionState, setScoreActionState] = useState<{ tone: 'info' | 'success' | 'danger'; title: string; message?: string } | null>(null);
   const includeEssaysInSummary = tab === 'essays';
+
+  useEffect(() => {
+    if (!scoreActionState || scoreActionState.tone === 'info') return;
+    const timer = window.setTimeout(() => setScoreActionState(null), 7000);
+    return () => window.clearTimeout(timer);
+  }, [scoreActionState]);
 
   const { data: rawData, loading, error, refetch } = useAsync<RawData>(async () => {
     const summary = await getEmployeeResultsSummary({
@@ -297,13 +304,28 @@ export default function EmployeeResults() {
     if (!ok) return;
 
     setSaving(true);
+    setScoreActionState({
+      tone: 'info',
+      title: 'Saving essay score...',
+      message: 'Please wait while we update this essay review.',
+    });
     try {
       await scoreEssay(scoreModal.id, s, commentVal.trim() || undefined);
       localStorage.removeItem(essayDraftKey(scoreModal.id));
       showToast('Essay scored!', 'success');
+      setScoreActionState({
+        tone: 'success',
+        title: 'Essay score saved successfully.',
+        message: 'The review data has been refreshed with the latest score.',
+      });
       setScoreModal(null);
       refetch();
     } catch {
+      setScoreActionState({
+        tone: 'danger',
+        title: 'Failed to save essay score.',
+        message: 'Please try again or check your network connection.',
+      });
       showToast('Failed to score essay.', 'error');
     } finally {
       setSaving(false);
@@ -409,6 +431,15 @@ export default function EmployeeResults() {
         )}
         <button role="tab" aria-selected={tab === 'analytics'} onClick={() => setTab('analytics')} className={`px-4 py-2 rounded-lg text-sm font-medium transition inline-flex items-center gap-1.5 ${tab === 'analytics' ? 'bg-forest-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}><Icon name="arrowTrendUp" className="w-4 h-4" /> Analytics</button>
       </div>
+
+      {scoreActionState && (
+        <StatusBanner
+          tone={scoreActionState.tone}
+          title={scoreActionState.title}
+          message={scoreActionState.message}
+          className="mb-4"
+        />
+      )}
 
       {summaryMeta?.capped && (
         <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">

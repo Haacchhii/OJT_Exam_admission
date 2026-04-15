@@ -1,9 +1,9 @@
-﻿import { useState, type ChangeEvent, type FormEvent } from 'react';
+﻿import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useAsync } from '../../../hooks/useAsync';
 import { getExams, getExamSchedulesPage, addExamSchedule, updateExamSchedule, deleteExamSchedule } from '../../../api/exams';
 import { showToast } from '../../../components/Toast';
 import { useConfirm } from '../../../components/ConfirmDialog';
-import { PageHeader, Badge, EmptyState, Pagination, SkeletonPage, ActionButton, SearchInput } from '../../../components/UI';
+import { PageHeader, Badge, EmptyState, Pagination, SkeletonPage, ActionButton, SearchInput, StatusBanner } from '../../../components/UI';
 import Icon from '../../../components/Icons';
 import { formatTime, formatDateRange, asArray } from '../../../utils/helpers';
 import { FormInput } from './ExamComponents';
@@ -37,7 +37,14 @@ export default function ScheduleManager() {
   const [schedExamFilter, setSchedExamFilter] = useState('all');
   const [schedPage, setSchedPage] = useState(1);
   const [isSavingSched, setIsSavingSched] = useState(false);
+  const [schedActionBanner, setSchedActionBanner] = useState<{ tone: 'info' | 'success' | 'danger'; title: string; message?: string } | null>(null);
   const set = (k: keyof typeof form) => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm(f => ({ ...f, [k]: e.target.value }));
+
+  useEffect(() => {
+    if (!schedActionBanner || schedActionBanner.tone === 'info') return;
+    const timer = window.setTimeout(() => setSchedActionBanner(null), 7000);
+    return () => window.clearTimeout(timer);
+  }, [schedActionBanner]);
 
   const applyDefaults = (targetDate?: string) => {
     const date = targetDate || form.date;
@@ -179,19 +186,44 @@ export default function ScheduleManager() {
     if (!ok) return;
 
     setIsSavingSched(true);
+    setSchedActionBanner({
+      tone: 'info',
+      title: editId ? 'Updating schedule...' : 'Saving schedule...',
+      message: 'Please wait while we apply the schedule changes.',
+    });
     try {
       if (editId) {
         await updateExamSchedule(editId, baseData);
         showToast('Schedule updated!', 'success');
+        setSchedActionBanner({
+          tone: 'success',
+          title: 'Schedule updated successfully.',
+          message: 'Students and staff now see the latest schedule details.',
+        });
         setEditId(null);
       } else if (targetExamIds.length > 1) {
         await Promise.all(targetExamIds.map(examId => addExamSchedule({ ...baseData, examId })));
         showToast(`${targetExamIds.length} schedules added!`, 'success');
+        setSchedActionBanner({
+          tone: 'success',
+          title: `${targetExamIds.length} schedules created successfully.`,
+          message: 'All selected exams now have schedule slots.',
+        });
       } else {
         await addExamSchedule({ ...baseData, examId: targetExamIds[0] });
         showToast('Schedule added!', 'success');
+        setSchedActionBanner({
+          tone: 'success',
+          title: 'Schedule created successfully.',
+          message: 'The exam schedule is now available in the schedule list.',
+        });
       }
     } catch (err: any) {
+      setSchedActionBanner({
+        tone: 'danger',
+        title: 'Failed to save schedule.',
+        message: err?.message || 'Please try again.',
+      });
       showToast('Failed to save schedule: ' + (err.message || 'Unknown error'), 'error');
     } finally {
       setIsSavingSched(false);
@@ -217,12 +249,52 @@ export default function ScheduleManager() {
     setSelectedExamIds([]);
   };
 
+  const handleDeleteSchedule = async (scheduleId: number) => {
+    const ok = await confirm({
+      title: 'Delete Schedule',
+      message: 'Are you sure you want to delete this schedule?',
+      confirmLabel: 'Delete',
+      variant: 'danger',
+    });
+    if (!ok) return;
+
+    setSchedActionBanner({
+      tone: 'info',
+      title: 'Deleting schedule...',
+      message: 'Please wait while we remove this schedule entry.',
+    });
+
+    try {
+      await deleteExamSchedule(scheduleId);
+      setSchedActionBanner({
+        tone: 'success',
+        title: 'Schedule deleted successfully.',
+      });
+      schedRefetch();
+    } catch {
+      setSchedActionBanner({
+        tone: 'danger',
+        title: 'Failed to delete schedule.',
+        message: 'Please try again.',
+      });
+      showToast('Failed to delete schedule.', 'error');
+    }
+  };
+
   if (schedLoading && !schedData) return <SkeletonPage />;
   if (schedError) return <div className="gk-section-card p-8 text-center"><p className="text-red-600 font-medium">Failed to load schedules.</p><div className="mt-3"><ActionButton variant="secondary" size="sm" onClick={schedRefetch}>Retry</ActionButton></div></div>;
 
   return (
     <div>
       <PageHeader title="Exam Schedules" subtitle="Create and manage exam date/time slots." />
+      {schedActionBanner && (
+        <StatusBanner
+          tone={schedActionBanner.tone}
+          title={schedActionBanner.title}
+          message={schedActionBanner.message}
+          className="mb-4"
+        />
+      )}
       <div className="gk-section-card p-6 mb-6">
         <h3 className="text-lg font-bold text-forest-500 mb-4">{editId ? 'Edit Schedule' : 'Add New Schedule'}</h3>
         <div className="mb-4 flex flex-wrap items-center gap-2 text-xs">
@@ -337,7 +409,7 @@ export default function ScheduleManager() {
                   </div>
                   <div className="flex gap-2">
                     <ActionButton size="sm" variant="ghost" onClick={() => editSched(s)} icon={<Icon name="edit" className="w-3 h-3" />} className="text-forest-600">Edit</ActionButton>
-                    <ActionButton size="sm" variant="ghost" onClick={async () => { if (await confirm({ title: 'Delete Schedule', message: 'Are you sure you want to delete this schedule?', confirmLabel: 'Delete', variant: 'danger' })) { try { await deleteExamSchedule(s.id); schedRefetch(); } catch { showToast('Failed to delete schedule.', 'error'); } } }} icon={<Icon name="trash" className="w-3 h-3" />} className="text-red-600">Delete</ActionButton>
+                    <ActionButton size="sm" variant="ghost" onClick={() => handleDeleteSchedule(s.id)} icon={<Icon name="trash" className="w-3 h-3" />} className="text-red-600">Delete</ActionButton>
                   </div>
                 </div>
               );

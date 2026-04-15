@@ -5,7 +5,7 @@ import { registerForExam, getAvailableSchedules, notifyNoExamSchedule, cancelExa
 import { getActivePeriod } from '../../../api/academicYears';
 import { showToast } from '../../../components/Toast';
 import { useConfirm } from '../../../components/ConfirmDialog';
-import { PageHeader, ActionButton, SkeletonPage, ErrorAlert } from '../../../components/UI';
+import { PageHeader, ActionButton, SkeletonPage, ErrorAlert, ProcessStatePanel, StatusBanner } from '../../../components/UI';
 import Icon from '../../../components/Icons';
 import { formatTime } from '../../../utils/helpers';
 import type { Exam, ExamSchedule, ExamRegistration, ExamResult, User } from '../../../types';
@@ -51,9 +51,16 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, onBo
   const confirm = useConfirm();
   const [bookingSlotId, setBookingSlotId] = useState<number | null>(null);
   const [cancelingRegistrationId, setCancelingRegistrationId] = useState<number | null>(null);
+  const [showCancelSuccess, setShowCancelSuccess] = useState(false);
   const [noticeMessage, setNoticeMessage] = useState('');
   const [sendingNotice, setSendingNotice] = useState(false);
   const [noticeSent, setNoticeSent] = useState(false);
+
+  useEffect(() => {
+    if (!showCancelSuccess) return;
+    const timer = window.setTimeout(() => setShowCancelSuccess(false), 7000);
+    return () => window.clearTimeout(timer);
+  }, [showCancelSuccess]);
 
   const { data: schedData, loading: schedLoading, error: schedError, refetch: refetchSchedules } = useAsync<ScheduleData>(async () => {
     const rawAvail = await getAvailableSchedules();
@@ -118,6 +125,7 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, onBo
     try {
       await cancelExamRegistration(registrationId);
       showToast('Your exam schedule has been cancelled.', 'success');
+      setShowCancelSuccess(true);
       onRefresh();
     } catch (err: unknown) {
       showToast((err as Error).message || 'Failed to cancel schedule. Please try again.', 'error');
@@ -127,6 +135,10 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, onBo
   };
 
   if (myReg) {
+    if (cancelingRegistrationId === myReg.id) {
+      return <CancelInProgressView />;
+    }
+
     return (
       <ScheduledView
         myReg={myReg}
@@ -193,6 +205,14 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, onBo
   return (
     <div>
       <PageHeader title="Entrance Examination" subtitle="Select an available exam slot and confirm your booking." />
+      {showCancelSuccess && (
+        <StatusBanner
+          tone="success"
+          className="mb-4"
+          title="Schedule cancellation complete."
+          message="Your previous slot was released. You can choose a new schedule below."
+        />
+      )}
       {activePeriod && (
         <div className={`mb-4 rounded-lg border px-4 py-3 text-sm ${isExamPeriodOpen ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
           <p className="font-semibold">Exam Period: {activePeriod.year} \u2014 {activeSemester?.name || 'N/A'}</p>
@@ -316,13 +336,12 @@ function ScheduledView({ myReg, onLobby, onCancel, isCanceling, showBookedSucces
       <PageHeader title="Entrance Examination" subtitle="Select an available exam slot and confirm your booking." />
       <div className="gk-section-card p-8 text-center">
         {showBookedSuccess && (
-          <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-left">
-            <p className="text-sm font-semibold text-emerald-700 flex items-center gap-2">
-              <Icon name="checkCircle" className="w-4 h-4" />
-              Booking confirmed. Your exam slot is secured.
-            </p>
-            <p className="text-xs text-emerald-700/80 mt-1">You can now review schedule details below and start when ready.</p>
-          </div>
+          <StatusBanner
+            tone="success"
+            className="mb-4 text-left"
+            title="Booking confirmed. Your exam slot is secured."
+            message="You can now review schedule details below and start when ready."
+          />
         )}
         <div className="w-14 h-14 rounded-2xl bg-forest-50 flex items-center justify-center mx-auto mb-3"><Icon name="calendar" className="w-7 h-7 text-forest-500" /></div>
         <h3 className="font-bold text-forest-500 mb-2">Exam Scheduled</h3>
@@ -374,13 +393,26 @@ function BookingInProgressView() {
   return (
     <div>
       <PageHeader title="Entrance Examination" subtitle="Please wait while we finalize your booking." />
-      <div className="gk-section-card p-10 text-center">
-        <div className="mx-auto mb-4 w-14 h-14 rounded-2xl bg-forest-50 flex items-center justify-center">
-          <span className="h-6 w-6 rounded-full border-2 border-forest-300 border-t-forest-600 animate-spin" />
-        </div>
-        <h3 className="text-lg font-bold text-forest-600">Booking Your Exam Slot...</h3>
-        <p className="text-gray-500 text-sm mt-2">Your request is being processed. This page will update automatically once confirmed.</p>
-      </div>
+      <ProcessStatePanel
+        tone="info"
+        loading
+        title="Booking Your Exam Slot..."
+        message="Your request is being processed. This page will update automatically once confirmed."
+      />
+    </div>
+  );
+}
+
+function CancelInProgressView() {
+  return (
+    <div>
+      <PageHeader title="Entrance Examination" subtitle="Please wait while we cancel your schedule." />
+      <ProcessStatePanel
+        tone="warning"
+        loading
+        title="Cancelling Scheduled Slot..."
+        message="We are releasing your current booking. You can select a new schedule right after this finishes."
+      />
     </div>
   );
 }

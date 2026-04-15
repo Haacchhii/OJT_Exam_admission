@@ -249,6 +249,75 @@ export function LoadingSpinner() {
   );
 }
 
+/* ===== Process Feedback ===== */
+interface ProcessStatePanelProps {
+  title: string;
+  message: string;
+  tone?: 'info' | 'success' | 'warning';
+  loading?: boolean;
+}
+
+export function ProcessStatePanel({
+  title,
+  message,
+  tone = 'info',
+  loading = true,
+}: ProcessStatePanelProps) {
+  const toneClass: Record<string, string> = {
+    info: 'border-forest-200 bg-forest-50 text-forest-700',
+    success: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    warning: 'border-amber-200 bg-amber-50 text-amber-700',
+  };
+
+  return (
+    <div className="gk-section-card p-10 text-center">
+      <div className={`mx-auto mb-4 w-14 h-14 rounded-2xl border flex items-center justify-center ${toneClass[tone] || toneClass.info}`}>
+        {loading ? (
+          <span className="h-6 w-6 rounded-full border-2 border-current/40 border-t-current animate-spin" />
+        ) : (
+          <Icon name="checkCircle" className="w-7 h-7" />
+        )}
+      </div>
+      <h3 className="text-lg font-bold text-forest-600">{title}</h3>
+      <p className="text-gray-500 text-sm mt-2">{message}</p>
+    </div>
+  );
+}
+
+interface StatusBannerProps {
+  title: string;
+  message?: string;
+  tone?: 'info' | 'success' | 'warning' | 'danger';
+  className?: string;
+}
+
+export function StatusBanner({
+  title,
+  message,
+  tone = 'info',
+  className = '',
+}: StatusBannerProps) {
+  const toneClass: Record<string, string> = {
+    info: 'border-forest-200 bg-forest-50 text-forest-700',
+    success: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    warning: 'border-amber-200 bg-amber-50 text-amber-700',
+    danger: 'border-red-200 bg-red-50 text-red-700',
+  };
+
+  return (
+    <div className={`rounded-lg border px-4 py-3 ${toneClass[tone] || toneClass.info} ${className}`}>
+      <p className="text-sm font-semibold flex items-center gap-2">
+        <Icon
+          name={tone === 'success' ? 'checkCircle' : tone === 'danger' ? 'xCircle' : tone === 'warning' ? 'clock' : 'info'}
+          className="w-4 h-4"
+        />
+        {title}
+      </p>
+      {message && <p className="text-xs mt-1 opacity-90">{message}</p>}
+    </div>
+  );
+}
+
 /* ===== PageHeader ===== */
 interface PageHeaderProps {
   title: string;

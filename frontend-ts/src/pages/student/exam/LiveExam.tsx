@@ -4,7 +4,7 @@ import { submitExamAnswers } from '../../../api/results';
 import { saveDraftAnswers } from '../../../api/exams';
 import { showToast } from '../../../components/Toast';
 import Modal from '../../../components/Modal';
-import { ActionButton } from '../../../components/UI';
+import { ActionButton, ProcessStatePanel } from '../../../components/UI';
 import Icon from '../../../components/Icons';
 import type { Exam, ExamRegistration, ExamQuestion, QuestionChoice } from '../../../types';
 
@@ -39,6 +39,8 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
   const [cheatFlags, setCheatFlags] = useState(0);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [autoModal, setAutoModal] = useState<{ title: string; msg: string } | null>(null);
+  const [submitPhase, setSubmitPhase] = useState<'idle' | 'submitting' | 'submitted'>('idle');
+  const [submitFeedback, setSubmitFeedback] = useState<{ title: string; message: string } | null>(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const submittedRef = useRef(false);
@@ -65,17 +67,36 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
   const doSubmit = useCallback(async (title: string | null, msg: string | null) => {
     if (submittedRef.current) return;
     submittedRef.current = true;
+    setSubmitPhase('submitting');
+    setSubmitFeedback({
+      title: 'Submitting Your Exam...',
+      message: 'Please wait while we securely save and grade your answers.',
+    });
     if (timerRef.current) clearInterval(timerRef.current);
     try {
       await submitExamAnswers(registration.id, answersRef.current);
     } catch (err: unknown) {
       submittedRef.current = false;
+      setSubmitPhase('idle');
+      setSubmitFeedback(null);
       showToast((err as Error).message || 'Failed to submit exam. Please try again.', 'error');
       return;
     }
     try { sessionStorage.removeItem(`gk_exam_answers_${registration.id}`); } catch { /* ignore */ }
-    if (title && msg) setAutoModal({ title, msg });
-    else { showToast('Exam submitted successfully!', 'success'); setTimeout(() => navigate('/student/results'), 1500); }
+    if (title && msg) {
+      setSubmitPhase('idle');
+      setSubmitFeedback(null);
+      setAutoModal({ title, msg });
+    }
+    else {
+      setSubmitPhase('submitted');
+      setSubmitFeedback({
+        title: 'Exam Submitted Successfully',
+        message: 'Your answers were saved. Redirecting to your results page...',
+      });
+      showToast('Exam submitted successfully!', 'success');
+      setTimeout(() => navigate('/student/results'), 1500);
+    }
   }, [registration.id, navigate]);
 
   const doSubmitRef = useRef(doSubmit);
@@ -149,6 +170,36 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
   const mins = Math.floor(timeLeft / 60);
   const secs = timeLeft % 60;
   const timerColor = timeLeft <= 60 ? 'text-red-500' : timeLeft <= 300 ? 'text-gold-500' : 'text-forest-500';
+
+  if (submitPhase === 'submitting' && submitFeedback) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-4">
+        <div className="max-w-3xl mx-auto">
+          <ProcessStatePanel
+            tone="info"
+            loading
+            title={submitFeedback.title}
+            message={submitFeedback.message}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (submitPhase === 'submitted' && submitFeedback) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-4">
+        <div className="max-w-3xl mx-auto">
+          <ProcessStatePanel
+            tone="success"
+            loading={false}
+            title={submitFeedback.title}
+            message={submitFeedback.message}
+          />
+        </div>
+      </div>
+    );
+  }
 
   if (!q) {
     return (

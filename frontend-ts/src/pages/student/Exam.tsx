@@ -5,7 +5,7 @@ import { getMyRegistrationSummary, startExam as apiStartExam, getExamForStudent 
 import { getMyResult } from '../../api/results';
 import { showToast } from '../../components/Toast';
 import { useConfirm } from '../../components/ConfirmDialog';
-import { SkeletonPage, ErrorAlert, ActionButton } from '../../components/UI';
+import { SkeletonPage, ErrorAlert, ActionButton, ProcessStatePanel } from '../../components/UI';
 import Icon from '../../components/Icons';
 import type { Exam, ExamRegistration, ExamResult } from '../../types';
 import ScheduleView from './exam/ScheduleView';
@@ -118,6 +118,19 @@ export default function StudentExam() {
   }
 
   if (view === 'lobby' && currentExam) {
+    if (startingExam) {
+      return (
+        <div className="max-w-2xl mx-auto">
+          <ProcessStatePanel
+            tone="info"
+            loading
+            title="Starting Your Exam Session..."
+            message="Please wait while we prepare your question set and timer. This should only take a moment."
+          />
+        </div>
+      );
+    }
+
     return (
       <div className="max-w-2xl mx-auto">
         <div className="gk-section-card p-8 text-center">

@@ -4,7 +4,7 @@ import { getAdmission, updateAdmissionStatus, VALID_TRANSITIONS } from '../../..
 import { useAsync } from '../../../hooks/useAsync';
 import { formatDate, formatDateRange, formatPersonName, badgeClass } from '../../../utils/helpers';
 import DocumentReview from '../../../components/DocumentReview';
-import { PageHeader, Badge, SkeletonPage, ActionButton, StatusStepper } from '../../../components/UI';
+import { PageHeader, Badge, SkeletonPage, ActionButton, StatusStepper, StatusBanner } from '../../../components/UI';
 import Icon from '../../../components/Icons';
 import { SCHOOL_NAME, SCHOOL_BRAND, SCHOOL_SUBTITLE, SCHOOL_ADDRESS, SCHOOL_PHONE } from '../../../utils/constants';
 import { useAuth } from '../../../context/AuthContext';
@@ -50,6 +50,13 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
   const [statusVal, setStatusVal] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const [actionBanner, setActionBanner] = useState<{ tone: 'info' | 'success' | 'danger'; title: string; message?: string } | null>(null);
+
+  useEffect(() => {
+    if (!actionBanner || actionBanner.tone === 'info') return;
+    const timer = window.setTimeout(() => setActionBanner(null), 7000);
+    return () => window.clearTimeout(timer);
+  }, [actionBanner]);
 
   useEffect(() => {
     if (!fetchedAdm) return;
@@ -166,14 +173,29 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
       if (!ok) return;
     }
     setSaving(true);
+    setActionBanner({
+      tone: 'info',
+      title: 'Updating application status...',
+      message: 'Please wait while we save this change for all stakeholders.',
+    });
     try {
       const updated = await updateAdmissionStatus(adm.id, statusVal, notes);
       setAdm(updated);
       setStatusVal(updated.status);
       setNotes(updated.notes || '');
+      setActionBanner({
+        tone: 'success',
+        title: 'Application status updated successfully.',
+        message: `Current status is now "${updated.status}".`,
+      });
       showToast(`Application ${statusVal.toLowerCase()} successfully!`, 'success');
       refetch();
     } catch (err: any) {
+      setActionBanner({
+        tone: 'danger',
+        title: 'Failed to update application status.',
+        message: err?.message || 'Please try again.',
+      });
       showToast('Update failed: ' + (err.message || 'Unknown error'), 'error');
     } finally {
       setSaving(false);
@@ -187,6 +209,15 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
         <ActionButton variant="secondary" onClick={handlePrint} className="ml-auto" icon={<Icon name="document" className="w-4 h-4" />}>Print / Export PDF</ActionButton>
       </div>
       <PageHeader title="Application Details" />
+
+      {actionBanner && (
+        <StatusBanner
+          tone={actionBanner.tone}
+          title={actionBanner.title}
+          message={actionBanner.message}
+          className="mb-4"
+        />
+      )}
 
       <div className="gk-section-card p-6 mb-4">
         <h3 className="text-lg font-bold text-forest-500 mb-4">Student Information</h3>
