@@ -28,6 +28,21 @@ interface ResultsData {
   storedAnswers: SubmittedAnswer[];
 }
 
+function normalizeFreeText(value: unknown) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
+function isIdentificationMatch(answer: unknown, key: unknown, mode: 'exact' | 'partial' | null | undefined) {
+  const normAnswer = normalizeFreeText(answer);
+  const normKey = normalizeFreeText(key);
+  if (!normAnswer || !normKey) return false;
+  if (mode === 'partial') return normAnswer.includes(normKey) || normKey.includes(normAnswer);
+  return normAnswer === normKey;
+}
+
 export default function StudentResults() {
   const { user } = useAuth();
 
@@ -218,7 +233,7 @@ export default function StudentResults() {
           <h3 className="text-lg font-bold text-forest-500 mb-4">Question Breakdown</h3>
           <div className="space-y-4">
             {exam.questions.map((q, i) => {
-              if (q.questionType === 'mc') {
+              if (q.questionType === 'mc' || q.questionType === 'true_false') {
                 const stored = storedAnswers.find((a: SubmittedAnswer) => a.questionId === q.id);
                 const selectedId = stored?.selectedChoiceId ?? null;
                 const correct = q.choices?.find(c => c.isCorrect);
@@ -235,6 +250,9 @@ export default function StudentResults() {
                       </div>
                     </div>
                     <p className="text-forest-500 font-medium mb-3">{q.questionText}</p>
+                    {q.questionType === 'true_false' && (
+                      <p className="text-xs text-gray-500 mb-2">Question type: True / False</p>
+                    )}
                     <div className="space-y-1.5">
                       {q.choices?.map(c => {
                         const isSel = c.id === selectedId;
@@ -246,6 +264,33 @@ export default function StudentResults() {
                       })}
                     </div>
                     <p className="text-xs mt-2 text-gray-400">{selected ? `Your answer: ${selected.choiceText}` : 'No answer selected'}</p>
+                  </div>
+                );
+              } else if (q.questionType === 'identification') {
+                const stored = storedAnswers.find((a: SubmittedAnswer) => a.questionId === q.id);
+                const answerText = stored?.essayText || '';
+                const correctAnswer = q.identificationAnswer || '';
+                const isCorrect = isIdentificationMatch(answerText, correctAnswer, q.identificationMatchMode);
+
+                return (
+                  <div key={q.id} className={`border rounded-lg p-4 ${isCorrect ? 'border-forest-200 bg-forest-50/50' : 'border-red-200 bg-red-50/50'}`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-bold text-sm text-gray-400">Q{i + 1}</span>
+                      <div className="flex items-center gap-3 text-sm">
+                        <span>{isCorrect ? <><Icon name="checkCircle" className="w-4 h-4 inline text-forest-500" /> Correct</> : <><Icon name="xCircle" className="w-4 h-4 inline text-red-500" /> Incorrect</>}</span>
+                        <span className="text-gray-400">{isCorrect ? q.points : 0} / {q.points} pts</span>
+                      </div>
+                    </div>
+                    <p className="text-forest-500 font-medium mb-3">{q.questionText}</p>
+                    <div className="bg-white rounded-lg p-3 border border-gray-200 mb-2">
+                      <p className="text-xs text-gray-400 mb-1 font-medium">Your Answer:</p>
+                      <p className="text-gray-700 text-sm whitespace-pre-wrap">{answerText || 'No response submitted.'}</p>
+                    </div>
+                    <div className="bg-white rounded-lg p-3 border border-gray-200">
+                      <p className="text-xs text-gray-400 mb-1 font-medium">Correct Answer:</p>
+                      <p className="text-gray-700 text-sm whitespace-pre-wrap">{correctAnswer || '-'}</p>
+                    </div>
+                    <p className="text-xs mt-2 text-gray-500">Match mode: {q.identificationMatchMode || 'exact'}</p>
                   </div>
                 );
               } else {

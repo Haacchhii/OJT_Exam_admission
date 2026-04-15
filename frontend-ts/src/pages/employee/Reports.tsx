@@ -124,6 +124,8 @@ export default function EmployeeReports() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [levelGroupFilter, setLevelGroupFilter] = useState('all');
   const [gradeFilter, setGradeFilter] = useState('all');
+  const [sortFilter, setSortFilter] = useState<'newest' | 'oldest' | 'alphabetical' | 'school'>('newest');
+  const [schoolFilter, setSchoolFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('all');
   const [semesterFilter, setSemesterFilter] = useState('all');
   const [dateFrom, setDateFrom] = useState('');
@@ -136,6 +138,8 @@ export default function EmployeeReports() {
       status?: string;
       levelGroup?: string;
       grade?: string;
+      sort: 'newest' | 'oldest' | 'alphabetical' | 'school';
+      school?: string;
       academicYearId?: number;
       semesterId?: number;
       dateFrom?: string;
@@ -143,11 +147,13 @@ export default function EmployeeReports() {
       limit: number;
     } = {
       limit: REPORTS_DEFAULT_LIMIT,
+      sort: sortFilter,
     };
 
     if (statusFilter !== 'all') params.status = statusFilter;
     if (levelGroupFilter !== 'all') params.levelGroup = levelGroupFilter;
     if (gradeFilter !== 'all') params.grade = gradeFilter;
+    if (schoolFilter.trim()) params.school = schoolFilter.trim();
     if (yearFilter !== 'all') params.academicYearId = Number(yearFilter);
     if (semesterFilter !== 'all') params.semesterId = Number(semesterFilter);
     if (!hasInvalidDateRange) {
@@ -156,7 +162,7 @@ export default function EmployeeReports() {
     }
 
     return params;
-  }, [statusFilter, levelGroupFilter, gradeFilter, yearFilter, semesterFilter, dateFrom, dateTo, hasInvalidDateRange]);
+  }, [statusFilter, levelGroupFilter, gradeFilter, sortFilter, schoolFilter, yearFilter, semesterFilter, dateFrom, dateTo, hasInvalidDateRange]);
 
   const { data: rawData, loading, error, refetch } = useAsync<ReportData>(async () => {
     try {
@@ -250,7 +256,7 @@ export default function EmployeeReports() {
 
   const exportApplicants = async (format: 'csv' | 'pdf' = 'csv') => {
     const { buildActiveFilters, downloadCSV, getChartSvgMarkup, printPdfReport } = await import('./reports/reportExport');
-    const headers = ['ID', 'First Name', 'Middle Name', 'Last Name', 'Email', 'Grade Level', 'Application Period', 'Status', 'Submitted'];
+    const headers = ['ID', 'First Name', 'Middle Name', 'Last Name', 'Email', 'Grade Level', 'Previous School', 'Application Period', 'Status', 'Submitted'];
     const rows: (string | number)[][] = admissions.map(a => [
       a.id,
       a.firstName,
@@ -258,6 +264,7 @@ export default function EmployeeReports() {
       a.lastName,
       a.email,
       a.gradeLevel,
+      a.prevSchool || '-',
       compactPeriod(a),
       a.status,
       compactDate(a.submittedAt),
@@ -266,6 +273,8 @@ export default function EmployeeReports() {
       statusFilter,
       levelGroupFilter,
       gradeFilter,
+      sortFilter,
+      schoolFilter,
       yearFilter,
       semesterFilter,
       dateFrom,
@@ -301,6 +310,8 @@ export default function EmployeeReports() {
       statusFilter,
       levelGroupFilter,
       gradeFilter,
+      sortFilter,
+      schoolFilter,
       yearFilter,
       semesterFilter,
       dateFrom,
@@ -341,6 +352,8 @@ export default function EmployeeReports() {
       statusFilter,
       levelGroupFilter,
       gradeFilter,
+      sortFilter,
+      schoolFilter,
       yearFilter,
       semesterFilter,
       dateFrom,
@@ -506,6 +519,27 @@ export default function EmployeeReports() {
           </div>
 
           <div className="min-w-0">
+            <label className="block text-xs font-semibold text-gray-500 mb-1">Sort By</label>
+            <select value={sortFilter} onChange={e => setSortFilter(e.target.value as 'newest' | 'oldest' | 'alphabetical' | 'school')} aria-label="Sort reports" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
+              <option value="newest">Date: Newest to Oldest</option>
+              <option value="oldest">Date: Oldest to Newest</option>
+              <option value="alphabetical">Alphabetical: Last Name (A-Z)</option>
+              <option value="school">Previous School (A-Z)</option>
+            </select>
+          </div>
+
+          <div className="min-w-0">
+            <label className="block text-xs font-semibold text-gray-500 mb-1">Previous School</label>
+            <input
+              value={schoolFilter}
+              onChange={e => setSchoolFilter(e.target.value)}
+              placeholder="Search previous school..."
+              aria-label="Filter by previous school"
+              className="w-full min-w-[170px] px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm bg-white"
+            />
+          </div>
+
+          <div className="min-w-0">
             <label className="block text-xs font-semibold text-gray-500 mb-1">School Year</label>
             <select value={yearFilter} onChange={e => { setYearFilter(e.target.value); setSemesterFilter('all'); }} aria-label="Filter by school year" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
               <option value="all">All Years</option>
@@ -531,9 +565,9 @@ export default function EmployeeReports() {
             <input type="date" value={dateTo} min={dateFrom || undefined} onChange={e => setDateTo(e.target.value)} className="w-full min-w-[170px] px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm bg-white" />
           </div>
 
-          {(statusFilter !== 'all' || levelGroupFilter !== 'all' || gradeFilter !== 'all' || yearFilter !== 'all' || semesterFilter !== 'all' || dateFrom || dateTo) && (
+          {(statusFilter !== 'all' || levelGroupFilter !== 'all' || gradeFilter !== 'all' || sortFilter !== 'newest' || schoolFilter.trim() || yearFilter !== 'all' || semesterFilter !== 'all' || dateFrom || dateTo) && (
             <div className="flex items-end">
-              <ActionButton variant="secondary" className="w-full xl:w-auto" onClick={() => { setStatusFilter('all'); setLevelGroupFilter('all'); setGradeFilter('all'); setYearFilter('all'); setSemesterFilter('all'); setDateFrom(''); setDateTo(''); }}>
+              <ActionButton variant="secondary" className="w-full xl:w-auto" onClick={() => { setStatusFilter('all'); setLevelGroupFilter('all'); setGradeFilter('all'); setSortFilter('newest'); setSchoolFilter(''); setYearFilter('all'); setSemesterFilter('all'); setDateFrom(''); setDateTo(''); }}>
                 Clear Filters
               </ActionButton>
             </div>

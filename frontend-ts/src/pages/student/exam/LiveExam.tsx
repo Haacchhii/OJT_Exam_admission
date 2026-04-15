@@ -257,13 +257,13 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
         <div className="gk-section-card p-6 mb-4">
           <div className="flex items-center gap-3 mb-4">
             <span className="text-sm font-bold text-gray-400">Question {currentQ + 1} of {questions.length}</span>
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${q.questionType === 'mc' ? 'bg-forest-100 text-forest-700' : 'bg-gold-100 text-gold-700'}`}>
-              {q.questionType === 'mc' ? 'Multiple Choice' : 'Essay'}
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${q.questionType === 'mc' ? 'bg-forest-100 text-forest-700' : q.questionType === 'essay' ? 'bg-gold-100 text-gold-700' : q.questionType === 'identification' ? 'bg-indigo-100 text-indigo-700' : 'bg-blue-100 text-blue-700'}`}>
+              {q.questionType === 'mc' ? 'Multiple Choice' : q.questionType === 'essay' ? 'Essay' : q.questionType === 'identification' ? 'Identification' : 'True / False'}
             </span>
           </div>
           <p className="text-forest-500 text-lg font-medium mb-4">{q.questionText}</p>
 
-          {q.questionType === 'mc' ? (
+          {(q.questionType === 'mc' || q.questionType === 'true_false') ? (
             <div className="space-y-2">
               {q.choices?.map((c: QuestionChoice) => (
                 <label key={c.id} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition ${answers[q.id] === c.id ? 'border-gold-400 bg-gold-50' : 'border-gray-200 hover:border-gray-300'}`}>
@@ -271,6 +271,17 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
                   <span className="text-gray-700">{c.choiceText}</span>
                 </label>
               ))}
+            </div>
+          ) : q.questionType === 'identification' ? (
+            <div>
+              <input
+                type="text"
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none"
+                placeholder="Type your answer here..."
+                value={(answers[q.id] as string) || ''}
+                onChange={e => setAnswers(a => ({ ...a, [q.id]: e.target.value }))}
+              />
+              <p className="text-xs text-gray-400 mt-1">{((answers[q.id] as string) || '').length} characters</p>
             </div>
           ) : (
             <div>

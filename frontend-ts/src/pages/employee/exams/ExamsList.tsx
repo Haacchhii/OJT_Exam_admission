@@ -125,31 +125,49 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
             const qtext = row['q' + i + '_text'];
             if (!qtext) continue;
             
-            const qType = row['q' + i + '_type'] || 'mc';
+            const rawType = String(row['q' + i + '_type'] || 'mc').toLowerCase().trim();
+            const qType = rawType === 'truefalse' || rawType === 'true_false' || rawType === 'true/false' ? 'true_false' : rawType === 'identification' ? 'identification' : rawType === 'essay' ? 'essay' : 'mc';
             const qPoints = parseInt(row['q' + i + '_points']) || 1;
-            
+
             const choices = [];
-            const correctAns = (row['q' + i + '_ans'] || 'a').toLowerCase();
+            const correctAns = String(row['q' + i + '_ans'] || 'a').toLowerCase().trim();
             const optionMap = ['a', 'b', 'c', 'd'];
-            
-            for (let j = 0; j < 4; j++) {
-              const choiceText = row['q' + i + '_' + optionMap[j]];
-              if (choiceText) {
-                choices.push({
-                  choiceText,
-                  isCorrect: correctAns === optionMap[j],
-                  orderNum: j + 1
-                });
+
+            if (qType === 'mc') {
+              for (let j = 0; j < 4; j++) {
+                const choiceText = row['q' + i + '_' + optionMap[j]];
+                if (choiceText) {
+                  choices.push({
+                    choiceText,
+                    isCorrect: correctAns === optionMap[j] || correctAns === String(j + 1),
+                    orderNum: j + 1,
+                  });
+                }
               }
             }
-            
-            questions.push({
+
+            if (qType === 'true_false') {
+              const trueIsCorrect = !['false', 'f', 'b', '2', 'no', '0'].includes(correctAns);
+              choices.push(
+                { choiceText: 'True', isCorrect: trueIsCorrect, orderNum: 1 },
+                { choiceText: 'False', isCorrect: !trueIsCorrect, orderNum: 2 }
+              );
+            }
+
+            const questionPayload: Record<string, unknown> = {
               questionText: qtext,
               questionType: qType,
               points: qPoints,
               orderNum: questions.length + 1,
-              choices
-            });
+              choices,
+            };
+
+            if (qType === 'identification') {
+              questionPayload.identificationAnswer = String(row['q' + i + '_ans'] || '').trim();
+              questionPayload.identificationMatchMode = String(row['q' + i + '_match'] || '').toLowerCase() === 'partial' ? 'partial' : 'exact';
+            }
+
+            questions.push(questionPayload);
           }
 
           await addExam({

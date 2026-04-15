@@ -112,7 +112,7 @@ export async function getQuestionAnalyticsPage(examId: number, params?: { page?:
     analytics: Array<{
       questionId: number;
       questionText: string;
-      questionType: 'mc' | 'essay';
+      questionType: 'mc' | 'essay' | 'identification' | 'true_false';
       points: number;
       totalAnswered: number;
       correctCount?: number;

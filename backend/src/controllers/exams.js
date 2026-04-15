@@ -37,6 +37,76 @@ function normalizeEmail(value) {
   return String(value || '').trim().toLowerCase();
 }
 
+function normalizeQuestionType(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  if (raw === 'multiple choice' || raw === 'multiple_choice') return 'mc';
+  if (raw === 'truefalse' || raw === 'true/false' || raw === 'true false') return 'true_false';
+  if (raw === 'identification') return 'identification';
+  if (raw === 'essay') return 'essay';
+  return raw === 'mc' ? 'mc' : 'essay';
+}
+
+function normalizeIdentificationMatchMode(value) {
+  return String(value || '').trim().toLowerCase() === 'partial' ? 'partial' : 'exact';
+}
+
+function normalizeTrueFalseToken(value) {
+  const token = String(value || '').trim().toLowerCase();
+  if (['true', 't', 'yes', 'y', '1'].includes(token)) return 'true';
+  if (['false', 'f', 'no', 'n', '0'].includes(token)) return 'false';
+  return null;
+}
+
+function buildQuestionChoices(questionType, rawChoices) {
+  const inputChoices = Array.isArray(rawChoices) ? rawChoices : [];
+  if (questionType === 'mc') {
+    const choices = inputChoices
+      .filter((c) => String(c?.choiceText || '').trim())
+      .map((c, ci) => ({
+        choiceText: String(c.choiceText || '').trim(),
+        isCorrect: Boolean(c.isCorrect),
+        orderNum: c.orderNum ?? ci + 1,
+      }));
+    return choices.length ? { create: choices } : undefined;
+  }
+
+  if (questionType === 'true_false') {
+    let trueIsCorrect = false;
+    let falseIsCorrect = false;
+
+    for (const c of inputChoices) {
+      const token = normalizeTrueFalseToken(c?.choiceText);
+      if (token === 'true') trueIsCorrect = Boolean(c?.isCorrect);
+      if (token === 'false') falseIsCorrect = Boolean(c?.isCorrect);
+    }
+
+    if (!trueIsCorrect && !falseIsCorrect) trueIsCorrect = true;
+    if (trueIsCorrect && falseIsCorrect) falseIsCorrect = false;
+
+    return {
+      create: [
+        { choiceText: 'True', isCorrect: trueIsCorrect, orderNum: 1 },
+        { choiceText: 'False', isCorrect: !trueIsCorrect && falseIsCorrect ? true : !trueIsCorrect, orderNum: 2 },
+      ],
+    };
+  }
+
+  return undefined;
+}
+
+function toQuestionCreateInput(q, qi) {
+  const questionType = normalizeQuestionType(q.questionType);
+  return {
+    questionText: q.questionText,
+    questionType,
+    points: q.points,
+    orderNum: q.orderNum ?? qi + 1,
+    identificationAnswer: questionType === 'identification' ? String(q.identificationAnswer || '').trim() : null,
+    identificationMatchMode: questionType === 'identification' ? normalizeIdentificationMatchMode(q.identificationMatchMode) : null,
+    choices: buildQuestionChoices(questionType, q.choices),
+  };
+}
+
 function ownershipWhereForUser(user) {
   return {
     OR: [
@@ -76,6 +146,8 @@ function stripAnswers(exam) {
     ...exam,
     questions: exam.questions?.map(q => ({
       ...q,
+      identificationAnswer: null,
+      identificationMatchMode: null,
       choices: q.choices?.map(({ isCorrect, ...c }) => c) || [],
     })) || [],
   };
@@ -281,19 +353,7 @@ export async function createExam(req, res, next) {
         ...(semesterId && { semesterId: Number(semesterId) }),
         createdById: req.user.id,
         questions: questions?.length ? {
-          create: questions.map((q, qi) => ({
-            questionText: q.questionText,
-            questionType: q.questionType,
-            points: q.points,
-            orderNum: q.orderNum ?? qi + 1,
-            choices: q.choices?.length ? {
-              create: q.choices.map((c, ci) => ({
-                choiceText: c.choiceText,
-                isCorrect: c.isCorrect || false,
-                orderNum: c.orderNum ?? ci + 1,
-              })),
-            } : undefined,
-          })),
+          create: questions.map((q, qi) => toQuestionCreateInput(q, qi)),
         } : undefined,
       },
       include: examDetailInclude,
@@ -331,19 +391,7 @@ export async function updateExam(req, res, next) {
           data: {
             ...data,
             questions: {
-              create: questions.map((q, qi) => ({
-                questionText: q.questionText,
-                questionType: q.questionType,
-                points: q.points,
-                orderNum: q.orderNum ?? qi + 1,
-                choices: q.choices?.length ? {
-                  create: q.choices.map((c, ci) => ({
-                    choiceText: c.choiceText,
-                    isCorrect: c.isCorrect || false,
-                    orderNum: c.orderNum ?? ci + 1,
-                  })),
-                } : undefined,
-              })),
+              create: questions.map((q, qi) => toQuestionCreateInput(q, qi)),
             },
           },
           include: examDetailInclude,
@@ -406,19 +454,7 @@ export async function cloneExam(req, res, next) {
         semesterId: source.semesterId,
         createdById: req.user.id,
         questions: {
-          create: source.questions.map((q, qi) => ({
-            questionText: q.questionText,
-            questionType: q.questionType,
-            points: q.points,
-            orderNum: q.orderNum ?? qi + 1,
-            choices: q.choices?.length ? {
-              create: q.choices.map((c, ci) => ({
-                choiceText: c.choiceText,
-                isCorrect: c.isCorrect || false,
-                orderNum: c.orderNum ?? ci + 1,
-              })),
-            } : undefined,
-          })),
+          create: source.questions.map((q, qi) => toQuestionCreateInput(q, qi)),
         },
       },
       include: examDetailInclude,

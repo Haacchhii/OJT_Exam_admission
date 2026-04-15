@@ -30,6 +30,8 @@ export function buildActiveFilters(filters: {
   statusFilter: string;
   levelGroupFilter: string;
   gradeFilter: string;
+  sortFilter?: string;
+  schoolFilter?: string;
   yearFilter: string;
   semesterFilter: string;
   dateFrom: string;
@@ -39,6 +41,8 @@ export function buildActiveFilters(filters: {
     filters.statusFilter !== 'all' ? `Status: ${filters.statusFilter}` : '',
     filters.levelGroupFilter !== 'all' ? `Level Group: ${filters.levelGroupFilter}` : '',
     filters.gradeFilter !== 'all' ? `Grade: ${filters.gradeFilter}` : '',
+    filters.sortFilter && filters.sortFilter !== 'newest' ? `Sort: ${filters.sortFilter}` : '',
+    filters.schoolFilter ? `Previous School: ${filters.schoolFilter}` : '',
     filters.yearFilter !== 'all' ? `School Year ID: ${filters.yearFilter}` : '',
     filters.semesterFilter !== 'all' ? `Semester ID: ${filters.semesterFilter}` : '',
     filters.dateFrom ? `From: ${filters.dateFrom}` : '',

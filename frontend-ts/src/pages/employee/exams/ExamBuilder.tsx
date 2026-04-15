@@ -13,6 +13,8 @@ import { FormInput, QuestionCard } from './ExamComponents';
 import type { ParsedQuestion, UploadPreview, ChoiceState } from './types';
 import type { Exam, AcademicYear, Semester } from '../../../types';
 
+type BuilderQuestionType = 'mc' | 'essay' | 'identification' | 'true_false';
+
 let examParsersModulePromise: Promise<typeof import('./examParsers')> | null = null;
 
 function loadExamParsersModule() {
@@ -20,6 +22,13 @@ function loadExamParsersModule() {
     examParsersModulePromise = import('./examParsers');
   }
   return examParsersModulePromise;
+}
+
+function questionTypeLabel(type: BuilderQuestionType) {
+  if (type === 'mc') return 'Multiple Choice';
+  if (type === 'essay') return 'Essay';
+  if (type === 'identification') return 'Identification';
+  return 'True / False';
 }
 
 export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | null; onDone: () => void }) {
@@ -34,11 +43,14 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
   const [yearId, setYearId] = useState<string | number>(editExam?.academicYear?.id || '');
   const [semId, setSemId] = useState<string | number>(editExam?.semester?.id || '');
   const [questions, setQuestions] = useState<ParsedQuestion[]>([]);
-  const [qModal, setQModal] = useState<'mc' | 'essay' | null>(null);
+  const [qModal, setQModal] = useState<BuilderQuestionType | null>(null);
   const [editIdx, setEditIdx] = useState<number | null>(null);
   const [qText, setQText] = useState('');
   const [qPts, setQPts] = useState('');
   const [choices, setChoices] = useState<ChoiceState[]>([{ text: '', correct: true }, { text: '' }, { text: '' }, { text: '' }]);
+  const [identificationAnswer, setIdentificationAnswer] = useState('');
+  const [identificationMatchMode, setIdentificationMatchMode] = useState<'exact' | 'partial'>('exact');
+  const [trueFalseCorrect, setTrueFalseCorrect] = useState<'true' | 'false'>('true');
   const [uploadPreview, setUploadPreview] = useState<UploadPreview | null>(null);
   const [uploadQueue, setUploadQueue] = useState<UploadPreview[]>([]);
   const [uploadQueueIndex, setUploadQueueIndex] = useState(0);
@@ -86,24 +98,38 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
     });
   };
 
-  const openQ = (type: 'mc' | 'essay') => {
+  const openQ = (type: BuilderQuestionType) => {
     setEditIdx(null);
     setQModal(type);
     setQText('');
     setQPts('');
     setChoices([{ text: '', correct: true }, { text: '' }, { text: '' }, { text: '' }]);
+    setIdentificationAnswer('');
+    setIdentificationMatchMode('exact');
+    setTrueFalseCorrect('true');
   };
 
   const openEditQ = (idx: number) => {
     const q = questions[idx];
     setEditIdx(idx);
-    setQModal(q.questionType as 'mc' | 'essay');
+    setQModal(q.questionType as BuilderQuestionType);
     setQText(q.questionText);
     setQPts(String(q.points));
-    if (q.questionType === 'mc' && q.choices?.length) {
+    if ((q.questionType === 'mc' || q.questionType === 'true_false') && q.choices?.length) {
       setChoices(q.choices.map((c: any) => ({ text: c.choiceText, correct: !!c.isCorrect })));
+      if (q.questionType === 'true_false') {
+        const trueChoice = q.choices.find((c: any) => String(c.choiceText || '').trim().toLowerCase() === 'true');
+        setTrueFalseCorrect(trueChoice?.isCorrect ? 'true' : 'false');
+      }
     } else {
       setChoices([{ text: '', correct: true }, { text: '' }, { text: '' }, { text: '' }]);
+    }
+    if (q.questionType === 'identification') {
+      setIdentificationAnswer(q.identificationAnswer || '');
+      setIdentificationMatchMode(q.identificationMatchMode === 'partial' ? 'partial' : 'exact');
+    } else {
+      setIdentificationAnswer('');
+      setIdentificationMatchMode('exact');
     }
   };
 
@@ -116,16 +142,34 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
       if (filledChoices.length < 2) { showToast('At least 2 choices are required.', 'error'); return; }
       if (!filledChoices.some(c => c.correct)) { showToast('Mark at least one correct answer.', 'error'); return; }
     }
+    if (qModal === 'identification' && !identificationAnswer.trim()) {
+      showToast('Identification questions require a correct answer key.', 'error');
+      return;
+    }
+
+    if (!qModal) {
+      showToast('Please choose a question type.', 'error');
+      return;
+    }
+
     const newQ: ParsedQuestion = {
       id: editIdx !== null ? questions[editIdx].id : uid(),
       questionText: qText,
-      questionType: qModal!,
+      questionType: qModal,
       points: pts,
       orderNum: editIdx !== null ? questions[editIdx].orderNum : questions.length + 1,
       choices: [],
     };
     if (qModal === 'mc') {
       newQ.choices = choices.filter(c => c.text.trim()).map(c => ({ id: uid(), choiceText: c.text, isCorrect: !!c.correct }));
+    } else if (qModal === 'true_false') {
+      newQ.choices = [
+        { id: uid(), choiceText: 'True', isCorrect: trueFalseCorrect === 'true' },
+        { id: uid(), choiceText: 'False', isCorrect: trueFalseCorrect === 'false' },
+      ];
+    } else if (qModal === 'identification') {
+      newQ.identificationAnswer = identificationAnswer.trim();
+      newQ.identificationMatchMode = identificationMatchMode;
     }
     if (editIdx !== null) {
       setQuestions(qs => qs.map((q, i) => i === editIdx ? newQ : q));
@@ -136,6 +180,9 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
     }
     setQModal(null);
     setEditIdx(null);
+    setIdentificationAnswer('');
+    setIdentificationMatchMode('exact');
+    setTrueFalseCorrect('true');
   };
 
   const suggestTitleFromFileName = (fileName: string) => {
@@ -361,6 +408,8 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
   const totalPoints = questions.reduce((s, q) => s + (q.points || 0), 0);
   const mcCount = questions.filter(q => q.questionType === 'mc').length;
   const essayCount = questions.filter(q => q.questionType === 'essay').length;
+  const identificationCount = questions.filter(q => q.questionType === 'identification').length;
+  const trueFalseCount = questions.filter(q => q.questionType === 'true_false').length;
 
   if (editExam && examLoading && !fullExam) return <SkeletonPage />;
 
@@ -439,7 +488,7 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="bg-gray-50 rounded-lg p-4">
               <h4 className="font-bold text-forest-500 text-sm mb-1 flex items-center gap-1"><Icon name="document" className="w-4 h-4" /> CSV / Excel Format</h4>
-              <p className="text-xs text-gray-500 mb-2">8 columns - same structure for both .csv and .xlsx</p>
+              <p className="text-xs text-gray-500 mb-2">9 columns - same structure for both .csv and .xlsx</p>
               <div className="text-xs font-mono bg-white rounded p-2 border border-gray-200 overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead><tr className="bg-forest-50">
@@ -451,16 +500,21 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
                     <th className="border border-gray-200 px-1.5 py-1">choiceC</th>
                     <th className="border border-gray-200 px-1.5 py-1">choiceD</th>
                     <th className="border border-gray-200 px-1.5 py-1">correct</th>
+                    <th className="border border-gray-200 px-1.5 py-1">matchMode</th>
                   </tr></thead>
                   <tbody>
-                    <tr><td className="border border-gray-200 px-1.5 py-1 text-blue-600">mc</td><td className="border border-gray-200 px-1.5 py-1">What is 2+2?</td><td className="border border-gray-200 px-1.5 py-1">2</td><td className="border border-gray-200 px-1.5 py-1">3</td><td className="border border-gray-200 px-1.5 py-1">4</td><td className="border border-gray-200 px-1.5 py-1">5</td><td className="border border-gray-200 px-1.5 py-1">6</td><td className="border border-gray-200 px-1.5 py-1 text-green-600">B</td></tr>
-                    <tr><td className="border border-gray-200 px-1.5 py-1 text-purple-600">essay</td><td className="border border-gray-200 px-1.5 py-1">Explain photosynthesis.</td><td className="border border-gray-200 px-1.5 py-1">5</td><td className="border border-gray-200 px-1.5 py-1 text-gray-300">-</td><td className="border border-gray-200 px-1.5 py-1 text-gray-300">-</td><td className="border border-gray-200 px-1.5 py-1 text-gray-300">-</td><td className="border border-gray-200 px-1.5 py-1 text-gray-300">-</td><td className="border border-gray-200 px-1.5 py-1 text-gray-300">-</td></tr>
+                    <tr><td className="border border-gray-200 px-1.5 py-1 text-blue-600">mc</td><td className="border border-gray-200 px-1.5 py-1">What is 2+2?</td><td className="border border-gray-200 px-1.5 py-1">2</td><td className="border border-gray-200 px-1.5 py-1">3</td><td className="border border-gray-200 px-1.5 py-1">4</td><td className="border border-gray-200 px-1.5 py-1">5</td><td className="border border-gray-200 px-1.5 py-1">6</td><td className="border border-gray-200 px-1.5 py-1 text-green-600">B</td><td className="border border-gray-200 px-1.5 py-1 text-gray-300">-</td></tr>
+                    <tr><td className="border border-gray-200 px-1.5 py-1 text-indigo-600">true_false</td><td className="border border-gray-200 px-1.5 py-1">The Earth orbits the Sun.</td><td className="border border-gray-200 px-1.5 py-1">1</td><td className="border border-gray-200 px-1.5 py-1">True</td><td className="border border-gray-200 px-1.5 py-1">False</td><td className="border border-gray-200 px-1.5 py-1 text-gray-300">-</td><td className="border border-gray-200 px-1.5 py-1 text-gray-300">-</td><td className="border border-gray-200 px-1.5 py-1 text-green-600">True</td><td className="border border-gray-200 px-1.5 py-1 text-gray-300">-</td></tr>
+                    <tr><td className="border border-gray-200 px-1.5 py-1 text-teal-600">identification</td><td className="border border-gray-200 px-1.5 py-1">What planet is known as the Red Planet?</td><td className="border border-gray-200 px-1.5 py-1">2</td><td className="border border-gray-200 px-1.5 py-1 text-gray-300">-</td><td className="border border-gray-200 px-1.5 py-1 text-gray-300">-</td><td className="border border-gray-200 px-1.5 py-1 text-gray-300">-</td><td className="border border-gray-200 px-1.5 py-1 text-gray-300">-</td><td className="border border-gray-200 px-1.5 py-1 text-green-600">Mars</td><td className="border border-gray-200 px-1.5 py-1">exact</td></tr>
+                    <tr><td className="border border-gray-200 px-1.5 py-1 text-purple-600">essay</td><td className="border border-gray-200 px-1.5 py-1">Explain photosynthesis.</td><td className="border border-gray-200 px-1.5 py-1">5</td><td className="border border-gray-200 px-1.5 py-1 text-gray-300">-</td><td className="border border-gray-200 px-1.5 py-1 text-gray-300">-</td><td className="border border-gray-200 px-1.5 py-1 text-gray-300">-</td><td className="border border-gray-200 px-1.5 py-1 text-gray-300">-</td><td className="border border-gray-200 px-1.5 py-1 text-gray-300">-</td><td className="border border-gray-200 px-1.5 py-1 text-gray-300">-</td></tr>
                   </tbody>
                 </table>
               </div>
-              <p className="text-xs text-gray-400 mt-2">- <strong>type:</strong> <code>mc</code> or <code>essay</code></p>
+              <p className="text-xs text-gray-400 mt-2">- <strong>type:</strong> <code>mc</code>, <code>true_false</code>, <code>identification</code>, or <code>essay</code></p>
               <p className="text-xs text-gray-400">- <strong>correct:</strong> A / B / C / D (or 1 / 2 / 3 / 4)</p>
-              <p className="text-xs text-gray-400">- Leave choiceA-D and correct blank for essay rows</p>
+              <p className="text-xs text-gray-400">- For <strong>true_false</strong>, set correct as True or False.</p>
+              <p className="text-xs text-gray-400">- For <strong>identification</strong>, place answer key in <strong>correct</strong> and optional <strong>matchMode</strong> as exact/partial.</p>
+              <p className="text-xs text-gray-400">- Leave choiceA-D and correct blank for essay rows.</p>
             </div>
             <div className="bg-gray-50 rounded-lg p-4">
               <h4 className="font-bold text-forest-500 text-sm mb-1 flex items-center gap-1"><Icon name="document" className="w-4 h-4" /> JSON Format</h4>
@@ -477,6 +531,19 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
     "type": "essay",
     "question": "Explain...",
     "points": 5
+  },
+  {
+    "type": "true_false",
+    "question": "The Pacific Ocean is the largest ocean.",
+    "points": 1,
+    "correct": "true"
+  },
+  {
+    "type": "identification",
+    "question": "What is H2O commonly called?",
+    "points": 2,
+    "answer": "water",
+    "matchMode": "exact"
   }
 ]`}</pre>
               <p className="text-xs text-gray-400 mt-2">- <strong>correct:</strong> 0-based index <em>or</em> letter A-D</p>
@@ -526,14 +593,22 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
               </div>
             )}
 
-            <div className="grid grid-cols-3 gap-3 mb-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
               <div className="bg-forest-50 rounded-lg p-3 text-center">
                 <div className="text-xl font-bold text-forest-700">{uploadPreview.parsed.length}</div>
                 <div className="text-xs text-gray-500">Questions</div>
               </div>
               <div className="bg-forest-50 rounded-lg p-3 text-center">
                 <div className="text-xl font-bold text-forest-700">{uploadPreview.parsed.filter(q => q.questionType === 'mc').length}</div>
-                <div className="text-xs text-gray-500">Multiple Choice</div>
+                <div className="text-xs text-gray-500">MC</div>
+              </div>
+              <div className="bg-blue-50 rounded-lg p-3 text-center">
+                <div className="text-xl font-bold text-blue-700">{uploadPreview.parsed.filter(q => q.questionType === 'true_false').length}</div>
+                <div className="text-xs text-gray-500">True / False</div>
+              </div>
+              <div className="bg-indigo-50 rounded-lg p-3 text-center">
+                <div className="text-xl font-bold text-indigo-700">{uploadPreview.parsed.filter(q => q.questionType === 'identification').length}</div>
+                <div className="text-xs text-gray-500">Identification</div>
               </div>
               <div className="bg-gold-50 rounded-lg p-3 text-center">
                 <div className="text-xl font-bold text-gold-700">{uploadPreview.parsed.filter(q => q.questionType === 'essay').length}</div>
@@ -551,11 +626,11 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
                   <span className="bg-forest-500 text-white text-xs px-1.5 py-0.5 rounded-full font-bold shrink-0 mt-0.5">Q{i + 1}</span>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <Badge className={q.questionType === 'mc' ? 'gk-badge gk-badge-mc' : 'gk-badge gk-badge-essay'}>{q.questionType === 'mc' ? 'MC' : 'Essay'}</Badge>
+                      <Badge className={q.questionType === 'mc' ? 'gk-badge gk-badge-mc' : q.questionType === 'essay' ? 'gk-badge gk-badge-essay' : 'gk-badge gk-badge-info'}>{questionTypeLabel(q.questionType as BuilderQuestionType)}</Badge>
                       <span className="text-gray-400 text-xs">{q.points} pts</span>
                     </div>
                     <p className="text-gray-700 truncate">{q.questionText}</p>
-                    {q.questionType === 'mc' && (
+                    {(q.questionType === 'mc' || q.questionType === 'true_false') && (
                       <div className="flex flex-wrap gap-1 mt-1">
                         {q.choices.map((c, j) => (
                           <span key={j} className={`text-xs px-1.5 py-0.5 rounded ${c.isCorrect ? 'bg-forest-50 text-forest-700 font-medium' : 'bg-gray-100 text-gray-500'}`}>
@@ -563,6 +638,9 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
                           </span>
                         ))}
                       </div>
+                    )}
+                    {q.questionType === 'identification' && (
+                      <p className="text-xs text-gray-500 mt-1">Answer key: {q.identificationAnswer || '-'} ({q.identificationMatchMode || 'exact'})</p>
                     )}
                   </div>
                 </div>
@@ -603,11 +681,13 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
           <div>
             <h3 className="text-lg font-bold text-forest-500">Questions ({questions.length})</h3>
             {questions.length > 0 && (
-              <p className="text-xs text-gray-400 mt-0.5">{mcCount} MC | {essayCount} Essay | {totalPoints} total pts</p>
+              <p className="text-xs text-gray-400 mt-0.5">{mcCount} MC | {trueFalseCount} True/False | {identificationCount} Identification | {essayCount} Essay | {totalPoints} total pts</p>
             )}
           </div>
           <div className="flex gap-2">
             <button onClick={() => openQ('mc')} className="bg-forest-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-forest-600">+ Multiple Choice</button>
+            <button onClick={() => openQ('true_false')} className="border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-sm hover:bg-gray-50">+ True / False</button>
+            <button onClick={() => openQ('identification')} className="border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-sm hover:bg-gray-50">+ Identification</button>
             <button onClick={() => openQ('essay')} className="border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-sm hover:bg-gray-50">+ Essay</button>
           </div>
         </div>
@@ -649,11 +729,9 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
       </div>
 
       {/* Question Modal */}
-      <Modal open={!!qModal} onClose={() => { setQModal(null); setEditIdx(null); }}>
+      <Modal open={!!qModal} onClose={() => { setQModal(null); setEditIdx(null); setIdentificationAnswer(''); setIdentificationMatchMode('exact'); setTrueFalseCorrect('true'); }}>
         <h3 className="text-lg font-bold text-forest-500 mb-4">
-          {editIdx !== null
-            ? (qModal === 'mc' ? 'Edit Multiple Choice Question' : 'Edit Essay Question')
-            : (qModal === 'mc' ? 'Add Multiple Choice Question' : 'Add Essay Question')}
+          {editIdx !== null ? `Edit ${questionTypeLabel((qModal || 'essay') as BuilderQuestionType)} Question` : `Add ${questionTypeLabel((qModal || 'essay') as BuilderQuestionType)} Question`}
         </h3>
         <div className="space-y-3">
           <div>
@@ -679,11 +757,63 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
               {choices.length < 6 && <button onClick={() => setChoices(cs => [...cs, { text: '' }])} className="mt-2 text-gold-500 text-sm font-medium">+ Add Choice</button>}
             </div>
           )}
+          {qModal === 'true_false' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Correct Answer</label>
+              <div className="flex gap-2">
+                <label className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer ${trueFalseCorrect === 'true' ? 'border-forest-400 bg-forest-50' : 'border-gray-300 bg-white'}`}>
+                  <input
+                    type="radio"
+                    name="trueFalseCorrect"
+                    className="accent-forest-500"
+                    checked={trueFalseCorrect === 'true'}
+                    onChange={() => setTrueFalseCorrect('true')}
+                  />
+                  <span className="text-sm text-gray-700">True</span>
+                </label>
+                <label className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer ${trueFalseCorrect === 'false' ? 'border-forest-400 bg-forest-50' : 'border-gray-300 bg-white'}`}>
+                  <input
+                    type="radio"
+                    name="trueFalseCorrect"
+                    className="accent-forest-500"
+                    checked={trueFalseCorrect === 'false'}
+                    onChange={() => setTrueFalseCorrect('false')}
+                  />
+                  <span className="text-sm text-gray-700">False</span>
+                </label>
+              </div>
+            </div>
+          )}
+          {qModal === 'identification' && (
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Correct Answer Key</label>
+                <input
+                  type="text"
+                  value={identificationAnswer}
+                  onChange={e => setIdentificationAnswer(e.target.value)}
+                  placeholder="Enter the expected answer"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Matching Mode</label>
+                <select
+                  value={identificationMatchMode}
+                  onChange={e => setIdentificationMatchMode(e.target.value as 'exact' | 'partial')}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white"
+                >
+                  <option value="exact">Exact match (trim + case-insensitive)</option>
+                  <option value="partial">Partial match (contains expected answer)</option>
+                </select>
+              </div>
+            </div>
+          )}
           <div className="flex gap-3 pt-2">
             <button onClick={addQuestion} className="bg-forest-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-forest-600">
               {editIdx !== null ? 'Update Question' : 'Add Question'}
             </button>
-            <button onClick={() => { setQModal(null); setEditIdx(null); }} className="border border-gray-300 text-gray-700 px-5 py-2 rounded-lg hover:bg-gray-50">Cancel</button>
+            <button onClick={() => { setQModal(null); setEditIdx(null); setIdentificationAnswer(''); setIdentificationMatchMode('exact'); setTrueFalseCorrect('true'); }} className="border border-gray-300 text-gray-700 px-5 py-2 rounded-lg hover:bg-gray-50">Cancel</button>
           </div>
         </div>
       </Modal>

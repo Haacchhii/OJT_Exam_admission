@@ -32,6 +32,23 @@ function registrationBelongsToUser(registration, user) {
   return normalizeEmail(registration.userEmail) === normalizeEmail(user.email);
 }
 
+function normalizeFreeText(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
+function isIdentificationMatch(answer, key, mode) {
+  const normAnswer = normalizeFreeText(answer);
+  const normKey = normalizeFreeText(key);
+  if (!normAnswer || !normKey) return false;
+  if (mode === 'partial') {
+    return normAnswer.includes(normKey) || normKey.includes(normAnswer);
+  }
+  return normAnswer === normKey;
+}
+
 // Re-export submission and essay scoring controllers so routes/results.js keeps working
 export { submitExam } from './examSubmission.js';
 export { getEssayAnswers, scoreEssay } from './essayScoring.js';
@@ -210,6 +227,7 @@ export async function getQuestionAnalytics(req, res, next) {
       ...(pg && { skip: pg.skip, take: pg.take }),
       orderBy: { orderNum: 'asc' },
       include: {
+        // Keep choice distribution for auto-graded objective types.
         choices: {
           orderBy: { orderNum: 'asc' },
           select: { id: true, choiceText: true, isCorrect: true },
@@ -237,6 +255,7 @@ export async function getQuestionAnalytics(req, res, next) {
             select: {
               questionId: true,
               selectedChoiceId: true,
+              essayText: true,
             },
           })
         : Promise.resolve([]),
@@ -273,7 +292,7 @@ export async function getQuestionAnalytics(req, res, next) {
     }
 
     const analytics = questions.map(q => {
-      if (q.questionType === 'mc') {
+      if (q.questionType === 'mc' || q.questionType === 'true_false') {
         const qSubs = subsByQuestion.get(q.id) || [];
         const correctChoice = q.choices.find(c => c.isCorrect);
         // Build choice count map in one pass
@@ -298,6 +317,23 @@ export async function getQuestionAnalytics(req, res, next) {
           correctCount,
           correctRate: qSubs.length > 0 ? Math.round((correctCount / qSubs.length) * 1000) / 10 : 0,
           choiceDistribution,
+        };
+      } else if (q.questionType === 'identification') {
+        const qSubs = subsByQuestion.get(q.id) || [];
+        let correctCount = 0;
+        for (const s of qSubs) {
+          if (isIdentificationMatch(s.essayText, q.identificationAnswer, q.identificationMatchMode)) {
+            correctCount += 1;
+          }
+        }
+        return {
+          questionId: q.id,
+          questionText: q.questionText,
+          questionType: q.questionType,
+          points: q.points,
+          totalAnswered: qSubs.length,
+          correctCount,
+          correctRate: qSubs.length > 0 ? Math.round((correctCount / qSubs.length) * 1000) / 10 : 0,
         };
       } else {
         const qEssays = essaysByQuestion.get(q.id) || [];

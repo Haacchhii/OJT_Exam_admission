@@ -118,9 +118,11 @@ export interface QuestionChoice {
 export interface ExamQuestion {
   id: number;
   questionText: string;
-  questionType: 'mc' | 'essay';
+  questionType: 'mc' | 'essay' | 'identification' | 'true_false';
   points: number;
   orderNum: number;
+  identificationAnswer?: string | null;
+  identificationMatchMode?: 'exact' | 'partial' | null;
   choices: QuestionChoice[];
 }
 

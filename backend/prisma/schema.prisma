@@ -178,7 +178,9 @@ model ExamQuestion {
   id           Int    @id @default(autoincrement())
   examId       Int    @map("exam_id")
   questionText String @map("question_text")
-  questionType String @map("question_type") // mc | essay
+  questionType String @map("question_type") // mc | essay | identification | true_false
+  identificationAnswer String? @map("identification_answer")
+  identificationMatchMode String? @map("identification_match_mode") // exact | partial
   points       Int
   orderNum     Int    @map("order_num")
 

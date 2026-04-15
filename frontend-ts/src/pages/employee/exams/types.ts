@@ -1,9 +1,11 @@
 export interface ParsedQuestion {
   id: string;
   questionText: string;
-  questionType: 'mc' | 'essay';
+  questionType: 'mc' | 'essay' | 'identification' | 'true_false';
   points: number;
   orderNum: number;
+  identificationAnswer?: string;
+  identificationMatchMode?: 'exact' | 'partial';
   choices: { id: string; choiceText: string; isCorrect: boolean }[];
 }
 

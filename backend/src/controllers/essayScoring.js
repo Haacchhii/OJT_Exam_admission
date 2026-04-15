@@ -3,6 +3,23 @@ import { paginate, paginatedResponse } from '../utils/pagination.js';
 import { logAudit } from '../utils/auditLog.js';
 import { sendExamResultEmail } from '../utils/email.js';
 
+function normalizeFreeText(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
+function isIdentificationMatch(answer, key, mode) {
+  const normAnswer = normalizeFreeText(answer);
+  const normKey = normalizeFreeText(key);
+  if (!normAnswer || !normKey) return false;
+  if (mode === 'partial') {
+    return normAnswer.includes(normKey) || normKey.includes(normAnswer);
+  }
+  return normAnswer === normKey;
+}
+
 // ═══════════════════════════════════════════════════════
 // GET /api/results/essays?status=&page=&limit=
 // ═══════════════════════════════════════════════════════
@@ -85,10 +102,13 @@ export async function scoreEssay(req, res, next) {
             title: true,
             passingScore: true,
             questions: {
-              where: { questionType: 'mc' },
+              where: { questionType: { in: ['mc', 'true_false', 'identification'] } },
               select: {
                 id: true,
+                questionType: true,
                 points: true,
+                identificationAnswer: true,
+                identificationMatchMode: true,
                 choices: { where: { isCorrect: true }, select: { id: true } },
               },
             },
@@ -96,7 +116,7 @@ export async function scoreEssay(req, res, next) {
         }),
         prisma.submittedAnswer.findMany({
           where: { registrationId: essay.registrationId },
-          select: { questionId: true, selectedChoiceId: true },
+          select: { questionId: true, selectedChoiceId: true, essayText: true },
         }),
         prisma.user.findFirst({
           where: { email: reg.userEmail },
@@ -111,8 +131,17 @@ export async function scoreEssay(req, res, next) {
         let mcScore = 0;
         for (const q of exam.questions) {
           const ans = answerByQuestionId.get(q.id);
+          if (!ans) continue;
+
+          if (q.questionType === 'identification') {
+            if (isIdentificationMatch(ans.essayText, q.identificationAnswer, q.identificationMatchMode)) {
+              mcScore += q.points;
+            }
+            continue;
+          }
+
           const correctChoiceId = q.choices[0]?.id;
-          if (ans?.selectedChoiceId && correctChoiceId && ans.selectedChoiceId === correctChoiceId) {
+          if (ans.selectedChoiceId && correctChoiceId && ans.selectedChoiceId === correctChoiceId) {
             mcScore += q.points;
           }
         }

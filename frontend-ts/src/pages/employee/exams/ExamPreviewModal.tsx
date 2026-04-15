@@ -19,13 +19,15 @@ export default function ExamPreviewModal({ exam, onClose }: { exam: Exam | null;
               .slice()
               .sort((a: ExamQuestion, b: ExamQuestion) => a.orderNum - b.orderNum)
               .map((q: ExamQuestion, i: number) => (
-              <div key={q.id} className={`rounded-lg p-4 border ${q.questionType === 'essay' ? 'border-gold-200 bg-gold-50/30' : 'border-gray-200 bg-gray-50/30'}`}>
+              <div key={q.id} className={`rounded-lg p-4 border ${q.questionType === 'essay' ? 'border-gold-200 bg-gold-50/30' : q.questionType === 'identification' ? 'border-indigo-200 bg-indigo-50/30' : 'border-gray-200 bg-gray-50/30'}`}>
                 <div className="flex justify-between items-start mb-2">
                   <span className="text-xs font-bold text-gray-400">Question {i + 1}</span>
-                  <span className="text-xs text-gray-400">{q.points} pts • {q.questionType === 'mc' ? 'Multiple Choice' : 'Essay'}</span>
+                  <span className="text-xs text-gray-400">
+                    {q.points} pts • {q.questionType === 'mc' ? 'Multiple Choice' : q.questionType === 'essay' ? 'Essay' : q.questionType === 'identification' ? 'Identification' : 'True / False'}
+                  </span>
                 </div>
                 <p className="text-sm font-medium text-gray-800 mb-3">{q.questionText}</p>
-                {q.questionType === 'mc' && q.choices && (
+                {(q.questionType === 'mc' || q.questionType === 'true_false') && q.choices && (
                   <div className="space-y-2">
                     {q.choices
                       .slice()
@@ -36,6 +38,14 @@ export default function ExamPreviewModal({ exam, onClose }: { exam: Exam | null;
                         <span>{String.fromCharCode(65 + ci)}. {c.choiceText}</span>
                       </div>
                     ))}
+                  </div>
+                )}
+                {q.questionType === 'identification' && (
+                  <div className="space-y-2">
+                    <div className="border border-dashed border-gray-300 rounded-lg p-3 text-sm text-gray-500 bg-white">
+                      Student types a short text answer here.
+                    </div>
+                    <p className="text-xs text-indigo-700">Answer key: {q.identificationAnswer || '-'} ({q.identificationMatchMode || 'exact'} mode)</p>
                   </div>
                 )}
                 {q.questionType === 'essay' && (

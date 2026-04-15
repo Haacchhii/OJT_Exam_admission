@@ -185,10 +185,60 @@ const choiceSchema = z.object({
 
 const questionSchema = z.object({
   questionText: z.string().min(1),
-  questionType: z.enum(['mc', 'essay']),
+  questionType: z.enum(['mc', 'essay', 'identification', 'true_false']),
   points: z.number().int().positive(),
   orderNum: z.number().int().optional(),
   choices: z.array(choiceSchema).optional(),
+  identificationAnswer: z.string().max(5000).optional().nullable(),
+  identificationMatchMode: z.enum(['exact', 'partial']).optional().nullable(),
+}).superRefine((q, ctx) => {
+  const choiceCount = Array.isArray(q.choices) ? q.choices.length : 0;
+  const correctCount = Array.isArray(q.choices) ? q.choices.filter(c => c.isCorrect).length : 0;
+
+  if (q.questionType === 'mc') {
+    if (choiceCount < 2) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['choices'],
+        message: 'Multiple choice questions require at least 2 choices.',
+      });
+    }
+    if (correctCount < 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['choices'],
+        message: 'Multiple choice questions require at least one correct answer.',
+      });
+    }
+  }
+
+  if (q.questionType === 'true_false') {
+    if (choiceCount < 2) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['choices'],
+        message: 'True/False questions require True and False options.',
+      });
+    }
+    if (correctCount !== 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['choices'],
+        message: 'True/False questions must have exactly one correct answer.',
+      });
+    }
+  }
+
+  if (q.questionType === 'identification') {
+    const answer = String(q.identificationAnswer || '').trim();
+    if (!answer) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['identificationAnswer'],
+        message: 'Identification questions require a correct answer key.',
+      });
+    }
+  }
 });
 
 export const createExamSchema = z.object({
@@ -256,6 +306,19 @@ export const admissionsStatsQuerySchema = z.object({
   to:             isoDateStr.optional(),
   academicYearId: coerceOptionalInt,
   semesterId:     coerceOptionalInt,
+});
+
+export const reportsSummaryQuerySchema = z.object({
+  status: z.enum(STATUS_VALUES).optional(),
+  levelGroup: optionalString,
+  grade: optionalString,
+  academicYearId: coerceOptionalInt,
+  semesterId: coerceOptionalInt,
+  dateFrom: isoDateStr.optional(),
+  dateTo: isoDateStr.optional(),
+  limit: z.coerce.number().int().min(1).max(500).optional(),
+  sort: z.enum(['newest', 'oldest', 'alphabetical', 'school']).optional(),
+  school: z.string().max(200).optional(),
 });
 
 export const examsQuerySchema = z.object({

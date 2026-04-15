@@ -4,7 +4,7 @@ import { authorize } from '../middleware/rbac.js';
 import { upload } from '../middleware/upload.js';
 import { verifyMime } from '../middleware/verifyMime.js';
 import { validate, validateQuery } from '../middleware/validate.js';
-import { createAdmissionSchema, updateStatusSchema, bulkUpdateStatusSchema, bulkDeleteSchema, reviewDocumentSchema, admissionsQuerySchema, admissionsStatsQuerySchema } from '../utils/schemas.js';
+import { createAdmissionSchema, updateStatusSchema, bulkUpdateStatusSchema, bulkDeleteSchema, reviewDocumentSchema, admissionsQuerySchema, admissionsStatsQuerySchema, reportsSummaryQuerySchema } from '../utils/schemas.js';
 import { writeLimiter } from '../middleware/rateLimits.js';
 import * as ctrl from '../controllers/admissions.js';
 import { previewDocument, extractDocument, getExtractionJobStatus } from '../controllers/documentPreview.js';
@@ -18,7 +18,7 @@ router.use(authenticate);
 router.get('/mine',  ctrl.getMyAdmission);
 router.get('/stats', authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), validateQuery(admissionsStatsQuerySchema), ctrl.getStats);
 router.get('/dashboard-summary', authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), ctrl.getDashboardSummary);
-router.get('/reports-summary', authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), ctrl.getReportsSummary);
+router.get('/reports-summary', authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), validateQuery(reportsSummaryQuerySchema), ctrl.getReportsSummary);
 
 // Tracking (search by tracking ID — any authenticated user)
 router.get('/track/:trackingId', ctrl.trackApplication);

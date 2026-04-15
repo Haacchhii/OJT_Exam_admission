@@ -361,6 +361,8 @@ export async function getReportsSummary(req, res, next) {
       dateFrom,
       dateTo,
       limit,
+      sort,
+      school,
     } = req.query;
 
     const requestedLimit = Number(limit);
@@ -372,6 +374,9 @@ export async function getReportsSummary(req, res, next) {
     if (status) admissionWhere.status = status;
     if (levelGroup) admissionWhere.levelGroup = levelGroup;
     if (grade) admissionWhere.gradeLevel = grade;
+    if (school) {
+      admissionWhere.prevSchool = { contains: school, mode: 'insensitive' };
+    }
     if (academicYearId) admissionWhere.academicYearId = Number(academicYearId);
     if (semesterId) admissionWhere.semesterId = Number(semesterId);
     if (dateFrom || dateTo) {
@@ -387,22 +392,29 @@ export async function getReportsSummary(req, res, next) {
       if (Object.keys(admissionWhere.submittedAt).length === 0) delete admissionWhere.submittedAt;
     }
 
+    let admissionOrderBy = { submittedAt: 'desc' };
+    if (sort === 'oldest') admissionOrderBy = { submittedAt: 'asc' };
+    if (sort === 'alphabetical') admissionOrderBy = [{ lastName: 'asc' }, { firstName: 'asc' }, { submittedAt: 'desc' }];
+    if (sort === 'school') admissionOrderBy = [{ prevSchool: 'asc' }, { lastName: 'asc' }, { firstName: 'asc' }, { submittedAt: 'desc' }];
+
     const cacheKey = `reportsSummary:v2:${JSON.stringify({
       status: status || null,
       levelGroup: levelGroup || null,
       grade: grade || null,
+      school: school || null,
       academicYearId: academicYearId ? Number(academicYearId) : null,
       semesterId: semesterId ? Number(semesterId) : null,
       dateFrom: dateFrom || null,
       dateTo: dateTo || null,
       limit: admissionLimit,
+      sort: sort || 'newest',
     })}`;
     const summary = await cached(cacheKey, async () => {
       const [totalAdmissions, admissions, academicYears, semesters] = await Promise.all([
         prisma.admission.count({ where: admissionWhere }),
         prisma.admission.findMany({
           where: admissionWhere,
-          orderBy: { submittedAt: 'desc' },
+          orderBy: admissionOrderBy,
           take: admissionLimit,
           select: {
             id: true,
@@ -413,6 +425,7 @@ export async function getReportsSummary(req, res, next) {
             email: true,
             gradeLevel: true,
             levelGroup: true,
+            prevSchool: true,
             status: true,
             submittedAt: true,
             academicYear: { select: { id: true, year: true, startDate: true, endDate: true } },

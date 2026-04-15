@@ -32,6 +32,8 @@ interface ReportsSummaryParams {
   dateFrom?: string;
   dateTo?: string;
   limit?: number;
+  sort?: 'newest' | 'oldest' | 'alphabetical' | 'school';
+  school?: string;
 }
 
 const DEFAULT_ADMISSIONS_PAGE = 1;

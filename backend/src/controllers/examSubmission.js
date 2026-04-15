@@ -14,6 +14,38 @@ function registrationBelongsToUser(registration, user) {
   return normalizeEmail(registration.userEmail) === normalizeEmail(user.email);
 }
 
+function normalizeFreeText(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
+function isIdentificationMatch(answer, key, mode) {
+  const normAnswer = normalizeFreeText(answer);
+  const normKey = normalizeFreeText(key);
+  if (!normAnswer || !normKey) return false;
+  if (mode === 'partial') {
+    return normAnswer.includes(normKey) || normKey.includes(normAnswer);
+  }
+  return normAnswer === normKey;
+}
+
+function resolveSelectedChoiceId(answer, choices) {
+  if (answer == null || answer === '') return null;
+
+  const asNumber = Number(answer);
+  if (Number.isFinite(asNumber) && asNumber > 0) return asNumber;
+
+  const token = normalizeFreeText(answer);
+  if (token === 'true' || token === 'false') {
+    const match = choices.find((c) => normalizeFreeText(c.choiceText) === token);
+    return match?.id || null;
+  }
+
+  return null;
+}
+
 // ═══════════════════════════════════════════════════════
 // POST /api/results/submit
 // SECURITY: grades server-side — only accepts { registrationId, answers }
@@ -78,8 +110,8 @@ export async function submitExam(req, res, next) {
       maxPossible += question.points;
       const answer = answers[String(question.id)];
 
-      if (question.questionType === 'mc') {
-        const selectedId = answer ? Number(answer) : null;
+      if (question.questionType === 'mc' || question.questionType === 'true_false') {
+        const selectedId = resolveSelectedChoiceId(answer, question.choices || []);
         submittedAnswerData.push({
           registrationId,
           questionId: question.id,
@@ -93,6 +125,18 @@ export async function submitExam(req, res, next) {
           if (correct && correct.id === selectedId) {
             totalScore += question.points;
           }
+        }
+      } else if (question.questionType === 'identification') {
+        const responseText = typeof answer === 'string' ? answer : '';
+        submittedAnswerData.push({
+          registrationId,
+          questionId: question.id,
+          selectedChoiceId: null,
+          essayText: responseText,
+        });
+
+        if (isIdentificationMatch(responseText, question.identificationAnswer, question.identificationMatchMode)) {
+          totalScore += question.points;
         }
       } else if (question.questionType === 'essay') {
         const essayText = typeof answer === 'string' ? answer : '';

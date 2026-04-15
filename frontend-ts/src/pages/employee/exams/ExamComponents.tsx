@@ -12,21 +12,33 @@ export function FormInput({ label, required, ...props }: { label: string; requir
 
 export function QuestionCard({ q, i }: { q: ParsedQuestion | ExamQuestion; i: number }) {
   const choices = q.choices || [];
+  const typeLabel = q.questionType === 'mc'
+    ? 'Multiple Choice'
+    : q.questionType === 'essay'
+      ? 'Essay'
+      : q.questionType === 'identification'
+        ? 'Identification'
+        : 'True / False';
   return (
     <div className="border border-gray-200 rounded-lg p-4">
       <div className="flex items-center gap-3 mb-2">
         <span className="bg-forest-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">Q{i + 1}</span>
-        <Badge className={q.questionType === 'mc' ? 'gk-badge gk-badge-mc' : 'gk-badge gk-badge-essay'}>{q.questionType === 'mc' ? 'Multiple Choice' : 'Essay'}</Badge>
+        <Badge className={q.questionType === 'mc' ? 'gk-badge gk-badge-mc' : q.questionType === 'essay' ? 'gk-badge gk-badge-essay' : 'gk-badge gk-badge-info'}>{typeLabel}</Badge>
         <span className="text-xs text-gray-400 ml-auto">{q.points} pts</span>
       </div>
       <p className="text-forest-500 font-medium text-sm mb-2">{q.questionText}</p>
-      {q.questionType === 'mc' ? (
+      {q.questionType === 'mc' || q.questionType === 'true_false' ? (
         <div className="space-y-1">
           {choices.map((c: any) => (
             <div key={c.id} className={`text-sm px-2 py-1 rounded ${c.isCorrect ? 'bg-forest-50 text-forest-700 font-medium' : 'text-gray-500'}`}>
               {c.isCorrect ? '✓' : '○'} {c.choiceText}
             </div>
           ))}
+        </div>
+      ) : q.questionType === 'identification' ? (
+        <div className="space-y-1.5">
+          <p className="text-sm text-gray-600">Answer Key: <span className="font-semibold text-forest-700">{q.identificationAnswer || '-'}</span></p>
+          <p className="text-xs text-gray-400">Match mode: {q.identificationMatchMode || 'exact'}</p>
         </div>
       ) : (
         <p className="text-gray-400 text-sm italic">📝 Essay response required</p>

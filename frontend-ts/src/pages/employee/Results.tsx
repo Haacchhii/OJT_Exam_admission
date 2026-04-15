@@ -733,13 +733,13 @@ export default function EmployeeResults() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
                 <StatCard icon="users" value={analyticsData.totalTakers} label="Total Takers" color="blue" />
                 <StatCard icon="chartBar" value={`${analyticsData.analytics.length} / ${analyticsData.pagination.total}`} label="Questions (Page/Total)" color="amber" />
-                <StatCard icon="checkCircle" value={analyticsData.analytics.filter(q => q.questionType === 'mc' && (q.correctRate ?? 0) >= 70).length} label="Easy Questions (>=70%)" color="emerald" />
+                <StatCard icon="checkCircle" value={analyticsData.analytics.filter(q => q.questionType !== 'essay' && (q.correctRate ?? 0) >= 70).length} label="Easy Questions (>=70%)" color="emerald" />
               </div>
 
               {(() => {
-                const mcQuestions = analyticsData.analytics.filter(q => q.questionType === 'mc');
-                const avgCorrect = mcQuestions.length > 0
-                  ? mcQuestions.reduce((sum, q) => sum + (q.correctRate ?? 0), 0) / mcQuestions.length
+                const autoGradedQuestions = analyticsData.analytics.filter(q => q.questionType !== 'essay');
+                const avgCorrect = autoGradedQuestions.length > 0
+                  ? autoGradedQuestions.reduce((sum, q) => sum + (q.correctRate ?? 0), 0) / autoGradedQuestions.length
                   : 0;
 
                 return (
@@ -749,20 +749,26 @@ export default function EmployeeResults() {
                       <span className="text-sm text-gray-500">Page {analyticsData.pagination.page} of {analyticsData.pagination.totalPages}</span>
                     </div>
                     <div className="text-sm text-gray-600 mb-4">
-                      Average MC correctness on this page: <span className="font-semibold text-forest-500">{avgCorrect.toFixed(1)}%</span>
+                      Average auto-graded correctness on this page: <span className="font-semibold text-forest-500">{avgCorrect.toFixed(1)}%</span>
                     </div>
-                    {mcQuestions.length === 0 ? (
-                      <p className="text-sm text-gray-500">No multiple-choice questions on this page.</p>
+                    {autoGradedQuestions.length === 0 ? (
+                      <p className="text-sm text-gray-500">No auto-graded questions on this page.</p>
                     ) : (
                       <div className="space-y-3">
-                        {mcQuestions.map((q, idx) => {
+                        {autoGradedQuestions.map((q, idx) => {
                           const questionNumber = ((analyticsData.pagination.page - 1) * analyticsData.pagination.limit) + idx + 1;
                           const pct = Math.max(0, Math.min(100, q.correctRate ?? 0));
+                          const typeLabel = q.questionType === 'mc'
+                            ? 'MC'
+                            : q.questionType === 'true_false'
+                              ? 'T/F'
+                              : 'ID';
                           return (
                             <div key={q.questionId}>
                               <div className="flex items-center gap-3 text-sm mb-1">
                                 <span className="font-medium text-gray-700 w-14 shrink-0">Q{questionNumber}</span>
                                 <span className="text-gray-600 truncate flex-1">{q.questionText}</span>
+                                <span className="text-xs text-gray-400 w-10 text-right">{typeLabel}</span>
                                 <span className="font-semibold text-forest-500 w-16 text-right">{pct.toFixed(1)}%</span>
                               </div>
                               <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
@@ -788,11 +794,11 @@ export default function EmployeeResults() {
                         <span className="text-xs font-semibold text-gray-400">Q{((analyticsData.pagination.page - 1) * analyticsData.pagination.limit) + idx + 1}</span>
                         <p className="font-medium text-forest-500">{q.questionText}</p>
                       </div>
-                      <Badge className={`gk-badge ml-2 ${q.questionType === 'mc' ? 'gk-badge-reviewed' : 'gk-badge-pending'}`}>
-                        {q.questionType === 'mc' ? 'Multiple Choice' : 'Essay'} | {q.points} pts
+                      <Badge className={`gk-badge ml-2 ${q.questionType === 'essay' ? 'gk-badge-pending' : 'gk-badge-reviewed'}`}>
+                        {q.questionType === 'mc' ? 'Multiple Choice' : q.questionType === 'true_false' ? 'True / False' : q.questionType === 'identification' ? 'Identification' : 'Essay'} | {q.points} pts
                       </Badge>
                     </div>
-                    {q.questionType === 'mc' && (
+                    {(q.questionType === 'mc' || q.questionType === 'true_false' || q.questionType === 'identification') && (
                       <div>
                         <div className="flex items-center gap-3 mb-3">
                           <span className="text-sm text-gray-600">Correct rate:</span>
@@ -812,6 +818,9 @@ export default function EmployeeResults() {
                               </div>
                             ))}
                           </div>
+                        )}
+                        {!q.choiceDistribution && (
+                          <p className="text-xs text-gray-500">This question type is auto-graded using answer-key matching.</p>
                         )}
                       </div>
                     )}
