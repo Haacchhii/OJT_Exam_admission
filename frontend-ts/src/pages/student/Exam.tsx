@@ -21,6 +21,7 @@ export default function StudentExam() {
   const [view, setView] = useState<'schedule' | 'lobby' | 'exam'>('schedule');
   const [currentExam, setCurrentExam] = useState<Exam | null>(null);
   const [optimisticReg, setOptimisticReg] = useState<ExamRegistration | null>(null);
+  const [cancelledRegId, setCancelledRegId] = useState<number | null>(null);
   const [recentlyBooked, setRecentlyBooked] = useState(false);
   const [recoveringExam, setRecoveringExam] = useState(false);
 
@@ -34,7 +35,9 @@ export default function StudentExam() {
   }, [user], 0, { setLoadingOnReload: true });
 
   const myReg = rawData?.myReg || null;
-  const activeReg = myReg || optimisticReg;
+  const activeServerReg = myReg && myReg.id !== cancelledRegId ? myReg : null;
+  const activeOptimisticReg = optimisticReg && optimisticReg.id !== cancelledRegId ? optimisticReg : null;
+  const activeReg = activeServerReg || activeOptimisticReg;
   const myResult = rawData?.myResult || null;
 
   const [startingExam, setStartingExam] = useState(false);
@@ -102,6 +105,12 @@ export default function StudentExam() {
       setOptimisticReg(null);
     }
   }, [myReg, optimisticReg]);
+
+  useEffect(() => {
+    if (!myReg && cancelledRegId !== null) {
+      setCancelledRegId(null);
+    }
+  }, [myReg, cancelledRegId]);
 
   useEffect(() => {
     if (!recentlyBooked) return;
@@ -174,7 +183,15 @@ export default function StudentExam() {
       onRefresh={refetch}
       onBookedRegistration={(registration) => {
         setOptimisticReg(registration);
+        setCancelledRegId(null);
         setRecentlyBooked(true);
+      }}
+      onCancelledRegistration={(registrationId) => {
+        setCancelledRegId(registrationId);
+        setOptimisticReg(prev => (prev?.id === registrationId ? null : prev));
+        setRecentlyBooked(false);
+        setCurrentExam(null);
+        setView('schedule');
       }}
       showBookedSuccess={recentlyBooked}
       user={user}

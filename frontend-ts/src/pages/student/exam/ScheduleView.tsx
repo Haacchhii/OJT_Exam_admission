@@ -20,6 +20,7 @@ interface ScheduleViewProps {
   onLobby: (exam: Exam) => void;
   onRefresh: () => void;
   onBookedRegistration: (registration: ExamRegistration) => void;
+  onCancelledRegistration: (registrationId: number) => void;
   showBookedSuccess: boolean;
   user: User | null;
 }
@@ -47,7 +48,7 @@ function formatDisplayDate(value: string | null | undefined): string {
   return parsed.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
-export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, onBookedRegistration, showBookedSuccess, user }: ScheduleViewProps) {
+export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, onBookedRegistration, onCancelledRegistration, showBookedSuccess, user }: ScheduleViewProps) {
   const confirm = useConfirm();
   const [bookingSlotId, setBookingSlotId] = useState<number | null>(null);
   const [cancelingRegistrationId, setCancelingRegistrationId] = useState<number | null>(null);
@@ -124,6 +125,7 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, onBo
     setCancelingRegistrationId(registrationId);
     try {
       await cancelExamRegistration(registrationId);
+      onCancelledRegistration(registrationId);
       showToast('Your exam schedule has been cancelled.', 'success');
       setShowCancelSuccess(true);
       onRefresh();
