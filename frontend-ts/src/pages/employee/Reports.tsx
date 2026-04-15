@@ -27,6 +27,53 @@ const REPORTS_DEFAULT_LIMIT = 300;
 const UNSPECIFIED_SCHOOL_KEY = '__unspecified_school__';
 const MAX_SCHOOL_BARS = 12;
 
+type ReportSortOption = 'newest' | 'oldest' | 'alphabetical' | 'school';
+
+interface ExportChartOption {
+  id: string;
+  label: string;
+}
+
+interface ReportPreset {
+  key: 'overview' | 'current-month' | 'accepted' | 'under-screening' | 'school-insights' | 'latest-cycle';
+  label: string;
+  description: string;
+}
+
+const REPORT_PRESETS: ReportPreset[] = [
+  { key: 'overview', label: 'Overview', description: 'Clear all filters and show full snapshot' },
+  { key: 'current-month', label: 'Current Month', description: 'Newest applicants from this month' },
+  { key: 'accepted', label: 'Accepted Focus', description: 'Accepted admissions and recent outcomes' },
+  { key: 'under-screening', label: 'Under Screening', description: 'Applicants currently under screening' },
+  { key: 'school-insights', label: 'School Insights', description: 'Sort by previous school for school trends' },
+  { key: 'latest-cycle', label: 'Latest Academic Cycle', description: 'Auto-pick latest year and semester' },
+];
+
+const APPLICANT_CHART_OPTIONS: ExportChartOption[] = [
+  { id: 'chart-previous-school-distribution', label: 'Previous School Distribution' },
+  { id: 'chart-admission-status-mix', label: 'Admission Status Mix' },
+  { id: 'chart-applicant-volume', label: 'Applicant Volume (Monthly)' },
+];
+
+const RESULTS_CHART_OPTIONS: ExportChartOption[] = [
+  { id: 'chart-pass-rate-by-exam', label: 'Pass Rate by Exam' },
+  { id: 'chart-results-breakdown-pass-fail', label: 'Pass vs Fail Breakdown' },
+  { id: 'chart-results-breakdown-score-bands', label: 'Score Bands' },
+];
+
+const SCHEDULE_CHART_OPTIONS: ExportChartOption[] = [
+  { id: 'chart-schedule-utilization', label: 'Schedule Utilization' },
+  { id: 'chart-pass-rate-by-exam', label: 'Pass Rate by Exam' },
+  { id: 'chart-applicant-volume', label: 'Applicant Volume (Monthly)' },
+];
+
+function toLocalIsoDate(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function normalizeSchoolLabel(value: unknown) {
   return String(value || '').replace(/\s+/g, ' ').trim();
 }
@@ -160,12 +207,15 @@ export default function EmployeeReports() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [levelGroupFilter, setLevelGroupFilter] = useState('all');
   const [gradeFilter, setGradeFilter] = useState('all');
-  const [sortFilter, setSortFilter] = useState<'newest' | 'oldest' | 'alphabetical' | 'school'>('newest');
+  const [sortFilter, setSortFilter] = useState<ReportSortOption>('newest');
   const [schoolFilter, setSchoolFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('all');
   const [semesterFilter, setSemesterFilter] = useState('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [applicantChartSelection, setApplicantChartSelection] = useState(APPLICANT_CHART_OPTIONS[0].id);
+  const [resultsChartSelection, setResultsChartSelection] = useState(RESULTS_CHART_OPTIONS[0].id);
+  const [scheduleChartSelection, setScheduleChartSelection] = useState(SCHEDULE_CHART_OPTIONS[0].id);
 
   const hasInvalidDateRange = Boolean(dateFrom && dateTo && dateFrom > dateTo);
 
@@ -280,6 +330,86 @@ export default function EmployeeReports() {
     yearFilter === 'all' || s.academicYearId === Number(yearFilter)
   );
 
+  const clearAllFilters = () => {
+    setStatusFilter('all');
+    setLevelGroupFilter('all');
+    setGradeFilter('all');
+    setSortFilter('newest');
+    setSchoolFilter('');
+    setYearFilter('all');
+    setSemesterFilter('all');
+    setDateFrom('');
+    setDateTo('');
+  };
+
+  const applyReportPreset = (presetKey: ReportPreset['key']) => {
+    const nowDate = new Date();
+    const todayIso = toLocalIsoDate(nowDate);
+    const firstDayOfMonthIso = toLocalIsoDate(new Date(nowDate.getFullYear(), nowDate.getMonth(), 1));
+
+    clearAllFilters();
+
+    if (presetKey === 'current-month') {
+      setDateFrom(firstDayOfMonthIso);
+      setDateTo(todayIso);
+      setSortFilter('newest');
+      showToast('Applied preset: Current Month', 'success');
+      return;
+    }
+
+    if (presetKey === 'accepted') {
+      setStatusFilter('Accepted');
+      setSortFilter('newest');
+      setDateFrom(firstDayOfMonthIso);
+      setDateTo(todayIso);
+      showToast('Applied preset: Accepted Focus', 'success');
+      return;
+    }
+
+    if (presetKey === 'under-screening') {
+      setStatusFilter('Under Screening');
+      setSortFilter('oldest');
+      showToast('Applied preset: Under Screening', 'success');
+      return;
+    }
+
+    if (presetKey === 'school-insights') {
+      setSortFilter('school');
+      setDateFrom(firstDayOfMonthIso);
+      setDateTo(todayIso);
+      showToast('Applied preset: School Insights', 'success');
+      return;
+    }
+
+    if (presetKey === 'latest-cycle') {
+      const latestYear = [...academicYears].sort((a, b) => b.id - a.id)[0] || null;
+      if (latestYear) {
+        setYearFilter(String(latestYear.id));
+        const latestSemester = [...allSemesters]
+          .filter((semester) => semester.academicYearId === latestYear.id)
+          .sort((a, b) => b.id - a.id)[0] || null;
+        setSemesterFilter(latestSemester ? String(latestSemester.id) : 'all');
+      }
+      setSortFilter('newest');
+      showToast('Applied preset: Latest Academic Cycle', 'success');
+      return;
+    }
+
+    showToast('Applied preset: Overview', 'success');
+  };
+
+  const pickExportChartSvg = (
+    getChartSvgMarkup: (containerId: string) => string,
+    preferredChartId: string,
+    fallbackChartIds: string[] = []
+  ) => {
+    for (const chartId of [preferredChartId, ...fallbackChartIds]) {
+      const chartSvg = getChartSvgMarkup(chartId);
+      if (chartSvg) return chartSvg;
+    }
+    return '';
+  };
+
   const hasActiveFilters =
     statusFilter !== 'all' ||
     levelGroupFilter !== 'all' ||
@@ -370,7 +500,7 @@ export default function EmployeeReports() {
       printPdfReport('Applicant List', [
         {
           subtitle: 'Admission Status Mix and Applicant Table',
-          chartSvg: getChartSvgMarkup('chart-previous-school-distribution') || getChartSvgMarkup('chart-admission-status-mix') || getChartSvgMarkup('chart-applicant-volume'),
+          chartSvg: pickExportChartSvg(getChartSvgMarkup, applicantChartSelection, ['chart-previous-school-distribution', 'chart-admission-status-mix', 'chart-applicant-volume']),
           headers,
           rows,
         },
@@ -410,7 +540,7 @@ export default function EmployeeReports() {
       printPdfReport('Exam Results', [
         {
           subtitle: 'Pass Rate by Exam and Detailed Results Table',
-          chartSvg: getChartSvgMarkup('chart-pass-rate-by-exam') || getChartSvgMarkup('chart-results-breakdown-pass-fail'),
+          chartSvg: pickExportChartSvg(getChartSvgMarkup, resultsChartSelection, ['chart-pass-rate-by-exam', 'chart-results-breakdown-pass-fail', 'chart-results-breakdown-score-bands']),
           headers,
           rows,
         },
@@ -455,7 +585,7 @@ export default function EmployeeReports() {
       printPdfReport('Exam Schedules', [
         {
           subtitle: 'Schedule Utilization and Schedules Table',
-          chartSvg: getChartSvgMarkup('chart-schedule-utilization'),
+          chartSvg: pickExportChartSvg(getChartSvgMarkup, scheduleChartSelection, ['chart-schedule-utilization']),
           headers,
           rows,
         },
@@ -617,6 +747,22 @@ export default function EmployeeReports() {
       {/* Filters */}
       <div className="gk-section-card p-4 mb-6">
         <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Filter Report Data</h4>
+        <div className="mb-4">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Quick Presets</p>
+          <div className="flex flex-wrap gap-2">
+            {REPORT_PRESETS.map((preset) => (
+              <button
+                key={preset.key}
+                type="button"
+                onClick={() => applyReportPreset(preset.key)}
+                title={preset.description}
+                className="px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-xs font-semibold text-gray-700 hover:border-forest-300 hover:text-forest-700 hover:bg-forest-50 transition"
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           <div className="min-w-0">
             <label className="block text-xs font-semibold text-gray-500 mb-1">Status</label>
@@ -691,7 +837,7 @@ export default function EmployeeReports() {
 
           {(statusFilter !== 'all' || levelGroupFilter !== 'all' || gradeFilter !== 'all' || sortFilter !== 'newest' || schoolFilter.trim() || yearFilter !== 'all' || semesterFilter !== 'all' || dateFrom || dateTo) && (
             <div className="flex items-end">
-              <ActionButton variant="secondary" className="w-full xl:w-auto" onClick={() => { setStatusFilter('all'); setLevelGroupFilter('all'); setGradeFilter('all'); setSortFilter('newest'); setSchoolFilter(''); setYearFilter('all'); setSemesterFilter('all'); setDateFrom(''); setDateTo(''); }}>
+              <ActionButton variant="secondary" className="w-full xl:w-auto" onClick={clearAllFilters}>
                 Clear Filters
               </ActionButton>
             </div>
@@ -715,9 +861,39 @@ export default function EmployeeReports() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         {[
-          { icon: 'clipboard', title: 'Applicant List', desc: 'Download a full list of all applicants with their admission status.', onCSV: () => exportApplicants('csv'), onPDF: () => exportApplicants('pdf'), color: 'forest' },
-          { icon: 'chartBar', title: 'Exam Results', desc: 'Download exam scores and pass/fail data for all applicants.', onCSV: () => exportResults('csv'), onPDF: () => exportResults('pdf'), color: 'gold' },
-          { icon: 'calendar', title: 'Exam Schedules', desc: 'Download all exam schedule data and slot availability.', onCSV: () => exportSchedules('csv'), onPDF: () => exportSchedules('pdf'), color: 'emerald' },
+          {
+            icon: 'clipboard',
+            title: 'Applicant List',
+            desc: 'Download a full list of all applicants with their admission status.',
+            onCSV: () => exportApplicants('csv'),
+            onPDF: () => exportApplicants('pdf'),
+            color: 'forest',
+            chartOptions: APPLICANT_CHART_OPTIONS,
+            selectedChart: applicantChartSelection,
+            onChartChange: setApplicantChartSelection,
+          },
+          {
+            icon: 'chartBar',
+            title: 'Exam Results',
+            desc: 'Download exam scores and pass/fail data for all applicants.',
+            onCSV: () => exportResults('csv'),
+            onPDF: () => exportResults('pdf'),
+            color: 'gold',
+            chartOptions: RESULTS_CHART_OPTIONS,
+            selectedChart: resultsChartSelection,
+            onChartChange: setResultsChartSelection,
+          },
+          {
+            icon: 'calendar',
+            title: 'Exam Schedules',
+            desc: 'Download all exam schedule data and slot availability.',
+            onCSV: () => exportSchedules('csv'),
+            onPDF: () => exportSchedules('pdf'),
+            color: 'emerald',
+            chartOptions: SCHEDULE_CHART_OPTIONS,
+            selectedChart: scheduleChartSelection,
+            onChartChange: setScheduleChartSelection,
+          },
         ].map((c, i) => {
           const bgGradient = c.color === 'gold' ? 'from-gold-50 to-gold-100' : c.color === 'emerald' ? 'from-emerald-50 to-teal-100' : 'from-forest-50 to-forest-100';
           const borderColor = c.color === 'gold' ? 'border-gold-200' : c.color === 'emerald' ? 'border-emerald-200' : 'border-forest-200';
@@ -731,6 +907,18 @@ export default function EmployeeReports() {
             <div className={`w-16 h-16 rounded-2xl ${iconBg} flex items-center justify-center mx-auto mb-3`}><Icon name={c.icon} className={`w-8 h-8 ${iconColor}`} /></div>
             <h3 className="font-bold text-lg mb-1" style={{ color: titleColor }}>{c.title}</h3>
             <p className="text-gray-600 text-sm mb-4 font-medium">{c.desc}</p>
+            <div className="mb-3 text-left">
+              <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Chart for PDF</label>
+              <select
+                value={c.selectedChart}
+                onChange={(event) => c.onChartChange(event.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-forest-500/20 outline-none"
+              >
+                {c.chartOptions.map((option) => (
+                  <option key={option.id} value={option.id}>{option.label}</option>
+                ))}
+              </select>
+            </div>
             <div className="flex gap-2 justify-center flex-wrap">
               <ActionButton variant="primary" className={`${btn1Color} font-bold shadow-md`} icon={<Icon name="document" className="w-4 h-4" />} onClick={c.onCSV}>CSV</ActionButton>
               <ActionButton variant="primary" className={`${btn2Color} font-bold shadow-md`} icon={<Icon name="document" className="w-4 h-4" />} onClick={c.onPDF}>PDF</ActionButton>
