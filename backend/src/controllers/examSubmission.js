@@ -35,12 +35,18 @@ function isIdentificationMatch(answer, key, mode) {
 function resolveSelectedChoiceId(answer, choices) {
   if (answer == null || answer === '') return null;
 
+  const availableChoices = Array.isArray(choices) ? choices : [];
+  const availableChoiceIds = new Set(availableChoices.map((choice) => choice.id));
+
   const asNumber = Number(answer);
-  if (Number.isFinite(asNumber) && asNumber > 0) return asNumber;
+  if (Number.isFinite(asNumber) && asNumber > 0) {
+    // Guard against stale client state if exam choices changed after the exam was opened.
+    return availableChoiceIds.has(asNumber) ? asNumber : null;
+  }
 
   const token = normalizeFreeText(answer);
   if (token === 'true' || token === 'false') {
-    const match = choices.find((c) => normalizeFreeText(c.choiceText) === token);
+    const match = availableChoices.find((c) => normalizeFreeText(c.choiceText) === token);
     return match?.id || null;
   }
 
@@ -94,6 +100,12 @@ export async function submitExam(req, res, next) {
       },
     });
     if (!exam) return res.status(404).json({ error: 'Exam not found', code: 'NOT_FOUND' });
+    if (!Array.isArray(exam.questions) || exam.questions.length === 0) {
+      return res.status(400).json({
+        error: 'Exam content changed while you were taking the test. Please refresh and ask staff to review this schedule.',
+        code: 'VALIDATION_ERROR',
+      });
+    }
 
     // ── Server-side timer enforcement ────────────────────
     // Reject submissions that arrive well after the allowed duration.

@@ -39,6 +39,14 @@ export function errorHandler(err, _req, res, _next) {
     });
   }
 
+  // Prisma foreign key constraint
+  if (err.code === 'P2003') {
+    return res.status(400).json({
+      error: 'Some submitted answers are no longer valid for this exam. Please refresh the exam page and try again.',
+      code: 'VALIDATION_ERROR',
+    });
+  }
+
   // Prisma not-found
   if (err.code === 'P2025') {
     return res.status(404).json({
