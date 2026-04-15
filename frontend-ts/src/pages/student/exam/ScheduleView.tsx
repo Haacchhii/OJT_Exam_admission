@@ -163,7 +163,7 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, onBo
     const exam = schedule?.exam || null;
     const ok = await confirm({
       title: 'Confirm Booking',
-      message: `Book "${exam?.title || 'Exam'}" on ${schedule?.scheduledDate} at ${formatTime(schedule?.startTime)}?`,
+      message: `Book "${exam?.title || 'Exam'}" for ${formatDisplayDate(schedule?.scheduledDate || null)}? You can start anytime while the exam window is open.`,
       confirmLabel: 'Book Slot',
       variant: 'info',
     });
@@ -261,7 +261,7 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, onBo
                     <p className="text-gray-500 text-sm">{formatTime(s.startTime)} - {formatTime(s.endTime)} | {remaining} slots left</p>
                     {(s.registrationOpenDate || s.registrationCloseDate) && (
                       <p className="text-gray-500 text-xs">
-                        Registration window: {formatDisplayDate(s.registrationOpenDate || null)} - {formatDisplayDate(s.registrationCloseDate || null)}
+                        Exam window: {formatDisplayDate(s.registrationOpenDate || null)} - {formatDisplayDate(s.registrationCloseDate || null)}
                       </p>
                     )}
                     {(s.visibilityStartDate || s.visibilityEndDate) && (

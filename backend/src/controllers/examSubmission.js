@@ -3,6 +3,7 @@ import { logAudit } from '../utils/auditLog.js';
 import { sendExamResultEmail } from '../utils/email.js';
 import { EXAM_GRACE_MINUTES } from '../utils/constants.js';
 import { invalidatePrefix } from '../utils/cache.js';
+import { isSubmissionWithinScheduleWindow } from '../utils/examWindow.js';
 
 function normalizeEmail(value) {
   return String(value || '').trim().toLowerCase();
@@ -73,6 +74,13 @@ export async function submitExam(req, res, next) {
     }
     if (reg.status !== 'started') {
       return res.status(400).json({ error: 'Exam must be started before submission', code: 'VALIDATION_ERROR' });
+    }
+
+    if (!isSubmissionWithinScheduleWindow(reg.schedule, new Date(), EXAM_GRACE_MINUTES)) {
+      return res.status(400).json({
+        error: 'Exam submission is no longer allowed because the exam window has closed.',
+        code: 'TIMER_EXPIRED',
+      });
     }
 
     // Get exam questions with correct answers from DB (NEVER from client)

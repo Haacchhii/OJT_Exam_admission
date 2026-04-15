@@ -286,7 +286,7 @@ export default function ScheduleManager() {
 
   return (
     <div>
-      <PageHeader title="Exam Schedules" subtitle="Create and manage exam date/time slots." />
+      <PageHeader title="Exam Schedules" subtitle="Create and manage exam access windows, start windows, and seat limits." />
       {schedActionBanner && (
         <StatusBanner
           tone={schedActionBanner.tone}
@@ -348,11 +348,11 @@ export default function ScheduleManager() {
           <FormInput label="End Time" type="time" value={form.end} onChange={set('end')} required />
           <FormInput label="Visibility Starts" type="date" value={form.visibilityStartDate} onChange={set('visibilityStartDate')} />
           <FormInput label="Visibility Ends" type="date" value={form.visibilityEndDate} onChange={set('visibilityEndDate')} />
-          <FormInput label="Registration Opens" type="date" value={form.openDate} onChange={set('openDate')} />
-          <FormInput label="Registration Closes" type="date" value={form.closeDate} onChange={set('closeDate')} />
+          <FormInput label="Exam Window Opens" type="date" value={form.openDate} onChange={set('openDate')} />
+          <FormInput label="Exam Window Closes" type="date" value={form.closeDate} onChange={set('closeDate')} />
           <FormInput label="Max Applicants" type="number" value={form.slots} onChange={set('slots')} placeholder="30" required />
           <div className="md:col-span-2 lg:col-span-3 text-xs text-gray-500">
-            Tip: use quick setup and auto-fill to generate time, registration, and visibility windows instantly.
+            Tip: students can start anytime while the exam window is open. Keep close date aligned with your intended exam deadline.
           </div>
           <div className="flex items-end">
             <ActionButton type="submit" loading={isSavingSched}>{editId ? 'Update Schedule' : 'Add Schedule'}</ActionButton>
@@ -394,7 +394,7 @@ export default function ScheduleManager() {
                     <p className="text-gray-500 text-sm">{formatTime(s.startTime)} - {formatTime(s.endTime)}</p>
                     {registrationWindow && (
                       <p className="text-gray-500 text-xs">
-                        Registration window: {registrationWindow}
+                        Exam access window: {registrationWindow}
                       </p>
                     )}
                     {visibilityWindow && (

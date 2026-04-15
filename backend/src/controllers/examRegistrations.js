@@ -4,6 +4,7 @@ import { generateTrackingId } from '../utils/tracking.js';
 import { sendExamBookingEmail } from '../utils/email.js';
 import { ROLES } from '../utils/constants.js';
 import { cached, invalidatePrefix } from '../utils/cache.js';
+import { evaluateExamStartAvailability } from '../utils/examWindow.js';
 
 function normalizeEmail(value) {
   return String(value || '').trim().toLowerCase();
@@ -389,14 +390,9 @@ export async function startExam(req, res, next) {
     }
 
     const nowTime = getNowLocalTime();
-    if (today < reg.schedule.scheduledDate) {
-      return res.status(400).json({ error: 'This exam is not available yet.', code: 'VALIDATION_ERROR' });
-    }
-    if (today > reg.schedule.scheduledDate || nowTime > reg.schedule.endTime) {
-      return res.status(400).json({ error: 'This exam schedule has already ended.', code: 'VALIDATION_ERROR' });
-    }
-    if (nowTime < reg.schedule.startTime) {
-      return res.status(400).json({ error: 'This exam has not started yet.', code: 'VALIDATION_ERROR' });
+    const startAvailability = evaluateExamStartAvailability(reg.schedule, today, nowTime);
+    if (!startAvailability.allowed) {
+      return res.status(400).json({ error: startAvailability.message, code: startAvailability.code || 'VALIDATION_ERROR' });
     }
 
     const questionCount = await prisma.examQuestion.count({ where: { examId: reg.schedule.examId } });
