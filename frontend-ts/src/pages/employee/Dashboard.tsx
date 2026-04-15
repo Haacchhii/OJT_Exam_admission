@@ -21,6 +21,7 @@ function daysPending(submittedAt: string) {
 
 export default function EmployeeDashboard() {
   const { user, canAccess, roleLabel } = useAuth();
+  const canViewAdmissions = canAccess('admissions');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [levelGroupFilter, setLevelGroupFilter] = useState('all');
@@ -40,6 +41,18 @@ export default function EmployeeDashboard() {
     error: admissionsError,
     refetch: refetchAdmissions,
   } = useAsync(async () => {
+    if (!canViewAdmissions) {
+      return {
+        data: [] as Admission[],
+        pagination: {
+          page,
+          limit: PER_PAGE,
+          total: 0,
+          totalPages: 1,
+        },
+      };
+    }
+
     const params: {
       page: number;
       limit: number;
@@ -55,7 +68,7 @@ export default function EmployeeDashboard() {
     if (search.trim()) params.search = search.trim();
 
     return getAdmissionsPage(params);
-  }, [statusFilter, levelGroupFilter, gradeFilter, search, page], 0, { setLoadingOnReload: true });
+  }, [canViewAdmissions, statusFilter, levelGroupFilter, gradeFilter, search, page], 0, { setLoadingOnReload: true });
 
 
   useEffect(() => {
@@ -95,7 +108,7 @@ export default function EmployeeDashboard() {
   const handleGrade = (v: string) => { setGradeFilter(v); setPage(1); };
   if (loading && !rawData) return <SkeletonPage />;
   if (error) return <ErrorAlert error={error} onRetry={refetch} />;
-  if (admissionsError && !admissionsPage) return <ErrorAlert error={admissionsError} onRetry={refetchAdmissions} />;
+  if (canViewAdmissions && admissionsError && !admissionsPage) return <ErrorAlert error={admissionsError} onRetry={refetchAdmissions} />;
 
   return (
     <div className="animate-[fadeIn_0.3s_ease-out]">
@@ -107,7 +120,7 @@ export default function EmployeeDashboard() {
       } />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8 animate-stagger">
-        {canAccess('admissions') && <>
+        {canViewAdmissions && <>
           <Link to="/employee/admissions"><StatCard icon="graduationCap" value={rawData?.stats?.total || 0} label="Total Applicants" color="blue" trend={rawData?.trends?.total} trendLabel="vs last week" /></Link>
           <Link to="/employee/admissions?status=Accepted"><StatCard icon="checkCircle" value={rawData?.stats?.accepted || 0} label="Accepted" color="emerald" trend={rawData?.trends?.accepted} trendLabel="vs last week" /></Link>
           <Link to="/employee/admissions"><StatCard icon="clock" value={(rawData?.stats?.submitted || 0) + (rawData?.stats?.underScreening || 0) + (rawData?.stats?.underEvaluation || 0)} label="In Progress" color="amber" trend={rawData?.trends?.inProgress} trendLabel="vs last week" /></Link>
@@ -123,7 +136,7 @@ export default function EmployeeDashboard() {
         </>}
       </div>
 
-      {canAccess('admissions') && (
+      {canViewAdmissions && (
       <div className="gk-section-card mb-8">
         <h3 className="gk-heading-sm mb-5 flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-forest-50 flex items-center justify-center">
