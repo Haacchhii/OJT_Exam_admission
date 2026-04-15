@@ -33,18 +33,27 @@ export function buildActiveFilters(filters: {
   sortFilter?: string;
   schoolFilter?: string;
   yearFilter: string;
+  yearLabel?: string;
   semesterFilter: string;
+  semesterLabel?: string;
   dateFrom: string;
   dateTo: string;
 }) {
+  const sortLabelMap: Record<string, string> = {
+    newest: 'Date: Newest to Oldest',
+    oldest: 'Date: Oldest to Newest',
+    alphabetical: 'Alphabetical: Last Name (A-Z)',
+    school: 'Previous School (A-Z)',
+  };
+
   return [
     filters.statusFilter !== 'all' ? `Status: ${filters.statusFilter}` : '',
     filters.levelGroupFilter !== 'all' ? `Level Group: ${filters.levelGroupFilter}` : '',
     filters.gradeFilter !== 'all' ? `Grade: ${filters.gradeFilter}` : '',
-    filters.sortFilter && filters.sortFilter !== 'newest' ? `Sort: ${filters.sortFilter}` : '',
+    filters.sortFilter && filters.sortFilter !== 'newest' ? `Sort: ${sortLabelMap[filters.sortFilter] || filters.sortFilter}` : '',
     filters.schoolFilter ? `Previous School: ${filters.schoolFilter}` : '',
-    filters.yearFilter !== 'all' ? `School Year ID: ${filters.yearFilter}` : '',
-    filters.semesterFilter !== 'all' ? `Semester ID: ${filters.semesterFilter}` : '',
+    filters.yearFilter !== 'all' ? `School Year: ${filters.yearLabel || filters.yearFilter}` : '',
+    filters.semesterFilter !== 'all' ? `Semester: ${filters.semesterLabel || filters.semesterFilter}` : '',
     filters.dateFrom ? `From: ${filters.dateFrom}` : '',
     filters.dateTo ? `To: ${filters.dateTo}` : '',
   ].filter(Boolean);

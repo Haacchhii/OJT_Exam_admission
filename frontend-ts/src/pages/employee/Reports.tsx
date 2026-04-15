@@ -12,6 +12,7 @@ import type { Admission, ExamResult, Exam, ExamSchedule, ExamRegistration, Essay
 const PassRateMonthlyCharts = lazyWithRetry(() => import('./reports/charts/PassRateMonthlyCharts'));
 const ResultsBreakdownCharts = lazyWithRetry(() => import('./reports/charts/ResultsBreakdownCharts'));
 const ScheduleUtilizationChart = lazyWithRetry(() => import('./reports/charts/ScheduleUtilizationChart'));
+const PreviousSchoolChart = lazyWithRetry(() => import('./reports/charts/PreviousSchoolChart'));
 
 const STATUS_COLORS: Record<string, string> = {
   Submitted: '#8b5cf6',
@@ -23,6 +24,41 @@ const STATUS_COLORS: Record<string, string> = {
 
 const CHART_FALLBACK_COLORS = ['#16a34a', '#0ea5e9', '#f59e0b', '#8b5cf6', '#ef4444', '#14b8a6'];
 const REPORTS_DEFAULT_LIMIT = 300;
+const UNSPECIFIED_SCHOOL_KEY = '__unspecified_school__';
+const MAX_SCHOOL_BARS = 12;
+
+function normalizeSchoolLabel(value: unknown) {
+  return String(value || '').replace(/\s+/g, ' ').trim();
+}
+
+function canonicalSchoolKey(rawSchool: string) {
+  const normalized = normalizeSchoolLabel(rawSchool);
+  if (!normalized) return UNSPECIFIED_SCHOOL_KEY;
+
+  const compact = normalized
+    .toLowerCase()
+    .replace(/[.,]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (['na', 'n/a', 'none', 'unknown', 'not provided'].includes(compact)) {
+    return UNSPECIFIED_SCHOOL_KEY;
+  }
+
+  // Collapse common spelling variants to the same school bucket.
+  if (/\blpu\b.*\bbatangas\b/.test(compact) || /\blyceum\b.*\bphilippines\b.*\bbatangas\b/.test(compact)) {
+    return 'lyceum of the philippines university batangas';
+  }
+
+  return compact;
+}
+
+function sortLabel(sort: 'newest' | 'oldest' | 'alphabetical' | 'school') {
+  if (sort === 'oldest') return 'Date: Oldest to Newest';
+  if (sort === 'alphabetical') return 'Alphabetical: Last Name (A-Z)';
+  if (sort === 'school') return 'Previous School (A-Z)';
+  return 'Date: Newest to Oldest';
+}
 
 function DeferredChartSection({ children, minHeight = 320 }: { children: ReactNode; minHeight?: number }) {
   const [isReady, setIsReady] = useState(false);
@@ -244,6 +280,43 @@ export default function EmployeeReports() {
     yearFilter === 'all' || s.academicYearId === Number(yearFilter)
   );
 
+  const hasActiveFilters =
+    statusFilter !== 'all' ||
+    levelGroupFilter !== 'all' ||
+    gradeFilter !== 'all' ||
+    sortFilter !== 'newest' ||
+    schoolFilter.trim().length > 0 ||
+    yearFilter !== 'all' ||
+    semesterFilter !== 'all' ||
+    dateFrom.length > 0 ||
+    dateTo.length > 0;
+
+  const exportFilterSummary = useMemo(() => {
+    const filters: string[] = [];
+    if (statusFilter !== 'all') filters.push(`Status: ${statusFilter}`);
+    if (levelGroupFilter !== 'all') filters.push(`Level Group: ${levelGroupFilter}`);
+    if (gradeFilter !== 'all') filters.push(`Grade: ${gradeFilter}`);
+    if (sortFilter !== 'newest') filters.push(`Sort: ${sortLabel(sortFilter)}`);
+    if (schoolFilter.trim()) filters.push(`Previous School: ${schoolFilter.trim()}`);
+
+    if (yearFilter !== 'all') {
+      const year = academicYears.find((item) => item.id === Number(yearFilter));
+      filters.push(`School Year: ${year?.year || yearFilter}`);
+    }
+
+    if (semesterFilter !== 'all') {
+      const semester = allSemesters.find((item) => item.id === Number(semesterFilter));
+      filters.push(`Semester: ${semester ? semesterLabel(semester) : semesterFilter}`);
+    }
+
+    if (dateFrom || dateTo) {
+      filters.push(`Submitted Date: ${dateFrom || 'Any'} to ${dateTo || 'Any'}`);
+    }
+
+    if (filters.length === 0) return 'No filters are active. Exports include all currently loaded records.';
+    return filters.join(' | ');
+  }, [statusFilter, levelGroupFilter, gradeFilter, sortFilter, schoolFilter, yearFilter, semesterFilter, dateFrom, dateTo, academicYears, allSemesters]);
+
   if (loading && !rawData) return <SkeletonPage />;
   if (error) return <ErrorAlert error={error} onRetry={refetch} />;
 
@@ -251,10 +324,20 @@ export default function EmployeeReports() {
   const accepted = admissions.filter(a => a.status === 'Accepted').length;
   const passed = results.filter(r => r.passed).length;
   const avg = results.length > 0 ? (results.reduce((s, r) => s + r.percentage, 0) / results.length).toFixed(1) : '0.0';
+  const selectedYearLabel = yearFilter !== 'all'
+    ? (academicYears.find((item) => item.id === Number(yearFilter))?.year || yearFilter)
+    : '';
+  const selectedSemesterLabel = semesterFilter !== 'all'
+    ? (() => {
+      const selected = allSemesters.find((item) => item.id === Number(semesterFilter));
+      return selected ? semesterLabel(selected) : semesterFilter;
+    })()
+    : '';
 
   const now = new Date();
 
   const exportApplicants = async (format: 'csv' | 'pdf' = 'csv') => {
+    showToast(hasActiveFilters ? 'Exporting applicant list with the active filters.' : 'Exporting applicant list with all loaded records.', 'info');
     const { buildActiveFilters, downloadCSV, getChartSvgMarkup, printPdfReport } = await import('./reports/reportExport');
     const headers = ['ID', 'First Name', 'Middle Name', 'Last Name', 'Email', 'Grade Level', 'Previous School', 'Application Period', 'Status', 'Submitted'];
     const rows: (string | number)[][] = admissions.map(a => [
@@ -276,7 +359,9 @@ export default function EmployeeReports() {
       sortFilter,
       schoolFilter,
       yearFilter,
+      yearLabel: selectedYearLabel,
       semesterFilter,
+      semesterLabel: selectedSemesterLabel,
       dateFrom,
       dateTo,
     });
@@ -285,7 +370,7 @@ export default function EmployeeReports() {
       printPdfReport('Applicant List', [
         {
           subtitle: 'Admission Status Mix and Applicant Table',
-          chartSvg: getChartSvgMarkup('chart-admission-status-mix') || getChartSvgMarkup('chart-applicant-volume'),
+          chartSvg: getChartSvgMarkup('chart-previous-school-distribution') || getChartSvgMarkup('chart-admission-status-mix') || getChartSvgMarkup('chart-applicant-volume'),
           headers,
           rows,
         },
@@ -296,6 +381,7 @@ export default function EmployeeReports() {
   };
 
   const exportResults = async (format: 'csv' | 'pdf' = 'csv') => {
+    showToast(hasActiveFilters ? 'Exporting exam results with the active filters.' : 'Exporting exam results with all loaded records.', 'info');
     const { buildActiveFilters, downloadCSV, getChartSvgMarkup, printPdfReport } = await import('./reports/reportExport');
     const headers = ['Student', 'Exam', 'Score', 'Max', 'Percentage', 'Passed', 'Essay Reviewed', 'Date'];
     const rows: (string | number)[][] = results.map(r => {
@@ -313,7 +399,9 @@ export default function EmployeeReports() {
       sortFilter,
       schoolFilter,
       yearFilter,
+      yearLabel: selectedYearLabel,
       semesterFilter,
+      semesterLabel: selectedSemesterLabel,
       dateFrom,
       dateTo,
     });
@@ -333,6 +421,7 @@ export default function EmployeeReports() {
   };
 
   const exportSchedules = async (format: 'csv' | 'pdf' = 'csv') => {
+    showToast(hasActiveFilters ? 'Exporting exam schedules with the active filters.' : 'Exporting exam schedules with all loaded records.', 'info');
     const { buildActiveFilters, downloadCSV, getChartSvgMarkup, printPdfReport } = await import('./reports/reportExport');
     const headers = ['Exam', 'Date', 'Start Time', 'End Time', 'Registration Open', 'Registration Close', 'Max Slots', 'Booked'];
     const rows: (string | number)[][] = schedules.map(s => {
@@ -355,7 +444,9 @@ export default function EmployeeReports() {
       sortFilter,
       schoolFilter,
       yearFilter,
+      yearLabel: selectedYearLabel,
       semesterFilter,
+      semesterLabel: selectedSemesterLabel,
       dateFrom,
       dateTo,
     });
@@ -419,6 +510,39 @@ export default function EmployeeReports() {
 
   const thisMonthKey = `${now.getFullYear()}-${String(now.getMonth()).padStart(2, '0')}`;
   const thisMonth = monthKeyCounts.get(thisMonthKey) || 0;
+
+  const previousSchoolBuckets = new Map<string, { count: number; labels: Map<string, number> }>();
+  for (const admission of admissions) {
+    const cleaned = normalizeSchoolLabel(admission.prevSchool);
+    const key = canonicalSchoolKey(cleaned);
+    const label = cleaned || 'Unspecified / Not Provided';
+    const current = previousSchoolBuckets.get(key) || { count: 0, labels: new Map<string, number>() };
+    current.count += 1;
+    current.labels.set(label, (current.labels.get(label) || 0) + 1);
+    previousSchoolBuckets.set(key, current);
+  }
+
+  const previousSchoolExpanded = Array.from(previousSchoolBuckets.entries())
+    .map(([key, value]) => {
+      const bestLabel = Array.from(value.labels.entries()).sort((a, b) => b[1] - a[1] || a[0].length - b[0].length)[0]?.[0]
+        || (key === UNSPECIFIED_SCHOOL_KEY ? 'Unspecified / Not Provided' : key);
+      return { key, name: bestLabel, count: value.count };
+    })
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+
+  const previousSchoolTotal = previousSchoolExpanded.reduce((sum, item) => sum + item.count, 0);
+  const previousSchoolDistinct = previousSchoolExpanded.filter((item) => item.key !== UNSPECIFIED_SCHOOL_KEY).length;
+
+  const previousSchoolData = previousSchoolExpanded.length > MAX_SCHOOL_BARS
+    ? [
+      ...previousSchoolExpanded.slice(0, MAX_SCHOOL_BARS - 1),
+      {
+        key: '__other_schools__',
+        name: 'Other Schools',
+        count: previousSchoolExpanded.slice(MAX_SCHOOL_BARS - 1).reduce((sum, item) => sum + item.count, 0),
+      },
+    ]
+    : previousSchoolExpanded;
 
   const admissionStatusCounts = new Map<string, number>();
   for (const admission of admissions) {
@@ -584,6 +708,11 @@ export default function EmployeeReports() {
       </div>
 
       {/* Export Cards */}
+      <div className="gk-section-card border border-sky-200 bg-sky-50 p-3 mb-4">
+        <p className="text-xs font-semibold text-sky-800">Export scope uses current filters</p>
+        <p className="text-xs text-sky-700 mt-1">{exportFilterSummary}</p>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         {[
           { icon: 'clipboard', title: 'Applicant List', desc: 'Download a full list of all applicants with their admission status.', onCSV: () => exportApplicants('csv'), onPDF: () => exportApplicants('pdf'), color: 'forest' },
@@ -619,6 +748,16 @@ export default function EmployeeReports() {
           admissionStatusTotal={admissionStatusTotal}
         />
       </Suspense>
+
+      <DeferredChartSection minHeight={380}>
+        <Suspense fallback={<LazyLoadingFallback />}>
+          <PreviousSchoolChart
+            data={previousSchoolData}
+            totalApplicants={previousSchoolTotal}
+            distinctSchools={previousSchoolDistinct}
+          />
+        </Suspense>
+      </DeferredChartSection>
 
       <DeferredChartSection minHeight={430}>
         <Suspense fallback={<LazyLoadingFallback />}>
