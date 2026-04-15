@@ -1,9 +1,51 @@
 import { describe, it, expect } from 'vitest';
 import {
+  computeExamWindowStatus,
   evaluateExamStartAvailability,
   computeScheduleSubmissionDeadline,
   isSubmissionWithinScheduleWindow,
 } from '../src/utils/examWindow.js';
+
+describe('exam window status', () => {
+  it('returns open when now is inside explicit datetime window', () => {
+    const schedule = {
+      scheduledDate: '2026-04-20',
+      startTime: '09:00',
+      endTime: '10:00',
+      examWindowStartAt: '2026-04-20T13:00:00.000Z',
+      examWindowEndAt: '2026-04-20T14:00:00.000Z',
+    };
+
+    const result = computeExamWindowStatus(schedule, new Date('2026-04-20T13:30:00.000Z'));
+    expect(result.status).toBe('open');
+  });
+
+  it('returns upcoming before explicit datetime window start', () => {
+    const schedule = {
+      scheduledDate: '2026-04-20',
+      startTime: '09:00',
+      endTime: '10:00',
+      examWindowStartAt: '2026-04-20T13:00:00.000Z',
+      examWindowEndAt: '2026-04-20T14:00:00.000Z',
+    };
+
+    const result = computeExamWindowStatus(schedule, new Date('2026-04-20T12:59:59.000Z'));
+    expect(result.status).toBe('upcoming');
+  });
+
+  it('returns closed after explicit datetime window end', () => {
+    const schedule = {
+      scheduledDate: '2026-04-20',
+      startTime: '09:00',
+      endTime: '10:00',
+      examWindowStartAt: '2026-04-20T13:00:00.000Z',
+      examWindowEndAt: '2026-04-20T14:00:00.000Z',
+    };
+
+    const result = computeExamWindowStatus(schedule, new Date('2026-04-20T14:00:01.000Z'));
+    expect(result.status).toBe('closed');
+  });
+});
 
 describe('evaluateExamStartAvailability', () => {
   it('allows rolling window exam starts anytime while window is open', () => {
@@ -15,7 +57,7 @@ describe('evaluateExamStartAvailability', () => {
       registrationCloseDate: '2026-04-20',
     };
 
-    const result = evaluateExamStartAvailability(schedule, '2026-04-15', '03:30');
+    const result = evaluateExamStartAvailability(schedule, new Date('2026-04-15T03:30:00.000Z'));
     expect(result.allowed).toBe(true);
   });
 
@@ -28,9 +70,9 @@ describe('evaluateExamStartAvailability', () => {
       registrationCloseDate: '2026-04-20',
     };
 
-    const result = evaluateExamStartAvailability(schedule, '2026-04-11', '12:00');
+    const result = evaluateExamStartAvailability(schedule, new Date('2026-04-11T12:00:00.000Z'));
     expect(result.allowed).toBe(false);
-    expect(result.message).toMatch(/not open yet/i);
+    expect(result.message).toMatch(/opens on/i);
   });
 
   it('blocks starts after rolling window closes', () => {
@@ -42,7 +84,7 @@ describe('evaluateExamStartAvailability', () => {
       registrationCloseDate: '2026-04-20',
     };
 
-    const result = evaluateExamStartAvailability(schedule, '2026-04-21', '12:00');
+    const result = evaluateExamStartAvailability(schedule, new Date('2026-04-21T12:00:00.000Z'));
     expect(result.allowed).toBe(false);
     expect(result.message).toMatch(/closed/i);
   });
@@ -56,9 +98,9 @@ describe('evaluateExamStartAvailability', () => {
       registrationCloseDate: null,
     };
 
-    expect(evaluateExamStartAvailability(schedule, '2026-04-20', '08:59').allowed).toBe(false);
-    expect(evaluateExamStartAvailability(schedule, '2026-04-20', '09:30').allowed).toBe(true);
-    expect(evaluateExamStartAvailability(schedule, '2026-04-20', '10:01').allowed).toBe(false);
+    expect(evaluateExamStartAvailability(schedule, new Date('2026-04-20T08:59:00')).allowed).toBe(false);
+    expect(evaluateExamStartAvailability(schedule, new Date('2026-04-20T09:30:00')).allowed).toBe(true);
+    expect(evaluateExamStartAvailability(schedule, new Date('2026-04-20T10:01:00')).allowed).toBe(false);
   });
 });
 
@@ -110,5 +152,39 @@ describe('submission schedule deadline policy', () => {
 
     expect(isSubmissionWithinScheduleWindow(schedule, beforeDeadline, 1)).toBe(true);
     expect(isSubmissionWithinScheduleWindow(schedule, afterDeadline, 1)).toBe(false);
+  });
+
+  it('enforces boundary behavior for explicit datetime close', () => {
+    const schedule = {
+      scheduledDate: '2026-04-20',
+      startTime: '09:00',
+      endTime: '10:00',
+      examWindowStartAt: '2026-04-20T13:00:00.000Z',
+      examWindowEndAt: '2026-04-20T14:00:00.000Z',
+    };
+
+    const beforeClose = new Date('2026-04-20T13:59:59.000Z');
+    const atClose = new Date('2026-04-20T14:00:00.000Z');
+    const afterClose = new Date('2026-04-20T14:00:01.000Z');
+
+    expect(isSubmissionWithinScheduleWindow(schedule, beforeClose, 0)).toBe(true);
+    expect(isSubmissionWithinScheduleWindow(schedule, atClose, 0)).toBe(true);
+    expect(isSubmissionWithinScheduleWindow(schedule, afterClose, 0)).toBe(false);
+  });
+
+  it('rejects submission after close even when started before close', () => {
+    const schedule = {
+      scheduledDate: '2026-04-20',
+      startTime: '09:00',
+      endTime: '10:00',
+      examWindowStartAt: '2026-04-20T13:00:00.000Z',
+      examWindowEndAt: '2026-04-20T14:00:00.000Z',
+    };
+
+    const startedAt = new Date('2026-04-20T13:20:00.000Z');
+    const submitAfterClose = new Date('2026-04-20T14:05:00.000Z');
+
+    expect(startedAt.getTime()).toBeLessThan(new Date('2026-04-20T14:00:00.000Z').getTime());
+    expect(isSubmissionWithinScheduleWindow(schedule, submitAfterClose, 0)).toBe(false);
   });
 });

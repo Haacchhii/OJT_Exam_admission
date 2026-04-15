@@ -59,6 +59,8 @@ export interface ExamSchedulePayload {
   visibilityEndDate?: string | null;
   registrationOpenDate?: string | null;
   registrationCloseDate?: string | null;
+  examWindowStartAt?: string | null;
+  examWindowEndAt?: string | null;
   maxSlots: number;
   venue?: string | null;
 }

@@ -157,6 +157,12 @@ export interface ExamSchedule {
   visibilityEndDate?: string | null;
   registrationOpenDate?: string | null;
   registrationCloseDate?: string | null;
+  examWindowStartAt?: string | null;
+  examWindowEndAt?: string | null;
+  effectiveExamWindowStartAt?: string | null;
+  effectiveExamWindowEndAt?: string | null;
+  examWindowStatus?: 'open' | 'upcoming' | 'closed';
+  examWindowStatusLabel?: string;
   maxSlots: number;
   slotsTaken: number;
   venue: string | null;

@@ -53,6 +53,7 @@ const env = {
   REDIS_URL: String(process.env.REDIS_URL || '').trim(),
   REDIS_CONNECT_TIMEOUT_MS: parseInt(process.env.REDIS_CONNECT_TIMEOUT_MS, 10) || 1500,
   DASHBOARD_ROLE_AWARE_QUERIES: (process.env.DASHBOARD_ROLE_AWARE_QUERIES || 'true').toLowerCase() === 'true',
+  EXAM_GRACE_MINUTES: Math.max(0, parseInt(process.env.EXAM_GRACE_MINUTES, 10) || 1),
 };
 
 // ─── Validate critical env vars ───────────────────────

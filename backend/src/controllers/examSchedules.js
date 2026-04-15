@@ -3,6 +3,7 @@ import { paginate, paginatedResponse } from '../utils/pagination.js';
 import { GRADE_TO_EXAM_LEVEL, GRADE_TO_LEGACY_EXAM_LEVEL, ROLES } from '../utils/constants.js';
 import { getIo } from '../utils/socket.js';
 import { logAudit } from '../utils/auditLog.js';
+import { attachExamWindowStatus, computeExamWindowStatus, getEffectiveExamWindow } from '../utils/examWindow.js';
 
 function getTodayLocalIso() {
   const now = new Date();
@@ -49,6 +50,65 @@ function validateRegistrationPeriod({ scheduledDate, registrationOpenDate, regis
     return 'registrationCloseDate cannot be after scheduledDate';
   }
   return null;
+}
+
+function parseOptionalDateTime(value) {
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+  if (value === undefined || value === null || String(value).trim() === '') return null;
+  const parsed = new Date(String(value));
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+}
+
+function normalizeExamWindowDateTimes({
+  examWindowStartAt,
+  examWindowEndAt,
+  scheduledDate,
+  startTime,
+  endTime,
+  registrationOpenDate,
+  registrationCloseDate,
+}) {
+  const parsedStart = examWindowStartAt === undefined ? undefined : parseOptionalDateTime(examWindowStartAt);
+  const parsedEnd = examWindowEndAt === undefined ? undefined : parseOptionalDateTime(examWindowEndAt);
+
+  if (examWindowStartAt !== undefined && examWindowStartAt !== null && String(examWindowStartAt).trim() !== '' && !parsedStart) {
+    return { error: 'examWindowStartAt must be a valid datetime', startAt: null, endAt: null };
+  }
+  if (examWindowEndAt !== undefined && examWindowEndAt !== null && String(examWindowEndAt).trim() !== '' && !parsedEnd) {
+    return { error: 'examWindowEndAt must be a valid datetime', startAt: null, endAt: null };
+  }
+
+  const syntheticSchedule = {
+    scheduledDate,
+    startTime,
+    endTime,
+    registrationOpenDate,
+    registrationCloseDate,
+    examWindowStartAt: parsedStart === undefined ? null : parsedStart,
+    examWindowEndAt: parsedEnd === undefined ? null : parsedEnd,
+  };
+
+  const effective = getEffectiveExamWindow(syntheticSchedule);
+  if (!effective.startAt || !effective.endAt) {
+    return {
+      error: 'Could not determine exam window start/end from the provided schedule values',
+      startAt: null,
+      endAt: null,
+    };
+  }
+
+  if (effective.startAt.getTime() >= effective.endAt.getTime()) {
+    return {
+      error: 'examWindowEndAt must be after examWindowStartAt',
+      startAt: null,
+      endAt: null,
+    };
+  }
+
+  return { error: null, startAt: effective.startAt, endAt: effective.endAt };
 }
 
 function addDaysIso(isoDate, days) {
@@ -121,7 +181,8 @@ export async function getSchedules(req, res, next) {
       prisma.examSchedule.count({ where }),
     ]);
 
-    res.json(paginatedResponse(schedules, total, pg));
+    const withStatus = schedules.map((schedule) => attachExamWindowStatus(schedule));
+    res.json(paginatedResponse(withStatus, total, pg));
   } catch (err) { next(err); }
 }
 
@@ -167,12 +228,13 @@ export async function getAvailableSchedules(req, res, next) {
 
     const schedules = await prisma.examSchedule.findMany({
       where: {
-        scheduledDate: { gte: today },
         exam: { isActive: true, academicYearId: activeYear.id, ...gradeFilter },
       },
       include: { exam: { select: { title: true, gradeLevel: true } } },
       orderBy: { scheduledDate: 'asc' },
     });
+
+    const now = new Date();
 
     // Filter: remaining slots > 0, visibility window open, and registration window is open (if configured)
     const available = schedules.filter(s => {
@@ -180,19 +242,17 @@ export async function getAvailableSchedules(req, res, next) {
       // Check visibility dates: exam must be within visibility window
       if (s.visibilityStartDate && today < s.visibilityStartDate) return false;
       if (s.visibilityEndDate && today > s.visibilityEndDate) return false;
-      // Check registration window: if configured, today must be within registration dates
-      if (s.registrationOpenDate && today < s.registrationOpenDate) return false;
-      if (s.registrationCloseDate && today > s.registrationCloseDate) return false;
-      return true;
+      const status = computeExamWindowStatus(s, now);
+      return status.status === 'open';
     });
-    res.json(available);
+    res.json(available.map((schedule) => attachExamWindowStatus(schedule, now)));
   } catch (err) { next(err); }
 }
 
 // POST /api/exams/schedules
 export async function createSchedule(req, res, next) {
   try {
-    const { examId, scheduledDate, startTime, endTime, visibilityStartDate, visibilityEndDate, registrationOpenDate, registrationCloseDate, maxSlots, venue } = req.body;
+    const { examId, scheduledDate, startTime, endTime, visibilityStartDate, visibilityEndDate, registrationOpenDate, registrationCloseDate, examWindowStartAt, examWindowEndAt, maxSlots, venue } = req.body;
     if (!examId || !scheduledDate || !startTime || !endTime || !maxSlots) {
       return res.status(400).json({ error: 'examId, scheduledDate, startTime, endTime, maxSlots required', code: 'VALIDATION_ERROR' });
     }
@@ -230,6 +290,19 @@ export async function createSchedule(req, res, next) {
       return res.status(400).json({ error: visibility.error, code: 'VALIDATION_ERROR' });
     }
 
+    const normalizedWindow = normalizeExamWindowDateTimes({
+      examWindowStartAt,
+      examWindowEndAt,
+      scheduledDate,
+      startTime,
+      endTime,
+      registrationOpenDate,
+      registrationCloseDate,
+    });
+    if (normalizedWindow.error) {
+      return res.status(400).json({ error: normalizedWindow.error, code: 'VALIDATION_ERROR' });
+    }
+
     const schedule = await prisma.examSchedule.create({
       data: {
         examId,
@@ -240,13 +313,15 @@ export async function createSchedule(req, res, next) {
         visibilityEndDate: visibility.end,
         registrationOpenDate: registrationOpenDate || null,
         registrationCloseDate: registrationCloseDate || null,
+        examWindowStartAt: normalizedWindow.startAt,
+        examWindowEndAt: normalizedWindow.endAt,
         maxSlots,
         venue: venue || null,
         slotsTaken: 0,
       },
     });
 
-    res.status(201).json(schedule);
+    res.status(201).json(attachExamWindowStatus(schedule));
   } catch (err) { next(err); }
 }
 
@@ -254,7 +329,7 @@ export async function createSchedule(req, res, next) {
 export async function updateSchedule(req, res, next) {
   try {
     const id = Number(req.params.id);
-    const { scheduledDate, startTime, endTime, visibilityStartDate, visibilityEndDate, registrationOpenDate, registrationCloseDate, maxSlots, venue } = req.body;
+    const { scheduledDate, startTime, endTime, visibilityStartDate, visibilityEndDate, registrationOpenDate, registrationCloseDate, examWindowStartAt, examWindowEndAt, maxSlots, venue } = req.body;
     const existing = await prisma.examSchedule.findUnique({ where: { id } });
     if (!existing) {
       return res.status(404).json({ error: 'Schedule not found', code: 'NOT_FOUND' });
@@ -267,6 +342,8 @@ export async function updateSchedule(req, res, next) {
     const nextVisibilityEndDate = visibilityEndDate !== undefined ? visibilityEndDate : existing.visibilityEndDate;
     const nextRegistrationOpenDate = registrationOpenDate !== undefined ? registrationOpenDate : existing.registrationOpenDate;
     const nextRegistrationCloseDate = registrationCloseDate !== undefined ? registrationCloseDate : existing.registrationCloseDate;
+    const nextExamWindowStartAt = examWindowStartAt !== undefined ? examWindowStartAt : existing.examWindowStartAt;
+    const nextExamWindowEndAt = examWindowEndAt !== undefined ? examWindowEndAt : existing.examWindowEndAt;
 
     const validationError = validateScheduleFields(
       { scheduledDate: nextScheduledDate, startTime: nextStartTime, endTime: nextEndTime },
@@ -294,6 +371,19 @@ export async function updateSchedule(req, res, next) {
       return res.status(400).json({ error: visibility.error, code: 'VALIDATION_ERROR' });
     }
 
+    const normalizedWindow = normalizeExamWindowDateTimes({
+      examWindowStartAt: nextExamWindowStartAt,
+      examWindowEndAt: nextExamWindowEndAt,
+      scheduledDate: nextScheduledDate,
+      startTime: nextStartTime,
+      endTime: nextEndTime,
+      registrationOpenDate: nextRegistrationOpenDate,
+      registrationCloseDate: nextRegistrationCloseDate,
+    });
+    if (normalizedWindow.error) {
+      return res.status(400).json({ error: normalizedWindow.error, code: 'VALIDATION_ERROR' });
+    }
+
     const data = {};
     if (scheduledDate !== undefined) data.scheduledDate = scheduledDate;
     if (startTime !== undefined)     data.startTime = startTime;
@@ -304,6 +394,10 @@ export async function updateSchedule(req, res, next) {
     }
     if (registrationOpenDate !== undefined) data.registrationOpenDate = registrationOpenDate || null;
     if (registrationCloseDate !== undefined) data.registrationCloseDate = registrationCloseDate || null;
+    if (examWindowStartAt !== undefined || examWindowEndAt !== undefined) {
+      data.examWindowStartAt = normalizedWindow.startAt;
+      data.examWindowEndAt = normalizedWindow.endAt;
+    }
     if (maxSlots !== undefined)      data.maxSlots = maxSlots;
     if (venue !== undefined)         data.venue = venue;
 
@@ -312,7 +406,7 @@ export async function updateSchedule(req, res, next) {
       data,
     });
 
-    res.json(schedule);
+    res.json(attachExamWindowStatus(schedule));
   } catch (err) { next(err); }
 }
 

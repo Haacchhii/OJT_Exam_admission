@@ -28,10 +28,41 @@ function addDaysIso(dateIso: string, days: number) {
   return `${year}-${month}-${day}`;
 }
 
+function toLocalInputDateTime(value?: string | null) {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const hour = String(d.getHours()).padStart(2, '0');
+  const minute = String(d.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hour}:${minute}`;
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return 'N/A';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value);
+  return d.toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+function statusBadgeClass(status?: string) {
+  if (status === 'closed') return 'gk-badge gk-badge-danger';
+  if (status === 'upcoming') return 'gk-badge gk-badge-warning';
+  return 'gk-badge gk-badge-active';
+}
+
 export default function ScheduleManager() {
   const confirm = useConfirm();
   const [editId, setEditId] = useState<number | null>(null);
-  const [form, setForm] = useState({ examId: '', date: '', start: '', end: '', visibilityStartDate: '', visibilityEndDate: '', openDate: '', closeDate: '', slots: '' });
+  const [form, setForm] = useState({ examId: '', date: '', start: '', end: '', visibilityStartDate: '', visibilityEndDate: '', openDate: '', closeDate: '', windowStartAt: '', windowEndAt: '', slots: '' });
   const [selectedExamIds, setSelectedExamIds] = useState<number[]>([]);
   const [schedSearch, setSchedSearch] = useState('');
   const [schedExamFilter, setSchedExamFilter] = useState('all');
@@ -66,6 +97,8 @@ export default function ScheduleManager() {
       closeDate: f.closeDate || regClose,
       visibilityStartDate: f.visibilityStartDate || today,
       visibilityEndDate: f.visibilityEndDate || visibilityEnd,
+      windowStartAt: f.windowStartAt || `${date}T${f.start || '09:00'}`,
+      windowEndAt: f.windowEndAt || `${date}T${f.end || '10:00'}`,
       slots: f.slots || '30',
     }));
     showToast('Schedule defaults applied.', 'success');
@@ -139,6 +172,14 @@ export default function ScheduleManager() {
       showToast('Visibility end date must be on or after visibility start date.', 'error');
       return;
     }
+    if (form.windowStartAt && form.windowEndAt) {
+      const startAt = new Date(form.windowStartAt);
+      const endAt = new Date(form.windowEndAt);
+      if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime()) || startAt.getTime() >= endAt.getTime()) {
+        showToast('Exam window end datetime must be after exam window start datetime.', 'error');
+        return;
+      }
+    }
     if (form.date) {
       const today = getTodayLocalIso();
       if (form.date < today) {
@@ -162,6 +203,8 @@ export default function ScheduleManager() {
       visibilityEndDate: form.visibilityEndDate || null,
       registrationOpenDate: form.openDate || null,
       registrationCloseDate: form.closeDate || null,
+      examWindowStartAt: form.windowStartAt ? new Date(form.windowStartAt).toISOString() : null,
+      examWindowEndAt: form.windowEndAt ? new Date(form.windowEndAt).toISOString() : null,
       maxSlots: parseInt(form.slots),
     };
 
@@ -228,7 +271,7 @@ export default function ScheduleManager() {
     } finally {
       setIsSavingSched(false);
     }
-    setForm({ examId: '', date: '', start: '', end: '', visibilityStartDate: '', visibilityEndDate: '', openDate: '', closeDate: '', slots: '' });
+    setForm({ examId: '', date: '', start: '', end: '', visibilityStartDate: '', visibilityEndDate: '', openDate: '', closeDate: '', windowStartAt: '', windowEndAt: '', slots: '' });
     setSelectedExamIds([]);
     schedRefetch();
   };
@@ -244,6 +287,8 @@ export default function ScheduleManager() {
       visibilityEndDate: s.visibilityEndDate || '',
       openDate: s.registrationOpenDate || '',
       closeDate: s.registrationCloseDate || '',
+      windowStartAt: toLocalInputDateTime(s.examWindowStartAt || s.effectiveExamWindowStartAt || null),
+      windowEndAt: toLocalInputDateTime(s.examWindowEndAt || s.effectiveExamWindowEndAt || null),
       slots: String(s.maxSlots),
     });
     setSelectedExamIds([]);
@@ -350,6 +395,8 @@ export default function ScheduleManager() {
           <FormInput label="Visibility Ends" type="date" value={form.visibilityEndDate} onChange={set('visibilityEndDate')} />
           <FormInput label="Exam Window Opens" type="date" value={form.openDate} onChange={set('openDate')} />
           <FormInput label="Exam Window Closes" type="date" value={form.closeDate} onChange={set('closeDate')} />
+          <FormInput label="Exact Window Start (optional)" type="datetime-local" value={form.windowStartAt} onChange={set('windowStartAt')} />
+          <FormInput label="Exact Window End (optional)" type="datetime-local" value={form.windowEndAt} onChange={set('windowEndAt')} />
           <FormInput label="Max Applicants" type="number" value={form.slots} onChange={set('slots')} placeholder="30" required />
           <div className="md:col-span-2 lg:col-span-3 text-xs text-gray-500">
             Tip: students can start anytime while the exam window is open. Keep close date aligned with your intended exam deadline.
@@ -383,6 +430,8 @@ export default function ScheduleManager() {
                 openStartLabel: 'Now',
                 openEndLabel: 'No end date',
               });
+              const effectiveStart = s.effectiveExamWindowStartAt || s.examWindowStartAt;
+              const effectiveEnd = s.effectiveExamWindowEndAt || s.examWindowEndAt;
               return (
                 <div key={s.id} className="flex items-center gap-4 bg-gray-50 rounded-lg p-4">
                   <div className="text-center bg-forest-500 text-white rounded-lg px-3 py-2 min-w-[60px]">
@@ -402,9 +451,15 @@ export default function ScheduleManager() {
                         Visible to students: {visibilityWindow}
                       </p>
                     )}
+                    {(effectiveStart || effectiveEnd) && (
+                      <p className="text-gray-500 text-xs">
+                        Effective exam window: {formatDateTime(effectiveStart || null)} - {formatDateTime(effectiveEnd || null)}
+                      </p>
+                    )}
                     <div className="flex gap-2 mt-1">
                       <Badge className="gk-badge gk-badge-info">{s.slotsTaken} / {s.maxSlots} booked</Badge>
                       <Badge className={remaining > 0 ? 'gk-badge gk-badge-active' : 'gk-badge gk-badge-danger'}>{remaining > 0 ? `${remaining} slots left` : 'Full'}</Badge>
+                      <Badge className={statusBadgeClass(s.examWindowStatus)}>{s.examWindowStatusLabel || 'Open now'}</Badge>
                     </div>
                   </div>
                   <div className="flex gap-2">

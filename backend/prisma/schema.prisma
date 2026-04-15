@@ -218,6 +218,8 @@ model ExamSchedule {
   visibilityEndDate   String?  @map("visibility_end_date")    // YYYY-MM-DD (when exam stops being visible, typically 10 days from start)
   registrationOpenDate  String?  @map("registration_open_date")  // YYYY-MM-DD
   registrationCloseDate String?  @map("registration_close_date") // YYYY-MM-DD
+  examWindowStartAt DateTime? @map("exam_window_start_at")
+  examWindowEndAt   DateTime? @map("exam_window_end_at")
   maxSlots      Int      @map("max_slots")
   slotsTaken    Int      @default(0) @map("slots_taken")
   venue         String?

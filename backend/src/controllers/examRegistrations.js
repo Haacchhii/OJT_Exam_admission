@@ -4,7 +4,7 @@ import { generateTrackingId } from '../utils/tracking.js';
 import { sendExamBookingEmail } from '../utils/email.js';
 import { ROLES } from '../utils/constants.js';
 import { cached, invalidatePrefix } from '../utils/cache.js';
-import { evaluateExamStartAvailability } from '../utils/examWindow.js';
+import { attachExamWindowStatus, evaluateExamStartAvailability, isNowWithinExamWindow, computeExamWindowStatus } from '../utils/examWindow.js';
 
 function normalizeEmail(value) {
   return String(value || '').trim().toLowerCase();
@@ -39,13 +39,6 @@ function getTodayLocalIso() {
   return `${year}-${month}-${day}`;
 }
 
-function getNowLocalTime() {
-  const now = new Date();
-  const hh = String(now.getHours()).padStart(2, '0');
-  const mm = String(now.getMinutes()).padStart(2, '0');
-  return `${hh}:${mm}`;
-}
-
 function isWithinPeriod(todayIso, startDate, endDate) {
   if (startDate && todayIso < startDate) return false;
   if (endDate && todayIso > endDate) return false;
@@ -74,10 +67,12 @@ async function getActiveAcademicPeriod() {
   return { activeYear, activeSemester };
 }
 
-function isWithinRegistrationWindow(schedule, todayIso) {
-  const opens = !schedule.registrationOpenDate || todayIso >= schedule.registrationOpenDate;
-  const closes = !schedule.registrationCloseDate || todayIso <= schedule.registrationCloseDate;
-  return opens && closes;
+function withWindowStatus(registration) {
+  if (!registration?.schedule) return registration;
+  return {
+    ...registration,
+    schedule: attachExamWindowStatus(registration.schedule),
+  };
 }
 
 const myRegistrationInclude = {
@@ -92,6 +87,8 @@ const myRegistrationInclude = {
       visibilityEndDate: true,
       registrationOpenDate: true,
       registrationCloseDate: true,
+      examWindowStartAt: true,
+      examWindowEndAt: true,
       maxSlots: true,
       slotsTaken: true,
       venue: true,
@@ -149,7 +146,7 @@ export async function getMyRegistrations(req, res, next) {
       include: myRegistrationInclude,
       orderBy: { createdAt: 'desc' },
     });
-    res.json(registrations);
+    res.json(registrations.map(withWindowStatus));
   } catch (err) { next(err); }
 }
 
@@ -175,7 +172,7 @@ export async function getMyRegistrationSummary(req, res, next) {
       ]);
 
       return {
-        latest: latest || null,
+        latest: latest ? withWindowStatus(latest) : null,
         hasCompletedExam: completedCount > 0,
         totalRegistrations,
       };
@@ -261,16 +258,17 @@ export async function createRegistration(req, res, next) {
       return res.status(400).json({ error: 'Registration is only available for exams in the active academic year.', code: 'VALIDATION_ERROR' });
     }
 
-    if (schedule.scheduledDate < today) {
-      return res.status(400).json({ error: 'This exam schedule is no longer available.', code: 'VALIDATION_ERROR' });
-    }
     if (schedule.visibilityStartDate && today < schedule.visibilityStartDate) {
       return res.status(400).json({ error: 'This exam schedule is not visible yet.', code: 'VALIDATION_ERROR' });
     }
     if (schedule.visibilityEndDate && today > schedule.visibilityEndDate) {
       return res.status(400).json({ error: 'This exam schedule is no longer visible.', code: 'VALIDATION_ERROR' });
     }
-    if (!isWithinRegistrationWindow(schedule, today)) {
+    if (!isNowWithinExamWindow(schedule, new Date())) {
+      const windowStatus = computeExamWindowStatus(schedule, new Date());
+      if (windowStatus.status === 'upcoming') {
+        return res.status(400).json({ error: windowStatus.label, code: 'VALIDATION_ERROR' });
+      }
       return res.status(400).json({ error: 'Registration for this schedule is currently closed.', code: 'VALIDATION_ERROR' });
     }
 
@@ -389,8 +387,7 @@ export async function startExam(req, res, next) {
       return res.status(400).json({ error: 'This exam can only be started during the active academic year.', code: 'VALIDATION_ERROR' });
     }
 
-    const nowTime = getNowLocalTime();
-    const startAvailability = evaluateExamStartAvailability(reg.schedule, today, nowTime);
+    const startAvailability = evaluateExamStartAvailability(reg.schedule, new Date());
     if (!startAvailability.allowed) {
       return res.status(400).json({ error: startAvailability.message, code: startAvailability.code || 'VALIDATION_ERROR' });
     }

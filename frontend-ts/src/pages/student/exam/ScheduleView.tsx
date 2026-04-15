@@ -48,6 +48,12 @@ function formatDisplayDate(value: string | null | undefined): string {
   return parsed.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
+function statusBadgeClass(status?: string) {
+  if (status === 'closed') return 'gk-badge gk-badge-danger';
+  if (status === 'upcoming') return 'gk-badge gk-badge-warning';
+  return 'gk-badge gk-badge-active';
+}
+
 export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, onBookedRegistration, onCancelledRegistration, showBookedSuccess, user }: ScheduleViewProps) {
   const confirm = useConfirm();
   const [bookingSlotId, setBookingSlotId] = useState<number | null>(null);
@@ -264,6 +270,9 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, onBo
                         Exam window: {formatDisplayDate(s.registrationOpenDate || null)} - {formatDisplayDate(s.registrationCloseDate || null)}
                       </p>
                     )}
+                    <div className="mt-1">
+                      <span className={statusBadgeClass(s.examWindowStatus)}>{s.examWindowStatusLabel || 'Open now'}</span>
+                    </div>
                     {(s.visibilityStartDate || s.visibilityEndDate) && (
                       <p className="text-gray-500 text-xs">
                         Visible in portal: {formatDisplayDate(s.visibilityStartDate || null)} - {formatDisplayDate(s.visibilityEndDate || null)}

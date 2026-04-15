@@ -262,6 +262,8 @@ export const createScheduleSchema = z.object({
   visibilityEndDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD format').optional().nullable(),
   registrationOpenDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD format').optional().nullable(),
   registrationCloseDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD format').optional().nullable(),
+  examWindowStartAt: z.string().datetime().optional().nullable(),
+  examWindowEndAt: z.string().datetime().optional().nullable(),
   maxSlots: z.number().int().positive(),
   venue: z.string().max(200).optional().nullable(),
 });
@@ -395,6 +397,8 @@ export const updateScheduleSchema = z.object({
   visibilityEndDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD format').optional().nullable(),
   registrationOpenDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD format').optional().nullable(),
   registrationCloseDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD format').optional().nullable(),
+  examWindowStartAt: z.string().datetime().optional().nullable(),
+  examWindowEndAt: z.string().datetime().optional().nullable(),
   maxSlots:      z.number().int().positive().optional(),
   venue:         z.string().max(200).optional().nullable(),
 });
