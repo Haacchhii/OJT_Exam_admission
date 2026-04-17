@@ -84,7 +84,10 @@ export default function StudentApplicationTracker() {
     if (!supportEmail) {
       showToast('Support email is not configured. Please send the copied details to the registrar manually.', 'error');
     }
-    window.location.href = mailto;
+    const opened = window.open(mailto, '_blank', 'noopener,noreferrer');
+    if (!opened) {
+      showToast('Could not open your email app automatically. Use the copied support details to contact the registrar.', 'warning');
+    }
   };
 
   if (myAdmissionLoading) return <SkeletonPage />;

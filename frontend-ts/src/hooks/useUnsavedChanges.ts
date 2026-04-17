@@ -5,6 +5,12 @@ interface UseUnsavedChangesResult {
   clear: () => void;
 }
 
+function emitStorageChanged(storageKey: string) {
+  window.dispatchEvent(new CustomEvent('gk:storage-changed', {
+    detail: { key: storageKey },
+  }));
+}
+
 export function useUnsavedChanges(
   isDirty: boolean,
   storageKey?: string,
@@ -28,7 +34,12 @@ export function useUnsavedChanges(
     if (!storageKey || !formState) return;
     const timer = setTimeout(() => {
       if (dirtyRef.current) {
-        try { localStorage.setItem(storageKey, JSON.stringify(formState)); } catch { /* quota exceeded */ }
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(formState));
+          emitStorageChanged(storageKey);
+        } catch {
+          /* quota exceeded */
+        }
       }
     }, 800);
     return () => clearTimeout(timer);
@@ -42,6 +53,7 @@ export function useUnsavedChanges(
       if (raw) {
         // Migrate from sessionStorage to localStorage
         sessionStorage.removeItem(storageKey);
+        emitStorageChanged(storageKey);
       }
       return raw ? (JSON.parse(raw) as Record<string, unknown>) : null;
     } catch {
@@ -53,6 +65,7 @@ export function useUnsavedChanges(
     if (storageKey) {
       localStorage.removeItem(storageKey);
       sessionStorage.removeItem(storageKey);
+      emitStorageChanged(storageKey);
     }
   }, [storageKey]);
 

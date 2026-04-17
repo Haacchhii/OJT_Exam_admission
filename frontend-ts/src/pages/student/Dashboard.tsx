@@ -9,7 +9,7 @@ import { formatDate, formatTime } from '../../utils/helpers';
 import { ADMISSION_PROGRESS_STEPS, SCHOOL_BRAND } from '../../utils/constants';
 import Icon from '../../components/Icons';
 import type { Admission, ExamRegistration, ExamResult } from '../../types';
-import { type ReactNode, useState, useEffect } from 'react';
+import { type ReactNode, useState, useEffect, useCallback } from 'react';
 
 interface DashboardData {
   myApp: Admission | null;
@@ -49,7 +49,7 @@ export default function StudentDashboard() {
   const statusColor = statusText === 'Accepted' ? 'emerald' : statusText === 'Rejected' ? 'red' : 'amber';
   const admissionUnlocked = hasCompletedExam;
 
-  useEffect(() => {
+  const syncDraftState = useCallback(() => {
     try {
       const rawStep = localStorage.getItem('gk_admission_step');
       const parsedStep = rawStep ? Number.parseInt(rawStep, 10) : 1;
@@ -60,7 +60,29 @@ export default function StudentDashboard() {
       setDraftStep(1);
       setHasAdmissionDraft(false);
     }
-  }, [myApp]);
+  }, []);
+
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (!event.key || event.key === 'gk_admission_step' || event.key === 'gk_admission_draft') {
+        syncDraftState();
+      }
+    };
+    const onStorageChanged = (event: Event) => {
+      const detail = (event as CustomEvent<{ key?: string }>).detail;
+      if (!detail?.key || detail.key === 'gk_admission_step' || detail.key === 'gk_admission_draft') {
+        syncDraftState();
+      }
+    };
+
+    syncDraftState();
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('gk:storage-changed', onStorageChanged as EventListener);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('gk:storage-changed', onStorageChanged as EventListener);
+    };
+  }, [syncDraftState, myApp?.id, myApp?.status]);
 
   if (loading && !rawData) return <SkeletonPage />;
   if (error) return <ErrorAlert error={error} onRetry={refetch} />;

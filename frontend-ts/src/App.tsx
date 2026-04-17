@@ -81,6 +81,19 @@ function StudentGuard({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+function RoleRoutePrefetcher() {
+  const { user, authReady } = useAuth();
+
+  useEffect(() => {
+    if (!authReady || !user) return;
+    const role = user.role;
+    const currentPath = window.location.hash ? window.location.hash.slice(1) : '/';
+    prefetchLikelyRoutesForRole(role, currentPath);
+  }, [authReady, user?.role]);
+
+  return null;
+}
+
 export default function App() {
   useEffect(() => {
     // Dark mode has been removed; clear any stale class or persisted flag.
@@ -92,21 +105,6 @@ export default function App() {
     }
   }, []);
 
-  useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem('gk_current_user');
-      const parsed = raw ? (JSON.parse(raw) as { role?: string }) : null;
-      const role = parsed?.role || null;
-      const currentPath = window.location.hash ? window.location.hash.slice(1) : '/';
-
-      if (role === 'applicant' || role === 'administrator' || role === 'registrar' || role === 'teacher') {
-        prefetchLikelyRoutesForRole(role, currentPath);
-      }
-    } catch {
-      // Ignore storage access issues.
-    }
-  }, []);
-
   return (
     <ErrorBoundary>
     <AuthProvider>
@@ -114,6 +112,7 @@ export default function App() {
         <ConfirmProvider>
       <HashRouter>
         <ScrollToTop />
+        <RoleRoutePrefetcher />
         <Suspense fallback={<LazyLoadingFallback />}>
         <Routes>
           {/* Public auth routes */}

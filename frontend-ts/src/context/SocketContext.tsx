@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from './AuthContext';
+import { getToken } from '../api/client';
 
 interface SocketContextValue {
   socket: Socket | null;
@@ -25,12 +26,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   })();
 
   useEffect(() => {
-    let token: string | null = null;
-    try {
-      token = sessionStorage.getItem('gk_auth_token');
-    } catch {
-      token = null;
-    }
+    const token = getToken();
 
     if (!socketEnabled) {
       if (socket) {
@@ -57,12 +53,18 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       auth: { token },
       transports: ['websocket'],
       reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000
+      reconnectionAttempts: Number.MAX_SAFE_INTEGER,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 10000,
     });
+
+    const emitDataReconcile = () => {
+      window.dispatchEvent(new Event('gk:data-changed'));
+    };
 
     newSocket.on('connect', () => {
       setIsConnected(true);
+      emitDataReconcile();
     });
 
     newSocket.on('disconnect', () => {
@@ -73,9 +75,15 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       setIsConnected(false);
     });
 
+    const onReconnect = () => {
+      emitDataReconcile();
+    };
+    newSocket.io.on('reconnect', onReconnect);
+
     setSocket(newSocket);
 
     return () => {
+      newSocket.io.off('reconnect', onReconnect);
       newSocket.disconnect();
     };
   }, [user, socketEnabled]);

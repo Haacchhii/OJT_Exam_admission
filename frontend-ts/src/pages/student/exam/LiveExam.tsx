@@ -231,7 +231,7 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
       <div className="bg-white border-b border-gray-200 sticky top-0 z-50 px-4 py-3">
         {!isOnline && (
           <div className="bg-yellow-100 border-b border-yellow-300 text-yellow-800 text-sm px-4 py-2 font-semibold text-center mb-2 rounded-md">
-            Warning: You are offline. Please do not submit the exam or refresh the page until your connection is restored.
+            Warning: You are offline. Please wait for your connection to return before submitting the exam.
           </div>
         )}
         <div className="flex items-center justify-between mb-2">
