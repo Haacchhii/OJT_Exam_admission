@@ -31,22 +31,11 @@ export function lazyWithRetry<T extends ComponentType<any>>(
       }
     }
     
-    // If chunks are stale after a deployment, force one hard reload to fetch fresh index/chunk map.
+    // If chunks are stale after a deployment, surface a clear retryable error.
     const message = String(lastError?.message || '');
     const isChunkLoadError = /Failed to fetch dynamically imported module|Importing a module script failed|Loading chunk/i.test(message);
-    const reloadKey = 'gk_chunk_reload_once';
-    if (isChunkLoadError && typeof window !== 'undefined') {
-      try {
-        const alreadyReloaded = sessionStorage.getItem(reloadKey) === '1';
-        if (!alreadyReloaded) {
-          sessionStorage.setItem(reloadKey, '1');
-          window.location.reload();
-          return new Promise(() => { /* page is reloading */ }) as Promise<{ default: T }>;
-        }
-        sessionStorage.removeItem(reloadKey);
-      } catch {
-        // Ignore storage access issues and fall through to throw.
-      }
+    if (isChunkLoadError) {
+      throw new Error('Failed to load the latest page resources. Please try again.');
     }
 
     // All retries exhausted
@@ -84,7 +73,7 @@ export function ChunkErrorFallback({ error, retry }: { error?: Error; retry?: ()
         </div>
         <h2 className="text-lg font-bold text-gray-800 mb-2">Failed to Load Page</h2>
         <p className="text-gray-500 text-sm mb-4">
-          The application encountered an issue loading this page. This might be a temporary network issue.
+          The application encountered an issue loading this page. This might be a temporary network or deployment update issue.
         </p>
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 text-left">
@@ -95,19 +84,12 @@ export function ChunkErrorFallback({ error, retry }: { error?: Error; retry?: ()
         )}
         <div className="flex gap-2 justify-center">
           <button
-            onClick={() => window.location.reload()}
+            onClick={() => retry?.()}
+            disabled={!retry}
             className="gk-btn-primary px-4 py-2 text-sm"
           >
-            Reload Page
+            Try Again
           </button>
-          {retry && (
-            <button
-              onClick={retry}
-              className="gk-btn-secondary px-4 py-2 text-sm"
-            >
-              Try Again
-            </button>
-          )}
         </div>
       </div>
     </div>

@@ -36,23 +36,26 @@ export default class ErrorBoundary extends Component<Props, State> {
             </div>
             <h1 className="text-2xl font-bold text-gray-800 mb-2">Something Went Wrong</h1>
             <p className="text-gray-500 text-sm mb-4">
-              An unexpected error occurred. Please try refreshing the page.
+              An unexpected error occurred. Try again or return to sign in.
             </p>
             {this.state.error && (
               <pre className="bg-gray-50/80 border border-gray-200/60 rounded-2xl p-3 text-left text-xs text-red-600 overflow-auto max-h-32 mb-5">
                 {this.state.error.message}
               </pre>
             )}
-            <button
-              onClick={() => {
-                this.setState({ hasError: false, error: null });
-                window.location.hash = '#/login';
-                window.location.reload();
-              }}
-              className="gk-btn-primary px-6 py-2.5 text-sm"
-            >
-              Reload Application
-            </button>
+            <div className="flex items-center justify-center gap-2">
+              <button
+                onClick={() => {
+                  this.setState({ hasError: false, error: null });
+                }}
+                className="gk-btn-primary px-6 py-2.5 text-sm"
+              >
+                Try Again
+              </button>
+              <a href="#/login" className="gk-btn-secondary px-6 py-2.5 text-sm">
+                Go to Login
+              </a>
+            </div>
             <p className="text-xs text-gray-400 mt-6">
               &copy; {SCHOOL_YEAR} <span className="text-gold-500 font-bold">{SCHOOL_BRAND}</span>{' '}
               <span className="text-forest-500">{SCHOOL_SUBTITLE}</span>

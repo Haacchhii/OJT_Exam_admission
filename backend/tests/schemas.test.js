@@ -6,6 +6,8 @@ import {
   resetPasswordSchema,
   bulkUpdateStatusSchema,
   createExamSchema,
+  saveDraftSchema,
+  submitExamSchema,
 } from '../src/utils/schemas.js';
 
 describe('loginSchema', () => {
@@ -105,6 +107,47 @@ describe('createExamSchema', () => {
       gradeLevel: 'Grade 7',
       durationMinutes: 60,
       passingScore: 150,
+    })).toThrow();
+  });
+});
+
+describe('saveDraftSchema', () => {
+  it('accepts mixed answer value types', () => {
+    expect(() => saveDraftSchema.parse({
+      answers: {
+        '101': 2,
+        '102': 'My essay answer',
+        '103': null,
+      },
+    })).not.toThrow();
+  });
+
+  it('rejects more than 1000 answers', () => {
+    const answers = Object.fromEntries(
+      Array.from({ length: 1001 }, (_, i) => [String(i + 1), 1])
+    );
+    expect(() => saveDraftSchema.parse({ answers })).toThrow(/Cannot save more than 1000 questions/);
+  });
+});
+
+describe('submitExamSchema', () => {
+  it('accepts registration id with answers', () => {
+    expect(() => submitExamSchema.parse({
+      registrationId: 14,
+      answers: {
+        '1': 4,
+        '2': 'Final essay answer',
+        '3': null,
+      },
+    })).not.toThrow();
+  });
+
+  it('rejects non-supported answer types', () => {
+    expect(() => submitExamSchema.parse({
+      registrationId: 14,
+      answers: {
+        '1': true,
+      },
     })).toThrow();
   });
 });
