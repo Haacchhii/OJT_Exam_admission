@@ -47,7 +47,7 @@ export default function StudentExam() {
     if (startingExam || !activeReg) return;
     const examId = activeReg.schedule?.examId;
     if (!examId) {
-      showToast('Exam details are missing for this registration. Please refresh and try again.', 'error');
+      showToast('Exam details are missing for this registration. Please return to your exam schedule and try again.', 'error');
       return;
     }
 
