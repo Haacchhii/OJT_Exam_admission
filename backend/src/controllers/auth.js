@@ -128,8 +128,8 @@ export async function register(req, res, next) {
 
     // Check duplicate
     const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
-    if (existing) {
-      if (shouldRequireEmailVerification && !existing.deletedAt && !existing.emailVerified) {
+    if (existing && !existing.deletedAt) {
+      if (shouldRequireEmailVerification && !existing.emailVerified) {
         const verifyToken = crypto.randomBytes(32).toString('hex');
         await prisma.user.update({
           where: { id: existing.id },
@@ -151,19 +151,68 @@ export async function register(req, res, next) {
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
     const verifyToken = shouldRequireEmailVerification ? crypto.randomBytes(32).toString('hex') : null;
     const applicantPeriodOpen = await isApplicantPeriodOpen();
-    const user = await prisma.user.create({
-      data: {
-        firstName, middleName, lastName, email: normalizedEmail, passwordHash,
-        role: ROLES.APPLICANT,
-        status: applicantPeriodOpen ? 'Active' : 'Inactive',
-        emailVerified: !shouldRequireEmailVerification,
-        emailVerifyToken: verifyToken,
-        emailVerifyExpires: shouldRequireEmailVerification ? new Date(Date.now() + EMAIL_VERIFY_EXPIRY_MS) : null,
-      },
-    });
+    const shouldRestoreDeletedAccount = !!existing?.deletedAt;
 
-    // Auto-create applicant profile with the chosen grade level
-    await prisma.applicantProfile.create({ data: { userId: user.id, gradeLevel: gradeLevel || null, levelGroup: gradeLevel ? getLevelGroup(gradeLevel) : null } });
+    const user = shouldRestoreDeletedAccount
+      ? await prisma.$transaction(async (tx) => {
+          const restoredUser = await tx.user.update({
+            where: { id: existing.id },
+            data: {
+              firstName,
+              middleName,
+              lastName,
+              passwordHash,
+              role: ROLES.APPLICANT,
+              status: applicantPeriodOpen ? 'Active' : 'Inactive',
+              emailVerified: !shouldRequireEmailVerification,
+              emailVerifyToken: verifyToken,
+              emailVerifyExpires: shouldRequireEmailVerification ? new Date(Date.now() + EMAIL_VERIFY_EXPIRY_MS) : null,
+              deletedAt: null,
+            },
+          });
+
+          await tx.applicantProfile.upsert({
+            where: { userId: existing.id },
+            update: {
+              gradeLevel: gradeLevel || null,
+              levelGroup: gradeLevel ? getLevelGroup(gradeLevel) : null,
+            },
+            create: {
+              userId: existing.id,
+              gradeLevel: gradeLevel || null,
+              levelGroup: gradeLevel ? getLevelGroup(gradeLevel) : null,
+            },
+          });
+
+          return restoredUser;
+        })
+      : await prisma.$transaction(async (tx) => {
+          const createdUser = await tx.user.create({
+            data: {
+              firstName,
+              middleName,
+              lastName,
+              email: normalizedEmail,
+              passwordHash,
+              role: ROLES.APPLICANT,
+              status: applicantPeriodOpen ? 'Active' : 'Inactive',
+              emailVerified: !shouldRequireEmailVerification,
+              emailVerifyToken: verifyToken,
+              emailVerifyExpires: shouldRequireEmailVerification ? new Date(Date.now() + EMAIL_VERIFY_EXPIRY_MS) : null,
+            },
+          });
+
+          // Auto-create applicant profile with the chosen grade level
+          await tx.applicantProfile.create({
+            data: {
+              userId: createdUser.id,
+              gradeLevel: gradeLevel || null,
+              levelGroup: gradeLevel ? getLevelGroup(gradeLevel) : null,
+            },
+          });
+
+          return createdUser;
+        });
 
     // Re-fetch with profile included for the response
     const fullUser = await prisma.user.findUnique({
@@ -178,7 +227,14 @@ export async function register(req, res, next) {
     }
 
     const token = signToken(user);
-    logAudit({ userId: user.id, action: 'auth.register', entity: 'user', entityId: user.id, ipAddress: req.ip });
+    logAudit({
+      userId: user.id,
+      action: 'auth.register',
+      entity: 'user',
+      entityId: user.id,
+      details: shouldRestoreDeletedAccount ? { restoredDeletedAccount: true } : undefined,
+      ipAddress: req.ip,
+    });
     const response = { user: safeUser(fullUser), token };
     if (shouldRequireEmailVerification) {
       response.emailVerificationRequired = true;
