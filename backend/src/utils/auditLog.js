@@ -1,5 +1,42 @@
 import prisma from '../config/db.js';
 
+const QUEUE_MAX = 2000;
+const FLUSH_BATCH_SIZE = 25;
+
+const queue = [];
+let flushing = false;
+
+function toAuditRow({ userId, action, entity, entityId, details, ipAddress }) {
+  return {
+    userId: userId ?? null,
+    action,
+    entity,
+    entityId: entityId ?? null,
+    details: details ? JSON.stringify(details) : null,
+    ipAddress: ipAddress ?? null,
+  };
+}
+
+function scheduleFlush() {
+  if (flushing) return;
+  flushing = true;
+  setImmediate(flushQueue);
+}
+
+async function flushQueue() {
+  try {
+    while (queue.length > 0) {
+      const batch = queue.splice(0, FLUSH_BATCH_SIZE);
+      await prisma.auditLog.createMany({ data: batch });
+    }
+  } catch {
+    // Never throw from async audit logging.
+  } finally {
+    flushing = false;
+    if (queue.length > 0) scheduleFlush();
+  }
+}
+
 /**
  * Log an action to the audit trail (fire-and-forget).
  * @param {object} opts
@@ -11,16 +48,9 @@ import prisma from '../config/db.js';
  * @param {string} [opts.ipAddress] – request IP
  */
 export function logAudit({ userId, action, entity, entityId, details, ipAddress }) {
-  prisma.auditLog.create({
-    data: {
-      userId:    userId ?? null,
-      action,
-      entity,
-      entityId:  entityId ?? null,
-      details:   details ? JSON.stringify(details) : null,
-      ipAddress: ipAddress ?? null,
-    },
-  }).catch(() => {
-    // Audit logging must never crash the request
-  });
+  if (queue.length >= QUEUE_MAX) {
+    queue.shift();
+  }
+  queue.push(toAuditRow({ userId, action, entity, entityId, details, ipAddress }));
+  scheduleFlush();
 }

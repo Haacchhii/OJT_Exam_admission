@@ -4,7 +4,17 @@ import jwt from 'jsonwebtoken';
 
 let io;
 
+function createMockIo() {
+  return { emit: () => {}, to: () => ({ emit: () => {} }) };
+}
+
 export function initIo(server) {
+  if (process.env.VERCEL) {
+    console.warn('[Socket.io] Disabled in serverless runtime');
+    io = createMockIo();
+    return io;
+  }
+
   io = new Server(server, {
     cors: {
       origin: env.CORS_ORIGIN.split(',').map(o => o.trim()),
@@ -42,7 +52,7 @@ export function initIo(server) {
 export function getIo() {
   if (!io) {
     console.error('Socket.io is not initialized. Using a mock to prevent crashes.');
-    return { emit: () => {}, to: () => ({ emit: () => {} }) };
+    return createMockIo();
   }
   return io;
 }

@@ -17,6 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      PERF_ALERT_WEBHOOK_URL: ${{ secrets.PERF_ALERT_WEBHOOK_URL }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -102,9 +103,7 @@ jobs:
           NODE
 
       - name: Send Perf Alert
-        if: ${{ always() && (steps.smoke.outcome == 'failure' || steps.slo.outcome == 'failure') && secrets.PERF_ALERT_WEBHOOK_URL != '' }}
-        env:
-          PERF_ALERT_WEBHOOK_URL: ${{ secrets.PERF_ALERT_WEBHOOK_URL }}
+        if: ${{ always() && (steps.smoke.outcome == 'failure' || steps.slo.outcome == 'failure') && env.PERF_ALERT_WEBHOOK_URL != '' }}
         run: |
           run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           payload="{\"text\":\"[perf-alert] Workflow '${{ github.workflow }}' failed on '${{ github.ref_name }}'. Smoke=${{ steps.smoke.outcome }} SLO=${{ steps.slo.outcome }}. Run: ${run_url}\"}"
