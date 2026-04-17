@@ -138,11 +138,14 @@ export async function register(req, res, next) {
             emailVerifyExpires: new Date(Date.now() + EMAIL_VERIFY_EXPIRY_MS),
           },
         });
-        await sendVerificationEmail({ to: existing.email, firstName: existing.firstName, verifyToken });
+        const verificationDispatch = await sendVerificationEmail({ to: existing.email, firstName: existing.firstName, verifyToken });
         return res.status(200).json({
           ok: true,
           emailVerificationRequired: true,
-          msg: 'This email is already registered but not verified. A new verification email has been sent.',
+          verificationEmailSent: verificationDispatch.ok,
+          msg: verificationDispatch.ok
+            ? 'This email is already registered but not verified. A new verification email has been sent.'
+            : 'This email is already registered but not verified. We could not send a verification email right now. Please try "Resend verification" shortly.',
         });
       }
       return res.status(409).json({ error: 'Email already registered', code: 'CONFLICT' });
@@ -220,8 +223,9 @@ export async function register(req, res, next) {
       include: { applicantProfile: true },
     });
 
+    let verificationDispatch = null;
     if (shouldRequireEmailVerification && verifyToken) {
-      await sendVerificationEmail({ to: user.email, firstName: user.firstName, verifyToken });
+      verificationDispatch = await sendVerificationEmail({ to: user.email, firstName: user.firstName, verifyToken });
     } else {
       await sendWelcomeEmail({ to: user.email, firstName: user.firstName });
     }
@@ -238,6 +242,10 @@ export async function register(req, res, next) {
     const response = { user: safeUser(fullUser), token };
     if (shouldRequireEmailVerification) {
       response.emailVerificationRequired = true;
+      response.verificationEmailSent = verificationDispatch?.ok ?? false;
+      if (!response.verificationEmailSent) {
+        response.message = 'Account created, but the verification email could not be sent right now. Please use "Resend verification" after a moment.';
+      }
     }
     res.status(201).json(response);
   } catch (err) { next(err); }
@@ -294,7 +302,7 @@ export async function resendVerification(req, res, next) {
     const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
     // Always return success to prevent email enumeration
     if (!user || user.deletedAt || user.emailVerified) {
-      return res.json({ ok: true, message: 'If an unverified account exists with this email, a verification link has been sent.' });
+      return res.json({ ok: true, message: 'If an unverified account exists with this email, we will attempt to send a verification link.' });
     }
 
     const verifyToken = crypto.randomBytes(32).toString('hex');
@@ -308,7 +316,7 @@ export async function resendVerification(req, res, next) {
 
     await sendVerificationEmail({ to: user.email, firstName: user.firstName, verifyToken });
 
-    res.json({ ok: true, message: 'If an unverified account exists with this email, a verification link has been sent.' });
+    res.json({ ok: true, message: 'If an unverified account exists with this email, we will attempt to send a verification link.' });
   } catch (err) { next(err); }
 }
 

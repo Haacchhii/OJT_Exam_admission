@@ -4,6 +4,16 @@ import { SCHOOL_NAME } from './constants.js';
 
 const appUrl = env.APP_URL;
 
+function resolveFromAddress() {
+  const configuredFrom = String(env.SMTP_FROM || '').trim();
+  if (configuredFrom) return configuredFrom;
+
+  const smtpUser = String(env.SMTP_USER || '').trim();
+  if (smtpUser) return `"${SCHOOL_NAME}" <${smtpUser}>`;
+
+  return `"${SCHOOL_NAME}" <no-reply@localhost>`;
+}
+
 // ─── Transporter ──────────────────────────────────────────────────────────────
 // If SMTP_HOST is set, use generic SMTP. Otherwise fall back to Gmail service
 // (SMTP_USER = gmail address, SMTP_PASS = Google App Password).
@@ -35,26 +45,31 @@ function createTransporter() {
 const transporter = createTransporter();
 
 /**
- * Send an email. Always resolves — never throws — so callers can fire-and-forget.
+ * Send an email and return delivery status. Never throws.
  * @param {{ to: string, subject: string, html: string }} opts
+ * @returns {Promise<{ok: boolean, skipped?: boolean, reason?: string, error?: string}>}
  */
 export async function sendEmail({ to, subject, html }) {
   if (!transporter) {
     if (env.NODE_ENV !== 'production') {
       console.log(`\n[EMAIL — not configured, printing preview to console]\nTo: ${to}\nSubject: ${subject}\nHTML:\n${html}\n`);
     }
-    return;
+    return { ok: false, skipped: true, reason: 'not_configured' };
   }
+
   try {
     await transporter.sendMail({
-      from: `"${SCHOOL_NAME}" <${env.SMTP_FROM || env.SMTP_USER}>`,
+      from: resolveFromAddress(),
       to,
       subject,
       html,
     });
+    return { ok: true };
   } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
     // Log but don't propagate — email failure must never break the main flow
-    console.error('[Email] Failed to send:', err.message);
+    console.error('[Email] Failed to send:', message);
+    return { ok: false, error: message };
   }
 }
 
