@@ -125,7 +125,8 @@ export default function StudentResults() {
     );
   }
 
-  const passed = myResult.passed;
+  const isPendingEssayReview = !myResult.essayReviewed;
+  const passed = !isPendingEssayReview && myResult.passed;
 
   const handlePrint = () => {
     const esc = (s: unknown) => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -135,6 +136,9 @@ export default function StudentResults() {
       return;
     }
     const studentName = user ? esc(formatPersonName(user)) : 'Student';
+    const resultLabel = isPendingEssayReview ? 'PENDING REVIEW' : passed ? 'PASSED' : 'FAILED';
+    const resultClass = isPendingEssayReview ? 'pending' : passed ? 'passed' : 'failed';
+
     printWin.document.write(`<!DOCTYPE html><html><head><title>My Exam Result</title>
       <style>
         body { font-family: 'Segoe UI', system-ui, sans-serif; padding: 40px; color: #1a1a1a; max-width: 800px; margin: 0 auto; }
@@ -147,10 +151,12 @@ export default function StudentResults() {
         .result-badge { display: inline-block; padding: 6px 16px; border-radius: 99px; font-size: 14px; font-weight: 700; }
         .result-badge.passed { background: #dcfce7; color: #166534; }
         .result-badge.failed { background: #fee2e2; color: #991b1b; }
+        .result-badge.pending { background: #fef3c7; color: #92400e; }
         .score-circle { text-align: center; margin: 20px 0; }
         .score-circle .pct { font-size: 48px; font-weight: 800; }
         .score-circle .pct.passed { color: #166534; }
         .score-circle .pct.failed { color: #991b1b; }
+        .score-circle .pct.pending { color: #92400e; }
         .logo { text-align: center; margin-bottom: 20px; } .logo span { font-size: 32px; }
         @media print { body { padding: 20px; } }
       </style>
@@ -158,12 +164,12 @@ export default function StudentResults() {
       <div class="logo"><span>GK</span><h1><span style="color:#fbbf24">${SCHOOL_BRAND}</span><br/><span style="color:#166534">${SCHOOL_SUBTITLE}</span></h1><p class="subtitle">${SCHOOL_ADDRESS} | Tel: ${SCHOOL_PHONE}<br/>Entrance Examination Result</p></div>
       <h2>Student: ${studentName}</h2>
       <h2>Exam Results</h2>
-      <div class="score-circle"><div class="pct ${passed ? 'passed' : 'failed'}">${myResult.percentage.toFixed(1)}%</div><p style="color:#888;font-size:13px">Overall Score</p></div>
+      <div class="score-circle"><div class="pct ${resultClass}">${myResult.percentage.toFixed(1)}%</div><p style="color:#888;font-size:13px">Overall Score</p></div>
       <div class="grid">
         <div class="field"><label>Exam</label><span>${esc(exam?.title || 'Entrance Exam')}</span></div>
         <div class="field"><label>Total Score</label><span>${myResult.totalScore} / ${myResult.maxPossible}</span></div>
         <div class="field"><label>Passing Score</label><span>${exam?.passingScore || '-'}%</span></div>
-        <div class="field"><label>Result</label><span class="result-badge ${passed ? 'passed' : 'failed'}">${passed ? 'PASSED' : 'FAILED'}</span></div>
+        <div class="field"><label>Result</label><span class="result-badge ${resultClass}">${resultLabel}</span></div>
         <div class="field"><label>Essay Review</label><span>${myResult.essayReviewed ? 'Reviewed' : 'Pending'}</span></div>
         <div class="field"><label>Date Taken</label><span>${myResult.createdAt ? new Date(myResult.createdAt).toLocaleDateString() : 'N/A'}</span></div>
       </div>
@@ -180,16 +186,16 @@ export default function StudentResults() {
         <ActionButton variant="secondary" onClick={handlePrint} icon={<Icon name="document" className="w-4 h-4" />} aria-label="Print exam result">Print / Export PDF</ActionButton>
       </PageHeader>
 
-      <div className={`rounded-xl border-2 p-6 mb-6 ${passed ? 'bg-forest-50 border-forest-200' : 'bg-red-50 border-red-200'}`}>
+      <div className={`rounded-xl border-2 p-6 mb-6 ${isPendingEssayReview ? 'bg-gold-50 border-gold-200' : passed ? 'bg-forest-50 border-forest-200' : 'bg-red-50 border-red-200'}`}>
         <div className="flex items-center gap-4 mb-4">
-          <span className="text-5xl">{passed ? <Icon name="trophy" className="w-12 h-12 text-gold-500" /> : <Icon name="xCircle" className="w-12 h-12 text-red-400" />}</span>
+          <span className="text-5xl">{isPendingEssayReview ? <Icon name="clock" className="w-12 h-12 text-gold-500" /> : passed ? <Icon name="trophy" className="w-12 h-12 text-gold-500" /> : <Icon name="xCircle" className="w-12 h-12 text-red-400" />}</span>
           <div>
-            <h3 className={`text-2xl font-bold ${passed ? 'text-forest-700' : 'text-red-700'}`}>{passed ? 'PASSED' : 'FAILED'}</h3>
+            <h3 className={`text-2xl font-bold ${isPendingEssayReview ? 'text-amber-700' : passed ? 'text-forest-700' : 'text-red-700'}`}>{isPendingEssayReview ? 'PENDING REVIEW' : passed ? 'PASSED' : 'FAILED'}</h3>
             <p className="text-gray-500">{exam?.title || 'Entrance Exam'}</p>
           </div>
         </div>
         <div className="flex flex-wrap gap-6 items-center">
-          <div className={`w-24 h-24 rounded-full flex flex-col items-center justify-center border-4 ${passed ? 'border-forest-400' : 'border-red-400'}`}>
+          <div className={`w-24 h-24 rounded-full flex flex-col items-center justify-center border-4 ${isPendingEssayReview ? 'border-amber-400' : passed ? 'border-forest-400' : 'border-red-400'}`}>
             <span className="text-2xl font-bold">{myResult.percentage.toFixed(0)}%</span>
             <span className="text-xs text-gray-500">Score</span>
           </div>
@@ -205,10 +211,10 @@ export default function StudentResults() {
           </div>
         </div>
 
-        {passed && !myResult.essayReviewed && (
+        {isPendingEssayReview && (
           <div className="mt-4 rounded-lg border border-gold-200 bg-gold-50 px-4 py-3 text-sm text-gold-800">
             <p className="font-semibold">Essay review in progress</p>
-            <p>Final essay checking usually takes 1-3 business days. You can return to this page to see updates.</p>
+            <p>Your final pass/fail status will be updated after teacher scoring. Final essay checking usually takes 1-3 business days.</p>
           </div>
         )}
 

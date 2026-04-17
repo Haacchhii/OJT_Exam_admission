@@ -180,6 +180,7 @@ export async function submitExam(req, res, next) {
 
     const percentage = maxPossible > 0 ? Math.round((totalScore / maxPossible) * 1000) / 10 : 0;
     const hasEssays = essayAnswerData.length > 0;
+    // Provisional pass state from auto-graded items. Final state may change after essay scoring.
     const passed = percentage >= exam.passingScore;
 
     // Transaction: save all at once
@@ -195,7 +196,7 @@ export async function submitExam(req, res, next) {
           totalScore,
           maxPossible,
           percentage,
-          passed: hasEssays ? false : passed, // If essays exist, wait for review
+          passed,
           essayReviewed: !hasEssays,
         },
       }),
@@ -208,7 +209,7 @@ export async function submitExam(req, res, next) {
 
     invalidatePrefix(`regs:mine-summary:${req.user.id}:`);
 
-    res.json({ totalScore, maxPossible, percentage, passed: hasEssays ? false : passed });
+    res.json({ totalScore, maxPossible, percentage, passed, essayReviewed: !hasEssays });
 
     logAudit({ userId: req.user.id, action: 'exam.submit', entity: 'result', entityId: registrationId, details: { totalScore, maxPossible, percentage, hasEssays }, ipAddress: req.ip });
 
