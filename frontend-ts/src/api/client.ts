@@ -121,8 +121,8 @@ export function qs(params: Record<string, any> = {}): string {
 const MAX_RETRIES = 2;
 const RETRY_BASE_MS = 500;
 const RETRYABLE_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
-const GET_BURST_CACHE_MS = 15000;
-const HEAVY_GET_CACHE_MS = 60000;
+const GET_BURST_CACHE_MS = 60000;
+const HEAVY_GET_CACHE_MS = 180000;
 let cacheEpoch = 0;
 
 const inflightGetRequests = new Map<string, Promise<unknown>>();
@@ -193,7 +193,12 @@ function getCacheTtlMs(path: string): number {
   if (
     cleanPath.startsWith('/admissions/dashboard-summary') ||
     cleanPath.startsWith('/admissions/reports-summary') ||
-    cleanPath.startsWith('/results/employee-summary')
+    cleanPath.startsWith('/results/employee-summary') ||
+    cleanPath.startsWith('/academic-years') ||
+    cleanPath.startsWith('/exams/readiness') ||
+    cleanPath.startsWith('/exams/registrations') ||
+    cleanPath.startsWith('/exams/schedules') ||
+    cleanPath.startsWith('/admissions/stats')
   ) {
     return HEAVY_GET_CACHE_MS;
   }

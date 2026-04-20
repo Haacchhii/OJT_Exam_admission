@@ -1,7 +1,8 @@
 import { client } from './client';
 import type { AcademicYear, Semester } from '../types';
 
-export const getAcademicYears = () => client.get<AcademicYear[]>('/academic-years');
+export const getAcademicYears = (opts?: { lite?: boolean }) =>
+  client.get<AcademicYear[]>(`/academic-years${opts?.lite === false ? '' : '?lite=1'}`);
 export const getActivePeriod = () => client.get<AcademicYear | null>('/academic-years/active');
 export const getSemesters = (yearId?: number) =>
   client.get<Semester[]>('/academic-years/semesters' + (yearId ? `?yearId=${yearId}` : ''));

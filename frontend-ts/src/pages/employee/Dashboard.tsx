@@ -128,7 +128,7 @@ export default function EmployeeDashboard() {
           {(rawData?.overdue || 0) > 0 && <StatCard icon="exclamation" value={rawData?.overdue || 0} label={`Overdue (>${SLA_DAYS} days)`} color="red" />}
         </>}
         {canAccess('exams') && <>
-          <Link to="/employee/exams"><StatCard icon="exam" value={rawData?.exams?.length || 0} label="Total Exams" color="blue" /></Link>
+          <Link to="/employee/exams"><StatCard icon="exam" value={(rawData?.examCount ?? rawData?.exams?.length ?? 0)} label="Total Exams" color="blue" /></Link>
           <Link to="/employee/exams"><StatCard icon="chartBar" value={rawData?.completed || 0} label="Exams Taken" color="amber" /></Link>
         </>}
         {canAccess('results') && <>

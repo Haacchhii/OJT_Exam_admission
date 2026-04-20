@@ -15,6 +15,12 @@ const ADMISSION_IN_PROGRESS = ['Submitted', 'Under Screening', 'Under Evaluation
 const REPORTS_DEFAULT_ADMISSIONS = 80;
 const REPORTS_MAX_ADMISSIONS = 200;
 
+function invalidateAdmissionCaches() {
+  invalidatePrefix('admStats:');
+  invalidatePrefix('dashboardSummary:');
+  invalidatePrefix('reportsSummary:');
+}
+
 function toIsoDay(d) {
   if (!d) return null;
   const dt = new Date(d);
@@ -188,7 +194,7 @@ export async function getStats(req, res, next) {
         unverifiedApplicants,
         inactiveApplicants,
       };
-    }, 15_000);
+    }, 60_000);
 
     res.json(counts);
   } catch (err) { next(err); }
@@ -276,13 +282,14 @@ export async function getDashboardSummary(req, res, next) {
       }
 
       let examActivity = [];
+      let examCount = 0;
       let completed = 0;
       if (includeExams) {
-        const [exams, registrationGrouped] = await Promise.all([
+        const [exams, totalExams, completedCount] = await Promise.all([
           prisma.exam.findMany({
             where: { deletedAt: null },
             orderBy: { createdAt: 'desc' },
-            take: 20,
+            take: 8,
             select: {
               id: true,
               title: true,
@@ -291,31 +298,20 @@ export async function getDashboardSummary(req, res, next) {
               _count: { select: { questions: true, schedules: true } },
             },
           }),
-          prisma.examRegistration.groupBy({ by: ['status'], _count: { _all: true } }),
+          prisma.exam.count({ where: { deletedAt: null } }),
+          prisma.examRegistration.count({ where: { status: 'done' } }),
         ]);
 
-        const scheduleIds = (await prisma.examSchedule.findMany({
-          where: { examId: { in: exams.map(e => e.id) } },
-          select: { id: true, examId: true },
-        })).reduce((acc, s) => {
-          if (!acc[s.examId]) acc[s.examId] = [];
-          acc[s.examId].push(s.id);
-          return acc;
-        }, {});
-
-        const allScheduleIds = Object.values(scheduleIds).flat();
-        const regCounts = allScheduleIds.length
-          ? await prisma.examRegistration.groupBy({
-              by: ['scheduleId'],
-              where: { scheduleId: { in: allScheduleIds } },
-              _count: { _all: true },
+        const slotCountsByExam = exams.length
+          ? await prisma.examSchedule.groupBy({
+              by: ['examId'],
+              where: { examId: { in: exams.map((exam) => exam.id) } },
+              _sum: { slotsTaken: true },
             })
           : [];
 
-        const regBySchedule = new Map(regCounts.map(r => [r.scheduleId, r._count._all]));
+        const slotsTakenByExam = new Map(slotCountsByExam.map((row) => [row.examId, row._sum.slotsTaken || 0]));
         examActivity = exams.map((exam) => {
-          const ids = scheduleIds[exam.id] || [];
-          const registrations = ids.reduce((sum, id) => sum + (regBySchedule.get(id) || 0), 0);
           return {
             id: exam.id,
             title: exam.title,
@@ -323,11 +319,12 @@ export async function getDashboardSummary(req, res, next) {
             questionCount: exam._count.questions,
             scheduleCount: exam._count.schedules,
             isActive: exam.isActive,
-            registrations,
+            registrations: slotsTakenByExam.get(exam.id) || 0,
           };
         });
 
-        completed = (registrationGrouped.find(r => r.status === 'done')?._count._all) || 0;
+        examCount = totalExams;
+        completed = completedCount;
       }
 
       const pendingEssays = includeResults
@@ -340,10 +337,11 @@ export async function getDashboardSummary(req, res, next) {
         admissions: [],
         overdue: overdueCount,
         exams: examActivity,
+        examCount,
         completed,
         pendingEssays,
       };
-    }, 60_000);
+    }, 120_000);
 
     res.json(summary);
   } catch (err) { next(err); }
@@ -541,7 +539,7 @@ export async function getReportsSummary(req, res, next) {
         : [];
 
       return { admissions, results, exams, schedules, regs, academicYears, semesters, meta };
-    }, 60_000);
+    }, 120_000);
 
     res.json(summary);
   } catch (err) { next(err); }
@@ -657,7 +655,7 @@ export async function createAdmission(req, res, next) {
 
     logAudit({ userId: req.user.id, action: 'admission.create', entity: 'admission', entityId: admission.id, details: { trackingId, gradeLevel, applicantType: applicantType || 'New' }, ipAddress: req.ip });
 
-    invalidatePrefix('admStats:');
+    invalidateAdmissionCaches();
 
     // Fire-and-forget confirmation email to the applicant
     sendAdmissionSubmittedEmail({ to: email, firstName, trackingId, gradeLevel });
@@ -752,7 +750,7 @@ export async function updateStatus(req, res, next) {
 
     logAudit({ userId: req.user.id, action: 'admission.status_update', entity: 'admission', entityId: id, details: { from: admission.status, to: status, notes: notes || null }, ipAddress: req.ip });
 
-    invalidatePrefix('admStats:');
+    invalidateAdmissionCaches();
 
     // Fire-and-forget status update email to the applicant
     sendAdmissionStatusEmail({
@@ -803,7 +801,7 @@ export async function bulkUpdateStatus(req, res, next) {
 
     logAudit({ userId: req.user.id, action: 'admission.bulk_status_update', entity: 'admission', entityId: null, details: { ids, to: status, count: result.count }, ipAddress: req.ip });
 
-    invalidatePrefix('admStats:');
+    invalidateAdmissionCaches();
 
     try {
       const io = getIo();
@@ -908,7 +906,7 @@ export async function bulkDeleteAdmissions(req, res, next) {
 
     logAudit({ userId: req.user.id, action: 'admission.bulkDelete', entity: 'admission', details: { count: ids.length, ids }, ipAddress: req.ip });
 
-    invalidatePrefix('admStats:');
+    invalidateAdmissionCaches();
 
     res.json({ deleted: ids.length });
   } catch (err) { next(err); }

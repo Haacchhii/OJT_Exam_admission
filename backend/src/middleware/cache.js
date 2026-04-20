@@ -14,7 +14,7 @@ export function cacheControl(directive) {
  * - Cache GET/HEAD briefly to reduce repeat load latency.
  * - Never cache mutations.
  */
-export function cachePrivateSmart(getDirective = 'private, max-age=15, stale-while-revalidate=60') {
+export function cachePrivateSmart(getDirective = 'private, max-age=60, stale-while-revalidate=300') {
   return (req, res, next) => {
     if (req.method === 'GET' || req.method === 'HEAD') {
       res.set('Cache-Control', getDirective);

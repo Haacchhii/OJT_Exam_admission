@@ -15,17 +15,34 @@ function validateDateWindow(startDate, endDate, label) {
 // ──────────────────────────────────────────────────────
 
 // GET /api/academic-years
-export async function getAcademicYears(_req, res, next) {
+export async function getAcademicYears(req, res, next) {
   try {
-    const years = await cached('ay:all', () =>
-      prisma.academicYear.findMany({
+    const liteParam = String(req.query?.lite || '').toLowerCase();
+    const isLite = liteParam === '1' || liteParam === 'true';
+    const cacheKey = `ay:all:${isLite ? 'lite' : 'full'}`;
+
+    const years = await cached(cacheKey, () => {
+      if (isLite) {
+        return prisma.academicYear.findMany({
+          orderBy: { year: 'desc' },
+          select: {
+            id: true,
+            year: true,
+            isActive: true,
+            startDate: true,
+            endDate: true,
+          },
+        });
+      }
+
+      return prisma.academicYear.findMany({
         orderBy: { year: 'desc' },
         include: {
           semesters: { orderBy: { id: 'asc' } },
           _count: { select: { admissions: true, exams: true } },
         },
-      })
-    );
+      });
+    });
     res.json(years);
   } catch (err) { next(err); }
 }

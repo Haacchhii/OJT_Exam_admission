@@ -104,6 +104,7 @@ export interface EmployeeDashboardSummary {
     isActive: boolean;
     registrations: number;
   }>;
+  examCount?: number;
   pendingEssays: number;
   completed: number;
   trends: { total: number; accepted: number; inProgress: number; rejected: number };
