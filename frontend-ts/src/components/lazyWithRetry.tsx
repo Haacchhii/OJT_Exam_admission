@@ -1,6 +1,28 @@
 import { ComponentType, lazy } from 'react';
 import { LoadingSpinner } from './UI';
 
+const CHUNK_REFRESH_ONCE_KEY = 'gk_chunk_refresh_once';
+
+function isChunkLoadErrorMessage(message: string): boolean {
+  return /Failed to fetch dynamically imported module|Importing a module script failed|Loading chunk|Unable to fetch dynamically imported module|ChunkLoadError/i.test(message);
+}
+
+function triggerOneTimeChunkRecovery(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const hasRefreshed = window.sessionStorage.getItem(CHUNK_REFRESH_ONCE_KEY) === '1';
+    if (hasRefreshed) {
+      window.sessionStorage.removeItem(CHUNK_REFRESH_ONCE_KEY);
+      return false;
+    }
+    window.sessionStorage.setItem(CHUNK_REFRESH_ONCE_KEY, '1');
+    window.location.reload();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Enhanced lazy loading with automatic retry on failure.
  * Wraps React.lazy with short retry delays to handle transient chunk fetch issues.
@@ -18,7 +40,15 @@ export function lazyWithRetry<T extends ComponentType<any>>(
     
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        return await importFunc();
+        const loaded = await importFunc();
+        if (typeof window !== 'undefined') {
+          try {
+            window.sessionStorage.removeItem(CHUNK_REFRESH_ONCE_KEY);
+          } catch {
+            // Ignore session storage cleanup failures.
+          }
+        }
+        return loaded;
       } catch (error) {
         lastError = error as Error;
         console.warn(`Chunk load failed (attempt ${attempt}/${maxAttempts}):`, lastError?.message);
@@ -33,8 +63,14 @@ export function lazyWithRetry<T extends ComponentType<any>>(
     
     // If chunks are stale after a deployment, surface a clear retryable error.
     const message = String(lastError?.message || '');
-    const isChunkLoadError = /Failed to fetch dynamically imported module|Importing a module script failed|Loading chunk/i.test(message);
+    const isChunkLoadError = isChunkLoadErrorMessage(message);
     if (isChunkLoadError) {
+      if (triggerOneTimeChunkRecovery()) {
+        // Keep this promise pending while the browser refreshes the app shell.
+        return new Promise(() => {
+          // no-op
+        });
+      }
       throw new Error('Failed to load the latest page resources. Please try again.');
     }
 
