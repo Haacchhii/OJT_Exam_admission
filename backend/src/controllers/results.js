@@ -2,8 +2,8 @@ import prisma from '../config/db.js';
 import { paginate, paginatedResponse } from '../utils/pagination.js';
 import { cached } from '../utils/cache.js';
 
-const EMPLOYEE_SUMMARY_DEFAULT_LIMIT = 500;
-const EMPLOYEE_SUMMARY_MAX_LIMIT = 1200;
+const EMPLOYEE_SUMMARY_DEFAULT_LIMIT = 120;
+const EMPLOYEE_SUMMARY_MAX_LIMIT = 300;
 
 function parseBooleanQuery(value, fallback) {
   if (value === undefined || value === null || value === '') return fallback;
@@ -537,7 +537,7 @@ export async function getEmployeeSummary(req, res, next) {
         : [];
 
       return { results, regs, users, schedules, exams, essays, academicYears, semesters, meta };
-    }, 15_000);
+    }, 60_000);
 
     res.json(summary);
   } catch (err) { next(err); }

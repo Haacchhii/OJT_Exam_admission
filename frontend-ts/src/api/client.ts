@@ -116,6 +116,7 @@ const MAX_RETRIES = 2;
 const RETRY_BASE_MS = 500;
 const RETRYABLE_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
 const GET_BURST_CACHE_MS = 15000;
+const HEAVY_GET_CACHE_MS = 60000;
 let cacheEpoch = 0;
 
 const inflightGetRequests = new Map<string, Promise<unknown>>();
@@ -151,9 +152,12 @@ function invalidateGetCache(prefixes?: string[]) {
     }
   }
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new Event('gk:data-changed'));
+    const scopedPrefixes = prefixes && prefixes.length > 0 ? prefixes : undefined;
+    if (!scopedPrefixes) {
+      window.dispatchEvent(new Event('gk:data-changed'));
+    }
     window.dispatchEvent(new CustomEvent('gk:data-changed-scoped', {
-      detail: { prefixes: prefixes && prefixes.length > 0 ? prefixes : undefined },
+      detail: { prefixes: scopedPrefixes },
     }));
   }
 }
@@ -176,6 +180,25 @@ function emitRequestTiming(path: string, method: string, durationMs: number, sta
 
 function makeRequestKey(path: string): string {
   return `${authToken || 'anon'}::${path}`;
+}
+
+function getCacheTtlMs(path: string): number {
+  const cleanPath = String(path || '').split('?')[0];
+  if (
+    cleanPath.startsWith('/admissions/dashboard-summary') ||
+    cleanPath.startsWith('/admissions/reports-summary') ||
+    cleanPath.startsWith('/results/employee-summary')
+  ) {
+    return HEAVY_GET_CACHE_MS;
+  }
+  return GET_BURST_CACHE_MS;
+}
+
+function inferInvalidatePrefixes(path: string): string[] | undefined {
+  const cleanPath = String(path || '').split('?')[0];
+  const first = cleanPath.split('/').filter(Boolean)[0];
+  if (!first) return undefined;
+  return [`/${first}`];
 }
 
 function clearExpiredGetCache() {
@@ -295,6 +318,7 @@ export const client = {
     if (inFlight) return inFlight as Promise<T>;
 
     const requestEpoch = cacheEpoch;
+    const ttlMs = getCacheTtlMs(path);
     const req = withRetry(() => request<T>('GET', path))
       .then(async (data) => {
         // If a mutation invalidated caches while this GET was in-flight,
@@ -305,7 +329,7 @@ export const client = {
           if (freshRequestEpoch === cacheEpoch) {
             recentGetResponses.set(key, {
               data: freshData,
-              expiresAt: Date.now() + GET_BURST_CACHE_MS,
+              expiresAt: Date.now() + ttlMs,
               epoch: freshRequestEpoch,
             });
           }
@@ -314,7 +338,7 @@ export const client = {
 
         recentGetResponses.set(key, {
           data,
-          expiresAt: Date.now() + GET_BURST_CACHE_MS,
+          expiresAt: Date.now() + ttlMs,
           epoch: requestEpoch,
         });
         return data;
@@ -326,11 +350,11 @@ export const client = {
     inflightGetRequests.set(key, req as Promise<unknown>);
     return req;
   },
-  post:   <T = unknown>(path: string, body?: unknown, options?: RequestOptions) => request<T>('POST', path, body, { signal: options?.signal }).then((data) => { invalidateGetCache(); return data; }),
-  put:    <T = unknown>(path: string, body?: unknown, options?: RequestOptions) => request<T>('PUT', path, body, { signal: options?.signal }).then((data) => { invalidateGetCache(); return data; }),
-  patch:  <T = unknown>(path: string, body?: unknown, options?: RequestOptions) => request<T>('PATCH', path, body, { signal: options?.signal }).then((data) => { invalidateGetCache(); return data; }),
-  delete: <T = unknown>(path: string, options?: RequestOptions) => request<T>('DELETE', path, undefined, { signal: options?.signal }).then((data) => { invalidateGetCache(); return data; }),
-  upload: <T = unknown>(path: string, formData: FormData, options?: RequestOptions) => request<T>('POST', path, formData, { isFormData: true, signal: options?.signal }).then((data) => { invalidateGetCache(); return data; }),
+  post:   <T = unknown>(path: string, body?: unknown, options?: RequestOptions) => request<T>('POST', path, body, { signal: options?.signal }).then((data) => { invalidateGetCache(inferInvalidatePrefixes(path)); return data; }),
+  put:    <T = unknown>(path: string, body?: unknown, options?: RequestOptions) => request<T>('PUT', path, body, { signal: options?.signal }).then((data) => { invalidateGetCache(inferInvalidatePrefixes(path)); return data; }),
+  patch:  <T = unknown>(path: string, body?: unknown, options?: RequestOptions) => request<T>('PATCH', path, body, { signal: options?.signal }).then((data) => { invalidateGetCache(inferInvalidatePrefixes(path)); return data; }),
+  delete: <T = unknown>(path: string, options?: RequestOptions) => request<T>('DELETE', path, undefined, { signal: options?.signal }).then((data) => { invalidateGetCache(inferInvalidatePrefixes(path)); return data; }),
+  upload: <T = unknown>(path: string, formData: FormData, options?: RequestOptions) => request<T>('POST', path, formData, { isFormData: true, signal: options?.signal }).then((data) => { invalidateGetCache(inferInvalidatePrefixes(path)); return data; }),
 };
 
 // Utility for filter/search UIs: cancel prior request before issuing the next one.

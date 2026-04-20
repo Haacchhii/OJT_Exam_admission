@@ -12,8 +12,8 @@ import env from '../config/env.js';
 import { resolveUploadedFilePath } from '../utils/uploadPaths.js';
 
 const ADMISSION_IN_PROGRESS = ['Submitted', 'Under Screening', 'Under Evaluation'];
-const REPORTS_DEFAULT_ADMISSIONS = 300;
-const REPORTS_MAX_ADMISSIONS = 400;
+const REPORTS_DEFAULT_ADMISSIONS = 120;
+const REPORTS_MAX_ADMISSIONS = 250;
 
 function toIsoDay(d) {
   if (!d) return null;
@@ -343,7 +343,7 @@ export async function getDashboardSummary(req, res, next) {
         completed,
         pendingEssays,
       };
-    }, 30_000);
+    }, 60_000);
 
     res.json(summary);
   } catch (err) { next(err); }
@@ -587,7 +587,7 @@ export async function getReportsSummary(req, res, next) {
         : [];
 
       return { admissions, results, exams, schedules, regs, essays, users, academicYears, semesters, meta };
-    }, 15_000);
+    }, 60_000);
 
     res.json(summary);
   } catch (err) { next(err); }

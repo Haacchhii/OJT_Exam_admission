@@ -19,7 +19,8 @@ interface DataChangedDetail {
 }
 
 function shouldRefreshForPrefixes(resourcePrefixes: string[] | undefined, changedPrefixes: string[] | undefined): boolean {
-  if (!resourcePrefixes || resourcePrefixes.length === 0) return true;
+  // Hooks that do not opt into scoped prefixes should refresh only on global events.
+  if (!resourcePrefixes || resourcePrefixes.length === 0) return false;
   if (!changedPrefixes || changedPrefixes.length === 0) return true;
   return resourcePrefixes.some(prefix => changedPrefixes.includes(prefix));
 }

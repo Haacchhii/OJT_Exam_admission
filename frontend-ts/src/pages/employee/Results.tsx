@@ -15,7 +15,7 @@ const RESULTS_PER_PAGE = 10;
 const ANALYTICS_PER_PAGE = 8;
 const ESSAY_EXAMS_PER_PAGE = 8;
 const ESSAY_ROWS_PER_PAGE = 8;
-const RESULTS_SUMMARY_LIMIT = 500;
+const RESULTS_SUMMARY_LIMIT = 120;
 
 function semesterLabel(s: Semester) {
   const start = s.startDate ? formatDate(String(s.startDate)) : null;
@@ -104,6 +104,7 @@ export default function EmployeeResults() {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [selectedEssayExamId, setSelectedEssayExamId] = useState<number | null>(null);
   const [scoreActionState, setScoreActionState] = useState<{ tone: 'info' | 'success' | 'danger'; title: string; message?: string } | null>(null);
+  const includeResultsInSummary = tab === 'results';
   const includeEssaysInSummary = tab === 'essays';
 
   useEffect(() => {
@@ -115,7 +116,7 @@ export default function EmployeeResults() {
   const { data: rawData, loading, error, refetch } = useAsync<RawData>(async () => {
     const summary = await getEmployeeResultsSummary({
       limit: RESULTS_SUMMARY_LIMIT,
-      includeResults: true,
+      includeResults: includeResultsInSummary,
       includeEssays: includeEssaysInSummary,
     });
     return {
@@ -129,7 +130,7 @@ export default function EmployeeResults() {
       semesters: summary.semesters as Semester[],
       meta: summary.meta,
     } as RawData;
-  }, [includeEssaysInSummary]);
+  }, [includeResultsInSummary, includeEssaysInSummary]);
 
   const academicYears = rawData?.academicYears || [];
   const allSemesters = rawData?.semesters || [];

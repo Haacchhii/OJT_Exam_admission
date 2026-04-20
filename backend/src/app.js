@@ -205,6 +205,50 @@ app.get('/api/health', async (_req, res) => {
   }
 });
 
+// Warmup endpoint for scheduled pings to reduce serverless cold starts.
+app.get('/api/warmup', async (req, res) => {
+  const cronHeader = String(req.get('x-vercel-cron') || '').trim();
+  const providedKey = String(req.query.key || '').trim();
+  const monitorKey = String(env.PERF_MONITOR_KEY || '').trim();
+  const authorizedByCron = cronHeader.length > 0;
+  const authorizedByKey = monitorKey.length > 0 && providedKey === monitorKey;
+
+  if (env.NODE_ENV === 'production' && !authorizedByCron && !authorizedByKey) {
+    return res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN' });
+  }
+
+  const startedAt = Date.now();
+  try {
+    const [db, admissions, results, essays, exams] = await Promise.all([
+      prisma.$queryRaw`SELECT 1`,
+      prisma.admission.count(),
+      prisma.examResult.count(),
+      prisma.essayAnswer.count(),
+      prisma.exam.count({ where: { deletedAt: null } }),
+    ]);
+
+    const dbConnected = Array.isArray(db) && db.length > 0;
+    return res.json({
+      status: 'ok',
+      warmed: true,
+      dbConnected,
+      durationMs: Date.now() - startedAt,
+      sampledCounts: {
+        admissions,
+        results,
+        essays,
+        exams,
+      },
+    });
+  } catch {
+    return res.status(503).json({
+      status: 'degraded',
+      warmed: false,
+      durationMs: Date.now() - startedAt,
+    });
+  }
+});
+
 // ─── Serve frontend in production ─────────────────────
 // Only serve static frontend if the dist folder exists (monolith deploy).
 // When frontend is deployed separately (e.g. Railway), this is skipped.

@@ -23,7 +23,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const CHART_FALLBACK_COLORS = ['#16a34a', '#0ea5e9', '#f59e0b', '#8b5cf6', '#ef4444', '#14b8a6'];
-const REPORTS_DEFAULT_LIMIT = 300;
+const REPORTS_DEFAULT_LIMIT = 120;
 const UNSPECIFIED_SCHOOL_KEY = '__unspecified_school__';
 const MAX_SCHOOL_BARS = 12;
 

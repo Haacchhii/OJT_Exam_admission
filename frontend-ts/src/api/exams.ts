@@ -23,7 +23,7 @@ interface ExamReadinessParams {
 
 const DEFAULT_LIST_PAGE = 1;
 const MAX_LIST_LIMIT = 100;
-const DEFAULT_LIST_LIMIT = MAX_LIST_LIMIT;
+const DEFAULT_LIST_LIMIT = 40;
 
 function normalizeLimit(limit?: number): number {
   if (!Number.isFinite(limit)) return DEFAULT_LIST_LIMIT;
