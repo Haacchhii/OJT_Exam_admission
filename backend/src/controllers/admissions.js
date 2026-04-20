@@ -14,9 +14,14 @@ import { resolveUploadedFilePath } from '../utils/uploadPaths.js';
 const ADMISSION_IN_PROGRESS = ['Submitted', 'Under Screening', 'Under Evaluation'];
 const REPORTS_DEFAULT_ADMISSIONS = 40;
 const REPORTS_MAX_ADMISSIONS = 200;
+const ADMISSIONS_LIST_DATA_TTL_MS = 30_000;
+const ADMISSIONS_LIST_COUNT_TTL_MS = 45_000;
+const ADMISSIONS_STATS_TTL_MS = 60_000;
 
 function invalidateAdmissionCaches(userIds = []) {
   invalidatePrefix('admStats:');
+  invalidatePrefix('admissions:list:');
+  invalidatePrefix('admissions:ops:');
   invalidatePrefix('dashboardSummary:');
   invalidatePrefix('reportsSummary:');
   for (const userId of userIds) {
@@ -80,11 +85,179 @@ function shapeAdmission(adm) {
   const { documents: docs, academicYear, semester, ...rest } = adm;
   return {
     ...rest,
+    documentCount: docs ? docs.length : 0,
     documents: docs ? docs.map(d => d.documentName) : [],
     documentFiles: docs ? docs.map(d => ({ id: d.id, name: d.documentName, filePath: d.filePath, hasExtraction: !!(d.extractedText && d.extractedData), reviewStatus: d.reviewStatus, reviewNote: d.reviewNote || null, reviewedAt: d.reviewedAt })) : [],
     academicYear: academicYear ? { id: academicYear.id, year: academicYear.year, startDate: academicYear.startDate || null, endDate: academicYear.endDate || null } : null,
     semester: semester ? { id: semester.id, name: semester.name, startDate: semester.startDate || null, endDate: semester.endDate || null } : null,
   };
+}
+
+function shapeAdmissionList(adm) {
+  if (!adm) return null;
+  const { _count, academicYear, semester, ...rest } = adm;
+  return {
+    ...rest,
+    documentCount: _count?.documents || 0,
+    documents: [],
+    documentFiles: [],
+    academicYear: academicYear ? { id: academicYear.id, year: academicYear.year, startDate: academicYear.startDate || null, endDate: academicYear.endDate || null } : null,
+    semester: semester ? { id: semester.id, name: semester.name, startDate: semester.startDate || null, endDate: semester.endDate || null } : null,
+  };
+}
+
+function buildAdmissionsWhereFromQuery(query = {}) {
+  const {
+    status,
+    grade,
+    levelGroup,
+    search,
+    academicYearId,
+    semesterId,
+    staleOnly,
+    slaDays,
+  } = query;
+
+  const where = { deletedAt: null };
+  if (status) where.status = status;
+  if (grade) where.gradeLevel = grade;
+  if (levelGroup) where.levelGroup = levelGroup;
+  if (academicYearId) where.academicYearId = Number(academicYearId);
+  if (semesterId) where.semesterId = Number(semesterId);
+
+  if (staleOnly === 'true') {
+    const thresholdDays = Number(slaDays) > 0 ? Number(slaDays) : 7;
+    where.status = { in: ADMISSION_IN_PROGRESS };
+    where.submittedAt = { lt: new Date(Date.now() - thresholdDays * 24 * 60 * 60 * 1000) };
+  }
+
+  if (search) {
+    where.OR = [
+      { firstName: { contains: search, mode: 'insensitive' } },
+      { middleName: { contains: search, mode: 'insensitive' } },
+      { lastName: { contains: search, mode: 'insensitive' } },
+      { email: { contains: search, mode: 'insensitive' } },
+    ];
+  }
+
+  return where;
+}
+
+function buildAdmissionsOrderBy(sort) {
+  if (sort === 'oldest') return { submittedAt: 'asc' };
+  if (sort === 'name') return [{ lastName: 'asc' }, { firstName: 'asc' }];
+  if (sort === 'status') return [{ status: 'asc' }, { submittedAt: 'desc' }];
+  return { submittedAt: 'desc' };
+}
+
+async function loadAdmissionsPageSnapshot(query = {}) {
+  const pg = paginate(query.page ?? 1, query.limit ?? 50);
+  const where = buildAdmissionsWhereFromQuery(query);
+  const orderBy = buildAdmissionsOrderBy(query.sort);
+
+  const countCacheKey = `admissions:list:count:${JSON.stringify(where)}`;
+  const total = await cached(countCacheKey, () => prisma.admission.count({ where }), ADMISSIONS_LIST_COUNT_TTL_MS);
+
+  const listCacheKey = `admissions:list:data:${JSON.stringify({ where, orderBy, skip: pg?.skip || 0, take: pg?.take || null })}`;
+  const admissions = await cached(listCacheKey, () => prisma.admission.findMany({
+    where,
+    ...(pg && { skip: pg.skip, take: pg.take }),
+    orderBy,
+    select: {
+      id: true,
+      trackingId: true,
+      userId: true,
+      firstName: true,
+      middleName: true,
+      lastName: true,
+      email: true,
+      phone: true,
+      gradeLevel: true,
+      levelGroup: true,
+      applicantType: true,
+      status: true,
+      submittedAt: true,
+      updatedAt: true,
+      academicYearId: true,
+      semesterId: true,
+      academicYear: { select: { id: true, year: true, startDate: true, endDate: true } },
+      semester: { select: { id: true, name: true, startDate: true, endDate: true } },
+      _count: { select: { documents: true } },
+    },
+  }), ADMISSIONS_LIST_DATA_TTL_MS);
+
+  return {
+    data: admissions.map(shapeAdmissionList),
+    total,
+    pg,
+  };
+}
+
+function buildAdmissionStatsWhere(query = {}) {
+  const { grade, levelGroup, from, to, academicYearId, semesterId } = query;
+  const where = { deletedAt: null };
+  if (grade) where.gradeLevel = grade;
+  if (levelGroup) where.levelGroup = levelGroup;
+  if (academicYearId) where.academicYearId = Number(academicYearId);
+  if (semesterId) where.semesterId = Number(semesterId);
+  if (from || to) {
+    where.submittedAt = {};
+    if (from) {
+      const d = new Date(from);
+      if (!isNaN(d.getTime())) where.submittedAt.gte = d;
+    }
+    if (to) {
+      const d = new Date(to);
+      if (!isNaN(d.getTime())) where.submittedAt.lte = d;
+    }
+  }
+  return where;
+}
+
+async function loadAdmissionStatsSnapshot(query = {}) {
+  const where = buildAdmissionStatsWhere(query);
+  const staleThresholdDays = Number(query.slaDays) > 0 ? Number(query.slaDays) : 7;
+  const staleThreshold = new Date(Date.now() - staleThresholdDays * 24 * 60 * 60 * 1000);
+
+  const cacheKey = `admStats:${JSON.stringify({ where, staleThresholdDays })}`;
+  return cached(cacheKey, async () => {
+    const applicantWhere = { deletedAt: null, role: ROLES.APPLICANT };
+    const [total, grouped, overSlaCount, registeredApplicants, applicantsWithoutAdmissions, unverifiedApplicants, inactiveApplicants] = await Promise.all([
+      prisma.admission.count({ where }),
+      prisma.admission.groupBy({ by: ['status'], _count: { _all: true }, where }),
+      prisma.admission.count({
+        where: {
+          ...where,
+          status: { in: ADMISSION_IN_PROGRESS },
+          submittedAt: { lt: staleThreshold },
+        },
+      }),
+      prisma.user.count({ where: applicantWhere }),
+      prisma.user.count({
+        where: {
+          ...applicantWhere,
+          admissions: { none: { deletedAt: null } },
+        },
+      }),
+      prisma.user.count({ where: { ...applicantWhere, emailVerified: false } }),
+      prisma.user.count({ where: { ...applicantWhere, status: 'Inactive' } }),
+    ]);
+
+    const statusMap = Object.fromEntries(grouped.map(g => [g.status, g._count._all]));
+    return {
+      total,
+      submitted: statusMap['Submitted'] || 0,
+      underScreening: statusMap['Under Screening'] || 0,
+      underEvaluation: statusMap['Under Evaluation'] || 0,
+      accepted: statusMap['Accepted'] || 0,
+      rejected: statusMap['Rejected'] || 0,
+      overSlaCount,
+      registeredApplicants,
+      applicantsWithoutAdmissions,
+      unverifiedApplicants,
+      inactiveApplicants,
+    };
+  }, ADMISSIONS_STATS_TTL_MS);
 }
 
 const myRegistrationInclude = {
@@ -226,43 +399,40 @@ async function findLatestResultForUser(user, normalizedEmail) {
 // GET /api/admissions?status=&grade=&search=&sort=&page=&limit=&academicYearId=&semesterId=
 export async function getAdmissions(req, res, next) {
   try {
-    const { status, grade, levelGroup, search, sort, page, limit, academicYearId, semesterId, staleOnly, slaDays } = req.query;
-    const pg = paginate(page ?? 1, limit ?? 50);
+    const snapshot = await loadAdmissionsPageSnapshot(req.query);
+    res.json(paginatedResponse(snapshot.data, snapshot.total, snapshot.pg));
+  } catch (err) { next(err); }
+}
 
-    const where = { deletedAt: null };
-    if (status)        where.status = status;
-    if (grade)         where.gradeLevel = grade;
-    if (levelGroup)    where.levelGroup = levelGroup;
-    if (academicYearId) where.academicYearId = Number(academicYearId);
-    if (semesterId)    where.semesterId = Number(semesterId);
-    if (staleOnly === 'true') {
-      const thresholdDays = Number(slaDays) > 0 ? Number(slaDays) : 7;
-      where.status = { in: ADMISSION_IN_PROGRESS };
-      where.submittedAt = { lt: new Date(Date.now() - thresholdDays * 24 * 60 * 60 * 1000) };
-    }
-    if (search) {
-      where.OR = [
-        { firstName: { contains: search, mode: 'insensitive' } },
-        { middleName: { contains: search, mode: 'insensitive' } },
-        { lastName:  { contains: search, mode: 'insensitive' } },
-        { email:     { contains: search, mode: 'insensitive' } },
-      ];
-    }
-
-    let orderBy = { submittedAt: 'desc' };
-    if (sort === 'oldest') orderBy = { submittedAt: 'asc' };
-    if (sort === 'name') orderBy = [{ lastName: 'asc' }, { firstName: 'asc' }];
-    if (sort === 'status') orderBy = [{ status: 'asc' }, { submittedAt: 'desc' }];
-
-    const [admissions, total] = await Promise.all([
-      prisma.admission.findMany({
-        where, ...(pg && { skip: pg.skip, take: pg.take }), orderBy,
-        include: { documents: true, academicYear: true, semester: true },
-      }),
-      prisma.admission.count({ where }),
+// GET /api/admissions/ops-bootstrap
+// Consolidated admin/registrar admissions bootstrap to reduce initial fanout.
+export async function getOpsBootstrap(req, res, next) {
+  try {
+    const [admissionsPage, stats, academicYears, semesters] = await Promise.all([
+      loadAdmissionsPageSnapshot(req.query),
+      loadAdmissionStatsSnapshot(req.query),
+      cached('ay:all:lite', () => prisma.academicYear.findMany({
+        orderBy: { year: 'desc' },
+        select: {
+          id: true,
+          year: true,
+          isActive: true,
+          startDate: true,
+          endDate: true,
+        },
+      }), 120_000),
+      cached('ay:semesters:all', () => prisma.semester.findMany({
+        orderBy: [{ academicYearId: 'desc' }, { id: 'asc' }],
+        include: { academicYear: { select: { year: true } } },
+      }), 120_000),
     ]);
 
-    res.json(paginatedResponse(admissions.map(shapeAdmission), total, pg));
+    res.json({
+      admissionsPage: paginatedResponse(admissionsPage.data, admissionsPage.total, admissionsPage.pg),
+      stats,
+      academicYears,
+      semesters,
+    });
   } catch (err) { next(err); }
 }
 
@@ -324,59 +494,7 @@ export async function getAdmission(req, res, next) {
 // GET /api/admissions/stats?grade=&from=&to=&academicYearId=&semesterId=
 export async function getStats(req, res, next) {
   try {
-    const { grade, levelGroup, from, to, academicYearId, semesterId, slaDays } = req.query;
-    const where = { deletedAt: null };
-    if (grade)         where.gradeLevel = grade;
-    if (levelGroup)    where.levelGroup = levelGroup;
-    if (academicYearId) where.academicYearId = Number(academicYearId);
-    if (semesterId)    where.semesterId = Number(semesterId);
-    if (from || to) {
-      where.submittedAt = {};
-      if (from) { const d = new Date(from); if (!isNaN(d.getTime())) where.submittedAt.gte = d; }
-      if (to)   { const d = new Date(to);   if (!isNaN(d.getTime())) where.submittedAt.lte = d; }
-    }
-    const staleThresholdDays = Number(slaDays) > 0 ? Number(slaDays) : 7;
-    const staleThreshold = new Date(Date.now() - staleThresholdDays * 24 * 60 * 60 * 1000);
-
-    const cacheKey = `admStats:${JSON.stringify({ where, staleThresholdDays })}`;
-    const counts = await cached(cacheKey, async () => {
-      const applicantWhere = { deletedAt: null, role: ROLES.APPLICANT };
-      const [total, grouped, overSlaCount, registeredApplicants, applicantsWithoutAdmissions, unverifiedApplicants, inactiveApplicants] = await Promise.all([
-        prisma.admission.count({ where }),
-        prisma.admission.groupBy({ by: ['status'], _count: { _all: true }, where }),
-        prisma.admission.count({
-          where: {
-            ...where,
-            status: { in: ADMISSION_IN_PROGRESS },
-            submittedAt: { lt: staleThreshold },
-          },
-        }),
-        prisma.user.count({ where: applicantWhere }),
-        prisma.user.count({
-          where: {
-            ...applicantWhere,
-            admissions: { none: { deletedAt: null } },
-          },
-        }),
-        prisma.user.count({ where: { ...applicantWhere, emailVerified: false } }),
-        prisma.user.count({ where: { ...applicantWhere, status: 'Inactive' } }),
-      ]);
-      const statusMap = Object.fromEntries(grouped.map(g => [g.status, g._count._all]));
-      return {
-        total,
-        submitted:        statusMap['Submitted'] || 0,
-        underScreening:   statusMap['Under Screening'] || 0,
-        underEvaluation:  statusMap['Under Evaluation'] || 0,
-        accepted:         statusMap['Accepted'] || 0,
-        rejected:         statusMap['Rejected'] || 0,
-        overSlaCount,
-        registeredApplicants,
-        applicantsWithoutAdmissions,
-        unverifiedApplicants,
-        inactiveApplicants,
-      };
-    }, 60_000);
-
+    const counts = await loadAdmissionStatsSnapshot(req.query);
     res.json(counts);
   } catch (err) { next(err); }
 }

@@ -20,6 +20,7 @@ router.get('/mine-summary', authorize(ROLES.APPLICANT), ctrl.getMyStudentSummary
 router.get('/stats', authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), validateQuery(admissionsStatsQuerySchema), ctrl.getStats);
 router.get('/dashboard-summary', authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), ctrl.getDashboardSummary);
 router.get('/reports-summary', authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), validateQuery(reportsSummaryQuerySchema), ctrl.getReportsSummary);
+router.get('/ops-bootstrap', authorize(ROLES.ADMIN, ROLES.REGISTRAR), validateQuery(admissionsQuerySchema), ctrl.getOpsBootstrap);
 
 // Tracking (search by tracking ID — any authenticated user)
 router.get('/track/:trackingId', ctrl.trackApplication);

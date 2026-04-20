@@ -88,6 +88,7 @@ export interface Admission {
   semesterId: number | null;
   submittedAt: string;
   updatedAt: string;
+  documentCount?: number;
   documents: string[];
   documentFiles: { id: number; name: string; filePath: string | null; hasExtraction?: boolean; reviewStatus?: string; reviewNote?: string | null; reviewedAt?: string | null }[];
   academicYear: { id: number; year: string; startDate?: string | null; endDate?: string | null } | null;

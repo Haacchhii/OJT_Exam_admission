@@ -121,6 +121,13 @@ export interface StudentHomeSummary {
   myResult: ExamResult | null;
 }
 
+export interface AdmissionsOpsBootstrap {
+  admissionsPage: PagedApiResponse<Admission>;
+  stats: AdmissionStats;
+  academicYears: AcademicYear[];
+  semesters: Semester[];
+}
+
 export async function getAdmissions(params?: AdmissionParams, options?: RequestOptions) {
   return client.get<Admission[]>(`/admissions${qs(withDefaultAdmissionListParams(params))}`, options);
 }
@@ -131,6 +138,10 @@ export async function getAdmission(id: number) {
 
 export async function getAdmissionsPage(params?: AdmissionParams) {
   return client.get<PagedApiResponse<Admission>>(`/admissions${qs(withDefaultAdmissionListParams(params))}`);
+}
+
+export async function getAdmissionsOpsBootstrap(params?: AdmissionParams, options?: RequestOptions) {
+  return client.get<AdmissionsOpsBootstrap>(`/admissions/ops-bootstrap${qs(withDefaultAdmissionListParams(params))}`, options);
 }
 
 export async function getMyAdmission() {

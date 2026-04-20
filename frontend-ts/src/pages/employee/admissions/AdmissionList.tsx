@@ -1,9 +1,8 @@
 ﻿import { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAsync } from '../../../hooks/useAsync';
-import { getAdmissionsPage, getStats, bulkUpdateStatus, bulkDeleteAdmissions, VALID_TRANSITIONS } from '../../../api/admissions';
+import { getAdmissionsPage, getAdmissionsOpsBootstrap, bulkUpdateStatus, bulkDeleteAdmissions, VALID_TRANSITIONS, type AdmissionsOpsBootstrap } from '../../../api/admissions';
 import { invalidateResourceCache } from '../../../api/client';
-import { getAcademicYears, getSemesters } from '../../../api/academicYears';
 import { showToast } from '../../../components/Toast';
 import { useConfirm } from '../../../components/ConfirmDialog';
 import { PageHeader, Badge, EmptyState, Pagination, SkeletonPage, ErrorAlert, ActionButton, SearchInput } from '../../../components/UI';
@@ -12,7 +11,7 @@ import { formatDate, badgeClass, exportToCSV, formatPersonName } from '../../../
 import { ADMISSION_STATUSES, ADMISSION_IN_PROGRESS, GRADE_OPTIONS, ALL_GRADE_LEVELS } from '../../../utils/constants';
 import { useAuth } from '../../../context/AuthContext';
 import { useSocket } from '../../../context/SocketContext';
-import type { Admission, AdmissionStats, AcademicYear, Semester } from '../../../types';
+import type { Admission, Semester } from '../../../types';
 
 const PER_PAGE = 10;
 const SLA_DAYS = 7;
@@ -28,17 +27,7 @@ function daysPending(submittedAt: string) {
   return Math.floor((Date.now() - new Date(submittedAt).getTime()) / 86400000);
 }
 
-interface RawData {
-  admissionsPage: {
-    data: Admission[];
-    pagination: {
-      page: number;
-      limit: number;
-      total: number;
-      totalPages: number;
-    };
-  };
-}
+type RawData = AdmissionsOpsBootstrap;
 
 interface Props {
   onShowDetail: (id: number) => void;
@@ -88,26 +77,9 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
     if (semesterFilter !== 'all') admissionParams.semesterId = Number(semesterFilter);
     if (search.trim()) admissionParams.search = search.trim();
 
-    const admissionsPage = await getAdmissionsPage(admissionParams);
-    return { admissionsPage };
+    return getAdmissionsOpsBootstrap(admissionParams);
   }, [filter, levelGroupFilter, gradeFilter, yearFilter, semesterFilter, sortBy, search, staleOnly, page], 0, {
     setLoadingOnReload: true,
-    autoRefreshOnDataChange: true,
-    resourcePrefixes: ['/admissions'],
-  });
-
-  const {
-    data: stats,
-    refetch: refetchStats,
-  } = useAsync<AdmissionStats>(async () => {
-    const statsParams: Record<string, unknown> = {};
-    if (gradeFilter !== 'all') statsParams.grade = gradeFilter;
-    if (levelGroupFilter !== 'all') statsParams.levelGroup = levelGroupFilter;
-    statsParams.slaDays = SLA_DAYS;
-    if (yearFilter !== 'all') statsParams.academicYearId = Number(yearFilter);
-    if (semesterFilter !== 'all') statsParams.semesterId = Number(semesterFilter);
-    return getStats(statsParams);
-  }, [levelGroupFilter, gradeFilter, yearFilter, semesterFilter], 0, {
     autoRefreshOnDataChange: true,
     resourcePrefixes: ['/admissions'],
   });
@@ -122,7 +94,6 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
         refetchTimer = null;
         invalidateResourceCache(['/admissions']);
         refetch();
-        refetchStats();
       }, 350);
     };
 
@@ -134,10 +105,11 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
       socket.off('admission_bulk_status_updated', handleStatusUpdate);
       if (refetchTimer) clearTimeout(refetchTimer);
     };
-  }, [socket, isConnected, refetch, refetchStats]);
+  }, [socket, isConnected, refetch]);
 
-  const { data: academicYears } = useAsync<AcademicYear[]>(() => getAcademicYears());
-  const { data: allSemesters } = useAsync<Semester[]>(() => getSemesters());
+  const stats = rawData?.stats;
+  const academicYears = rawData?.academicYears || [];
+  const allSemesters = rawData?.semesters || [];
 
   const semesterOptions = useMemo(() => {
     const list = allSemesters || [];
@@ -203,7 +175,6 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
       showToast(`${validIds.length} application(s) updated to ${bulkStatus}.${skippedIds.length ? ` ${skippedIds.length} skipped.` : ''}`, 'success');
       setSelected(new Set());
       refetch();
-      refetchStats();
     } catch (err: any) {
       showToast('Bulk update failed: ' + (err.message || 'Unknown error'), 'error');
     } finally {
@@ -227,7 +198,6 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
       showToast(`${ids.length} application(s) deleted.`, 'info');
       setSelected(new Set());
       refetch();
-      refetchStats();
     } catch {
       showToast('Failed to delete applications.', 'error');
     } finally {
@@ -474,7 +444,7 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
                       <td className="py-3 px-2 text-gray-500">{a.email}</td>
                       <td className="py-3 px-2">{a.gradeLevel}</td>
                       <td className="py-3 px-2"><Badge variant="info">{a.applicantType || 'New'}</Badge></td>
-                      <td className="py-3 px-2">{a.documents.length} file(s)</td>
+                      <td className="py-3 px-2">{a.documentCount ?? a.documents.length} file(s)</td>
                       <td className="py-3 px-2"><Badge className={badgeClass(a.status)}>{a.status}</Badge></td>
                       <td className="py-3 px-2 text-gray-500">{formatDate(a.submittedAt)}</td>
                       <td className="py-3 px-2">{(ADMISSION_IN_PROGRESS as readonly string[]).includes(a.status) ? (

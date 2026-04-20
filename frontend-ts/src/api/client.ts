@@ -192,6 +192,8 @@ function getCacheTtlMs(path: string): number {
   const cleanPath = String(path || '').split('?')[0];
   const examDetailPath = /^\/exams\/\d+\/(review|student)$/;
   if (
+    cleanPath.startsWith('/admissions/ops-bootstrap') ||
+    cleanPath === '/admissions' ||
     cleanPath.startsWith('/admissions/dashboard-summary') ||
     cleanPath.startsWith('/admissions/reports-summary') ||
     cleanPath.startsWith('/results/employee-summary') ||
