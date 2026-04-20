@@ -2,7 +2,13 @@
 // client.ts — Typed HTTP client for backend API
 // ============================================
 
-const BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
+const configuredBaseUrl = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
+const shouldForceSameOriginApi = (() => {
+  if (typeof window === 'undefined') return false;
+  const host = String(window.location.hostname || '').toLowerCase();
+  return host.endsWith('.vercel.app') && host.includes('ojt-exam-admission');
+})();
+const BASE_URL = shouldForceSameOriginApi ? '/api' : (configuredBaseUrl || '/api');
 
 // ---- Token management ----
 let authToken: string | null = null;

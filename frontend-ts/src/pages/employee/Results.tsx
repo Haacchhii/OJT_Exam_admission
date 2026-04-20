@@ -15,7 +15,7 @@ const RESULTS_PER_PAGE = 10;
 const ANALYTICS_PER_PAGE = 8;
 const ESSAY_EXAMS_PER_PAGE = 8;
 const ESSAY_ROWS_PER_PAGE = 8;
-const RESULTS_SUMMARY_LIMIT = 120;
+const RESULTS_SUMMARY_LIMIT = 80;
 
 function semesterLabel(s: Semester) {
   const start = s.startDate ? formatDate(String(s.startDate)) : null;

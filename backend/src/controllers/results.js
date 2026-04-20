@@ -2,8 +2,8 @@ import prisma from '../config/db.js';
 import { paginate, paginatedResponse } from '../utils/pagination.js';
 import { cached } from '../utils/cache.js';
 
-const EMPLOYEE_SUMMARY_DEFAULT_LIMIT = 120;
-const EMPLOYEE_SUMMARY_MAX_LIMIT = 300;
+const EMPLOYEE_SUMMARY_DEFAULT_LIMIT = 80;
+const EMPLOYEE_SUMMARY_MAX_LIMIT = 200;
 
 function parseBooleanQuery(value, fallback) {
   if (value === undefined || value === null || value === '') return fallback;

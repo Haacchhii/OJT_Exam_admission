@@ -318,7 +318,7 @@ export const reportsSummaryQuerySchema = z.object({
   semesterId: coerceOptionalInt,
   dateFrom: isoDateStr.optional(),
   dateTo: isoDateStr.optional(),
-  limit: z.coerce.number().int().min(1).max(250).optional(),
+  limit: z.coerce.number().int().min(1).max(200).optional(),
   sort: z.enum(['newest', 'oldest', 'alphabetical', 'school']).optional(),
   school: z.string().max(200).optional(),
 });

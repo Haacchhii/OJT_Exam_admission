@@ -12,8 +12,8 @@ import env from '../config/env.js';
 import { resolveUploadedFilePath } from '../utils/uploadPaths.js';
 
 const ADMISSION_IN_PROGRESS = ['Submitted', 'Under Screening', 'Under Evaluation'];
-const REPORTS_DEFAULT_ADMISSIONS = 120;
-const REPORTS_MAX_ADMISSIONS = 250;
+const REPORTS_DEFAULT_ADMISSIONS = 80;
+const REPORTS_MAX_ADMISSIONS = 200;
 
 function toIsoDay(d) {
   if (!d) return null;

@@ -29,7 +29,6 @@ function daysPending(submittedAt: string) {
 }
 
 interface RawData {
-  stats: AdmissionStats;
   admissionsPage: {
     data: Admission[];
     pagination: {
@@ -75,12 +74,6 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
   }, [searchInput]);
 
   const { data: rawData, loading, error, refetch } = useAsync<RawData>(async () => {
-    const statsParams: Record<string, unknown> = {};
-    if (gradeFilter !== 'all') statsParams.grade = gradeFilter;
-    if (levelGroupFilter !== 'all') statsParams.levelGroup = levelGroupFilter;
-    if (yearFilter !== 'all') statsParams.academicYearId = Number(yearFilter);
-    if (semesterFilter !== 'all') statsParams.semesterId = Number(semesterFilter);
-
     const admissionParams: Record<string, unknown> = {
       page,
       limit: PER_PAGE,
@@ -95,13 +88,25 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
     if (semesterFilter !== 'all') admissionParams.semesterId = Number(semesterFilter);
     if (search.trim()) admissionParams.search = search.trim();
 
-    const [stats, admissionsPage] = await Promise.all([
-      getStats(statsParams),
-      getAdmissionsPage(admissionParams),
-    ]);
-    return { stats, admissionsPage };
+    const admissionsPage = await getAdmissionsPage(admissionParams);
+    return { admissionsPage };
   }, [filter, levelGroupFilter, gradeFilter, yearFilter, semesterFilter, sortBy, search, staleOnly, page], 0, {
     setLoadingOnReload: true,
+    autoRefreshOnDataChange: true,
+    resourcePrefixes: ['/admissions'],
+  });
+
+  const {
+    data: stats,
+    refetch: refetchStats,
+  } = useAsync<AdmissionStats>(async () => {
+    const statsParams: Record<string, unknown> = {};
+    if (gradeFilter !== 'all') statsParams.grade = gradeFilter;
+    if (levelGroupFilter !== 'all') statsParams.levelGroup = levelGroupFilter;
+    if (yearFilter !== 'all') statsParams.academicYearId = Number(yearFilter);
+    if (semesterFilter !== 'all') statsParams.semesterId = Number(semesterFilter);
+    return getStats(statsParams);
+  }, [levelGroupFilter, gradeFilter, yearFilter, semesterFilter], 0, {
     autoRefreshOnDataChange: true,
     resourcePrefixes: ['/admissions'],
   });
@@ -123,6 +128,7 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
         refetchTimer = null;
         invalidateResourceCache(['/admissions']);
         refetch();
+        refetchStats();
         refetchStalePreview();
       }, 350);
     };
@@ -135,7 +141,7 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
       socket.off('admission_bulk_status_updated', handleStatusUpdate);
       if (refetchTimer) clearTimeout(refetchTimer);
     };
-  }, [socket, isConnected, refetch, refetchStalePreview]);
+  }, [socket, isConnected, refetch, refetchStats, refetchStalePreview]);
 
   const { data: academicYears } = useAsync<AcademicYear[]>(() => getAcademicYears());
   const { data: allSemesters } = useAsync<Semester[]>(() => getSemesters());
@@ -261,18 +267,18 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
   if (error) return <ErrorAlert error={error} onRetry={refetch} />;
 
   const tabs = [
-    { key: 'all', label: 'All', count: rawData?.stats?.total || 0 },
-    { key: 'Submitted', label: 'Submitted', count: rawData?.stats?.submitted || 0 },
-    { key: 'Under Screening', label: 'Screening', count: rawData?.stats?.underScreening || 0 },
-    { key: 'Under Evaluation', label: 'Evaluation', count: rawData?.stats?.underEvaluation || 0 },
-    { key: 'Accepted', label: 'Accepted', count: rawData?.stats?.accepted || 0 },
-    { key: 'Rejected', label: 'Rejected', count: rawData?.stats?.rejected || 0 },
+    { key: 'all', label: 'All', count: stats?.total || 0 },
+    { key: 'Submitted', label: 'Submitted', count: stats?.submitted || 0 },
+    { key: 'Under Screening', label: 'Screening', count: stats?.underScreening || 0 },
+    { key: 'Under Evaluation', label: 'Evaluation', count: stats?.underEvaluation || 0 },
+    { key: 'Accepted', label: 'Accepted', count: stats?.accepted || 0 },
+    { key: 'Rejected', label: 'Rejected', count: stats?.rejected || 0 },
   ];
 
-  const registeredApplicants = rawData?.stats?.registeredApplicants || 0;
-  const applicantsWithoutAdmissions = rawData?.stats?.applicantsWithoutAdmissions || 0;
-  const unverifiedApplicants = rawData?.stats?.unverifiedApplicants || 0;
-  const inactiveApplicants = rawData?.stats?.inactiveApplicants || 0;
+  const registeredApplicants = stats?.registeredApplicants || 0;
+  const applicantsWithoutAdmissions = stats?.applicantsWithoutAdmissions || 0;
+  const unverifiedApplicants = stats?.unverifiedApplicants || 0;
+  const inactiveApplicants = stats?.inactiveApplicants || 0;
 
   return (
     <div>
