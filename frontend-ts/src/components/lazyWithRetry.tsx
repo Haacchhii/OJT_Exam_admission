@@ -1,17 +1,17 @@
-import { ComponentType, lazy, Suspense, ReactNode } from 'react';
+import { ComponentType, lazy } from 'react';
 import { LoadingSpinner } from './UI';
 
 /**
  * Enhanced lazy loading with automatic retry on failure.
- * Wraps React.lazy with exponential backoff retry logic.
+ * Wraps React.lazy with short retry delays to handle transient chunk fetch issues.
  * 
  * @param importFunc - Dynamic import function: () => import('./Component')
- * @param maxAttempts - Number of retry attempts (default: 3)
+ * @param maxAttempts - Number of retry attempts (default: 2)
  * @returns Lazy-loaded component
  */
 export function lazyWithRetry<T extends ComponentType<any>>(
   importFunc: () => Promise<{ default: T }>,
-  maxAttempts: number = 3
+  maxAttempts: number = 2
 ): T {
   return lazy(async () => {
     let lastError: Error | null = null;
@@ -24,8 +24,8 @@ export function lazyWithRetry<T extends ComponentType<any>>(
         console.warn(`Chunk load failed (attempt ${attempt}/${maxAttempts}):`, lastError?.message);
         
         if (attempt < maxAttempts) {
-          // Wait before retrying (exponential backoff: 1s, 2s, 4s)
-          const delayMs = 1000 * Math.pow(2, attempt - 1);
+          // Keep retry delays short to reduce perceived route-navigation blocking.
+          const delayMs = 250 * Math.pow(2, attempt - 1);
           await new Promise((resolve) => setTimeout(resolve, delayMs));
         }
       }
@@ -45,14 +45,20 @@ export function lazyWithRetry<T extends ComponentType<any>>(
 
 /**
  * Loading fallback component for lazy-loaded pages.
- * Shows a centered spinner while chunks are loading.
+ * Compact by default for in-page route transitions; supports full-screen mode when needed.
  */
-export function LazyLoadingFallback() {
+export function LazyLoadingFallback({
+  fullScreen = false,
+  message = 'Loading page...',
+}: {
+  fullScreen?: boolean;
+  message?: string;
+}) {
   return (
-    <div className="min-h-screen flex items-center justify-center">
+    <div className={fullScreen ? 'min-h-screen flex items-center justify-center' : 'w-full py-10 flex items-center justify-center'}>
       <div className="text-center">
         <LoadingSpinner />
-        <p className="text-gray-500 text-sm mt-4">Loading page...</p>
+        <p className="text-gray-500 text-sm mt-4">{message}</p>
       </div>
     </div>
   );

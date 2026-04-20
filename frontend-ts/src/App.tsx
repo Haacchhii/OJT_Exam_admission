@@ -94,6 +94,16 @@ function RoleRoutePrefetcher() {
   return null;
 }
 
+function withLazyPageBoundary(pageName: string, page: ReactNode) {
+  return (
+    <PageErrorBoundary pageName={pageName}>
+      <Suspense fallback={<LazyLoadingFallback />}>
+        {page}
+      </Suspense>
+    </PageErrorBoundary>
+  );
+}
+
 export default function App() {
   useEffect(() => {
     // Dark mode has been removed; clear any stale class or persisted flag.
@@ -113,7 +123,6 @@ export default function App() {
       <HashRouter>
         <ScrollToTop />
         <RoleRoutePrefetcher />
-        <Suspense fallback={<LazyLoadingFallback />}>
         <Routes>
           {/* Public auth routes */}
           <Route path="/login" element={<Login />} />
@@ -124,27 +133,27 @@ export default function App() {
 
           {/* Student routes */}
           <Route path="/student" element={<StudentGuard><StudentLayout /></StudentGuard>}>
-            <Route index element={<PageErrorBoundary pageName="Dashboard"><StudentDashboard /></PageErrorBoundary>} />
-            <Route path="dashboard" element={<PageErrorBoundary pageName="Dashboard"><StudentDashboard /></PageErrorBoundary>} />
-            <Route path="admission" element={<PageErrorBoundary pageName="Admission"><StudentAdmission /></PageErrorBoundary>} />
-            <Route path="track" element={<PageErrorBoundary pageName="Track Application"><StudentApplicationTracker /></PageErrorBoundary>} />
-            <Route path="exam" element={<PageErrorBoundary pageName="Exam"><StudentExam /></PageErrorBoundary>} />
-            <Route path="results" element={<PageErrorBoundary pageName="Results"><StudentResults /></PageErrorBoundary>} />
-            <Route path="profile" element={<PageErrorBoundary pageName="Profile"><Profile /></PageErrorBoundary>} />
+            <Route index element={withLazyPageBoundary('Dashboard', <StudentDashboard />)} />
+            <Route path="dashboard" element={withLazyPageBoundary('Dashboard', <StudentDashboard />)} />
+            <Route path="admission" element={withLazyPageBoundary('Admission', <StudentAdmission />)} />
+            <Route path="track" element={withLazyPageBoundary('Track Application', <StudentApplicationTracker />)} />
+            <Route path="exam" element={withLazyPageBoundary('Exam', <StudentExam />)} />
+            <Route path="results" element={withLazyPageBoundary('Results', <StudentResults />)} />
+            <Route path="profile" element={withLazyPageBoundary('Profile', <Profile />)} />
           </Route>
 
           {/* Employee routes */}
           <Route path="/employee" element={<EmployeeLayout />}>
-            <Route index element={<PageErrorBoundary pageName="Dashboard"><EmployeeDashboard /></PageErrorBoundary>} />
-            <Route path="dashboard" element={<PageErrorBoundary pageName="Dashboard"><EmployeeDashboard /></PageErrorBoundary>} />
-            <Route path="admissions" element={<RoleGuard page="admissions"><PageErrorBoundary pageName="Admissions"><EmployeeAdmissions /></PageErrorBoundary></RoleGuard>} />
-            <Route path="exams" element={<RoleGuard page="exams"><PageErrorBoundary pageName="Exams"><EmployeeExams /></PageErrorBoundary></RoleGuard>} />
-            <Route path="results" element={<RoleGuard page="results"><PageErrorBoundary pageName="Results"><EmployeeResults /></PageErrorBoundary></RoleGuard>} />
-            <Route path="reports" element={<RoleGuard page="reports"><PageErrorBoundary pageName="Reports"><EmployeeReports /></PageErrorBoundary></RoleGuard>} />
-            <Route path="users" element={<RoleGuard page="users"><PageErrorBoundary pageName="Users"><EmployeeUsers /></PageErrorBoundary></RoleGuard>} />
-            <Route path="audit" element={<RoleGuard page="audit"><PageErrorBoundary pageName="Audit Log"><EmployeeAuditLog /></PageErrorBoundary></RoleGuard>} />
-            <Route path="settings" element={<RoleGuard page="settings"><PageErrorBoundary pageName="Settings"><EmployeeSettings /></PageErrorBoundary></RoleGuard>} />
-            <Route path="profile" element={<PageErrorBoundary pageName="Profile"><Profile /></PageErrorBoundary>} />
+            <Route index element={withLazyPageBoundary('Dashboard', <EmployeeDashboard />)} />
+            <Route path="dashboard" element={withLazyPageBoundary('Dashboard', <EmployeeDashboard />)} />
+            <Route path="admissions" element={<RoleGuard page="admissions">{withLazyPageBoundary('Admissions', <EmployeeAdmissions />)}</RoleGuard>} />
+            <Route path="exams" element={<RoleGuard page="exams">{withLazyPageBoundary('Exams', <EmployeeExams />)}</RoleGuard>} />
+            <Route path="results" element={<RoleGuard page="results">{withLazyPageBoundary('Results', <EmployeeResults />)}</RoleGuard>} />
+            <Route path="reports" element={<RoleGuard page="reports">{withLazyPageBoundary('Reports', <EmployeeReports />)}</RoleGuard>} />
+            <Route path="users" element={<RoleGuard page="users">{withLazyPageBoundary('Users', <EmployeeUsers />)}</RoleGuard>} />
+            <Route path="audit" element={<RoleGuard page="audit">{withLazyPageBoundary('Audit Log', <EmployeeAuditLog />)}</RoleGuard>} />
+            <Route path="settings" element={<RoleGuard page="settings">{withLazyPageBoundary('Settings', <EmployeeSettings />)}</RoleGuard>} />
+            <Route path="profile" element={withLazyPageBoundary('Profile', <Profile />)} />
           </Route>
 
           {/* Root redirect */}
@@ -153,7 +162,6 @@ export default function App() {
           {/* Catch-all 404 */}
           <Route path="*" element={<NotFound />} />
         </Routes>
-        </Suspense>
       </HashRouter>
       </ConfirmProvider>
         </SocketProvider>
