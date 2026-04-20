@@ -2,6 +2,7 @@ import prisma from '../config/db.js';
 import { paginate, paginatedResponse } from '../utils/pagination.js';
 import { logAudit } from '../utils/auditLog.js';
 import { sendExamResultEmail } from '../utils/email.js';
+import { invalidatePrefix } from '../utils/cache.js';
 
 function normalizeFreeText(value) {
   return String(value || '')
@@ -120,7 +121,7 @@ export async function scoreEssay(req, res, next) {
         }),
         prisma.user.findFirst({
           where: { email: reg.userEmail },
-          select: { email: true, firstName: true },
+          select: { id: true, email: true, firstName: true },
         }),
       ]);
 
@@ -161,6 +162,11 @@ export async function scoreEssay(req, res, next) {
             reviewedById: req.user.id,
           },
         });
+
+        if (student?.id) {
+          invalidatePrefix(`results:mine:${student.id}:`);
+        }
+        invalidatePrefix(`results:answers:${essay.registrationId}`);
 
         if (student) {
           sendExamResultEmail({

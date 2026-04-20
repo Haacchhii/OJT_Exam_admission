@@ -108,28 +108,20 @@ export async function getMyResult(req, res, next) {
       where.registration = { ...where.registration, schedule: { exam: { academicYearId: Number(academicYearId) } } };
     }
 
-    const summary = await prisma.examResult.aggregate({
-      where,
-      _count: { _all: true },
-      _max: { id: true, updatedAt: true },
-    });
-
-    const etag = `W/"results-mine:${req.user.id}:${academicYearId || 'all'}:${summary._count._all}:${summary._max.id || 0}:${summary._max.updatedAt ? summary._max.updatedAt.getTime() : 0}"`;
-    res.set('ETag', etag);
-    res.vary('Authorization');
-    if (req.fresh) return res.status(304).end();
-
-    const latest = await prisma.examResult.findFirst({
-      where,
-      include: {
-        registration: {
-          include: {
-            schedule: { include: { exam: { select: { title: true, gradeLevel: true, academicYearId: true } } } },
+    const cacheKey = `results:mine:${req.user.id}:${academicYearId || 'all'}`;
+    const latest = await cached(cacheKey, async () => {
+      return prisma.examResult.findFirst({
+        where,
+        include: {
+          registration: {
+            include: {
+              schedule: { include: { exam: { select: { title: true, gradeLevel: true, academicYearId: true } } } },
+            },
           },
         },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+        orderBy: { createdAt: 'desc' },
+      });
+    }, 60_000);
 
     res.json(latest || null);
   } catch (err) { next(err); }
@@ -172,35 +164,40 @@ export async function getSubmittedAnswers(req, res, next) {
         return res.status(403).json({ error: 'Access denied', code: 'FORBIDDEN' });
       }
     }
-    const answers = await prisma.submittedAnswer.findMany({
-      where: { registrationId: regId },
-      select: {
-        id: true,
-        registrationId: true,
-        questionId: true,
-        selectedChoiceId: true,
-        essayText: true,
-        question: {
-          select: {
-            id: true,
-            questionType: true,
-            points: true,
+    const cacheKey = `results:answers:${regId}`;
+    const enriched = await cached(cacheKey, async () => {
+      const answers = await prisma.submittedAnswer.findMany({
+        where: { registrationId: regId },
+        select: {
+          id: true,
+          registrationId: true,
+          questionId: true,
+          selectedChoiceId: true,
+          essayText: true,
+          question: {
+            select: {
+              id: true,
+              questionType: true,
+              points: true,
+            },
           },
         },
-      },
-    });
-    // Attach essay scoring data (comment, pointsAwarded) from EssayAnswer records
-    const essayRecords = await prisma.essayAnswer.findMany({
-      where: { registrationId: regId },
-    });
-    const essayMap = new Map(essayRecords.map(e => [e.questionId, e]));
-    const enriched = answers.map(a => {
-      const essay = essayMap.get(a.questionId);
-      if (essay) {
-        return { ...a, pointsAwarded: essay.pointsAwarded, essayComment: essay.comment };
-      }
-      return a;
-    });
+      });
+
+      // Attach essay scoring data (comment, pointsAwarded) from EssayAnswer records
+      const essayRecords = await prisma.essayAnswer.findMany({
+        where: { registrationId: regId },
+      });
+      const essayMap = new Map(essayRecords.map(e => [e.questionId, e]));
+      return answers.map(a => {
+        const essay = essayMap.get(a.questionId);
+        if (essay) {
+          return { ...a, pointsAwarded: essay.pointsAwarded, essayComment: essay.comment };
+        }
+        return a;
+      });
+    }, 60_000);
+
     res.json(enriched);
   } catch (err) { next(err); }
 }

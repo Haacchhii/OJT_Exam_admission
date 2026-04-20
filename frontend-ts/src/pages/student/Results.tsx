@@ -1,9 +1,9 @@
 ﻿import { Link } from 'react-router-dom';
-import { getMyRegistrationSummary, getExamForReview, getMyRegistrations } from '../../api/exams';
+import { getMyRegistrationSummary, getExamForReview, getMyRegistrationById } from '../../api/exams';
 import { getMyResult, getSubmittedAnswers } from '../../api/results';
 import { PageHeader, SkeletonPage, ErrorAlert, ActionButton } from '../../components/UI';
 import Icon from '../../components/Icons';
-import { formatDate, asArray, formatPersonName } from '../../utils/helpers';
+import { formatDate, formatPersonName } from '../../utils/helpers';
 import { SCHOOL_NAME, SCHOOL_BRAND, SCHOOL_SUBTITLE, SCHOOL_ADDRESS, SCHOOL_PHONE } from '../../utils/constants';
 import { useAuth } from '../../context/AuthContext';
 import { showToast } from '../../components/Toast';
@@ -47,16 +47,20 @@ export default function StudentResults() {
   const { user } = useAuth();
 
   const { data: rawData, loading, error, refetch } = useAsync<ResultsData>(async () => {
-    const [regSummary, myResult, registrations] = await Promise.all([
+    const [regSummary, myResult] = await Promise.all([
       getMyRegistrationSummary(),
       getMyResult(),
-      getMyRegistrations(),
     ]);
-    const regs = asArray<ExamRegistration>(registrations);
-    const regFromResult = myResult?.registrationId
-      ? (regs.find((r) => r.id === myResult.registrationId) || null)
-      : null;
-    const myReg = regFromResult || regSummary?.latest || null;
+
+    let myReg = regSummary?.latest || null;
+    if (myResult?.registrationId && (!myReg || myReg.id !== myResult.registrationId)) {
+      try {
+        myReg = await getMyRegistrationById(myResult.registrationId);
+      } catch {
+        // Keep fallback registration summary if targeted lookup fails.
+      }
+    }
+
     const targetRegistrationId = myResult?.registrationId || myReg?.id || null;
     const examId = myReg?.schedule?.examId;
 
@@ -77,7 +81,8 @@ export default function StudentResults() {
         })(),
         (async () => {
           try {
-            return asArray<SubmittedAnswer>(await getSubmittedAnswers(targetRegistrationId));
+            const rows = await getSubmittedAnswers(targetRegistrationId);
+            return Array.isArray(rows) ? rows : [];
           } catch (err) {
             showToast('Could not load your submitted answers.', 'error');
             console.error('getSubmittedAnswers failed:', err);

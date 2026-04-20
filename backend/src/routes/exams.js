@@ -21,6 +21,7 @@ router.delete('/schedules/:id',    authorize(ROLES.ADMIN, ROLES.TEACHER), ctrl.d
 router.get('/registrations',       authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), validateQuery(registrationsQuerySchema), ctrl.getRegistrations);
 router.get('/readiness',           authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), validateQuery(examReadinessQuerySchema), ctrl.getReadiness);
 router.get('/registrations/mine-summary', authorize(ROLES.APPLICANT), ctrl.getMyRegistrationSummary);
+router.get('/registrations/mine/:id', authorize(ROLES.APPLICANT), ctrl.getMyRegistrationById);
 router.get('/registrations/mine',  authorize(ROLES.APPLICANT), ctrl.getMyRegistrations);
 router.post('/registrations',      authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.APPLICANT), validate(createRegistrationSchema), ctrl.createRegistration);
 router.patch('/registrations/:id/start', authorize(ROLES.APPLICANT), ctrl.startExam);

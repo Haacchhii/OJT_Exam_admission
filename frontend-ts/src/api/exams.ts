@@ -115,7 +115,7 @@ export async function getExamSchedulesPage(params?: ExamParams & { examId?: numb
 }
 
 export async function getAvailableSchedules() {
-  return client.get<ExamSchedule[]>('/exams/schedules/available', { noCache: true });
+  return client.get<ExamSchedule[]>('/exams/schedules/available');
 }
 
 export async function notifyNoExamSchedule(message?: string) {
@@ -153,7 +153,11 @@ export async function getExamReadinessPage(params?: ExamReadinessParams) {
 }
 
 export async function getMyRegistrations() {
-  return client.get<ExamRegistration[]>('/exams/registrations/mine', { noCache: true });
+  return client.get<ExamRegistration[]>('/exams/registrations/mine');
+}
+
+export async function getMyRegistrationById(registrationId: number) {
+  return client.get<ExamRegistration>(`/exams/registrations/mine/${registrationId}`);
 }
 
 export interface MyRegistrationSummary {
@@ -163,7 +167,7 @@ export interface MyRegistrationSummary {
 }
 
 export async function getMyRegistrationSummary(params?: { academicYearId?: number }) {
-  return client.get<MyRegistrationSummary>(`/exams/registrations/mine-summary${qs(params)}`, { noCache: true });
+  return client.get<MyRegistrationSummary>(`/exams/registrations/mine-summary${qs(params)}`);
 }
 
 export async function registerForExam(userEmail: string, scheduleId: number) {

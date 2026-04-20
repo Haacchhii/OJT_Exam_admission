@@ -85,7 +85,7 @@ export async function getEmployeeResultsSummary(params?: EmployeeResultsSummaryP
 }
 
 export async function getMyResult() {
-  return client.get<ExamResult | null>('/results/mine', { noCache: true });
+  return client.get<ExamResult | null>('/results/mine');
 }
 
 export async function getEssayAnswers(params?: EssayParams) {
@@ -97,7 +97,7 @@ export async function scoreEssay(answerId: number, points: number, comment?: str
 }
 
 export async function getSubmittedAnswers(registrationId: number) {
-  return client.get<SubmittedAnswer[]>(`/results/answers/${registrationId}`, { noCache: true });
+  return client.get<SubmittedAnswer[]>(`/results/answers/${registrationId}`);
 }
 
 export async function getQuestionAnalytics(examId: number) {

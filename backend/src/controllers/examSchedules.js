@@ -4,6 +4,7 @@ import { GRADE_TO_EXAM_LEVEL, GRADE_TO_LEGACY_EXAM_LEVEL, ROLES } from '../utils
 import { getIo } from '../utils/socket.js';
 import { logAudit } from '../utils/auditLog.js';
 import { attachExamWindowStatus, computeExamWindowStatus, getEffectiveExamWindow } from '../utils/examWindow.js';
+import { cached, invalidatePrefix } from '../utils/cache.js';
 
 function getTodayLocalIso() {
   const now = new Date();
@@ -226,13 +227,16 @@ export async function getAvailableSchedules(req, res, next) {
       }
     }
 
-    const schedules = await prisma.examSchedule.findMany({
-      where: {
-        exam: { isActive: true, academicYearId: activeYear.id, ...gradeFilter },
-      },
-      include: { exam: { select: { title: true, gradeLevel: true } } },
-      orderBy: { scheduledDate: 'asc' },
-    });
+    const cacheKey = `schedules:available:${req.user?.id || 'anon'}:${activeYear.id}:${activeSemester.id}:${JSON.stringify(gradeFilter)}`;
+    const schedules = await cached(cacheKey, async () => {
+      return prisma.examSchedule.findMany({
+        where: {
+          exam: { isActive: true, academicYearId: activeYear.id, ...gradeFilter },
+        },
+        include: { exam: { select: { title: true, gradeLevel: true } } },
+        orderBy: { scheduledDate: 'asc' },
+      });
+    }, 45_000);
 
     const now = new Date();
 
@@ -321,6 +325,8 @@ export async function createSchedule(req, res, next) {
       },
     });
 
+    invalidatePrefix('schedules:available:');
+
     res.status(201).json(attachExamWindowStatus(schedule));
   } catch (err) { next(err); }
 }
@@ -406,6 +412,8 @@ export async function updateSchedule(req, res, next) {
       data,
     });
 
+    invalidatePrefix('schedules:available:');
+
     res.json(attachExamWindowStatus(schedule));
   } catch (err) { next(err); }
 }
@@ -417,6 +425,7 @@ export async function deleteSchedule(req, res, next) {
     // Cascade: delete registrations first (which cascade to results/answers)
     await prisma.examRegistration.deleteMany({ where: { scheduleId: id } });
     await prisma.examSchedule.delete({ where: { id } });
+    invalidatePrefix('schedules:available:');
     res.status(204).end();
   } catch (err) { next(err); }
 }

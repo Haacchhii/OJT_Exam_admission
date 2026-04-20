@@ -26,9 +26,10 @@ function registrationBelongsToUser(registration, user) {
   return normalizeEmail(registration.userEmail) === normalizeEmail(user.email);
 }
 
-function invalidateMyRegistrationSummary(userId) {
+function invalidateMyRegistrationCaches(userId) {
   if (!userId) return;
   invalidatePrefix(`regs:mine-summary:${userId}:`);
+  invalidatePrefix(`regs:mine:${userId}:`);
 }
 
 function getTodayLocalIso() {
@@ -141,12 +142,39 @@ export async function getMyRegistrations(req, res, next) {
     if (academicYearId) {
       where.schedule = { exam: { academicYearId: Number(academicYearId) } };
     }
-    const registrations = await prisma.examRegistration.findMany({
-      where,
-      include: myRegistrationInclude,
-      orderBy: { createdAt: 'desc' },
-    });
+    const cacheKey = `regs:mine:${req.user.id}:${academicYearId || 'all'}`;
+    const registrations = await cached(cacheKey, async () => {
+      return prisma.examRegistration.findMany({
+        where,
+        include: myRegistrationInclude,
+        orderBy: { createdAt: 'desc' },
+      });
+    }, 60_000);
     res.json(registrations.map(withWindowStatus));
+  } catch (err) { next(err); }
+}
+
+// GET /api/exams/registrations/mine/:id
+export async function getMyRegistrationById(req, res, next) {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id) || id <= 0) {
+      return res.status(400).json({ error: 'Invalid registration id', code: 'VALIDATION_ERROR' });
+    }
+
+    const cacheKey = `regs:mine:${req.user.id}:id:${id}`;
+    const registration = await cached(cacheKey, async () => {
+      return prisma.examRegistration.findUnique({
+        where: { id },
+        include: myRegistrationInclude,
+      });
+    }, 60_000);
+
+    if (!registration || !registrationBelongsToUser(registration, req.user)) {
+      return res.status(404).json({ error: 'Registration not found', code: 'NOT_FOUND' });
+    }
+
+    res.json(withWindowStatus(registration));
   } catch (err) { next(err); }
 }
 
@@ -176,7 +204,7 @@ export async function getMyRegistrationSummary(req, res, next) {
         hasCompletedExam: completedCount > 0,
         totalRegistrations,
       };
-    }, 15_000);
+    }, 60_000);
 
     res.json(summary);
   } catch (err) { next(err); }
@@ -312,7 +340,8 @@ export async function createRegistration(req, res, next) {
     });
 
     res.status(201).json(registration);
-    invalidateMyRegistrationSummary(targetUserId);
+    invalidateMyRegistrationCaches(targetUserId);
+    invalidatePrefix('schedules:available:');
 
     // Fire-and-forget booking confirmation email
     prisma.examSchedule.findUnique({
@@ -405,7 +434,7 @@ export async function startExam(req, res, next) {
       data: { status: 'started', startedAt: new Date() },
     });
 
-    invalidateMyRegistrationSummary(req.user.id);
+    invalidateMyRegistrationCaches(req.user.id);
     res.json(updated);
   } catch (err) { next(err); }
 }
@@ -458,7 +487,8 @@ export async function cancelRegistration(req, res, next) {
       });
     });
 
-    invalidateMyRegistrationSummary(req.user.id);
+    invalidateMyRegistrationCaches(req.user.id);
+    invalidatePrefix('schedules:available:');
     res.status(204).end();
   } catch (err) { next(err); }
 }

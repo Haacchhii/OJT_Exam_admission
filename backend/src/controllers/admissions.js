@@ -15,10 +15,13 @@ const ADMISSION_IN_PROGRESS = ['Submitted', 'Under Screening', 'Under Evaluation
 const REPORTS_DEFAULT_ADMISSIONS = 80;
 const REPORTS_MAX_ADMISSIONS = 200;
 
-function invalidateAdmissionCaches() {
+function invalidateAdmissionCaches(userIds = []) {
   invalidatePrefix('admStats:');
   invalidatePrefix('dashboardSummary:');
   invalidatePrefix('reportsSummary:');
+  for (const userId of userIds) {
+    if (userId) invalidatePrefix(`adm:mine:${userId}`);
+  }
 }
 
 function toIsoDay(d) {
@@ -126,11 +129,14 @@ export async function getAdmissions(req, res, next) {
 // GET /api/admissions/mine
 export async function getMyAdmission(req, res, next) {
   try {
-    const admission = await prisma.admission.findFirst({
-      where: { userId: req.user.id, deletedAt: null },
-      include: { documents: true, academicYear: true, semester: true },
-      orderBy: { submittedAt: 'desc' },
-    });
+    const cacheKey = `adm:mine:${req.user.id}`;
+    const admission = await cached(cacheKey, () =>
+      prisma.admission.findFirst({
+        where: { userId: req.user.id, deletedAt: null },
+        include: { documents: true, academicYear: true, semester: true },
+        orderBy: { submittedAt: 'desc' },
+      }),
+    60_000);
     res.json(shapeAdmission(admission));
   } catch (err) { next(err); }
 }
@@ -655,7 +661,7 @@ export async function createAdmission(req, res, next) {
 
     logAudit({ userId: req.user.id, action: 'admission.create', entity: 'admission', entityId: admission.id, details: { trackingId, gradeLevel, applicantType: applicantType || 'New' }, ipAddress: req.ip });
 
-    invalidateAdmissionCaches();
+    invalidateAdmissionCaches([req.user.id]);
 
     // Fire-and-forget confirmation email to the applicant
     sendAdmissionSubmittedEmail({ to: email, firstName, trackingId, gradeLevel });
@@ -750,7 +756,7 @@ export async function updateStatus(req, res, next) {
 
     logAudit({ userId: req.user.id, action: 'admission.status_update', entity: 'admission', entityId: id, details: { from: admission.status, to: status, notes: notes || null }, ipAddress: req.ip });
 
-    invalidateAdmissionCaches();
+    invalidateAdmissionCaches([admission.userId]);
 
     // Fire-and-forget status update email to the applicant
     sendAdmissionStatusEmail({
@@ -801,7 +807,7 @@ export async function bulkUpdateStatus(req, res, next) {
 
     logAudit({ userId: req.user.id, action: 'admission.bulk_status_update', entity: 'admission', entityId: null, details: { ids, to: status, count: result.count }, ipAddress: req.ip });
 
-    invalidateAdmissionCaches();
+    invalidateAdmissionCaches(admissions.map((adm) => adm.userId));
 
     try {
       const io = getIo();
