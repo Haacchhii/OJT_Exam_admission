@@ -103,6 +103,7 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
     const statsParams: Record<string, unknown> = {};
     if (gradeFilter !== 'all') statsParams.grade = gradeFilter;
     if (levelGroupFilter !== 'all') statsParams.levelGroup = levelGroupFilter;
+    statsParams.slaDays = SLA_DAYS;
     if (yearFilter !== 'all') statsParams.academicYearId = Number(yearFilter);
     if (semesterFilter !== 'all') statsParams.semesterId = Number(semesterFilter);
     return getStats(statsParams);
@@ -110,13 +111,6 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
     autoRefreshOnDataChange: true,
     resourcePrefixes: ['/admissions'],
   });
-
-  const { data: stalePreview, refetch: refetchStalePreview } = useAsync(async () => {
-    if (!canManage) {
-      return { data: [] as Admission[], pagination: { page: 1, limit: 20, total: 0, totalPages: 1 } };
-    }
-    return getAdmissionsPage({ staleOnly: true, slaDays: SLA_DAYS, page: 1, limit: 20 });
-  }, [canManage], 0, { autoRefreshOnDataChange: true, resourcePrefixes: ['/admissions'] });
 
 
   useEffect(() => {
@@ -129,7 +123,6 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
         invalidateResourceCache(['/admissions']);
         refetch();
         refetchStats();
-        refetchStalePreview();
       }, 350);
     };
 
@@ -141,7 +134,7 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
       socket.off('admission_bulk_status_updated', handleStatusUpdate);
       if (refetchTimer) clearTimeout(refetchTimer);
     };
-  }, [socket, isConnected, refetch, refetchStats, refetchStalePreview]);
+  }, [socket, isConnected, refetch, refetchStats]);
 
   const { data: academicYears } = useAsync<AcademicYear[]>(() => getAcademicYears());
   const { data: allSemesters } = useAsync<Semester[]>(() => getSemesters());
@@ -155,8 +148,7 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
   const admissions = rawData?.admissionsPage?.data || [];
   const pagination = rawData?.admissionsPage?.pagination || { page: 1, limit: PER_PAGE, total: 0, totalPages: 1 };
 
-  const staleAdmissions = stalePreview?.data || [];
-  const staleCount = stalePreview?.pagination?.total || 0;
+  const staleCount = stats?.overSlaCount || 0;
 
   useEffect(() => {
     setSelected(new Set());
@@ -211,7 +203,7 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
       showToast(`${validIds.length} application(s) updated to ${bulkStatus}.${skippedIds.length ? ` ${skippedIds.length} skipped.` : ''}`, 'success');
       setSelected(new Set());
       refetch();
-      refetchStalePreview();
+      refetchStats();
     } catch (err: any) {
       showToast('Bulk update failed: ' + (err.message || 'Unknown error'), 'error');
     } finally {
@@ -235,7 +227,7 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
       showToast(`${ids.length} application(s) deleted.`, 'info');
       setSelected(new Set());
       refetch();
-      refetchStalePreview();
+      refetchStats();
     } catch {
       showToast('Failed to delete applications.', 'error');
     } finally {
@@ -244,18 +236,19 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
   };
 
   const copyEscalationDraft = async () => {
-    if (staleAdmissions.length === 0) return;
-    const lines = [
-      'Admissions Escalation Draft',
-      `Date: ${new Date().toLocaleDateString()}`,
-      `Over-SLA applications: ${staleCount}`,
-      '',
-      ...staleAdmissions.slice(0, 20).map(a => {
-        const name = formatPersonName(a);
-        return `#${a.id} | ${name} | ${a.status} | ${daysPending(a.submittedAt)}d pending`;
-      }),
-    ];
+    if (staleCount === 0) return;
     try {
+      const stalePreview = await getAdmissionsPage({ staleOnly: true, slaDays: SLA_DAYS, page: 1, limit: 20 });
+      const lines = [
+        'Admissions Escalation Draft',
+        `Date: ${new Date().toLocaleDateString()}`,
+        `Over-SLA applications: ${staleCount}`,
+        '',
+        ...stalePreview.data.slice(0, 20).map(a => {
+          const name = formatPersonName(a);
+          return `#${a.id} | ${name} | ${a.status} | ${daysPending(a.submittedAt)}d pending`;
+        }),
+      ];
       await navigator.clipboard.writeText(lines.join('\n'));
       showToast('Escalation draft copied to clipboard.', 'success');
     } catch {

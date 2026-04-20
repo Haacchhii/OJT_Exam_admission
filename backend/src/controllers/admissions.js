@@ -324,9 +324,10 @@ export async function getAdmission(req, res, next) {
 // GET /api/admissions/stats?grade=&from=&to=&academicYearId=&semesterId=
 export async function getStats(req, res, next) {
   try {
-    const { grade, from, to, academicYearId, semesterId } = req.query;
+    const { grade, levelGroup, from, to, academicYearId, semesterId, slaDays } = req.query;
     const where = { deletedAt: null };
     if (grade)         where.gradeLevel = grade;
+    if (levelGroup)    where.levelGroup = levelGroup;
     if (academicYearId) where.academicYearId = Number(academicYearId);
     if (semesterId)    where.semesterId = Number(semesterId);
     if (from || to) {
@@ -334,13 +335,22 @@ export async function getStats(req, res, next) {
       if (from) { const d = new Date(from); if (!isNaN(d.getTime())) where.submittedAt.gte = d; }
       if (to)   { const d = new Date(to);   if (!isNaN(d.getTime())) where.submittedAt.lte = d; }
     }
+    const staleThresholdDays = Number(slaDays) > 0 ? Number(slaDays) : 7;
+    const staleThreshold = new Date(Date.now() - staleThresholdDays * 24 * 60 * 60 * 1000);
 
-    const cacheKey = `admStats:${JSON.stringify(where)}`;
+    const cacheKey = `admStats:${JSON.stringify({ where, staleThresholdDays })}`;
     const counts = await cached(cacheKey, async () => {
       const applicantWhere = { deletedAt: null, role: ROLES.APPLICANT };
-      const [total, grouped, registeredApplicants, applicantsWithoutAdmissions, unverifiedApplicants, inactiveApplicants] = await Promise.all([
+      const [total, grouped, overSlaCount, registeredApplicants, applicantsWithoutAdmissions, unverifiedApplicants, inactiveApplicants] = await Promise.all([
         prisma.admission.count({ where }),
         prisma.admission.groupBy({ by: ['status'], _count: { _all: true }, where }),
+        prisma.admission.count({
+          where: {
+            ...where,
+            status: { in: ADMISSION_IN_PROGRESS },
+            submittedAt: { lt: staleThreshold },
+          },
+        }),
         prisma.user.count({ where: applicantWhere }),
         prisma.user.count({
           where: {
@@ -359,6 +369,7 @@ export async function getStats(req, res, next) {
         underEvaluation:  statusMap['Under Evaluation'] || 0,
         accepted:         statusMap['Accepted'] || 0,
         rejected:         statusMap['Rejected'] || 0,
+        overSlaCount,
         registeredApplicants,
         applicantsWithoutAdmissions,
         unverifiedApplicants,
@@ -391,6 +402,7 @@ export async function getDashboardSummary(req, res, next) {
       };
       let trends = { total: 0, accepted: 0, inProgress: 0, rejected: 0 };
       let overdueCount = 0;
+      let recentAdmissions = [];
 
       if (includeAdmissions) {
         const now = Date.now();
@@ -398,7 +410,7 @@ export async function getDashboardSummary(req, res, next) {
         const twoWeeksAgo = new Date(now - 14 * 24 * 60 * 60 * 1000);
         const overdueThreshold = new Date(now - 7 * 24 * 60 * 60 * 1000);
 
-        const [total, grouped, overdue, thisWeekTotal, lastWeekTotal, thisWeekGrouped, lastWeekGrouped] = await Promise.all([
+        const [total, grouped, overdue, thisWeekTotal, lastWeekTotal, thisWeekGrouped, lastWeekGrouped, recentAdmissionsRows] = await Promise.all([
           prisma.admission.count({ where: { deletedAt: null } }),
           prisma.admission.groupBy({
             by: ['status'],
@@ -424,9 +436,16 @@ export async function getDashboardSummary(req, res, next) {
             _count: { _all: true },
             where: { deletedAt: null, submittedAt: { gte: twoWeeksAgo, lt: weekAgo } },
           }),
+          prisma.admission.findMany({
+            where: { deletedAt: null },
+            orderBy: { submittedAt: 'desc' },
+            take: 5,
+            include: { documents: true, academicYear: true, semester: true },
+          }),
         ]);
 
         overdueCount = overdue;
+        recentAdmissions = recentAdmissionsRows.map(shapeAdmission);
         const statusMap = Object.fromEntries(grouped.map(g => [g.status, g._count._all]));
         stats = {
           total,
@@ -504,7 +523,7 @@ export async function getDashboardSummary(req, res, next) {
       return {
         stats,
         trends,
-        admissions: [],
+        admissions: recentAdmissions,
         overdue: overdueCount,
         exams: examActivity,
         examCount,

@@ -306,6 +306,7 @@ export const admissionsStatsQuerySchema = z.object({
   levelGroup:     optionalString,
   from:           isoDateStr.optional(),
   to:             isoDateStr.optional(),
+  slaDays:        z.coerce.number().int().min(1).max(60).optional(),
   academicYearId: coerceOptionalInt,
   semesterId:     coerceOptionalInt,
 });

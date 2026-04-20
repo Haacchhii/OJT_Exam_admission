@@ -375,6 +375,7 @@ model AcademicYear {
   admissions  Admission[]
   exams       Exam[]
 
+  @@index([isActive])
   @@map("academic_years")
 }
 
@@ -393,6 +394,9 @@ model Semester {
   exams        Exam[]
 
   @@unique([academicYearId, name])
+  @@index([academicYearId])
+  @@index([academicYearId, isActive])
+  @@index([isActive])
   @@map("semesters")
 }
 

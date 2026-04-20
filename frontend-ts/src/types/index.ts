@@ -101,6 +101,7 @@ export interface AdmissionStats {
   underEvaluation: number;
   accepted: number;
   rejected: number;
+  overSlaCount?: number;
   registeredApplicants?: number;
   applicantsWithoutAdmissions?: number;
   unverifiedApplicants?: number;

@@ -28,6 +28,11 @@ export default function EmployeeDashboard() {
   const [gradeFilter, setGradeFilter] = useState('all');
   const [page, setPage] = useState(1);
   const [examPage, setExamPage] = useState(1);
+  const hasAdmissionFilters = statusFilter !== 'all'
+    || levelGroupFilter !== 'all'
+    || gradeFilter !== 'all'
+    || search.trim().length > 0
+    || page !== 1;
 
   const { socket, isConnected } = useSocket();
 
@@ -53,6 +58,20 @@ export default function EmployeeDashboard() {
       };
     }
 
+    if (!hasAdmissionFilters) {
+      const summaryAdmissions = rawData?.admissions || [];
+      const total = rawData?.stats?.total ?? summaryAdmissions.length;
+      return {
+        data: summaryAdmissions,
+        pagination: {
+          page: 1,
+          limit: PER_PAGE,
+          total,
+          totalPages: Math.max(1, Math.ceil(total / PER_PAGE)),
+        },
+      };
+    }
+
     const params: {
       page: number;
       limit: number;
@@ -68,7 +87,7 @@ export default function EmployeeDashboard() {
     if (search.trim()) params.search = search.trim();
 
     return getAdmissionsPage(params);
-  }, [canViewAdmissions, statusFilter, levelGroupFilter, gradeFilter, search, page], 0, { setLoadingOnReload: true });
+  }, [canViewAdmissions, hasAdmissionFilters, rawData?.admissions, rawData?.stats?.total, statusFilter, levelGroupFilter, gradeFilter, search, page], 0, { setLoadingOnReload: true });
 
 
   useEffect(() => {
@@ -80,7 +99,9 @@ export default function EmployeeDashboard() {
         refetchTimer = null;
         invalidateResourceCache(['/admissions']);
         refetch();
-        refetchAdmissions();
+        if (hasAdmissionFilters) {
+          refetchAdmissions();
+        }
       }, 350);
     };
     socket.on('admission_status_updated', handleUpdate);
@@ -90,7 +111,7 @@ export default function EmployeeDashboard() {
       socket.off('admission_bulk_status_updated', handleUpdate);
       if (refetchTimer) clearTimeout(refetchTimer);
     };
-  }, [socket, isConnected, refetch, refetchAdmissions]);
+  }, [socket, isConnected, hasAdmissionFilters, refetch, refetchAdmissions]);
 
   const admissions = admissionsPage?.data || [];
   const admissionsPagination = admissionsPage?.pagination || {
