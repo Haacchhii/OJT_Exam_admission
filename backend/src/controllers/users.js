@@ -3,6 +3,47 @@ import prisma from '../config/db.js';
 import { paginate, paginatedResponse } from '../utils/pagination.js';
 import { logAudit } from '../utils/auditLog.js';
 import { ROLES, BCRYPT_ROUNDS } from '../utils/constants.js';
+import { cached, invalidatePrefix } from '../utils/cache.js';
+
+const userListSelect = {
+  id: true,
+  firstName: true,
+  middleName: true,
+  lastName: true,
+  email: true,
+  role: true,
+  status: true,
+  phone: true,
+  address: true,
+  emailVerified: true,
+  createdAt: true,
+  updatedAt: true,
+  deletedAt: true,
+  applicantProfile: { select: { gradeLevel: true } },
+};
+
+const userDetailSelect = {
+  id: true,
+  firstName: true,
+  middleName: true,
+  lastName: true,
+  email: true,
+  role: true,
+  status: true,
+  phone: true,
+  address: true,
+  emailVerified: true,
+  createdAt: true,
+  updatedAt: true,
+  deletedAt: true,
+};
+
+function invalidateUserCaches() {
+  invalidatePrefix('users:list:');
+  invalidatePrefix('users:stats');
+  invalidatePrefix('users:id:');
+  invalidatePrefix('users:email:');
+}
 
 function safifyUser(user) {
   if (!user) return null;
@@ -28,10 +69,26 @@ export async function getUsers(req, res, next) {
       ];
     }
 
-    const [users, total] = await Promise.all([
-      prisma.user.findMany({ where, ...(pg && { skip: pg.skip, take: pg.take }), orderBy: { createdAt: 'desc' }, include: { applicantProfile: { select: { gradeLevel: true } } } }),
-      prisma.user.count({ where }),
-    ]);
+    const cacheKey = `users:list:${JSON.stringify({
+      search: search || null,
+      role: role || null,
+      status: status || null,
+      page: pg?.page || 1,
+      limit: pg?.limit || null,
+    })}`;
+
+    const { users, total } = await cached(cacheKey, async () => {
+      const [rows, count] = await Promise.all([
+        prisma.user.findMany({
+          where,
+          ...(pg && { skip: pg.skip, take: pg.take }),
+          orderBy: { createdAt: 'desc' },
+          select: userListSelect,
+        }),
+        prisma.user.count({ where }),
+      ]);
+      return { users: rows, total: count };
+    }, 120_000);
 
     res.json(paginatedResponse(users.map(safifyUser), total, pg));
   } catch (err) { next(err); }
@@ -40,32 +97,39 @@ export async function getUsers(req, res, next) {
 // GET /api/users/stats
 export async function getUserStats(req, res, next) {
   try {
-    const where = { deletedAt: null };
+    const stats = await cached('users:stats', async () => {
+      const where = { deletedAt: null };
+      const [total, grouped] = await Promise.all([
+        prisma.user.count({ where }),
+        prisma.user.groupBy({
+          by: ['role'],
+          _count: { _all: true },
+          where,
+        }),
+      ]);
 
-    const [total, grouped] = await Promise.all([
-      prisma.user.count({ where }),
-      prisma.user.groupBy({
-        by: ['role'],
-        _count: { _all: true },
-        where,
-      }),
-    ]);
+      const byRole = Object.fromEntries(grouped.map((row) => [row.role, row._count._all]));
+      return {
+        total,
+        admins: byRole['administrator'] || 0,
+        registrars: byRole['registrar'] || 0,
+        teachers: byRole['teacher'] || 0,
+        applicants: byRole['applicant'] || 0,
+      };
+    }, 120_000);
 
-    const byRole = Object.fromEntries(grouped.map((row) => [row.role, row._count._all]));
-    res.json({
-      total,
-      admins: byRole['administrator'] || 0,
-      registrars: byRole['registrar'] || 0,
-      teachers: byRole['teacher'] || 0,
-      applicants: byRole['applicant'] || 0,
-    });
+    res.json(stats);
   } catch (err) { next(err); }
 }
 
 // GET /api/users/:id
 export async function getUser(req, res, next) {
   try {
-    const user = await prisma.user.findUnique({ where: { id: Number(req.params.id) } });
+    const userId = Number(req.params.id);
+    const user = await cached(`users:id:${userId}`, async () => {
+      return prisma.user.findUnique({ where: { id: userId }, select: userDetailSelect });
+    }, 120_000);
+
     if (!user || user.deletedAt) return res.status(404).json({ error: 'We could not find this user.', code: 'NOT_FOUND' });
     res.json(safifyUser(user));
   } catch (err) { next(err); }
@@ -74,7 +138,12 @@ export async function getUser(req, res, next) {
 // GET /api/users/by-email/:email
 export async function getUserByEmail(req, res, next) {
   try {
-    const user = await prisma.user.findUnique({ where: { email: req.params.email } });
+    const rawEmail = String(req.params.email || '').trim();
+    const cacheKeyEmail = rawEmail.toLowerCase();
+    const user = await cached(`users:email:${cacheKeyEmail}`, async () => {
+      return prisma.user.findFirst({ where: { email: { equals: rawEmail, mode: 'insensitive' } }, select: userDetailSelect });
+    }, 120_000);
+
     if (!user || user.deletedAt) return res.status(404).json({ error: 'We could not find this user.', code: 'NOT_FOUND' });
     res.json(safifyUser(user));
   } catch (err) { next(err); }
@@ -92,6 +161,8 @@ export async function createUser(req, res, next) {
     const user = await prisma.user.create({
       data: { firstName, middleName, lastName, email, passwordHash, role: role || ROLES.APPLICANT, status: status || 'Active' },
     });
+
+    invalidateUserCaches();
 
     res.status(201).json(safifyUser(user));
 
@@ -130,6 +201,7 @@ export async function updateUser(req, res, next) {
           }),
           prisma.user.update({ where: { id }, data }),
         ]);
+        invalidateUserCaches();
         return res.json(safifyUser(user));
       }
     }
@@ -138,6 +210,8 @@ export async function updateUser(req, res, next) {
       where: { id },
       data,
     });
+
+    invalidateUserCaches();
 
     logAudit({ userId: req.user.id, action: 'user.update', entity: 'user', entityId: id, details: { fields: Object.keys(data) }, ipAddress: req.ip });
 
@@ -156,6 +230,8 @@ export async function deleteUser(req, res, next) {
     if (!user || user.deletedAt) return res.status(404).json({ error: 'We could not find this user.', code: 'NOT_FOUND' });
 
     await prisma.user.update({ where: { id }, data: { deletedAt: new Date() } });
+
+    invalidateUserCaches();
 
     logAudit({ userId: req.user.id, action: 'user.delete', entity: 'user', entityId: id, details: { email: user.email, role: user.role }, ipAddress: req.ip });
 
@@ -177,6 +253,8 @@ export async function bulkDeleteUsers(req, res, next) {
     const foundIds = users.map(u => u.id);
 
     await prisma.user.updateMany({ where: { id: { in: foundIds } }, data: { deletedAt: new Date() } });
+
+    invalidateUserCaches();
 
     logAudit({ userId: req.user.id, action: 'user.bulkDelete', entity: 'user', details: { count: users.length, ids: foundIds }, ipAddress: req.ip });
 

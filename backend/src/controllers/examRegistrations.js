@@ -10,14 +10,54 @@ function normalizeEmail(value) {
   return String(value || '').trim().toLowerCase();
 }
 
-function ownershipWhereForUser(user) {
+function buildRegistrationScope(academicYearId) {
+  if (!academicYearId) return {};
+  return { schedule: { exam: { academicYearId: Number(academicYearId) } } };
+}
+
+async function findOwnedRegistrations(user, academicYearId, include) {
+  const registrationScope = buildRegistrationScope(academicYearId);
   const email = normalizeEmail(user?.email);
-  return {
-    OR: [
-      { userId: user.id },
-      { userEmail: { equals: email, mode: 'insensitive' } },
-    ],
-  };
+
+  const byUserIdPromise = prisma.examRegistration.findMany({
+    where: {
+      userId: user.id,
+      ...registrationScope,
+    },
+    include,
+    orderBy: { createdAt: 'desc' },
+  });
+
+  const byEmailExactPromise = email
+    ? prisma.examRegistration.findMany({
+      where: {
+        userId: null,
+        userEmail: email,
+        ...registrationScope,
+      },
+      include,
+      orderBy: { createdAt: 'desc' },
+    })
+    : Promise.resolve([]);
+
+  const [byUserId, byEmailExact] = await Promise.all([byUserIdPromise, byEmailExactPromise]);
+
+  let byEmail = byEmailExact;
+  if (email && byEmailExact.length === 0) {
+    byEmail = await prisma.examRegistration.findMany({
+      where: {
+        userId: null,
+        userEmail: { equals: email, mode: 'insensitive' },
+        ...registrationScope,
+      },
+      include,
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  const merged = [...byUserId, ...byEmail];
+  merged.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  return merged;
 }
 
 function registrationBelongsToUser(registration, user) {
@@ -30,6 +70,12 @@ function invalidateMyRegistrationCaches(userId) {
   if (!userId) return;
   invalidatePrefix(`regs:mine-summary:${userId}:`);
   invalidatePrefix(`regs:mine:${userId}:`);
+}
+
+function invalidateEmployeeRegistrationCaches() {
+  invalidatePrefix('regs:list:');
+  invalidatePrefix('readiness:list:');
+  invalidatePrefix('resultsEmployeeSummary:');
 }
 
 function getTodayLocalIso() {
@@ -122,13 +168,26 @@ export async function getRegistrations(req, res, next) {
       where.userEmail = { contains: search, mode: 'insensitive' };
     }
 
-    const [registrations, total] = await Promise.all([
-      prisma.examRegistration.findMany({
-        where, ...(pg && { skip: pg.skip, take: pg.take }), orderBy: { createdAt: 'desc' },
-        include: { schedule: { include: { exam: { select: { title: true } } } } },
-      }),
-      prisma.examRegistration.count({ where }),
-    ]);
+    const cacheKey = `regs:list:${JSON.stringify({
+      search: search || null,
+      status: status || null,
+      examId: examId ? Number(examId) : null,
+      page: pg?.page || 1,
+      limit: pg?.limit || null,
+    })}`;
+
+    const { registrations, total } = await cached(cacheKey, async () => {
+      const [rows, count] = await Promise.all([
+        prisma.examRegistration.findMany({
+          where,
+          ...(pg && { skip: pg.skip, take: pg.take }),
+          orderBy: { createdAt: 'desc' },
+          include: { schedule: { include: { exam: { select: { title: true } } } } },
+        }),
+        prisma.examRegistration.count({ where }),
+      ]);
+      return { registrations: rows, total: count };
+    }, 45_000);
 
     res.json(paginatedResponse(registrations, total, pg));
   } catch (err) { next(err); }
@@ -137,19 +196,13 @@ export async function getRegistrations(req, res, next) {
 // GET /api/exams/registrations/mine?academicYearId=
 export async function getMyRegistrations(req, res, next) {
   try {
-    const where = ownershipWhereForUser(req.user);
     const { academicYearId } = req.query;
-    if (academicYearId) {
-      where.schedule = { exam: { academicYearId: Number(academicYearId) } };
-    }
+
     const cacheKey = `regs:mine:${req.user.id}:${academicYearId || 'all'}`;
     const registrations = await cached(cacheKey, async () => {
-      return prisma.examRegistration.findMany({
-        where,
-        include: myRegistrationInclude,
-        orderBy: { createdAt: 'desc' },
-      });
-    }, 60_000);
+      return findOwnedRegistrations(req.user, academicYearId, myRegistrationInclude);
+    }, 120_000);
+
     res.json(registrations.map(withWindowStatus));
   } catch (err) { next(err); }
 }
@@ -181,30 +234,22 @@ export async function getMyRegistrationById(req, res, next) {
 // GET /api/exams/registrations/mine-summary?academicYearId=
 export async function getMyRegistrationSummary(req, res, next) {
   try {
-    const where = ownershipWhereForUser(req.user);
     const { academicYearId } = req.query;
-    if (academicYearId) {
-      where.schedule = { exam: { academicYearId: Number(academicYearId) } };
-    }
 
     const cacheKey = `regs:mine-summary:${req.user.id}:${academicYearId || 'all'}`;
     const summary = await cached(cacheKey, async () => {
-      const [latest, totalRegistrations, completedCount] = await Promise.all([
-        prisma.examRegistration.findFirst({
-          where,
-          include: myRegistrationInclude,
-          orderBy: { createdAt: 'desc' },
-        }),
-        prisma.examRegistration.count({ where }),
-        prisma.examRegistration.count({ where: { ...where, status: 'done' } }),
-      ]);
+      const registrations = await findOwnedRegistrations(req.user, academicYearId, myRegistrationInclude);
+      const latest = registrations[0] || null;
+      const completedCount = registrations.reduce((acc, registration) => {
+        return acc + (registration.status === 'done' ? 1 : 0);
+      }, 0);
 
       return {
         latest: latest ? withWindowStatus(latest) : null,
         hasCompletedExam: completedCount > 0,
-        totalRegistrations,
+        totalRegistrations: registrations.length,
       };
-    }, 60_000);
+    }, 120_000);
 
     res.json(summary);
   } catch (err) { next(err); }
@@ -341,6 +386,7 @@ export async function createRegistration(req, res, next) {
 
     res.status(201).json(registration);
     invalidateMyRegistrationCaches(targetUserId);
+    invalidateEmployeeRegistrationCaches();
     invalidatePrefix('schedules:available:');
 
     // Fire-and-forget booking confirmation email
@@ -435,6 +481,7 @@ export async function startExam(req, res, next) {
     });
 
     invalidateMyRegistrationCaches(req.user.id);
+    invalidateEmployeeRegistrationCaches();
     res.json(updated);
   } catch (err) { next(err); }
 }
@@ -488,6 +535,7 @@ export async function cancelRegistration(req, res, next) {
     });
 
     invalidateMyRegistrationCaches(req.user.id);
+    invalidateEmployeeRegistrationCaches();
     invalidatePrefix('schedules:available:');
     res.status(204).end();
   } catch (err) { next(err); }

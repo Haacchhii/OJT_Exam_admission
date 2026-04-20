@@ -122,7 +122,7 @@ const MAX_RETRIES = 2;
 const RETRY_BASE_MS = 500;
 const RETRYABLE_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
 const GET_BURST_CACHE_MS = 60000;
-const HEAVY_GET_CACHE_MS = 180000;
+const HEAVY_GET_CACHE_MS = 300000;
 let cacheEpoch = 0;
 
 const inflightGetRequests = new Map<string, Promise<unknown>>();
@@ -190,14 +190,20 @@ function makeRequestKey(path: string): string {
 
 function getCacheTtlMs(path: string): number {
   const cleanPath = String(path || '').split('?')[0];
+  const examDetailPath = /^\/exams\/\d+\/(review|student)$/;
   if (
     cleanPath.startsWith('/admissions/dashboard-summary') ||
     cleanPath.startsWith('/admissions/reports-summary') ||
     cleanPath.startsWith('/results/employee-summary') ||
+    cleanPath.startsWith('/results/mine') ||
+    cleanPath.startsWith('/results/answers/') ||
     cleanPath.startsWith('/academic-years') ||
     cleanPath.startsWith('/exams/readiness') ||
     cleanPath.startsWith('/exams/registrations') ||
     cleanPath.startsWith('/exams/schedules') ||
+    cleanPath.startsWith('/users') ||
+    cleanPath.startsWith('/audit-logs') ||
+    examDetailPath.test(cleanPath) ||
     cleanPath.startsWith('/admissions/stats')
   ) {
     return HEAVY_GET_CACHE_MS;

@@ -167,6 +167,8 @@ export async function scoreEssay(req, res, next) {
           invalidatePrefix(`results:mine:${student.id}:`);
         }
         invalidatePrefix(`results:answers:${essay.registrationId}`);
+        invalidatePrefix('readiness:list:');
+        invalidatePrefix('resultsEmployeeSummary:');
 
         if (student) {
           sendExamResultEmail({

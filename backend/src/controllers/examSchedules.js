@@ -159,6 +159,39 @@ function inferLegacyGradeBucket(gradeLevel = '') {
   return null;
 }
 
+async function getActiveAcademicPeriodCached() {
+  return cached('academic-period:active', async () => {
+    const activeYear = await prisma.academicYear.findFirst({ where: { isActive: true } });
+    if (!activeYear) return null;
+
+    const activeSemester = await prisma.semester.findFirst({
+      where: { academicYearId: activeYear.id, isActive: true },
+      orderBy: { id: 'asc' },
+    });
+    if (!activeSemester) return null;
+
+    return { activeYear, activeSemester };
+  }, 15_000);
+}
+
+async function getApplicantGradeFilterCached(userId) {
+  if (!userId) return {};
+
+  return cached(`applicant:grade-filter:${userId}`, async () => {
+    const profile = await prisma.applicantProfile.findUnique({ where: { userId } });
+    if (!profile?.gradeLevel) return {};
+
+    const resolvedKey = resolveGradeKey(profile.gradeLevel);
+    const examLevel = resolvedKey ? GRADE_TO_EXAM_LEVEL[resolvedKey] : null;
+    const legacyLevel = resolvedKey ? GRADE_TO_LEGACY_EXAM_LEVEL[resolvedKey] : null;
+    const inferredLegacy = inferLegacyGradeBucket(profile.gradeLevel);
+    const allowedLevels = [...new Set([examLevel, legacyLevel, inferredLegacy, profile.gradeLevel, 'All Levels'].filter(Boolean))];
+
+    if (allowedLevels.length === 0) return {};
+    return { gradeLevel: { in: allowedLevels } };
+  }, 60_000);
+}
+
 // GET /api/exams/schedules?examId=&search=&page=&limit=
 export async function getSchedules(req, res, next) {
   try {
@@ -191,18 +224,12 @@ export async function getSchedules(req, res, next) {
 export async function getAvailableSchedules(req, res, next) {
   try {
     const today = getTodayLocalIso();
-    const activeYear = await prisma.academicYear.findFirst({ where: { isActive: true } });
-    if (!activeYear) {
+    const activePeriod = await getActiveAcademicPeriodCached();
+    if (!activePeriod) {
       return res.json([]);
     }
 
-    const activeSemester = await prisma.semester.findFirst({
-      where: { academicYearId: activeYear.id, isActive: true },
-      orderBy: { id: 'asc' },
-    });
-    if (!activeSemester) {
-      return res.json([]);
-    }
+    const { activeYear, activeSemester } = activePeriod;
 
     const semStart = toIsoDay(activeSemester.startDate);
     const semEnd = toIsoDay(activeSemester.endDate);
@@ -213,30 +240,45 @@ export async function getAvailableSchedules(req, res, next) {
     // If the requester is an applicant, filter schedules to their grade level
     let gradeFilter = {};
     if (req.user?.role === ROLES.APPLICANT) {
-      const profile = await prisma.applicantProfile.findUnique({ where: { userId: req.user.id } });
-      // If grade profile is missing (manual account creation), do not block exam visibility.
-      if (profile?.gradeLevel) {
-        const resolvedKey = resolveGradeKey(profile.gradeLevel);
-        const examLevel = resolvedKey ? GRADE_TO_EXAM_LEVEL[resolvedKey] : null;
-        const legacyLevel = resolvedKey ? GRADE_TO_LEGACY_EXAM_LEVEL[resolvedKey] : null;
-        const inferredLegacy = inferLegacyGradeBucket(profile.gradeLevel);
-        const allowedLevels = [...new Set([examLevel, legacyLevel, inferredLegacy, profile.gradeLevel, 'All Levels'].filter(Boolean))];
-        if (allowedLevels.length > 0) {
-          gradeFilter = { gradeLevel: { in: allowedLevels } };
-        }
-      }
+      gradeFilter = await getApplicantGradeFilterCached(req.user.id);
     }
 
-    const cacheKey = `schedules:available:${req.user?.id || 'anon'}:${activeYear.id}:${activeSemester.id}:${JSON.stringify(gradeFilter)}`;
+    const cacheKey = `schedules:available:${req.user?.id || 'anon'}:${activeYear.id}:${activeSemester.id}:${today}:${JSON.stringify(gradeFilter)}`;
     const schedules = await cached(cacheKey, async () => {
       return prisma.examSchedule.findMany({
         where: {
+          AND: [
+            {
+              OR: [
+                { visibilityStartDate: null },
+                { visibilityStartDate: { lte: today } },
+              ],
+            },
+            {
+              OR: [
+                { visibilityEndDate: null },
+                { visibilityEndDate: { gte: today } },
+              ],
+            },
+            {
+              OR: [
+                { registrationOpenDate: null },
+                { registrationOpenDate: { lte: today } },
+              ],
+            },
+            {
+              OR: [
+                { registrationCloseDate: null },
+                { registrationCloseDate: { gte: today } },
+              ],
+            },
+          ],
           exam: { isActive: true, academicYearId: activeYear.id, ...gradeFilter },
         },
         include: { exam: { select: { title: true, gradeLevel: true } } },
         orderBy: { scheduledDate: 'asc' },
       });
-    }, 45_000);
+    }, 90_000);
 
     const now = new Date();
 

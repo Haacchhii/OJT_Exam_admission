@@ -211,6 +211,9 @@ export async function submitExam(req, res, next) {
     invalidatePrefix(`regs:mine:${req.user.id}:`);
     invalidatePrefix(`results:mine:${req.user.id}:`);
     invalidatePrefix(`results:answers:${registrationId}`);
+    invalidatePrefix('regs:list:');
+    invalidatePrefix('readiness:list:');
+    invalidatePrefix('resultsEmployeeSummary:');
 
     res.json({ totalScore, maxPossible, percentage, passed, essayReviewed: !hasEssays });
 

@@ -40,6 +40,10 @@ model User {
   applicantProfile  ApplicantProfile?
   staffProfile      StaffProfile?
 
+  @@index([deletedAt, createdAt])
+  @@index([deletedAt, role, createdAt])
+  @@index([deletedAt, status, createdAt])
+  @@index([deletedAt, role])
   @@map("users")
 }
 
@@ -261,6 +265,10 @@ model ExamRegistration {
   @@index([userEmail, status])
   @@index([scheduleId, status])
   @@index([userEmail, status, scheduleId])
+  @@index([status, createdAt])
+  @@index([userId, createdAt])
+  @@index([userId, status, createdAt])
+  @@index([userEmail, createdAt])
   @@index([createdAt])
   @@map("exam_registrations")
 }
@@ -347,6 +355,9 @@ model AuditLog {
   @@index([action])
   @@index([entity])
   @@index([createdAt])
+  @@index([userId, createdAt])
+  @@index([entity, createdAt])
+  @@index([action, createdAt])
   @@index([action, entity, createdAt])
   @@map("audit_logs")
 }

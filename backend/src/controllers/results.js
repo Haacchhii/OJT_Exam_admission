@@ -17,13 +17,61 @@ function normalizeEmail(value) {
   return String(value || '').trim().toLowerCase();
 }
 
-function ownershipWhereForUser(user) {
-  return {
-    OR: [
-      { userId: user.id },
-      { userEmail: { equals: normalizeEmail(user.email), mode: 'insensitive' } },
-    ],
-  };
+const myResultInclude = {
+  registration: {
+    include: {
+      schedule: { include: { exam: { select: { title: true, gradeLevel: true, academicYearId: true } } } },
+    },
+  },
+};
+
+function buildRegistrationScope(academicYearId) {
+  if (!academicYearId) return {};
+  return { schedule: { exam: { academicYearId: Number(academicYearId) } } };
+}
+
+async function findLatestOwnedResult(user, academicYearId) {
+  const registrationScope = buildRegistrationScope(academicYearId);
+
+  const byUserId = await prisma.examResult.findFirst({
+    where: {
+      registration: {
+        userId: user.id,
+        ...registrationScope,
+      },
+    },
+    include: myResultInclude,
+    orderBy: { createdAt: 'desc' },
+  });
+  if (byUserId) return byUserId;
+
+  const normalizedEmail = normalizeEmail(user.email);
+  if (!normalizedEmail) return null;
+
+  const byExactEmail = await prisma.examResult.findFirst({
+    where: {
+      registration: {
+        userId: null,
+        userEmail: normalizedEmail,
+        ...registrationScope,
+      },
+    },
+    include: myResultInclude,
+    orderBy: { createdAt: 'desc' },
+  });
+  if (byExactEmail) return byExactEmail;
+
+  return prisma.examResult.findFirst({
+    where: {
+      registration: {
+        userId: null,
+        userEmail: { equals: normalizedEmail, mode: 'insensitive' },
+        ...registrationScope,
+      },
+    },
+    include: myResultInclude,
+    orderBy: { createdAt: 'desc' },
+  });
 }
 
 function registrationBelongsToUser(registration, user) {
@@ -102,26 +150,12 @@ export async function getResults(req, res, next) {
 // ═══════════════════════════════════════════════════════
 export async function getMyResult(req, res, next) {
   try {
-    const where = { registration: ownershipWhereForUser(req.user) };
     const { academicYearId } = req.query;
-    if (academicYearId) {
-      where.registration = { ...where.registration, schedule: { exam: { academicYearId: Number(academicYearId) } } };
-    }
 
     const cacheKey = `results:mine:${req.user.id}:${academicYearId || 'all'}`;
     const latest = await cached(cacheKey, async () => {
-      return prisma.examResult.findFirst({
-        where,
-        include: {
-          registration: {
-            include: {
-              schedule: { include: { exam: { select: { title: true, gradeLevel: true, academicYearId: true } } } },
-            },
-          },
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-    }, 60_000);
+      return findLatestOwnedResult(req.user, academicYearId);
+    }, 120_000);
 
     res.json(latest || null);
   } catch (err) { next(err); }
@@ -196,7 +230,7 @@ export async function getSubmittedAnswers(req, res, next) {
         }
         return a;
       });
-    }, 60_000);
+    }, 120_000);
 
     res.json(enriched);
   } catch (err) { next(err); }
@@ -534,7 +568,7 @@ export async function getEmployeeSummary(req, res, next) {
         : [];
 
       return { results, regs, users, schedules, exams, essays, academicYears, semesters, meta };
-    }, 60_000);
+    }, 120_000);
 
     res.json(summary);
   } catch (err) { next(err); }

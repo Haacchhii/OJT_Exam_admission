@@ -3,7 +3,7 @@ import { paginate, paginatedResponse } from '../utils/pagination.js';
 import { EMPLOYEE_ROLES, getLevelGroup } from '../utils/constants.js';
 import { logAudit } from '../utils/auditLog.js';
 import { getIo } from '../utils/socket.js';
-import { cached } from '../utils/cache.js';
+import { cached, invalidatePrefix } from '../utils/cache.js';
 
 
 // Re-export schedule and registration controllers so routes/exams.js keeps working
@@ -107,13 +107,52 @@ function toQuestionCreateInput(q, qi) {
   };
 }
 
-function ownershipWhereForUser(user) {
-  return {
-    OR: [
-      { userId: user.id },
-      { userEmail: { equals: normalizeEmail(user.email), mode: 'insensitive' } },
-    ],
-  };
+async function findOwnedRegistrationForExamStatus({ user, examId, status, select }) {
+  const byUserId = await prisma.examRegistration.findFirst({
+    where: {
+      userId: user.id,
+      status,
+      schedule: { examId },
+    },
+    ...(select ? { select } : {}),
+  });
+  if (byUserId) return byUserId;
+
+  const normalizedEmail = normalizeEmail(user.email);
+  if (!normalizedEmail) return null;
+
+  const byNormalizedEmail = await prisma.examRegistration.findFirst({
+    where: {
+      userId: null,
+      userEmail: normalizedEmail,
+      status,
+      schedule: { examId },
+    },
+    ...(select ? { select } : {}),
+  });
+  if (byNormalizedEmail) return byNormalizedEmail;
+
+  return prisma.examRegistration.findFirst({
+    where: {
+      userId: null,
+      userEmail: { equals: normalizedEmail, mode: 'insensitive' },
+      status,
+      schedule: { examId },
+    },
+    ...(select ? { select } : {}),
+  });
+}
+
+function invalidateExamCaches() {
+  invalidatePrefix('exams:list:');
+  invalidatePrefix('exams:detail:');
+  invalidatePrefix('schedules:available:');
+}
+
+async function getExamDetailCached(examId) {
+  return cached(`exams:detail:${examId}`, async () => {
+    return prisma.exam.findUnique({ where: { id: examId }, include: examDetailInclude });
+  }, 300_000);
 }
 
 function shapeExam(exam) {
@@ -230,46 +269,56 @@ export async function getReadiness(req, res, next) {
       where.result = { is: { passed: false } };
     }
 
-    const [rows, total] = await Promise.all([
-      prisma.examRegistration.findMany({
-        where,
-        ...(pg && { skip: pg.skip, take: pg.take }),
-        orderBy: { createdAt: 'desc' },
-        select: {
-          id: true,
-          userEmail: true,
-          status: true,
-          schedule: {
-            select: {
-              exam: {
-                select: {
-                  title: true,
+    const cacheKey = `readiness:list:${JSON.stringify({
+      search: search || null,
+      status,
+      page: pg?.page || 1,
+      limit: pg?.limit || null,
+    })}`;
+
+    const { rows, total } = await cached(cacheKey, async () => {
+      const [listRows, count] = await Promise.all([
+        prisma.examRegistration.findMany({
+          where,
+          ...(pg && { skip: pg.skip, take: pg.take }),
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            userEmail: true,
+            status: true,
+            schedule: {
+              select: {
+                exam: {
+                  select: {
+                    title: true,
+                  },
                 },
               },
             },
-          },
-          user: {
-            select: {
-              id: true,
-              firstName: true,
-              middleName: true,
-              lastName: true,
-              email: true,
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                middleName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+            result: {
+              select: {
+                totalScore: true,
+                maxPossible: true,
+                percentage: true,
+                passed: true,
+                essayReviewed: true,
+              },
             },
           },
-          result: {
-            select: {
-              totalScore: true,
-              maxPossible: true,
-              percentage: true,
-              passed: true,
-              essayReviewed: true,
-            },
-          },
-        },
-      }),
-      prisma.examRegistration.count({ where }),
-    ]);
+        }),
+        prisma.examRegistration.count({ where }),
+      ]);
+      return { rows: listRows, total: count };
+    }, 45_000);
 
     res.json(paginatedResponse(rows, total, pg));
   } catch (err) { next(err); }
@@ -278,7 +327,7 @@ export async function getReadiness(req, res, next) {
 // GET /api/exams/:id  (full — with isCorrect)
 export async function getExam(req, res, next) {
   try {
-    const exam = await prisma.exam.findUnique({ where: { id: Number(req.params.id) }, include: examDetailInclude });
+    const exam = await getExamDetailCached(Number(req.params.id));
     if (!exam || exam.deletedAt) return res.status(404).json({ error: 'We could not find this exam.', code: 'NOT_FOUND' });
     res.json(shapeExam(exam));
   } catch (err) { next(err); }
@@ -288,19 +337,17 @@ export async function getExam(req, res, next) {
 export async function getExamForStudent(req, res, next) {
   try {
     const examId = Number(req.params.id);
-    const activeRegistration = await prisma.examRegistration.findFirst({
-      where: {
-        ...ownershipWhereForUser(req.user),
-        status: 'started',
-        schedule: { examId },
-      },
+    const activeRegistration = await findOwnedRegistrationForExamStatus({
+      user: req.user,
+      examId,
+      status: 'started',
       select: { id: true },
     });
     if (!activeRegistration) {
       return res.status(403).json({ error: 'Please start your scheduled exam before viewing questions.', code: 'FORBIDDEN' });
     }
 
-    const exam = await prisma.exam.findUnique({ where: { id: examId }, include: examDetailInclude });
+    const exam = await getExamDetailCached(examId);
     if (!exam || exam.deletedAt) return res.status(404).json({ error: 'We could not find this exam.', code: 'NOT_FOUND' });
     if (!exam.questions?.length) {
       return res.status(400).json({
@@ -317,17 +364,15 @@ export async function getExamForReview(req, res, next) {
   try {
     const examId = Number(req.params.id);
     // Verify the student has a 'done' registration for this exam
-    const reg = await prisma.examRegistration.findFirst({
-      where: {
-        ...ownershipWhereForUser(req.user),
-        status: 'done',
-        schedule: { examId },
-      },
+    const reg = await findOwnedRegistrationForExamStatus({
+      user: req.user,
+      examId,
+      status: 'done',
     });
     if (!reg) {
       return res.status(403).json({ error: 'Please complete this exam before viewing the review.', code: 'FORBIDDEN' });
     }
-    const exam = await prisma.exam.findUnique({ where: { id: examId }, include: examDetailInclude });
+    const exam = await getExamDetailCached(examId);
     if (!exam) return res.status(404).json({ error: 'We could not find this exam.', code: 'NOT_FOUND' });
     res.json(shapeExam(exam)); // full exam with correct answers
   } catch (err) { next(err); }
@@ -358,6 +403,8 @@ export async function createExam(req, res, next) {
       },
       include: examDetailInclude,
     });
+
+    invalidateExamCaches();
 
     res.status(201).json(shapeExam(exam));
 
@@ -397,6 +444,7 @@ export async function updateExam(req, res, next) {
           include: examDetailInclude,
         });
       }, { timeout: 20000 });  // Increased from 10s → 20s for Vercel cold starts
+      invalidateExamCaches();
       return res.json(shapeExam(result));
     }
 
@@ -405,6 +453,8 @@ export async function updateExam(req, res, next) {
       data,
       include: examDetailInclude,
     });
+
+    invalidateExamCaches();
 
     res.json(shapeExam(exam));
   } catch (err) { next(err); }
@@ -415,6 +465,8 @@ export async function deleteExam(req, res, next) {
   try {
     const id = Number(req.params.id);
     await prisma.exam.update({ where: { id }, data: { deletedAt: new Date() } });
+
+    invalidateExamCaches();
 
     logAudit({ userId: req.user.id, action: 'exam.delete', entity: 'exam', entityId: id, ipAddress: req.ip });
 
@@ -428,6 +480,8 @@ export async function bulkDeleteExams(req, res, next) {
     const { ids } = req.body;
 
     await prisma.exam.updateMany({ where: { id: { in: ids } }, data: { deletedAt: new Date() } });
+
+    invalidateExamCaches();
 
     logAudit({ userId: req.user.id, action: 'exam.bulkDelete', entity: 'exam', details: { count: ids.length, ids }, ipAddress: req.ip });
 
@@ -459,6 +513,8 @@ export async function cloneExam(req, res, next) {
       },
       include: examDetailInclude,
     });
+
+    invalidateExamCaches();
 
     logAudit({ userId: req.user.id, action: 'exam.clone', entity: 'exam', entityId: clone.id, details: { sourceId, title: clone.title }, ipAddress: req.ip });
 
