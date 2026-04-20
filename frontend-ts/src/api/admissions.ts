@@ -82,15 +82,6 @@ export interface EmployeeReportsSummary {
     slotsTaken: number;
   }>;
   regs: Array<{ id: number; scheduleId: number; userEmail: string; userId?: number | null; status: string }>;
-  essays: Array<{ id: number; registrationId: number; scored: boolean }>;
-  users: Array<{
-    id: number;
-    firstName: string;
-    middleName?: string | null;
-    lastName: string;
-    email: string;
-    applicantProfile?: { gradeLevel?: string | null } | null;
-  }>;
   academicYears: AcademicYear[];
   semesters: Semester[];
   meta?: {

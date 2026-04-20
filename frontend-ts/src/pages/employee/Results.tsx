@@ -104,7 +104,7 @@ export default function EmployeeResults() {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [selectedEssayExamId, setSelectedEssayExamId] = useState<number | null>(null);
   const [scoreActionState, setScoreActionState] = useState<{ tone: 'info' | 'success' | 'danger'; title: string; message?: string } | null>(null);
-  const includeResultsInSummary = tab === 'results';
+  const includeResultsInSummary = tab === 'results' || tab === 'analytics';
   const includeEssaysInSummary = tab === 'essays';
 
   useEffect(() => {

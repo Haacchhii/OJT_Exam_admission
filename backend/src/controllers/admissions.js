@@ -456,8 +456,6 @@ export async function getReportsSummary(req, res, next) {
           exams: [],
           schedules: [],
           regs: [],
-          essays: [],
-          users: [],
           academicYears,
           semesters,
           meta,
@@ -485,31 +483,12 @@ export async function getReportsSummary(req, res, next) {
         : [];
 
       if (!regs.length) {
-        const users = await prisma.user.findMany({
-          where: {
-            deletedAt: null,
-            OR: [
-              ...(admissionUserIds.length ? [{ id: { in: admissionUserIds } }] : []),
-              ...(admissionEmails.length ? [{ email: { in: admissionEmails } }] : []),
-            ],
-          },
-          select: {
-            id: true,
-            firstName: true,
-            middleName: true,
-            lastName: true,
-            email: true,
-            applicantProfile: { select: { gradeLevel: true } },
-          },
-        });
         return {
           admissions,
           results: [],
           exams: [],
           schedules: [],
           regs: [],
-          essays: [],
-          users,
           academicYears,
           semesters,
           meta,
@@ -519,7 +498,7 @@ export async function getReportsSummary(req, res, next) {
       const registrationIds = regs.map(r => r.id);
       const scheduleIds = Array.from(new Set(regs.map(r => r.scheduleId)));
 
-      const [results, essays, schedules, users] = await Promise.all([
+      const [results, schedules] = await Promise.all([
         prisma.examResult.findMany({
           where: { registrationId: { in: registrationIds } },
           select: {
@@ -531,14 +510,6 @@ export async function getReportsSummary(req, res, next) {
             passed: true,
             essayReviewed: true,
             createdAt: true,
-          },
-        }),
-        prisma.essayAnswer.findMany({
-          where: { registrationId: { in: registrationIds } },
-          select: {
-            id: true,
-            registrationId: true,
-            scored: true,
           },
         }),
         prisma.examSchedule.findMany({
@@ -555,23 +526,6 @@ export async function getReportsSummary(req, res, next) {
             slotsTaken: true,
           },
         }),
-        prisma.user.findMany({
-          where: {
-            deletedAt: null,
-            OR: [
-              ...(admissionUserIds.length ? [{ id: { in: admissionUserIds } }] : []),
-              ...(admissionEmails.length ? [{ email: { in: admissionEmails } }] : []),
-            ],
-          },
-          select: {
-            id: true,
-            firstName: true,
-            middleName: true,
-            lastName: true,
-            email: true,
-            applicantProfile: { select: { gradeLevel: true } },
-          },
-        }),
       ]);
 
       const examIds = Array.from(new Set(schedules.map(s => s.examId)));
@@ -586,7 +540,7 @@ export async function getReportsSummary(req, res, next) {
           })
         : [];
 
-      return { admissions, results, exams, schedules, regs, essays, users, academicYears, semesters, meta };
+      return { admissions, results, exams, schedules, regs, academicYears, semesters, meta };
     }, 60_000);
 
     res.json(summary);

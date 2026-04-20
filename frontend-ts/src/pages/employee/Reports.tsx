@@ -7,7 +7,7 @@ import { PageHeader, SkeletonPage, ErrorAlert, ActionButton } from '../../compon
 import Icon from '../../components/Icons';
 import { lazyWithRetry, LazyLoadingFallback } from '../../components/lazyWithRetry';
 import { ADMISSION_STATUSES, GRADE_OPTIONS, ALL_GRADE_LEVELS } from '../../utils/constants';
-import type { Admission, ExamResult, Exam, ExamSchedule, ExamRegistration, EssayAnswer, User, AcademicYear, Semester } from '../../types';
+import type { Admission, ExamResult, Exam, ExamSchedule, ExamRegistration, AcademicYear, Semester } from '../../types';
 
 const PassRateMonthlyCharts = lazyWithRetry(() => import('./reports/charts/PassRateMonthlyCharts'));
 const ResultsBreakdownCharts = lazyWithRetry(() => import('./reports/charts/ResultsBreakdownCharts'));
@@ -173,8 +173,6 @@ interface ReportData {
   exams: Exam[];
   schedules: ExamSchedule[];
   regs: ExamRegistration[];
-  essays: EssayAnswer[];
-  users: User[];
   academicYears: AcademicYear[];
   semesters: Semester[];
   meta?: {
@@ -191,8 +189,6 @@ const EMPTY_REPORT_DATA: ReportData = {
   exams: [],
   schedules: [],
   regs: [],
-  essays: [],
-  users: [],
   academicYears: [],
   semesters: [],
   meta: {
@@ -259,8 +255,6 @@ export default function EmployeeReports() {
         exams: summary.exams as Exam[],
         schedules: summary.schedules as ExamSchedule[],
         regs: summary.regs as ExamRegistration[],
-        essays: summary.essays as EssayAnswer[],
-        users: summary.users as User[],
         academicYears: summary.academicYears as AcademicYear[],
         semesters: summary.semesters as Semester[],
         meta: summary.meta,
@@ -279,8 +273,8 @@ export default function EmployeeReports() {
     regs,
     academicYears,
     allSemesters,
-    usersById,
-    usersByEmail,
+    admissionsByUserId,
+    admissionsByEmail,
     regsById,
     schedulesById,
     examsById,
@@ -300,12 +294,23 @@ export default function EmployeeReports() {
 
     const registrationIds = new Set(filteredRegs.map(r => r.id));
     const filteredResults = source.results.filter(r => registrationIds.has(r.registrationId));
-    const filteredEssays = source.essays.filter(e => registrationIds.has(e.registrationId));
 
     const scheduleIds = new Set(filteredRegs.map(r => r.scheduleId));
     const filteredSchedules = source.schedules.filter(s => scheduleIds.has(s.id));
     const examIds = new Set(filteredSchedules.map(s => s.examId));
     const filteredExams = source.exams.filter(e => examIds.has(e.id));
+
+    const admissionByUserId = new Map<number, Admission>();
+    const admissionByEmail = new Map<string, Admission>();
+    for (const admission of filteredAdmissions) {
+      if (typeof admission.userId === 'number' && !admissionByUserId.has(admission.userId)) {
+        admissionByUserId.set(admission.userId, admission);
+      }
+      const cleanEmail = String(admission.email || '').trim().toLowerCase();
+      if (cleanEmail && !admissionByEmail.has(cleanEmail)) {
+        admissionByEmail.set(cleanEmail, admission);
+      }
+    }
 
     return {
       admissions: filteredAdmissions,
@@ -313,12 +318,10 @@ export default function EmployeeReports() {
       exams: filteredExams,
       schedules: filteredSchedules,
       regs: filteredRegs,
-      essays: filteredEssays,
-      users: source.users,
       academicYears: source.academicYears,
       allSemesters: source.semesters,
-      usersById: new Map(source.users.map(u => [u.id, u])),
-      usersByEmail: new Map(source.users.map(u => [u.email, u])),
+      admissionsByUserId: admissionByUserId,
+      admissionsByEmail: admissionByEmail,
       regsById: new Map(filteredRegs.map(r => [r.id, r])),
       schedulesById: new Map(filteredSchedules.map(s => [s.id, s])),
       examsById: new Map(filteredExams.map(e => [e.id, e])),
@@ -517,7 +520,11 @@ export default function EmployeeReports() {
     const rows: (string | number)[][] = results.map(r => {
       const reg = regsById.get(r.registrationId);
       const regUserId = reg ? getRegUserId(reg) : null;
-      const student = reg ? (regUserId !== null ? usersById.get(regUserId) : usersByEmail.get(reg.userEmail)) : null;
+      const student = reg
+        ? (regUserId !== null
+            ? admissionsByUserId.get(regUserId)
+            : admissionsByEmail.get(String(reg.userEmail || '').trim().toLowerCase()))
+        : null;
       const sched = reg ? schedulesById.get(reg.scheduleId) : null;
       const exam = sched ? examsById.get(sched.examId) : null;
       return [student ? formatPersonName(student) : 'Unknown', exam?.title || 'N/A', r.totalScore, r.maxPossible, r.percentage.toFixed(1) + '%', r.passed ? 'Yes' : 'No', r.essayReviewed ? 'Yes' : 'No', compactDate(r.createdAt) || ''];
