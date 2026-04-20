@@ -1,6 +1,7 @@
 ﻿import { Link } from 'react-router-dom';
-import { getMyRegistrationSummary, getExamForReview, getMyRegistrationById } from '../../api/exams';
-import { getMyResult, getSubmittedAnswers } from '../../api/results';
+import { getExamForReview, getMyRegistrationById } from '../../api/exams';
+import { getSubmittedAnswers } from '../../api/results';
+import { getStudentHomeSummary } from '../../api/admissions';
 import { PageHeader, SkeletonPage, ErrorAlert, ActionButton } from '../../components/UI';
 import Icon from '../../components/Icons';
 import { formatDate, formatPersonName } from '../../utils/helpers';
@@ -47,10 +48,9 @@ export default function StudentResults() {
   const { user } = useAuth();
 
   const { data: rawData, loading, error, refetch } = useAsync<ResultsData>(async () => {
-    const [regSummary, myResult] = await Promise.all([
-      getMyRegistrationSummary(),
-      getMyResult(),
-    ]);
+    const summary = await getStudentHomeSummary();
+    const regSummary = summary?.registrationSummary;
+    const myResult = summary?.myResult || null;
 
     let myReg = regSummary?.latest || null;
     if (myResult?.registrationId && (!myReg || myReg.id !== myResult.registrationId)) {

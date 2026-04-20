@@ -1,5 +1,5 @@
 import { client, qs, type RequestOptions } from './client';
-import type { Admission, AdmissionStats, AdmissionStatus, AcademicYear, Semester } from '../types';
+import type { Admission, AdmissionStats, AdmissionStatus, AcademicYear, Semester, ExamRegistration, ExamResult } from '../types';
 
 export const VALID_TRANSITIONS: Record<string, AdmissionStatus[]> = {
   'Submitted': ['Under Screening', 'Rejected'],
@@ -111,6 +111,16 @@ export interface EmployeeDashboardSummary {
   overdue: number;
 }
 
+export interface StudentHomeSummary {
+  myAdmission: Admission | null;
+  registrationSummary: {
+    latest: ExamRegistration | null;
+    hasCompletedExam: boolean;
+    totalRegistrations: number;
+  };
+  myResult: ExamResult | null;
+}
+
 export async function getAdmissions(params?: AdmissionParams, options?: RequestOptions) {
   return client.get<Admission[]>(`/admissions${qs(withDefaultAdmissionListParams(params))}`, options);
 }
@@ -125,6 +135,10 @@ export async function getAdmissionsPage(params?: AdmissionParams) {
 
 export async function getMyAdmission() {
   return client.get<Admission | null>('/admissions/mine');
+}
+
+export async function getStudentHomeSummary() {
+  return client.get<StudentHomeSummary>('/admissions/mine-summary');
 }
 
 export async function addAdmission(admission: Record<string, unknown>) {

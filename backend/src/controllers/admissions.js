@@ -12,7 +12,7 @@ import env from '../config/env.js';
 import { resolveUploadedFilePath } from '../utils/uploadPaths.js';
 
 const ADMISSION_IN_PROGRESS = ['Submitted', 'Under Screening', 'Under Evaluation'];
-const REPORTS_DEFAULT_ADMISSIONS = 80;
+const REPORTS_DEFAULT_ADMISSIONS = 40;
 const REPORTS_MAX_ADMISSIONS = 200;
 
 function invalidateAdmissionCaches(userIds = []) {
@@ -32,6 +32,10 @@ function toIsoDay(d) {
   const m = String(dt.getMonth() + 1).padStart(2, '0');
   const day = String(dt.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
+}
+
+function normalizeEmail(value) {
+  return String(value || '').trim().toLowerCase();
 }
 
 function isWithinPeriod(day, start, end) {
@@ -81,6 +85,142 @@ function shapeAdmission(adm) {
     academicYear: academicYear ? { id: academicYear.id, year: academicYear.year, startDate: academicYear.startDate || null, endDate: academicYear.endDate || null } : null,
     semester: semester ? { id: semester.id, name: semester.name, startDate: semester.startDate || null, endDate: semester.endDate || null } : null,
   };
+}
+
+const myRegistrationInclude = {
+  schedule: {
+    select: {
+      id: true,
+      examId: true,
+      scheduledDate: true,
+      startTime: true,
+      endTime: true,
+      visibilityStartDate: true,
+      visibilityEndDate: true,
+      registrationOpenDate: true,
+      registrationCloseDate: true,
+      examWindowStartAt: true,
+      examWindowEndAt: true,
+      maxSlots: true,
+      slotsTaken: true,
+      venue: true,
+      exam: {
+        select: {
+          id: true,
+          title: true,
+          gradeLevel: true,
+          durationMinutes: true,
+          passingScore: true,
+          academicYearId: true,
+        },
+      },
+    },
+  },
+};
+
+const myResultInclude = {
+  registration: {
+    include: {
+      schedule: { include: { exam: { select: { title: true, gradeLevel: true, academicYearId: true } } } },
+    },
+  },
+};
+
+function pickLatestByCreatedAt(primary, secondary) {
+  if (!primary) return secondary || null;
+  if (!secondary) return primary || null;
+  const primaryTs = new Date(primary.createdAt).getTime();
+  const secondaryTs = new Date(secondary.createdAt).getTime();
+  return secondaryTs > primaryTs ? secondary : primary;
+}
+
+async function getOwnedRegistrationSummaryForUser(user, normalizedEmail) {
+  const [
+    latestByUserId,
+    totalByUserId,
+    completedByUserId,
+    latestByEmailExact,
+    totalByEmailExact,
+    completedByEmailExact,
+  ] = await Promise.all([
+    prisma.examRegistration.findFirst({
+      where: { userId: user.id },
+      include: myRegistrationInclude,
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.examRegistration.count({ where: { userId: user.id } }),
+    prisma.examRegistration.count({ where: { userId: user.id, status: 'done' } }),
+    normalizedEmail
+      ? prisma.examRegistration.findFirst({
+          where: { userId: null, userEmail: normalizedEmail },
+          include: myRegistrationInclude,
+          orderBy: { createdAt: 'desc' },
+        })
+      : Promise.resolve(null),
+    normalizedEmail
+      ? prisma.examRegistration.count({ where: { userId: null, userEmail: normalizedEmail } })
+      : Promise.resolve(0),
+    normalizedEmail
+      ? prisma.examRegistration.count({ where: { userId: null, userEmail: normalizedEmail, status: 'done' } })
+      : Promise.resolve(0),
+  ]);
+
+  let latestByEmail = latestByEmailExact;
+  let totalByEmail = totalByEmailExact;
+  let completedByEmail = completedByEmailExact;
+
+  if (normalizedEmail && !latestByEmailExact && totalByEmailExact === 0) {
+    const [insensitiveLatest, insensitiveTotal, insensitiveCompleted] = await Promise.all([
+      prisma.examRegistration.findFirst({
+        where: { userId: null, userEmail: { equals: normalizedEmail, mode: 'insensitive' } },
+        include: myRegistrationInclude,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.examRegistration.count({ where: { userId: null, userEmail: { equals: normalizedEmail, mode: 'insensitive' } } }),
+      prisma.examRegistration.count({ where: { userId: null, userEmail: { equals: normalizedEmail, mode: 'insensitive' }, status: 'done' } }),
+    ]);
+    latestByEmail = insensitiveLatest;
+    totalByEmail = insensitiveTotal;
+    completedByEmail = insensitiveCompleted;
+  }
+
+  const latest = pickLatestByCreatedAt(latestByUserId, latestByEmail);
+  const totalRegistrations = totalByUserId + totalByEmail;
+  const completedCount = completedByUserId + completedByEmail;
+
+  return {
+    latest,
+    hasCompletedExam: completedCount > 0,
+    totalRegistrations,
+  };
+}
+
+async function findLatestResultForUser(user, normalizedEmail) {
+  const [latestByUserId, latestByEmailExact] = await Promise.all([
+    prisma.examResult.findFirst({
+      where: { registration: { userId: user.id } },
+      include: myResultInclude,
+      orderBy: { createdAt: 'desc' },
+    }),
+    normalizedEmail
+      ? prisma.examResult.findFirst({
+          where: { registration: { userId: null, userEmail: normalizedEmail } },
+          include: myResultInclude,
+          orderBy: { createdAt: 'desc' },
+        })
+      : Promise.resolve(null),
+  ]);
+
+  let latestByEmail = latestByEmailExact;
+  if (normalizedEmail && !latestByEmailExact) {
+    latestByEmail = await prisma.examResult.findFirst({
+      where: { registration: { userId: null, userEmail: { equals: normalizedEmail, mode: 'insensitive' } } },
+      include: myResultInclude,
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  return pickLatestByCreatedAt(latestByUserId, latestByEmail);
 }
 
 // GET /api/admissions?status=&grade=&search=&sort=&page=&limit=&academicYearId=&semesterId=
@@ -138,6 +278,30 @@ export async function getMyAdmission(req, res, next) {
       }),
     60_000);
     res.json(shapeAdmission(admission));
+  } catch (err) { next(err); }
+}
+
+// GET /api/admissions/mine-summary
+// Bundled student bootstrap to reduce initial page fanout.
+export async function getMyStudentSummary(req, res, next) {
+  try {
+    const normalizedEmail = normalizeEmail(req.user?.email);
+
+    const [myAdmission, registrationSummary, myResult] = await Promise.all([
+      prisma.admission.findFirst({
+        where: { userId: req.user.id, deletedAt: null },
+        include: { documents: true, academicYear: true, semester: true },
+        orderBy: { submittedAt: 'desc' },
+      }),
+      getOwnedRegistrationSummaryForUser(req.user, normalizedEmail),
+      findLatestResultForUser(req.user, normalizedEmail),
+    ]);
+
+    res.json({
+      myAdmission: shapeAdmission(myAdmission),
+      registrationSummary,
+      myResult: myResult || null,
+    });
   } catch (err) { next(err); }
 }
 

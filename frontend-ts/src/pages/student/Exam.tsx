@@ -1,8 +1,8 @@
 ﻿import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useAsync } from '../../hooks/useAsync';
-import { getMyRegistrationSummary, startExam as apiStartExam, getExamForStudent } from '../../api/exams';
-import { getMyResult } from '../../api/results';
+import { startExam as apiStartExam, getExamForStudent } from '../../api/exams';
+import { getStudentHomeSummary } from '../../api/admissions';
 import { showToast } from '../../components/Toast';
 import { useConfirm } from '../../components/ConfirmDialog';
 import { SkeletonPage, ErrorAlert, ActionButton, ProcessStatePanel } from '../../components/UI';
@@ -27,9 +27,9 @@ export default function StudentExam() {
 
   const { user } = useAuth();
   const { data: rawData, loading, error, refetch } = useAsync<ExamData>(async () => {
-    const [regSummary, myResult] = await Promise.all([
-      getMyRegistrationSummary(), getMyResult()
-    ]);
+    const summary = await getStudentHomeSummary();
+    const regSummary = summary?.registrationSummary;
+    const myResult = summary?.myResult || null;
     const myReg = regSummary?.latest || null;
     return { myReg, myResult };
   }, [user], 0, { setLoadingOnReload: true });

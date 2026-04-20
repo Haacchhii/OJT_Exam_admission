@@ -1,9 +1,7 @@
 ﻿import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useAsync } from '../../hooks/useAsync';
-import { getMyAdmission } from '../../api/admissions';
-import { getMyRegistrationSummary } from '../../api/exams';
-import { getMyResult } from '../../api/results';
+import { getStudentHomeSummary } from '../../api/admissions';
 import { StatCard, PageHeader, SkeletonPage, ErrorAlert } from '../../components/UI';
 import { formatDate, formatTime } from '../../utils/helpers';
 import { ADMISSION_PROGRESS_STEPS, SCHOOL_BRAND } from '../../utils/constants';
@@ -25,9 +23,10 @@ export default function StudentDashboard() {
   const [hasAdmissionDraft, setHasAdmissionDraft] = useState(false);
 
   const { data: rawData, loading, error, refetch } = useAsync<DashboardData>(async () => {
-    const [myApp, regSummary, myResult] = await Promise.all([
-      getMyAdmission(), getMyRegistrationSummary(), getMyResult()
-    ]);
+    const summary = await getStudentHomeSummary();
+    const myApp = summary?.myAdmission || null;
+    const regSummary = summary?.registrationSummary;
+    const myResult = summary?.myResult || null;
     const myReg = regSummary?.latest || null;
     const hasCompletedExam = !!regSummary?.hasCompletedExam;
 

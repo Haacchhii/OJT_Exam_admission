@@ -16,6 +16,7 @@ router.use(authenticate);
 
 // Student scoped
 router.get('/mine',  ctrl.getMyAdmission);
+router.get('/mine-summary', authorize(ROLES.APPLICANT), ctrl.getMyStudentSummary);
 router.get('/stats', authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), validateQuery(admissionsStatsQuerySchema), ctrl.getStats);
 router.get('/dashboard-summary', authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), ctrl.getDashboardSummary);
 router.get('/reports-summary', authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), validateQuery(reportsSummaryQuerySchema), ctrl.getReportsSummary);
