@@ -1,6 +1,6 @@
 import prisma from '../config/db.js';
 import { paginate, paginatedResponse } from '../utils/pagination.js';
-import { EMPLOYEE_ROLES, getLevelGroup } from '../utils/constants.js';
+import { EMPLOYEE_ROLES, getLevelGroup, shouldSkipEntranceExam } from '../utils/constants.js';
 import { logAudit } from '../utils/auditLog.js';
 import { getIo } from '../utils/socket.js';
 import { cached, invalidatePrefix } from '../utils/cache.js';
@@ -108,34 +108,9 @@ function toQuestionCreateInput(q, qi) {
 }
 
 async function findOwnedRegistrationForExamStatus({ user, examId, status, select }) {
-  const byUserId = await prisma.examRegistration.findFirst({
-    where: {
-      userId: user.id,
-      status,
-      schedule: { examId },
-    },
-    ...(select ? { select } : {}),
-  });
-  if (byUserId) return byUserId;
-
-  const normalizedEmail = normalizeEmail(user.email);
-  if (!normalizedEmail) return null;
-
-  const byNormalizedEmail = await prisma.examRegistration.findFirst({
-    where: {
-      userId: null,
-      userEmail: normalizedEmail,
-      status,
-      schedule: { examId },
-    },
-    ...(select ? { select } : {}),
-  });
-  if (byNormalizedEmail) return byNormalizedEmail;
-
   return prisma.examRegistration.findFirst({
     where: {
-      userId: null,
-      userEmail: { equals: normalizedEmail, mode: 'insensitive' },
+      userId: user.id,
       status,
       schedule: { examId },
     },
@@ -337,6 +312,18 @@ export async function getExam(req, res, next) {
 export async function getExamForStudent(req, res, next) {
   try {
     const examId = Number(req.params.id);
+    if (req.user?.role === 'applicant') {
+      const profile = await prisma.applicantProfile.findUnique({
+        where: { userId: req.user.id },
+        select: { gradeLevel: true },
+      });
+      if (shouldSkipEntranceExam(profile?.gradeLevel)) {
+        return res.status(403).json({
+          error: 'This account uses the online application form and does not have an entrance exam.',
+          code: 'FORBIDDEN',
+        });
+      }
+    }
     const activeRegistration = await findOwnedRegistrationForExamStatus({
       user: req.user,
       examId,
@@ -363,6 +350,18 @@ export async function getExamForStudent(req, res, next) {
 export async function getExamForReview(req, res, next) {
   try {
     const examId = Number(req.params.id);
+    if (req.user?.role === 'applicant') {
+      const profile = await prisma.applicantProfile.findUnique({
+        where: { userId: req.user.id },
+        select: { gradeLevel: true },
+      });
+      if (shouldSkipEntranceExam(profile?.gradeLevel)) {
+        return res.status(403).json({
+          error: 'This account uses the online application form and does not have an entrance exam.',
+          code: 'FORBIDDEN',
+        });
+      }
+    }
     // Verify the student has a 'done' registration for this exam
     const reg = await findOwnedRegistrationForExamStatus({
       user: req.user,

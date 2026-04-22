@@ -1,6 +1,6 @@
 import prisma from '../config/db.js';
 import { paginate, paginatedResponse } from '../utils/pagination.js';
-import { GRADE_TO_EXAM_LEVEL, GRADE_TO_LEGACY_EXAM_LEVEL, ROLES } from '../utils/constants.js';
+import { GRADE_TO_EXAM_LEVEL, GRADE_TO_LEGACY_EXAM_LEVEL, ROLES, shouldSkipEntranceExam } from '../utils/constants.js';
 import { getIo } from '../utils/socket.js';
 import { logAudit } from '../utils/auditLog.js';
 import { attachExamWindowStatus, computeExamWindowStatus, getEffectiveExamWindow } from '../utils/examWindow.js';
@@ -180,6 +180,7 @@ async function getApplicantGradeFilterCached(userId) {
   return cached(`applicant:grade-filter:${userId}`, async () => {
     const profile = await prisma.applicantProfile.findUnique({ where: { userId } });
     if (!profile?.gradeLevel) return {};
+    if (shouldSkipEntranceExam(profile.gradeLevel)) return null;
 
     const resolvedKey = resolveGradeKey(profile.gradeLevel);
     const examLevel = resolvedKey ? GRADE_TO_EXAM_LEVEL[resolvedKey] : null;
@@ -241,6 +242,9 @@ export async function getAvailableSchedules(req, res, next) {
     let gradeFilter = {};
     if (req.user?.role === ROLES.APPLICANT) {
       gradeFilter = await getApplicantGradeFilterCached(req.user.id);
+      if (gradeFilter === null) {
+        return res.json([]);
+      }
     }
 
     const cacheKey = `schedules:available:${req.user?.id || 'anon'}:${activeYear.id}:${activeSemester.id}:${today}:${JSON.stringify(gradeFilter)}`;

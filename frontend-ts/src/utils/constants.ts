@@ -19,6 +19,21 @@ export const GRADE_OPTIONS: GradeGroup[] = [
   { group: 'Senior High School', items: ['Grade 11 — ABM','Grade 11 — STEM','Grade 11 — HUMSS','Grade 12 — ABM','Grade 12 — STEM','Grade 12 — HUMSS'] },
 ];
 
+function normalizeGradeLevelLabel(gradeLevel: string | null | undefined): string {
+  return String(gradeLevel || '').toLowerCase().replace(/[\u2013\u2014]/g, '-').replace(/\s+/g, ' ').trim();
+}
+
+export function getSchoolStage(gradeLevel: string | null | undefined): string | null {
+  const normalized = normalizeGradeLevelLabel(gradeLevel);
+  const stage = GRADE_OPTIONS.find(group => group.items.some(item => normalizeGradeLevelLabel(item) === normalized));
+  return stage?.group || null;
+}
+
+export function shouldSkipEntranceExam(gradeLevel: string | null | undefined): boolean {
+  const stage = getSchoolStage(gradeLevel);
+  return stage === 'Preschool' || stage === 'Grade School';
+}
+
 export const ALL_GRADE_LEVELS: string[] = GRADE_OPTIONS.flatMap(g => g.items);
 
 export const EXAM_GRADE_LEVELS: string[] = ['Preschool', 'Grade 1-6', 'Grade 7-10', 'Grade 11-12', 'All Levels'];

@@ -11,7 +11,7 @@ import StepDocuments from './admission/StepDocuments';
 import StepReview from './admission/StepReview';
 import Modal from '../../components/Modal';
 import { PageHeader, SkeletonPage, ErrorAlert } from '../../components/UI';
-import { SCHOOL_NAME } from '../../utils/constants';
+import { SCHOOL_NAME, shouldSkipEntranceExam } from '../../utils/constants';
 import Icon from '../../components/Icons';
 
 const STEPS = ['Personal Info', 'School Info', 'Family Details', 'Documents', 'Review & Submit'];
@@ -41,6 +41,7 @@ function formatDisplayDate(v: string | null): string {
 
 export default function StudentAdmission() {
   const w = useAdmissionWizard();
+  const requiresEntranceExam = !shouldSkipEntranceExam(w.user?.applicantProfile?.gradeLevel);
   const { data: activePeriod } = useAsync(() => getActivePeriod());
 
   const activeSemester = activePeriod?.semesters?.find(s => s.isActive) || null;
@@ -75,7 +76,7 @@ export default function StudentAdmission() {
   }
 
   /* Exam gate */
-  if (!w.existingApp && !w.examCompleted) {
+  if (!w.existingApp && requiresEntranceExam && !w.examCompleted) {
     return (
       <div>
         <PageHeader title="Admission Application" subtitle={`${SCHOOL_NAME} - Admission Form`} />
@@ -111,10 +112,10 @@ export default function StudentAdmission() {
         <h4 className="font-semibold text-forest-700 text-sm mb-2 flex items-center gap-1.5"><Icon name="clipboard" className="w-4 h-4" /> Admission Policy & Procedure</h4>
         <div className="text-xs text-forest-600 space-y-1">
           <p>Admission is open to all students regardless of race, religion, gender, or socioeconomic status.</p>
-          <p><strong>Procedure:</strong> 1) Complete Entrance Exam, then 2) Submit Application and Documents, then 3) Screening and Evaluation, then 4) Admission Confirmation</p>
+          <p><strong>Procedure:</strong> {requiresEntranceExam ? '1) Complete Entrance Exam, then 2) Submit Application and Documents, then 3) Screening and Evaluation, then 4) Admission Confirmation' : '1) Complete the online application form, then 2) Upload documents, then 3) Screening and Evaluation, then 4) Admission Confirmation'}</p>
           <p><strong>Age Requirement:</strong> Kindergarten applicants must be 5 years old by October 31 of the school year. Grade 1 requires proof of kindergarten completion.</p>
           <p><strong>Late Admission:</strong> Accepted up to 2 weeks after the first day of classes with School Head approval.</p>
-          <p className="text-gray-400">New students may undergo an interview and/or diagnostic entrance test as required. All data handled per RA 10173 (Data Privacy Act).</p>
+          <p className="text-gray-400">New students may undergo an interview and/or diagnostic entrance test as required. Preschool and Grade School applicants use the online application form directly. All data handled per RA 10173 (Data Privacy Act).</p>
         </div>
       </div>
 

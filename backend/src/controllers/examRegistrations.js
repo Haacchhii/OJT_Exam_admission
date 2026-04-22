@@ -2,7 +2,7 @@ import prisma from '../config/db.js';
 import { paginate, paginatedResponse } from '../utils/pagination.js';
 import { generateTrackingId } from '../utils/tracking.js';
 import { sendExamBookingEmail } from '../utils/email.js';
-import { ROLES } from '../utils/constants.js';
+import { ROLES, shouldSkipEntranceExam } from '../utils/constants.js';
 import { cached, invalidatePrefix } from '../utils/cache.js';
 import { attachExamWindowStatus, evaluateExamStartAvailability, isNowWithinExamWindow, computeExamWindowStatus } from '../utils/examWindow.js';
 
@@ -17,9 +17,8 @@ function buildRegistrationScope(academicYearId) {
 
 async function findOwnedRegistrations(user, academicYearId, include) {
   const registrationScope = buildRegistrationScope(academicYearId);
-  const email = normalizeEmail(user?.email);
 
-  const byUserIdPromise = prisma.examRegistration.findMany({
+  return prisma.examRegistration.findMany({
     where: {
       userId: user.id,
       ...registrationScope,
@@ -27,41 +26,11 @@ async function findOwnedRegistrations(user, academicYearId, include) {
     include,
     orderBy: { createdAt: 'desc' },
   });
-
-  const byEmailExactPromise = email
-    ? prisma.examRegistration.findMany({
-      where: {
-        userId: null,
-        userEmail: email,
-        ...registrationScope,
-      },
-      include,
-      orderBy: { createdAt: 'desc' },
-    })
-    : Promise.resolve([]);
-
-  const [byUserId, byEmailExact] = await Promise.all([byUserIdPromise, byEmailExactPromise]);
-
-  let byEmail = byEmailExact;
-  if (email && byEmailExact.length === 0) {
-    byEmail = await prisma.examRegistration.findMany({
-      where: {
-        userId: null,
-        userEmail: { equals: email, mode: 'insensitive' },
-        ...registrationScope,
-      },
-      include,
-      orderBy: { createdAt: 'desc' },
-    });
-  }
-
-  const merged = [...byUserId, ...byEmail];
-  merged.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  return merged;
 }
 
 function registrationBelongsToUser(registration, user) {
   if (!registration || !user) return false;
+  if (user.role === ROLES.APPLICANT) return registration.userId != null && registration.userId === user.id;
   if (registration.userId != null && registration.userId === user.id) return true;
   return normalizeEmail(registration.userEmail) === normalizeEmail(user.email);
 }
@@ -120,6 +89,14 @@ function withWindowStatus(registration) {
     ...registration,
     schedule: attachExamWindowStatus(registration.schedule),
   };
+}
+
+async function applicantRequiresEntranceExam(userId) {
+  const profile = await prisma.applicantProfile.findUnique({
+    where: { userId },
+    select: { gradeLevel: true },
+  });
+  return !shouldSkipEntranceExam(profile?.gradeLevel);
 }
 
 const myRegistrationInclude = {
@@ -296,6 +273,15 @@ export async function createRegistration(req, res, next) {
     }
 
     const targetUserId = targetUser.id;
+    if (targetUser.role === ROLES.APPLICANT) {
+      const requiresExam = await applicantRequiresEntranceExam(targetUserId);
+      if (!requiresExam) {
+        return res.status(400).json({
+          error: 'Preschool and Grade School applicants do not require an entrance exam. Please continue from the online application dashboard.',
+          code: 'VALIDATION_ERROR',
+        });
+      }
+    }
 
     // Check for existing active registration for this specific schedule's exam
     const schedule = await prisma.examSchedule.findUnique({
@@ -347,10 +333,7 @@ export async function createRegistration(req, res, next) {
 
     const existing = await prisma.examRegistration.findFirst({
       where: {
-        OR: [
-          { userId: targetUserId },
-          { userEmail: { equals: email, mode: 'insensitive' } },
-        ],
+        userId: targetUserId,
         status: { not: 'done' },
         schedule: { examId: schedule.examId },
       },
@@ -440,6 +423,16 @@ export async function startExam(req, res, next) {
     // Ownership check: only the registered student can start their own exam
     if (!registrationBelongsToUser(reg, req.user)) {
       return res.status(403).json({ error: 'You can only start exams assigned to your account.', code: 'FORBIDDEN' });
+    }
+
+    if (req.user.role === ROLES.APPLICANT) {
+      const requiresExam = await applicantRequiresEntranceExam(req.user.id);
+      if (!requiresExam) {
+        return res.status(400).json({
+          error: 'This account uses the online application flow and does not have an entrance exam.',
+          code: 'VALIDATION_ERROR',
+        });
+      }
     }
 
     if (reg.status !== 'scheduled') {

@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect } from 'react';
+import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useAsync } from '../../hooks/useAsync';
 import { startExam as apiStartExam, getExamForStudent } from '../../api/exams';
@@ -10,6 +11,7 @@ import Icon from '../../components/Icons';
 import type { Exam, ExamRegistration, ExamResult } from '../../types';
 import ScheduleView from './exam/ScheduleView';
 import LiveExam from './exam/LiveExam';
+import { shouldSkipEntranceExam } from '../../utils/constants';
 
 interface ExamData {
   myReg: ExamRegistration | null;
@@ -26,6 +28,9 @@ export default function StudentExam() {
   const [recoveringExam, setRecoveringExam] = useState(false);
 
   const { user } = useAuth();
+  if (shouldSkipEntranceExam(user?.applicantProfile?.gradeLevel)) {
+    return <Navigate to="/student" replace />;
+  }
   const { data: rawData, loading, error, refetch } = useAsync<ExamData>(async () => {
     const summary = await getStudentHomeSummary();
     const regSummary = summary?.registrationSummary;

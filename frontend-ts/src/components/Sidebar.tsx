@@ -2,7 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useConfirm } from './ConfirmDialog';
 import Icon from './Icons';
-import { SCHOOL_BRAND, SCHOOL_SUBTITLE } from '../utils/constants';
+import { SCHOOL_BRAND, SCHOOL_SUBTITLE, shouldSkipEntranceExam } from '../utils/constants';
 import { prefetchRouteByPath } from '../utils/routePrefetch';
 
 interface LinkItem {
@@ -40,12 +40,13 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ open, onClose, role, collapsed, onToggleCollapse }: SidebarProps) {
-  const { logout, canAccess, roleLabel } = useAuth();
+  const { logout, canAccess, roleLabel, user } = useAuth();
   const navigate = useNavigate();
   const confirm = useConfirm();
+  const hideExamLink = role === 'student' && shouldSkipEntranceExam(user?.applicantProfile?.gradeLevel);
   const links = role === 'employee'
     ? allEmployeeLinks.filter(l => canAccess(l.page as any))
-    : studentLinks;
+    : studentLinks.filter(l => !(hideExamLink && l.to === '/student/exam'));
   const isEmployee = role === 'employee';
 
   const roleBadgeText = isEmployee ? roleLabel : 'Student';

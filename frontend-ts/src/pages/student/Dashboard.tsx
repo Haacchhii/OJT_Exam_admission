@@ -4,7 +4,7 @@ import { useAsync } from '../../hooks/useAsync';
 import { getStudentHomeSummary } from '../../api/admissions';
 import { StatCard, PageHeader, SkeletonPage, ErrorAlert } from '../../components/UI';
 import { formatDate, formatTime } from '../../utils/helpers';
-import { ADMISSION_PROGRESS_STEPS, SCHOOL_BRAND } from '../../utils/constants';
+import { ADMISSION_PROGRESS_STEPS, SCHOOL_BRAND, shouldSkipEntranceExam } from '../../utils/constants';
 import Icon from '../../components/Icons';
 import type { Admission, ExamRegistration, ExamResult } from '../../types';
 import { type ReactNode, useState, useEffect, useCallback } from 'react';
@@ -21,6 +21,7 @@ export default function StudentDashboard() {
   const { user } = useAuth();
   const [draftStep, setDraftStep] = useState(1);
   const [hasAdmissionDraft, setHasAdmissionDraft] = useState(false);
+  const requiresEntranceExam = !shouldSkipEntranceExam(user?.applicantProfile?.gradeLevel);
 
   const { data: rawData, loading, error, refetch } = useAsync<DashboardData>(async () => {
     const summary = await getStudentHomeSummary();
@@ -46,7 +47,20 @@ export default function StudentDashboard() {
 
   const statusText = myApp ? myApp.status : 'Not Submitted';
   const statusColor = statusText === 'Accepted' ? 'emerald' : statusText === 'Rejected' ? 'red' : 'amber';
-  const admissionUnlocked = hasCompletedExam;
+  const admissionUnlocked = hasCompletedExam || !requiresEntranceExam;
+
+  const journeySteps = requiresEntranceExam ? [
+    { step: 1, label: 'Register', desc: 'Create your account', icon: 'check', done: true },
+    { step: 2, label: 'Book Exam', desc: 'Schedule entrance exam', icon: 'calendar', done: !!myReg },
+    { step: 3, label: 'Complete Exam', desc: 'Finish the entrance exam', icon: 'trophy', done: admissionUnlocked },
+    { step: 4, label: 'Apply', desc: 'Submit admission form', icon: 'admissions', done: !!myApp },
+    { step: 5, label: 'Accepted', desc: 'Admission confirmed', icon: 'graduationCap', done: myApp?.status === 'Accepted' },
+  ] : [
+    { step: 1, label: 'Register', desc: 'Create your account', icon: 'check', done: true },
+    { step: 2, label: 'Open Application', desc: 'Fill out the online form', icon: 'admissions', done: !!myApp || hasAdmissionDraft },
+    { step: 3, label: 'Submit Application', desc: 'Upload documents and send it in', icon: 'clipboard', done: !!myApp },
+    { step: 4, label: 'Accepted', desc: 'Admission confirmed', icon: 'graduationCap', done: myApp?.status === 'Accepted' },
+  ];
 
   const syncDraftState = useCallback(() => {
     try {
@@ -98,13 +112,21 @@ export default function StudentDashboard() {
             </div>
             <div className="flex-1 min-w-0">
               <h3 className="font-bold text-gray-800 mb-1">Welcome to {SCHOOL_BRAND}!</h3>
-              <p className="text-gray-500 text-sm mb-4">You're all set. Here's what to do next to complete your application:</p>
+              <p className="text-gray-500 text-sm mb-4">
+                {requiresEntranceExam
+                  ? "You're all set. Here's what to do next to complete your application:"
+                  : 'Preschool and Grade School applicants can go straight to the online application form.'}
+              </p>
               <div className="flex flex-wrap gap-4 mb-5">
-                {[
+                {(requiresEntranceExam ? [
                   { num: '1', label: 'Create account', done: true },
                   { num: '2', label: 'Book entrance exam', done: false },
                   { num: '3', label: 'Submit admission application', done: false },
-                ].map(({ num, label, done }) => (
+                ] : [
+                  { num: '1', label: 'Create account', done: true },
+                  { num: '2', label: 'Open online application', done: true },
+                  { num: '3', label: 'Submit admission application', done: false },
+                ]).map(({ num, label, done }) => (
                   <div key={num} className="flex items-center gap-2">
                     <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold ${done ? 'bg-emerald-500 text-white' : 'bg-gray-200 text-gray-500'}`}>
                       {done ? <Icon name="check" className="w-3.5 h-3.5" /> : num}
@@ -113,9 +135,9 @@ export default function StudentDashboard() {
                   </div>
                 ))}
               </div>
-              <Link to="/student/exam" className="gk-btn-primary inline-flex items-center gap-2 px-5 py-2.5 text-sm">
-                <Icon name="calendar" className="w-4 h-4" />
-                Book Entrance Exam
+              <Link to={requiresEntranceExam ? '/student/exam' : '/student/admission'} className="gk-btn-primary inline-flex items-center gap-2 px-5 py-2.5 text-sm">
+                <Icon name={requiresEntranceExam ? 'calendar' : 'admissions'} className="w-4 h-4" />
+                {requiresEntranceExam ? 'Book Entrance Exam' : 'Open Online Application Form'}
               </Link>
             </div>
           </div>
@@ -128,14 +150,8 @@ export default function StudentDashboard() {
           <span className="p-1.5 bg-gold-50 rounded-lg"><Icon name="star" className="w-5 h-5 text-gold-500" /></span>
           Your Application Journey
         </h3>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          {[
-            { step: 1, label: 'Register', desc: 'Create your account', icon: 'check', done: true },
-            { step: 2, label: 'Book Exam', desc: 'Schedule entrance exam', icon: 'calendar', done: !!myReg },
-            { step: 3, label: 'Complete Exam', desc: 'Finish the entrance exam', icon: 'trophy', done: admissionUnlocked },
-            { step: 4, label: 'Apply', desc: 'Submit admission form', icon: 'admissions', done: !!myApp },
-            { step: 5, label: 'Accepted', desc: 'Admission confirmed', icon: 'graduationCap', done: myApp?.status === 'Accepted' },
-          ].map(({ step, label, desc, icon, done }) => (
+        <div className={`grid grid-cols-2 sm:grid-cols-3 ${requiresEntranceExam ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-3`}>
+          {journeySteps.map(({ step, label, desc, icon, done }) => (
             <div key={step} className={`relative rounded-xl border-2 p-4 text-center transition-all ${done ? 'border-forest-300 bg-forest-50/50' : 'border-gray-200 bg-gray-50/30'}`}>
               <div className={`w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-2 ${done ? 'bg-forest-500 text-white' : 'bg-gray-200 text-gray-400'}`}>
                 {done ? <Icon name="check" className="w-5 h-5" /> : <Icon name={icon} className="w-5 h-5" />}
@@ -224,7 +240,11 @@ export default function StudentDashboard() {
             <h4 className="font-bold text-gray-800 mb-1.5">No Application Yet</h4>
             {admissionUnlocked ? (
               <>
-                <p className="text-gray-500 text-sm mb-4 max-w-lg mx-auto">You completed the entrance exam. Track your admission form progress below and continue where you left off.</p>
+                <p className="text-gray-500 text-sm mb-4 max-w-lg mx-auto">
+                  {requiresEntranceExam
+                    ? 'You completed the entrance exam. Track your admission form progress below and continue where you left off.'
+                    : 'You can continue to the online application form below and track your submission from this dashboard.'}
+                </p>
 
                 <div className="max-w-xl mx-auto text-left rounded-xl border border-forest-200 bg-forest-50/60 p-4 mb-5">
                   <div className="flex items-center justify-between mb-1.5">
@@ -265,13 +285,13 @@ export default function StudentDashboard() {
           Quick Actions
         </h3>
         <div className="flex flex-wrap gap-3">
-          <Link to="/student/exam" className="gk-btn-primary inline-flex items-center gap-2 px-5 py-2.5 text-sm">
-            <Icon name="exam" className="w-4 h-4" />
-            Go to Exam
+          <Link to={requiresEntranceExam ? '/student/exam' : '/student/admission'} className="gk-btn-primary inline-flex items-center gap-2 px-5 py-2.5 text-sm">
+            <Icon name={requiresEntranceExam ? 'exam' : 'admissions'} className="w-4 h-4" />
+            {requiresEntranceExam ? 'Go to Exam' : 'Open Application Form'}
           </Link>
-          <Link to={admissionUnlocked ? '/student/admission' : '/student/exam'} className="gk-btn-secondary inline-flex items-center gap-2 px-5 py-2.5 text-sm">
-            <Icon name={admissionUnlocked ? 'admissions' : 'lock'} className="w-4 h-4" />
-            {admissionUnlocked ? 'Go to Admission' : 'Complete Exam to Unlock Admission'}
+          <Link to={admissionUnlocked ? '/student/admission' : '/student/track'} className="gk-btn-secondary inline-flex items-center gap-2 px-5 py-2.5 text-sm">
+            <Icon name={admissionUnlocked ? 'admissions' : 'clipboard'} className="w-4 h-4" />
+            {admissionUnlocked ? 'Go to Admission' : 'Track Application'}
           </Link>
           <Link to="/student/results" className="gk-btn-secondary inline-flex items-center gap-2 px-5 py-2.5 text-sm">
             <Icon name="results" className="w-4 h-4" />

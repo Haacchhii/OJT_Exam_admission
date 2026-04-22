@@ -112,3 +112,8 @@ export function getLevelGroup(grade) {
   const stage = GRADE_OPTIONS.find(g => g.items.includes(grade));
   return stage ? stage.group : null;
 }
+
+export function shouldSkipEntranceExam(gradeLevel) {
+  const stage = getLevelGroup(gradeLevel);
+  return stage === 'Preschool' || stage === 'Grade School';
+}

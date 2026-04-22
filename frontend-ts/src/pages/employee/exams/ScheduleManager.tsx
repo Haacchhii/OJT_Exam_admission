@@ -62,6 +62,7 @@ function statusBadgeClass(status?: string) {
 export default function ScheduleManager() {
   const confirm = useConfirm();
   const [editId, setEditId] = useState<number | null>(null);
+  const [optimisticSchedule, setOptimisticSchedule] = useState<ExamSchedule | null>(null);
   const [form, setForm] = useState({ examId: '', date: '', start: '', end: '', visibilityStartDate: '', visibilityEndDate: '', openDate: '', closeDate: '', windowStartAt: '', windowEndAt: '', slots: '' });
   const [selectedExamIds, setSelectedExamIds] = useState<number[]>([]);
   const [schedSearch, setSchedSearch] = useState('');
@@ -124,7 +125,10 @@ export default function ScheduleManager() {
       exams: asArray<Exam>(rawExm),
       schedulesPage,
     };
-  }, [schedExamFilter, schedSearch, schedPage], 0, { setLoadingOnReload: true });
+  }, [schedExamFilter, schedSearch, schedPage], 0, {
+    setLoadingOnReload: true,
+    resourcePrefixes: ['/exams'],
+  });
 
   const exams: Exam[] = schedData?.exams || [];
   const schedulesPage = schedData?.schedulesPage || { data: [] as ExamSchedule[], pagination: { page: 1, limit: SCHED_PER_PAGE, total: 0, totalPages: 1 } };
@@ -133,7 +137,9 @@ export default function ScheduleManager() {
     setSelectedExamIds(prev => prev.includes(examId) ? prev.filter(id => id !== examId) : [...prev, examId]);
   };
 
-  const paginatedScheds = schedulesPage.data;
+  const paginatedScheds = schedulesPage.data.map((schedule) => (
+    optimisticSchedule?.id === schedule.id ? optimisticSchedule : schedule
+  ));
   const schedTotalPages = schedulesPage.pagination.totalPages;
   const schedSafePage = schedulesPage.pagination.page;
   const schedTotal = schedulesPage.pagination.total;
@@ -236,7 +242,8 @@ export default function ScheduleManager() {
     });
     try {
       if (editId) {
-        await updateExamSchedule(editId, baseData);
+        const updatedSchedule = await updateExamSchedule(editId, baseData);
+        setOptimisticSchedule(updatedSchedule);
         showToast('Schedule updated!', 'success');
         setSchedActionBanner({
           tone: 'success',
@@ -246,6 +253,7 @@ export default function ScheduleManager() {
         setEditId(null);
       } else if (targetExamIds.length > 1) {
         await Promise.all(targetExamIds.map(examId => addExamSchedule({ ...baseData, examId })));
+        setOptimisticSchedule(null);
         showToast(`${targetExamIds.length} schedules added!`, 'success');
         setSchedActionBanner({
           tone: 'success',
@@ -254,6 +262,7 @@ export default function ScheduleManager() {
         });
       } else {
         await addExamSchedule({ ...baseData, examId: targetExamIds[0] });
+        setOptimisticSchedule(null);
         showToast('Schedule added!', 'success');
         setSchedActionBanner({
           tone: 'success',
@@ -277,6 +286,7 @@ export default function ScheduleManager() {
   };
 
   const editSched = (s: ExamSchedule) => {
+    setOptimisticSchedule(null);
     setEditId(s.id);
     setForm({
       examId: String(s.examId),
@@ -311,6 +321,9 @@ export default function ScheduleManager() {
 
     try {
       await deleteExamSchedule(scheduleId);
+      if (optimisticSchedule?.id === scheduleId) {
+        setOptimisticSchedule(null);
+      }
       setSchedActionBanner({
         tone: 'success',
         title: 'Schedule deleted successfully.',
