@@ -18,7 +18,12 @@ function validatePassword(password) {
 
 
 function signToken(user) {
-  return jwt.sign({ sub: user.id, role: user.role }, env.JWT_SECRET, {
+  return jwt.sign({
+    sub: user.id,
+    role: user.role,
+    status: user.status,
+    emailVerified: user.emailVerified,
+  }, env.JWT_SECRET, {
     expiresIn: env.JWT_EXPIRES_IN,
   });
 }

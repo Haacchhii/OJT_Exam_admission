@@ -18,14 +18,11 @@ function isWithinPeriod(day, start, end) {
 }
 
 export async function isApplicantPeriodOpen(referenceDate = new Date()) {
-  const activeYear = await prisma.academicYear.findFirst({
-    where: { isActive: true },
-    select: { id: true },
-  });
-  if (!activeYear) return false;
-
   const activeSemester = await prisma.semester.findFirst({
-    where: { academicYearId: activeYear.id, isActive: true },
+    where: {
+      isActive: true,
+      academicYear: { isActive: true },
+    },
     orderBy: { id: 'asc' },
     select: { startDate: true, endDate: true },
   });
