@@ -20,7 +20,7 @@ export default function StepReview({ form, slotFiles, extraFiles, requiredDocs, 
   return (
     <div className="gk-section-card p-6">
       <h3 className="text-lg font-bold text-forest-500 mb-1">Step 5: Review & Submit</h3>
-      <p className="text-gray-500 text-sm mb-6">Please review all information before submitting.</p>
+      <p className="text-gray-600 text-base mb-6">Please review all information before submitting.</p>
       <ReviewSection title={<><Icon name="userCircle" className="w-4 h-4 inline" /> Personal Information</>}>
         <Detail label="Student Name" value={`${form.firstName} ${form.middleName} ${form.lastName}`.replace(/\s+/g, ' ').trim()} />
         <Detail label="Middle Name" value={form.noMiddleName ? 'No middle name' : (form.middleName || '-')} />
@@ -54,10 +54,10 @@ export default function StepReview({ form, slotFiles, extraFiles, requiredDocs, 
         <h4 className="font-semibold text-forest-500 mb-3 flex items-center gap-1.5"><Icon name="document" className="w-4 h-4" /> Uploaded Documents</h4>
         <div className="space-y-2">
           {Object.entries(slotFiles).filter(([,f]) => f).map(([k, f]) => (
-            <div key={k} className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-lg text-sm"><Icon name="document" className="w-4 h-4 text-gray-400 shrink-0" /> <strong>{(DOC_SLOT_LABELS as Record<string, string>)[k] || k}:</strong> {f!.name} <span className="text-gray-400 text-xs">({(f!.size/1024).toFixed(1)} KB)</span></div>
+            <div key={k} className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-lg text-sm"><Icon name="document" className="w-4 h-4 text-gray-400 shrink-0" /> <strong>{(DOC_SLOT_LABELS as Record<string, string>)[k] || k}:</strong> {f!.name} <span className="text-gray-500 text-sm">({(f!.size/1024).toFixed(1)} KB)</span></div>
           ))}
           {extraFiles.map((f, i) => (
-            <div key={`e${i}`} className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-lg text-sm"><Icon name="document" className="w-4 h-4 text-gray-400 shrink-0" /> <strong>Additional:</strong> {f.name} <span className="text-gray-400 text-xs">({(f.size/1024).toFixed(1)} KB)</span></div>
+            <div key={`e${i}`} className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-lg text-sm"><Icon name="document" className="w-4 h-4 text-gray-400 shrink-0" /> <strong>Additional:</strong> {f.name} <span className="text-gray-500 text-sm">({(f.size/1024).toFixed(1)} KB)</span></div>
           ))}
           {Object.values(slotFiles).every(f => !f) && extraFiles.length === 0 && <p className="text-gray-400 text-sm">No documents uploaded</p>}
         </div>
@@ -67,7 +67,7 @@ export default function StepReview({ form, slotFiles, extraFiles, requiredDocs, 
           </div>
         )}
       </div>
-      <label className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 mb-6 text-xs text-gray-500 flex items-start gap-3 cursor-pointer select-none">
+      <label className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 mb-6 text-sm text-gray-600 flex items-start gap-3 cursor-pointer select-none">
         <input type="checkbox" checked={privacyConsent} onChange={e => setPrivacyConsent(e.target.checked)} className="accent-forest-500 mt-0.5 shrink-0" />
         <span><Icon name="lock" className="w-4 h-4 inline shrink-0 mr-1" /> By submitting this application, I consent to the collection and processing of my personal information in accordance with the Data Privacy Act of 2012 (RA 10173) and {SCHOOL_NAME}'s privacy policies. Personal data shall not be disclosed without consent, except as required by law.</span>
       </label>

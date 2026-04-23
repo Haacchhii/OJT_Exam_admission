@@ -79,7 +79,7 @@ export default function Register() {
             Join our community of learners. Register to apply for admission and take entrance exams online.
           </p>
           <div className="space-y-4 pt-2">
-            <p className="text-white/50 text-xs font-semibold uppercase tracking-widest">How it works</p>
+            <p className="text-white/60 text-sm font-semibold uppercase tracking-widest">How it works</p>
             {[
               { step: '1', label: 'Create your account', desc: 'Register with your name and email — takes less than a minute.' },
               { step: '2', label: 'Book & take the entrance exam', desc: 'Choose a schedule and complete the online entrance exam.' },
@@ -91,14 +91,14 @@ export default function Register() {
                 </div>
                 <div>
                   <p className="text-white/80 text-sm font-semibold">{label}</p>
-                  <p className="text-white/40 text-xs mt-0.5">{desc}</p>
+                  <p className="text-white/50 text-sm mt-0.5">{desc}</p>
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        <p className="relative z-10 text-xs text-white/30">&copy; {new Date().getFullYear()} {SCHOOL_NAME}. All rights reserved.</p>
+        <p className="relative z-10 text-sm text-white/40">&copy; {new Date().getFullYear()} {SCHOOL_NAME}. All rights reserved.</p>
       </div>
 
       <div className="flex-1 flex items-center justify-center p-6 lg:p-12">
@@ -184,11 +184,11 @@ export default function Register() {
                   <>
                     <div className="mt-2 flex items-center gap-2">
                       <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className={`h-full ${strength.color} transition-all rounded-full`} style={{ width: strength.width }} /></div>
-                      <span className="text-xs text-gray-500 font-medium">{strength.text}</span>
+                      <span className="text-sm text-gray-600 font-medium">{strength.text}</span>
                     </div>
                     <div className="mt-2 rounded-lg border border-gray-200 bg-gray-50 p-2.5 space-y-1.5">
                       {passwordChecks.map(rule => (
-                        <p key={rule.key} className={`text-xs flex items-center gap-1.5 ${rule.met ? 'text-emerald-700' : 'text-gray-500'}`}>
+                        <p key={rule.key} className={`text-sm flex items-center gap-1.5 ${rule.met ? 'text-emerald-700' : 'text-gray-600'}`}>
                           <Icon name={rule.met ? 'checkCircle' : 'xCircle'} className="w-3.5 h-3.5" />
                           {rule.label}
                         </p>
@@ -209,7 +209,7 @@ export default function Register() {
                   </button>
                 </div>
                 {form.confirmPassword && form.confirmPassword !== form.password && (
-                  <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1"><Icon name="exclamation" className="w-3.5 h-3.5" />Passwords do not match</p>
+                  <p className="text-red-500 text-sm mt-1.5 flex items-center gap-1"><Icon name="exclamation" className="w-3.5 h-3.5" />Passwords do not match</p>
                 )}
               </div>
               <ActionButton type="submit" loading={loading} data-testid="register-submit" className="w-full py-3 text-sm">

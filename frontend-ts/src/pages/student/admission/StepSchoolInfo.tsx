@@ -39,7 +39,7 @@ export default function StepSchoolInfo({ form, set, setForm, goTo, requiredDocs,
               </optgroup>
             ))}
           </select>
-          {errors.gradeLevel && <p className="mt-1 text-xs text-red-500" role="alert">{errors.gradeLevel}</p>}
+          {errors.gradeLevel && <p className="mt-1 text-sm text-red-500" role="alert">{errors.gradeLevel}</p>}
         </div>
         <Input label="Learner Reference Number (LRN)" value={form.lrn} onChange={(e: ChangeEvent<HTMLInputElement>) => { const v = e.target.value.replace(/\D/g, ''); setForm(f => ({ ...f, lrn: v })); clearError?.('lrn'); }} required placeholder="12-digit LRN" maxLength={12} inputMode="numeric" pattern="[0-9]*" error={errors.lrn} />
         <Select label="Applicant Type" value={form.applicantType} onChange={(e: ChangeEvent<HTMLSelectElement>) => {
@@ -55,11 +55,11 @@ export default function StepSchoolInfo({ form, set, setForm, goTo, requiredDocs,
         {form.applicantType === 'Continuing' && (
           <div className="md:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">Student Number {form.applicantType === 'Continuing' && <span className="text-red-500">*</span>}</label>
-            {errors.studentNumber && <p className="mb-1 text-xs text-red-500" role="alert">{errors.studentNumber}</p>}
+            {errors.studentNumber && <p className="mb-1 text-sm text-red-500" role="alert">{errors.studentNumber}</p>}
             {user?.applicantProfile?.studentNumber ? (
               <div className="flex items-center gap-2">
                 <input type="text" value={form.studentNumber || user.applicantProfile.studentNumber} readOnly className="gk-input bg-gray-50 font-mono" />
-                <span className="text-xs text-forest-500 font-medium whitespace-nowrap">Auto-detected</span>
+                <span className="text-sm text-forest-500 font-medium whitespace-nowrap">Auto-detected</span>
               </div>
             ) : (
               <input type="text" value={form.studentNumber} onChange={(e) => setForm(f => ({ ...f, studentNumber: e.target.value }))} placeholder="Enter your student number" className="gk-input font-mono" required />
@@ -75,7 +75,7 @@ export default function StepSchoolInfo({ form, set, setForm, goTo, requiredDocs,
       {form.gradeLevel && (
         <div className="bg-gold-50 border border-gold-200 rounded-lg px-4 py-3 mb-4">
           <h4 className="text-sm font-semibold text-gold-700 mb-2 flex items-center gap-1.5"><Icon name="clipboard" className="w-4 h-4" /> Required Documents for {form.gradeLevel}</h4>
-          <ul className="text-xs text-gold-600 space-y-1">
+          <ul className="text-sm text-gold-700 space-y-1">
             {requiredDocs.map(docKey => (
               <li key={docKey} className="flex items-center gap-1.5">
                 {slotFiles[docKey] ? <span className="text-forest-500"><Icon name="checkCircle" className="w-3.5 h-3.5 inline" /></span> : <span className="text-gray-400">o</span>}

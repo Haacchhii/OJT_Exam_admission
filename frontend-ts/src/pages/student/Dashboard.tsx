@@ -128,7 +128,7 @@ export default function StudentDashboard() {
                   { num: '3', label: 'Submit admission application', done: false },
                 ]).map(({ num, label, done }) => (
                   <div key={num} className="flex items-center gap-2">
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold ${done ? 'bg-emerald-500 text-white' : 'bg-gray-200 text-gray-500'}`}>
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold ${done ? 'bg-emerald-500 text-white' : 'bg-gray-200 text-gray-500'}`}>
                       {done ? <Icon name="check" className="w-3.5 h-3.5" /> : num}
                     </div>
                     <span className={`text-sm font-medium ${done ? 'line-through text-gray-400' : 'text-gray-700'}`}>{label}</span>
@@ -157,7 +157,7 @@ export default function StudentDashboard() {
                 {done ? <Icon name="check" className="w-5 h-5" /> : <Icon name={icon} className="w-5 h-5" />}
               </div>
               <p className={`text-sm font-bold ${done ? 'text-forest-700' : 'text-gray-500'}`}>{label}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{desc}</p>
+              <p className="text-sm text-gray-500 mt-0.5">{desc}</p>
               {done && <span className="absolute top-2 right-2 text-forest-500"><Icon name="checkCircle" className="w-4 h-4" /></span>}
             </div>
           ))}
@@ -186,7 +186,7 @@ export default function StudentDashboard() {
               </div>
               <div className="text-center px-4">
                 <div className="text-2xl font-extrabold text-amber-600">{days > 0 ? `${days}d ${hours}h` : `${hours}h`}</div>
-                <div className="text-xs text-gray-400">until exam</div>
+                <div className="text-sm text-gray-500">until exam</div>
               </div>
               <Link to="/student/exam" className="gk-btn-primary px-4 py-2 text-sm whitespace-nowrap">
                 <Icon name="exam" className="w-4 h-4 mr-1.5 inline" />Go to Exam

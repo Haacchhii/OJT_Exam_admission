@@ -100,7 +100,7 @@ export default function Login() {
           <div className="space-y-3">
             <div className="inline-flex items-center gap-2 bg-gold-400/15 border border-gold-400/30 rounded-full px-4 py-1.5">
               <div className="w-1.5 h-1.5 bg-gold-400 rounded-full animate-pulse" />
-              <span className="text-gold-400 text-xs font-semibold tracking-wider uppercase">Now Accepting Applications</span>
+              <span className="text-gold-300 text-sm font-semibold tracking-wider uppercase">Now Accepting Applications</span>
             </div>
             <h2 className="text-5xl font-extrabold leading-tight tracking-tight">
               Start Your<br />
@@ -127,19 +127,19 @@ export default function Login() {
 
           {/* Platform Highlights */}
           <div className="flex flex-wrap gap-2 pt-1">
-            <span className="inline-flex items-center gap-1.5 text-xs text-gold-200 bg-white/10 border border-white/15 rounded-full px-3 py-1.5">
+            <span className="inline-flex items-center gap-1.5 text-sm text-gold-100 bg-white/10 border border-white/15 rounded-full px-3 py-1.5">
               <Icon name="checkCircle" className="w-3.5 h-3.5" /> Online Application Tracking
             </span>
-            <span className="inline-flex items-center gap-1.5 text-xs text-gold-200 bg-white/10 border border-white/15 rounded-full px-3 py-1.5">
+            <span className="inline-flex items-center gap-1.5 text-sm text-gold-100 bg-white/10 border border-white/15 rounded-full px-3 py-1.5">
               <Icon name="checkCircle" className="w-3.5 h-3.5" /> Entrance Exam Scheduling
             </span>
-            <span className="inline-flex items-center gap-1.5 text-xs text-gold-200 bg-white/10 border border-white/15 rounded-full px-3 py-1.5">
+            <span className="inline-flex items-center gap-1.5 text-sm text-gold-100 bg-white/10 border border-white/15 rounded-full px-3 py-1.5">
               <Icon name="checkCircle" className="w-3.5 h-3.5" /> Real-time Status Updates
             </span>
           </div>
         </div>
 
-        <p className="relative z-10 text-xs text-white/30">&copy; {new Date().getFullYear()} {SCHOOL_NAME}. All rights reserved.</p>
+        <p className="relative z-10 text-sm text-white/40">&copy; {new Date().getFullYear()} {SCHOOL_NAME}. All rights reserved.</p>
       </div>
 
       {/* Right: Login Form */}
@@ -162,7 +162,7 @@ export default function Login() {
             {verificationRequired && (
               <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
                 <p className="text-sm text-amber-900 font-medium">Your email is not verified yet.</p>
-                <p className="text-xs text-amber-800 mt-1">Please verify your email to continue. If you did not receive the email, request a new link below.</p>
+                <p className="text-sm text-amber-900 mt-1">Please verify your email to continue. If you did not receive the email, request a new link below.</p>
                 <ActionButton
                   type="button"
                   variant="secondary"
@@ -188,7 +188,7 @@ export default function Login() {
                     data-testid="login-email"
                     className={`gk-input pl-11 ${errors.email ? 'border-red-400 focus:border-red-400' : ''}`} placeholder="your@email.com" />
                 </div>
-                {errors.email && <p id="email-error" className="text-red-500 text-xs mt-1.5 flex items-center gap-1" role="alert"><Icon name="exclamation" className="w-3.5 h-3.5" />{errors.email}</p>}
+                {errors.email && <p id="email-error" className="text-red-500 text-sm mt-1.5 flex items-center gap-1" role="alert"><Icon name="exclamation" className="w-3.5 h-3.5" />{errors.email}</p>}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
@@ -203,7 +203,7 @@ export default function Login() {
                     <Icon name={showPw ? 'eyeOff' : 'eye'} className="w-4.5 h-4.5" />
                   </button>
                 </div>
-                {errors.password && <p id="password-error" className="text-red-500 text-xs mt-1.5 flex items-center gap-1" role="alert"><Icon name="exclamation" className="w-3.5 h-3.5" />{errors.password}</p>}
+                {errors.password && <p id="password-error" className="text-red-500 text-sm mt-1.5 flex items-center gap-1" role="alert"><Icon name="exclamation" className="w-3.5 h-3.5" />{errors.password}</p>}
               </div>
 
               <div className="flex items-center justify-between text-sm">

@@ -13,7 +13,7 @@ export function Input({ label, type = 'text', required, error, className, ...pro
     <div className={className}>
       <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">{label} {required && <span className="text-red-500">*</span>}</label>
       <input id={id} type={type} {...props} className={inputCls} aria-invalid={!!error} aria-describedby={error ? `${id}-error` : undefined} />
-      {error && <p id={`${id}-error`} className="mt-1 text-xs text-red-500" role="alert">{error}</p>}
+      {error && <p id={`${id}-error`} className="mt-1 text-sm text-red-500" role="alert">{error}</p>}
     </div>
   );
 }
@@ -31,7 +31,7 @@ export function TextArea({ label, required, error, className, ...props }: TextAr
     <div className={className}>
       <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">{label} {required && <span className="text-red-500">*</span>}</label>
       <textarea id={id} {...props} className={textareaCls} aria-invalid={!!error} aria-describedby={error ? `${id}-error` : undefined} />
-      {error && <p id={`${id}-error`} className="mt-1 text-xs text-red-500" role="alert">{error}</p>}
+      {error && <p id={`${id}-error`} className="mt-1 text-sm text-red-500" role="alert">{error}</p>}
     </div>
   );
 }
@@ -70,7 +70,7 @@ export function UploadSlot({ label, required, slot, file, onFile, onRemove }: Up
       <p className="text-sm font-medium text-gray-700 mb-1">{label} {required && <span className="text-red-500">*</span>}</p>
       {file ? (
         <div className="border border-forest-200 bg-forest-50 rounded-lg p-3 flex items-center justify-between">
-          <span className="text-sm text-forest-700">✅ {file.name} <span className="text-xs text-gray-400">({(file.size/1024).toFixed(1)} KB)</span></span>
+          <span className="text-sm text-forest-700">✅ {file.name} <span className="text-sm text-gray-500">({(file.size/1024).toFixed(1)} KB)</span></span>
           <button onClick={() => onRemove(slot)} className="text-red-400 hover:text-red-600 text-lg">✕</button>
         </div>
       ) : (
@@ -100,8 +100,8 @@ interface DetailProps {
 export function Detail({ label, value, children }: DetailProps) {
   return (
     <div>
-      <span className="block text-xs text-gray-400 uppercase tracking-wide">{label}</span>
-      {children || <span className="text-sm text-forest-500 font-medium">{value}</span>}
+      <span className="block text-sm text-gray-500 uppercase tracking-wide">{label}</span>
+      {children || <span className="text-base text-forest-500 font-medium">{value}</span>}
     </div>
   );
 }

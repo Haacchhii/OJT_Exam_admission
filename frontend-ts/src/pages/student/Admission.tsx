@@ -63,10 +63,10 @@ export default function StudentAdmission() {
           <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4"><Icon name="clock" className="w-8 h-8 text-red-500" /></div>
           <h3 className="text-xl font-bold text-red-600 mb-2">Application Period Is Currently Closed</h3>
           <p className="text-gray-500 mb-2">Admissions are only accepted during the active school period.</p>
-          <p className="text-gray-400 text-sm mb-2">
+          <p className="text-gray-500 text-base mb-2">
             Active period: <strong>{activePeriod.year}</strong> - <strong>{activeSemester?.name || 'N/A'}</strong>
           </p>
-          <p className="text-gray-400 text-sm mb-6">
+          <p className="text-gray-500 text-base mb-6">
             Window: <strong>{semStartText}</strong> - <strong>{semEndText}</strong>
           </p>
           <Link to="/student/dashboard" className="inline-block bg-forest-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-forest-600">Back to Dashboard</Link>
@@ -84,7 +84,7 @@ export default function StudentAdmission() {
           <div className="w-16 h-16 rounded-2xl bg-forest-50 flex items-center justify-center mx-auto mb-4"><Icon name="lock" className="w-8 h-8 text-forest-500" /></div>
           <h3 className="text-xl font-bold text-forest-500 mb-2">Entrance Exam Completion Required</h3>
           <p className="text-gray-500 mb-2">You must complete the entrance examination before you can submit an admission application.</p>
-          <p className="text-gray-400 text-sm mb-6">Please complete your entrance exam first, then come back here to continue your admission.</p>
+          <p className="text-gray-500 text-base mb-6">Please complete your entrance exam first, then come back here to continue your admission.</p>
           <Link to="/student/exam" className="inline-block bg-gradient-to-r from-forest-500 to-forest-400 text-white px-6 py-3 rounded-lg font-semibold hover:from-gold-500 hover:to-gold-600 shadow-md">Go to Entrance Exam</Link>
         </div>
       </div>
@@ -104,25 +104,25 @@ export default function StudentAdmission() {
       {activePeriod && (
         <div className={`mb-4 rounded-lg border px-4 py-3 text-sm ${isApplicationPeriodOpen ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
           <p className="font-semibold">Application Period: {activePeriod.year} - {activeSemester?.name || 'N/A'}</p>
-          <p className="text-xs mt-1">Window: {semStartText} - {semEndText}</p>
+          <p className="text-sm mt-1">Window: {semStartText} - {semEndText}</p>
         </div>
       )}
 
       <div className="bg-forest-50 border border-forest-200 rounded-xl p-4 mb-6">
-        <h4 className="font-semibold text-forest-700 text-sm mb-2 flex items-center gap-1.5"><Icon name="clipboard" className="w-4 h-4" /> Admission Policy & Procedure</h4>
-        <div className="text-xs text-forest-600 space-y-1">
+        <h4 className="font-semibold text-forest-700 text-base mb-2 flex items-center gap-1.5"><Icon name="clipboard" className="w-4 h-4" /> Admission Policy & Procedure</h4>
+        <div className="text-sm text-forest-700 space-y-1">
           <p>Admission is open to all students regardless of race, religion, gender, or socioeconomic status.</p>
           <p><strong>Procedure:</strong> {requiresEntranceExam ? '1) Complete Entrance Exam, then 2) Submit Application and Documents, then 3) Screening and Evaluation, then 4) Admission Confirmation' : '1) Complete the online application form, then 2) Upload documents, then 3) Screening and Evaluation, then 4) Admission Confirmation'}</p>
           <p><strong>Age Requirement:</strong> Kindergarten applicants must be 5 years old by October 31 of the school year. Grade 1 requires proof of kindergarten completion.</p>
           <p><strong>Late Admission:</strong> Accepted up to 2 weeks after the first day of classes with School Head approval.</p>
-          <p className="text-gray-400">New students may undergo an interview and/or diagnostic entrance test as required. Preschool and Grade School applicants use the online application form directly. All data handled per RA 10173 (Data Privacy Act).</p>
+          <p className="text-gray-500">New students may undergo an interview and/or diagnostic entrance test as required. Preschool and Grade School applicants use the online application form directly. All data handled per RA 10173 (Data Privacy Act).</p>
         </div>
       </div>
 
       <p className="text-sm text-gold-600 bg-gold-50 border border-gold-200 rounded-lg px-4 py-2 mb-6 flex items-center gap-2"><Icon name="info" className="w-4 h-4 shrink-0" /> Parents or guardians may fill out this form on behalf of their child.</p>
 
       {w.isDirty && (
-        <div className="flex items-center gap-2 text-xs text-gray-400 mb-4">
+        <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
           <Icon name="checkCircle" className="w-3.5 h-3.5 text-forest-400" />
           <span>Your progress is automatically saved. You can safely close and return later.</span>
         </div>
@@ -163,7 +163,7 @@ export default function StudentAdmission() {
           <h3 className="text-xl font-bold text-forest-500">Application Submitted!</h3>
           {w.submittedTrackingId && (
             <div className="mt-3 bg-forest-50 border border-forest-200 rounded-lg px-4 py-3">
-              <p className="text-xs text-gray-500 mb-1">Your Tracking ID</p>
+              <p className="text-sm text-gray-600 mb-1">Your Tracking ID</p>
               <div className="flex items-center justify-center gap-2">
                 <p className="text-lg font-mono font-bold text-forest-700">{w.submittedTrackingId}</p>
                 <button
@@ -178,13 +178,13 @@ export default function StudentAdmission() {
                   <Icon name="clipboard" className="w-4 h-4" />
                 </button>
               </div>
-              <p className="text-xs text-gray-400 mt-1">Save this ID to track your application status anytime.</p>
+              <p className="text-sm text-gray-500 mt-1">Save this ID to track your application status anytime.</p>
             </div>
           )}
           <p className="text-gray-500 mt-2">Your admission application has been received by <strong>{SCHOOL_NAME}</strong>.</p>
           <div className="mt-3 rounded-lg border border-gold-200 bg-gold-50 px-4 py-3 text-left">
-            <p className="text-xs font-semibold text-gold-800 mb-1">What happens next</p>
-            <ul className="text-xs text-gold-800 space-y-1 list-disc list-inside">
+            <p className="text-sm font-semibold text-gold-800 mb-1">What happens next</p>
+            <ul className="text-sm text-gold-800 space-y-1 list-disc list-inside">
               <li>Initial screening starts within 1-3 business days.</li>
               <li>Status is usually finalized within 5-10 business days.</li>
               <li>Check your dashboard anytime to view application progress.</li>

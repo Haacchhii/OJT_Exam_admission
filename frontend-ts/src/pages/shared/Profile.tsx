@@ -170,22 +170,22 @@ export default function Profile() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
             <div>
-              <span className="text-gray-400 text-xs uppercase font-semibold">Account Created</span>
+              <span className="text-gray-500 text-sm uppercase font-semibold">Account Created</span>
               <p className="text-gray-700 mt-0.5">{user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : '-'}</p>
             </div>
             <div>
-              <span className="text-gray-400 text-xs uppercase font-semibold">Status</span>
+              <span className="text-gray-500 text-sm uppercase font-semibold">Status</span>
               <p className="text-gray-700 mt-0.5">{user.status || 'Active'}</p>
             </div>
             {user.applicantProfile?.studentNumber && (
               <div>
-                <span className="text-gray-400 text-xs uppercase font-semibold">Student Number</span>
+                <span className="text-gray-500 text-sm uppercase font-semibold">Student Number</span>
                 <p className="text-gray-700 mt-0.5">{user.applicantProfile.studentNumber}</p>
               </div>
             )}
             {user.applicantProfile?.lrn && (
               <div>
-                <span className="text-gray-400 text-xs uppercase font-semibold">LRN</span>
+                <span className="text-gray-500 text-sm uppercase font-semibold">LRN</span>
                 <p className="text-gray-700 mt-0.5">{user.applicantProfile.lrn}</p>
               </div>
             )}
@@ -202,32 +202,32 @@ export default function Profile() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
               <input type="text" value={firstName} onChange={e => setFirstName(e.target.value)} className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm ${errors.firstName ? 'border-red-300 bg-red-50' : 'border-gray-300'}`} />
-              {errors.firstName && <p className="text-xs text-red-600 mt-1">{errors.firstName}</p>}
+              {errors.firstName && <p className="text-sm text-red-600 mt-1">{errors.firstName}</p>}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Middle Name</label>
               <input type="text" value={middleName} onChange={e => setMiddleName(e.target.value)} className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm ${errors.middleName ? 'border-red-300 bg-red-50' : 'border-gray-300'}`} />
-              {errors.middleName && <p className="text-xs text-red-600 mt-1">{errors.middleName}</p>}
+              {errors.middleName && <p className="text-sm text-red-600 mt-1">{errors.middleName}</p>}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Surname</label>
               <input type="text" value={lastName} onChange={e => setLastName(e.target.value)} className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm ${errors.lastName ? 'border-red-300 bg-red-50' : 'border-gray-300'}`} />
-              {errors.lastName && <p className="text-xs text-red-600 mt-1">{errors.lastName}</p>}
+              {errors.lastName && <p className="text-sm text-red-600 mt-1">{errors.lastName}</p>}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
               <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="e.g. 09171234567" className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm ${errors.phone ? 'border-red-300 bg-red-50' : 'border-gray-300'}`} />
-              {errors.phone && <p className="text-xs text-red-600 mt-1">{errors.phone}</p>}
+              {errors.phone && <p className="text-sm text-red-600 mt-1">{errors.phone}</p>}
             </div>
             <div className="sm:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
               <input type="text" value={address} onChange={e => setAddress(e.target.value)} placeholder="Street, City, Province" className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm ${errors.address ? 'border-red-300 bg-red-50' : 'border-gray-300'}`} />
-              {errors.address && <p className="text-xs text-red-600 mt-1">{errors.address}</p>}
+              {errors.address && <p className="text-sm text-red-600 mt-1">{errors.address}</p>}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
               <input type="email" value={user.email} disabled className="w-full px-3 py-2 border border-gray-200 bg-gray-50 rounded-lg text-sm text-gray-500 cursor-not-allowed" />
-              <p className="text-xs text-gray-400 mt-0.5">Email cannot be changed.</p>
+              <p className="text-sm text-gray-500 mt-0.5">Email cannot be changed.</p>
             </div>
           </div>
           <ActionButton onClick={handleSaveProfile} loading={saving} className="text-sm">
@@ -249,13 +249,13 @@ export default function Profile() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
               <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm ${errors.newPassword ? 'border-red-300 bg-red-50' : 'border-gray-300'}`} />
-              {errors.newPassword && <p className="text-xs text-red-600 mt-1">{errors.newPassword}</p>}
-              <p className="text-xs text-gray-500 mt-1">Min 8 chars, uppercase, lowercase, number, special char</p>
+              {errors.newPassword && <p className="text-sm text-red-600 mt-1">{errors.newPassword}</p>}
+              <p className="text-sm text-gray-600 mt-1">Min 8 chars, uppercase, lowercase, number, special char</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
               <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm ${errors.confirmPassword ? 'border-red-300 bg-red-50' : 'border-gray-300'}`} />
-              {errors.confirmPassword && <p className="text-xs text-red-600 mt-1">{errors.confirmPassword}</p>}
+              {errors.confirmPassword && <p className="text-sm text-red-600 mt-1">{errors.confirmPassword}</p>}
             </div>
           </div>
           <ActionButton onClick={handleChangePassword} loading={changingPassword} className="text-sm">
