@@ -86,13 +86,13 @@ export default function Login() {
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gold-400/5 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-xl bg-white/90 flex items-center justify-center shadow-lg overflow-hidden">
-              <img src={SCHOOL_LOGO_PATH} alt={`${SCHOOL_BRAND} logo`} className="w-8 h-8 object-contain" />
+          <div className="flex items-center gap-4 mb-2">
+            <div className="w-20 h-20 rounded-2xl bg-white/95 flex items-center justify-center shadow-lg overflow-hidden ring-2 ring-gold-300/40">
+              <img src={SCHOOL_LOGO_PATH} alt={`${SCHOOL_BRAND} logo`} className="w-16 h-16 object-contain" />
             </div>
-            <span className="text-lg font-bold tracking-tight text-gold-400">{SCHOOL_BRAND}</span>
+            <span className="text-3xl font-extrabold tracking-tight text-gold-300 leading-none">{SCHOOL_BRAND}</span>
           </div>
-          <p className="text-forest-300 text-sm font-semibold">{SCHOOL_SUBTITLE}</p>
+          <p className="text-forest-200 text-lg font-semibold">{SCHOOL_SUBTITLE}</p>
         </div>
 
         <div className="relative z-10 space-y-8">
@@ -146,11 +146,11 @@ export default function Login() {
       <div className="flex-1 flex items-center justify-center p-6 lg:p-12">
         <div className="w-full max-w-md animate-[fadeIn_0.4s_ease-out]">
           <div className="lg:hidden text-center mb-8">
-            <div className="w-12 h-12 rounded-xl bg-white/90 flex items-center justify-center mx-auto mb-3 shadow-lg overflow-hidden">
-              <img src={SCHOOL_LOGO_PATH} alt={`${SCHOOL_BRAND} logo`} className="w-9 h-9 object-contain" />
+            <div className="w-20 h-20 rounded-2xl bg-white/95 flex items-center justify-center mx-auto mb-3 shadow-lg overflow-hidden ring-2 ring-gold-300/40">
+              <img src={SCHOOL_LOGO_PATH} alt={`${SCHOOL_BRAND} logo`} className="w-16 h-16 object-contain" />
             </div>
-            <h1 className="text-lg font-bold text-gold-400">{SCHOOL_BRAND}</h1>
-            <p className="text-sm text-forest-300 font-semibold">{SCHOOL_SUBTITLE}</p>
+            <h1 className="text-3xl font-extrabold text-gold-400 leading-tight">{SCHOOL_BRAND}</h1>
+            <p className="text-base text-forest-400 font-semibold">{SCHOOL_SUBTITLE}</p>
           </div>
 
           <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-elevated p-8 sm:p-10 border border-white/60">
