@@ -5,7 +5,7 @@ import { getStudentHomeSummary } from '../../api/admissions';
 import { PageHeader, SkeletonPage, ErrorAlert, ActionButton } from '../../components/UI';
 import Icon from '../../components/Icons';
 import { formatDate, formatPersonName } from '../../utils/helpers';
-import { SCHOOL_NAME, SCHOOL_BRAND, SCHOOL_SUBTITLE, SCHOOL_ADDRESS, SCHOOL_PHONE } from '../../utils/constants';
+import { SCHOOL_NAME, SCHOOL_BRAND, SCHOOL_SUBTITLE, SCHOOL_LOGO_PATH, SCHOOL_ADDRESS, SCHOOL_PHONE } from '../../utils/constants';
 import { useAuth } from '../../context/AuthContext';
 import { showToast } from '../../components/Toast';
 import { useAsync } from '../../hooks/useAsync';
@@ -162,11 +162,12 @@ export default function StudentResults() {
         .score-circle .pct.passed { color: #166534; }
         .score-circle .pct.failed { color: #991b1b; }
         .score-circle .pct.pending { color: #92400e; }
-        .logo { text-align: center; margin-bottom: 20px; } .logo span { font-size: 32px; }
+        .logo { text-align: center; margin-bottom: 20px; }
+        .logo img { width: 72px; height: 72px; object-fit: contain; display: block; margin: 0 auto 8px; }
         @media print { body { padding: 20px; } }
       </style>
     </head><body>
-      <div class="logo"><span>GK</span><h1><span style="color:#fbbf24">${SCHOOL_BRAND}</span><br/><span style="color:#166534">${SCHOOL_SUBTITLE}</span></h1><p class="subtitle">${SCHOOL_ADDRESS} | Tel: ${SCHOOL_PHONE}<br/>Entrance Examination Result</p></div>
+      <div class="logo"><img src="${SCHOOL_LOGO_PATH}" alt="${SCHOOL_BRAND} logo" /><h1><span style="color:#fbbf24">${SCHOOL_BRAND}</span><br/><span style="color:#166534">${SCHOOL_SUBTITLE}</span></h1><p class="subtitle">${SCHOOL_ADDRESS} | Tel: ${SCHOOL_PHONE}<br/>Entrance Examination Result</p></div>
       <h2>Student: ${studentName}</h2>
       <h2>Exam Results</h2>
       <div class="score-circle"><div class="pct ${resultClass}">${myResult.percentage.toFixed(1)}%</div><p style="color:#888;font-size:13px">Overall Score</p></div>

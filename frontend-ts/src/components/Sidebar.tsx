@@ -2,7 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useConfirm } from './ConfirmDialog';
 import Icon from './Icons';
-import { SCHOOL_BRAND, SCHOOL_SUBTITLE, shouldSkipEntranceExam } from '../utils/constants';
+import { SCHOOL_BRAND, SCHOOL_SUBTITLE, SCHOOL_LOGO_PATH, shouldSkipEntranceExam } from '../utils/constants';
 import { prefetchRouteByPath } from '../utils/routePrefetch';
 
 interface LinkItem {
@@ -63,8 +63,8 @@ export default function Sidebar({ open, onClose, role, collapsed, onToggleCollap
 
           {/* Brand */}
           <div className={`flex items-center gap-3 border-b border-forest-700/40 ${collapsed ? 'lg:justify-center lg:px-3 lg:py-5' : 'px-5 py-5'}`}>
-            <div className="w-9 h-9 rounded-lg bg-forest-600 flex items-center justify-center shrink-0">
-              <Icon name="key" className="w-4.5 h-4.5 text-gold-400" />
+            <div className="w-9 h-9 rounded-lg bg-white/90 flex items-center justify-center shrink-0 overflow-hidden">
+              <img src={SCHOOL_LOGO_PATH} alt={`${SCHOOL_BRAND} logo`} className="w-7 h-7 object-contain" />
             </div>
             <div className={`transition-opacity duration-200 ${collapsed ? 'lg:hidden' : ''}`}>
               <h2 className="text-sm font-bold tracking-wide text-white leading-tight">{SCHOOL_BRAND}</h2>

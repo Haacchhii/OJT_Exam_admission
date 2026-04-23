@@ -6,6 +6,7 @@ import type { GradeGroup, SelectOption } from '../types';
 export const SCHOOL_NAME = 'GOLDEN KEY Integrated School of St. Joseph';
 export const SCHOOL_BRAND = 'GOLDEN KEY';
 export const SCHOOL_SUBTITLE = 'Integrated School of St. Joseph';
+export const SCHOOL_LOGO_PATH = '/school-logo.png';
 export const SCHOOL_ADDRESS = 'Lapolapo 1st, San Jose, Batangas, Philippines';
 export const SCHOOL_PHONE = '(043)-702-2153';
 export const SCHOOL_YEAR = String(new Date().getFullYear());

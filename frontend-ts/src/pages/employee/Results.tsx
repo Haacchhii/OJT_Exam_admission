@@ -1,7 +1,7 @@
 ﻿import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useAsync } from '../../hooks/useAsync';
 import { getEmployeeResultsSummary, scoreEssay, getQuestionAnalyticsPage } from '../../api/results';
-import { SCHOOL_NAME, SCHOOL_BRAND, SCHOOL_SUBTITLE, SCHOOL_ADDRESS, SCHOOL_PHONE } from '../../utils/constants';
+import { SCHOOL_NAME, SCHOOL_BRAND, SCHOOL_SUBTITLE, SCHOOL_LOGO_PATH, SCHOOL_ADDRESS, SCHOOL_PHONE } from '../../utils/constants';
 import { useAuth } from '../../context/AuthContext';
 import { showToast } from '../../components/Toast';
 import { useConfirm } from '../../components/ConfirmDialog';
@@ -381,11 +381,12 @@ export default function EmployeeResults() {
         .score-circle .pct { font-size: 48px; font-weight: 800; }
         .score-circle .pct.passed { color: #166534; }
         .score-circle .pct.failed { color: #991b1b; }
-        .logo { text-align: center; margin-bottom: 20px; } .logo span { font-size: 32px; }
+        .logo { text-align: center; margin-bottom: 20px; }
+        .logo img { width: 72px; height: 72px; object-fit: contain; display: block; margin: 0 auto 8px; }
         @media print { body { padding: 20px; } }
       </style>
     </head><body>
-      <div class="logo"><span>GK</span><h1><span style="color:#fbbf24">${SCHOOL_BRAND}</span><br/><span style="color:#166534">${SCHOOL_SUBTITLE}</span></h1><p class="subtitle">${SCHOOL_ADDRESS} | Tel: ${SCHOOL_PHONE}<br/>Entrance Examination Result</p></div>
+      <div class="logo"><img src="${SCHOOL_LOGO_PATH}" alt="${SCHOOL_BRAND} logo" /><h1><span style="color:#fbbf24">${SCHOOL_BRAND}</span><br/><span style="color:#166534">${SCHOOL_SUBTITLE}</span></h1><p class="subtitle">${SCHOOL_ADDRESS} | Tel: ${SCHOOL_PHONE}<br/>Entrance Examination Result</p></div>
       <h2>Student Information</h2>
       <div class="grid">
         <div class="field"><label>Student Name</label><span>${studentName}</span></div>

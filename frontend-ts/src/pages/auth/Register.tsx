@@ -5,7 +5,7 @@ import { showToast } from '../../components/Toast';
 import { getPasswordStrength, getPasswordRequirementChecks, isPasswordCompliant } from '../../utils/passwordStrength';
 import { ActionButton } from '../../components/UI';
 import Icon from '../../components/Icons';
-import { SCHOOL_NAME, SCHOOL_BRAND, SCHOOL_SUBTITLE, GRADE_OPTIONS } from '../../utils/constants';
+import { SCHOOL_NAME, SCHOOL_BRAND, SCHOOL_SUBTITLE, SCHOOL_LOGO_PATH, GRADE_OPTIONS } from '../../utils/constants';
 
 export default function Register() {
   const gradeStages = GRADE_OPTIONS.map(g => g.group);
@@ -62,8 +62,8 @@ export default function Register() {
 
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gold-400 to-gold-500 flex items-center justify-center shadow-lg">
-              <Icon name="key" className="w-5 h-5 text-forest-800" />
+            <div className="w-10 h-10 rounded-xl bg-white/90 flex items-center justify-center shadow-lg overflow-hidden">
+              <img src={SCHOOL_LOGO_PATH} alt={`${SCHOOL_BRAND} logo`} className="w-8 h-8 object-contain" />
             </div>
             <span className="text-lg font-bold tracking-tight text-gold-400">{SCHOOL_BRAND}</span>
           </div>
@@ -104,8 +104,8 @@ export default function Register() {
       <div className="flex-1 flex items-center justify-center p-6 lg:p-12">
         <div className="w-full max-w-md animate-[fadeIn_0.4s_ease-out]">
           <div className="lg:hidden text-center mb-8">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-gold-400 to-gold-500 flex items-center justify-center mx-auto mb-3 shadow-lg">
-              <Icon name="key" className="w-6 h-6 text-forest-800" />
+            <div className="w-12 h-12 rounded-xl bg-white/90 flex items-center justify-center mx-auto mb-3 shadow-lg overflow-hidden">
+              <img src={SCHOOL_LOGO_PATH} alt={`${SCHOOL_BRAND} logo`} className="w-9 h-9 object-contain" />
             </div>
             <h1 className="text-lg font-bold text-gold-400">{SCHOOL_BRAND}</h1>
             <p className="text-sm text-forest-300 font-semibold">{SCHOOL_SUBTITLE}</p>

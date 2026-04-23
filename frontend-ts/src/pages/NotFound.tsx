@@ -1,13 +1,13 @@
 import { Link } from 'react-router-dom';
 import Icon from '../components/Icons';
-import { SCHOOL_BRAND, SCHOOL_SUBTITLE, SCHOOL_YEAR } from '../utils/constants';
+import { SCHOOL_BRAND, SCHOOL_SUBTITLE, SCHOOL_YEAR, SCHOOL_LOGO_PATH } from '../utils/constants';
 
 export default function NotFound() {
   return (
     <div className="min-h-screen flex items-center justify-center gk-auth-bg p-4">
       <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-elevated max-w-md w-full p-10 text-center border border-white/60 animate-[scaleIn_0.3s_ease-out]">
-        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-gold-400 to-gold-500 flex items-center justify-center mx-auto mb-5 shadow-lg">
-          <Icon name="key" className="w-8 h-8 text-forest-800" />
+        <div className="w-16 h-16 rounded-2xl bg-white/90 flex items-center justify-center mx-auto mb-5 shadow-lg overflow-hidden">
+          <img src={SCHOOL_LOGO_PATH} alt={`${SCHOOL_BRAND} logo`} className="w-12 h-12 object-contain" />
         </div>
         <h1 className="text-7xl font-extrabold text-gold-400 mb-2">404</h1>
         <h2 className="text-xl font-bold text-gray-800 mb-2">Page Not Found</h2>

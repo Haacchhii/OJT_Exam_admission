@@ -6,7 +6,7 @@ import { formatDate, formatDateRange, formatPersonName, badgeClass } from '../..
 import DocumentReview from '../../../components/DocumentReview';
 import { PageHeader, Badge, SkeletonPage, ActionButton, StatusStepper, StatusBanner } from '../../../components/UI';
 import Icon from '../../../components/Icons';
-import { SCHOOL_NAME, SCHOOL_BRAND, SCHOOL_SUBTITLE, SCHOOL_ADDRESS, SCHOOL_PHONE } from '../../../utils/constants';
+import { SCHOOL_NAME, SCHOOL_BRAND, SCHOOL_SUBTITLE, SCHOOL_LOGO_PATH, SCHOOL_ADDRESS, SCHOOL_PHONE } from '../../../utils/constants';
 import { useAuth } from '../../../context/AuthContext';
 import type { Admission } from '../../../types';
 import { useEffect, useState } from 'react';
@@ -119,11 +119,12 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
         .status.Under-Evaluation { background: #f3e8ff; color: #7c3aed; }
         .status.Accepted { background: #dcfce7; color: #166534; }
         .status.Rejected { background: #fee2e2; color: #991b1b; }
-        .logo { text-align: center; margin-bottom: 20px; } .logo span { font-size: 32px; }
+        .logo { text-align: center; margin-bottom: 20px; }
+        .logo img { width: 72px; height: 72px; object-fit: contain; display: block; margin: 0 auto 8px; }
         @media print { body { padding: 20px; } }
       </style>
     </head><body>
-      <div class="logo"><span>GK</span><h1><span style="color:#fbbf24">${SCHOOL_BRAND}</span><br/><span style="color:#166534">${SCHOOL_SUBTITLE}</span></h1><p class="subtitle">${SCHOOL_ADDRESS} | Tel: ${SCHOOL_PHONE}<br/>Admission Application Form</p></div>
+      <div class="logo"><img src="${SCHOOL_LOGO_PATH}" alt="${SCHOOL_BRAND} logo" /><h1><span style="color:#fbbf24">${SCHOOL_BRAND}</span><br/><span style="color:#166534">${SCHOOL_SUBTITLE}</span></h1><p class="subtitle">${SCHOOL_ADDRESS} | Tel: ${SCHOOL_PHONE}<br/>Admission Application Form</p></div>
       <h2>Student Information</h2>
       <div class="grid">
         <div class="field"><label>Full Name</label><span>${esc(fullName)}</span></div>
