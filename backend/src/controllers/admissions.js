@@ -308,14 +308,7 @@ function pickLatestByCreatedAt(primary, secondary) {
 }
 
 async function getOwnedRegistrationSummaryForUser(user, normalizedEmail) {
-  const [
-    latestByUserId,
-    totalByUserId,
-    completedByUserId,
-    latestByEmailExact,
-    totalByEmailExact,
-    completedByEmailExact,
-  ] = await Promise.all([
+  const [latestByUserId, totalByUserId, completedByUserId] = await Promise.all([
     prisma.examRegistration.findFirst({
       where: { userId: user.id },
       include: myRegistrationInclude,
@@ -323,77 +316,23 @@ async function getOwnedRegistrationSummaryForUser(user, normalizedEmail) {
     }),
     prisma.examRegistration.count({ where: { userId: user.id } }),
     prisma.examRegistration.count({ where: { userId: user.id, status: 'done' } }),
-    normalizedEmail
-      ? prisma.examRegistration.findFirst({
-          where: { userId: null, userEmail: normalizedEmail },
-          include: myRegistrationInclude,
-          orderBy: { createdAt: 'desc' },
-        })
-      : Promise.resolve(null),
-    normalizedEmail
-      ? prisma.examRegistration.count({ where: { userId: null, userEmail: normalizedEmail } })
-      : Promise.resolve(0),
-    normalizedEmail
-      ? prisma.examRegistration.count({ where: { userId: null, userEmail: normalizedEmail, status: 'done' } })
-      : Promise.resolve(0),
   ]);
 
-  let latestByEmail = latestByEmailExact;
-  let totalByEmail = totalByEmailExact;
-  let completedByEmail = completedByEmailExact;
-
-  if (normalizedEmail && !latestByEmailExact && totalByEmailExact === 0) {
-    const [insensitiveLatest, insensitiveTotal, insensitiveCompleted] = await Promise.all([
-      prisma.examRegistration.findFirst({
-        where: { userId: null, userEmail: { equals: normalizedEmail, mode: 'insensitive' } },
-        include: myRegistrationInclude,
-        orderBy: { createdAt: 'desc' },
-      }),
-      prisma.examRegistration.count({ where: { userId: null, userEmail: { equals: normalizedEmail, mode: 'insensitive' } } }),
-      prisma.examRegistration.count({ where: { userId: null, userEmail: { equals: normalizedEmail, mode: 'insensitive' }, status: 'done' } }),
-    ]);
-    latestByEmail = insensitiveLatest;
-    totalByEmail = insensitiveTotal;
-    completedByEmail = insensitiveCompleted;
-  }
-
-  const latest = pickLatestByCreatedAt(latestByUserId, latestByEmail);
-  const totalRegistrations = totalByUserId + totalByEmail;
-  const completedCount = completedByUserId + completedByEmail;
-
   return {
-    latest,
-    hasCompletedExam: completedCount > 0,
-    totalRegistrations,
+    latest: latestByUserId,
+    hasCompletedExam: completedByUserId > 0,
+    totalRegistrations: totalByUserId,
   };
 }
 
 async function findLatestResultForUser(user, normalizedEmail) {
-  const [latestByUserId, latestByEmailExact] = await Promise.all([
-    prisma.examResult.findFirst({
-      where: { registration: { userId: user.id } },
-      include: myResultInclude,
-      orderBy: { createdAt: 'desc' },
-    }),
-    normalizedEmail
-      ? prisma.examResult.findFirst({
-          where: { registration: { userId: null, userEmail: normalizedEmail } },
-          include: myResultInclude,
-          orderBy: { createdAt: 'desc' },
-        })
-      : Promise.resolve(null),
-  ]);
+  const latestByUserId = await prisma.examResult.findFirst({
+    where: { registration: { userId: user.id } },
+    include: myResultInclude,
+    orderBy: { createdAt: 'desc' },
+  });
 
-  let latestByEmail = latestByEmailExact;
-  if (normalizedEmail && !latestByEmailExact) {
-    latestByEmail = await prisma.examResult.findFirst({
-      where: { registration: { userId: null, userEmail: { equals: normalizedEmail, mode: 'insensitive' } } },
-      include: myResultInclude,
-      orderBy: { createdAt: 'desc' },
-    });
-  }
-
-  return pickLatestByCreatedAt(latestByUserId, latestByEmail);
+  return latestByUserId;
 }
 
 // GET /api/admissions?status=&grade=&search=&sort=&page=&limit=&academicYearId=&semesterId=
@@ -528,8 +467,7 @@ export async function getDashboardSummary(req, res, next) {
         const twoWeeksAgo = new Date(now - 14 * 24 * 60 * 60 * 1000);
         const overdueThreshold = new Date(now - 7 * 24 * 60 * 60 * 1000);
 
-        const [total, grouped, overdue, thisWeekTotal, lastWeekTotal, thisWeekGrouped, lastWeekGrouped, recentAdmissionsRows] = await Promise.all([
-          prisma.admission.count({ where: { deletedAt: null } }),
+        const [grouped, overdue, recentAdmissionsRows, trendRows] = await Promise.all([
           prisma.admission.groupBy({
             by: ['status'],
             _count: { _all: true },
@@ -542,29 +480,22 @@ export async function getDashboardSummary(req, res, next) {
               submittedAt: { lt: overdueThreshold },
             },
           }),
-          prisma.admission.count({ where: { deletedAt: null, submittedAt: { gte: weekAgo } } }),
-          prisma.admission.count({ where: { deletedAt: null, submittedAt: { gte: twoWeeksAgo, lt: weekAgo } } }),
-          prisma.admission.groupBy({
-            by: ['status'],
-            _count: { _all: true },
-            where: { deletedAt: null, submittedAt: { gte: weekAgo } },
-          }),
-          prisma.admission.groupBy({
-            by: ['status'],
-            _count: { _all: true },
-            where: { deletedAt: null, submittedAt: { gte: twoWeeksAgo, lt: weekAgo } },
-          }),
           prisma.admission.findMany({
             where: { deletedAt: null },
             orderBy: { submittedAt: 'desc' },
             take: 5,
             include: { documents: true, academicYear: true, semester: true },
           }),
+          prisma.admission.findMany({
+            where: { deletedAt: null, submittedAt: { gte: twoWeeksAgo } },
+            select: { status: true, submittedAt: true },
+          }),
         ]);
 
         overdueCount = overdue;
         recentAdmissions = recentAdmissionsRows.map(shapeAdmission);
         const statusMap = Object.fromEntries(grouped.map(g => [g.status, g._count._all]));
+        const total = Object.values(statusMap).reduce((sum, count) => sum + count, 0);
         stats = {
           total,
           submitted: statusMap['Submitted'] || 0,
@@ -575,9 +506,28 @@ export async function getDashboardSummary(req, res, next) {
         };
 
         const pct = (curr, prev) => (prev === 0 ? (curr > 0 ? 100 : 0) : Math.round(((curr - prev) / prev) * 100));
-        const statusCountMap = (rows) => Object.fromEntries(rows.map((row) => [row.status, row._count._all]));
-        const thisWeekStatusMap = statusCountMap(thisWeekGrouped);
-        const lastWeekStatusMap = statusCountMap(lastWeekGrouped);
+        const inRange = (submittedAt, start, end) => {
+          if (!submittedAt) return false;
+          const ts = new Date(submittedAt);
+          if (Number.isNaN(ts.getTime())) return false;
+          if (start && ts < start) return false;
+          if (end && ts >= end) return false;
+          return true;
+        };
+        const thisWeekRows = trendRows.filter((row) => inRange(row.submittedAt, weekAgo, null));
+        const lastWeekRows = trendRows.filter((row) => inRange(row.submittedAt, twoWeeksAgo, weekAgo));
+        const thisWeekTotal = thisWeekRows.length;
+        const lastWeekTotal = lastWeekRows.length;
+        const statusCountMap = (rows) => {
+          const counts = {};
+          for (const row of rows) {
+            const key = row.status;
+            counts[key] = (counts[key] || 0) + 1;
+          }
+          return counts;
+        };
+        const thisWeekStatusMap = statusCountMap(thisWeekRows);
+        const lastWeekStatusMap = statusCountMap(lastWeekRows);
         const countStatus = (map, status) => map[status] || 0;
         const countInProgress = (map) => ADMISSION_IN_PROGRESS.reduce((sum, status) => sum + (map[status] || 0), 0);
         trends = {
@@ -591,8 +541,12 @@ export async function getDashboardSummary(req, res, next) {
       let examActivity = [];
       let examCount = 0;
       let completed = 0;
+      const pendingEssaysPromise = includeResults
+        ? prisma.essayAnswer.count({ where: { scored: false } })
+        : Promise.resolve(0);
+      let pendingEssays = 0;
       if (includeExams) {
-        const [exams, totalExams, completedCount] = await Promise.all([
+        const [exams, totalExams, completedCount, pendingEssaysCount] = await Promise.all([
           prisma.exam.findMany({
             where: { deletedAt: null },
             orderBy: { createdAt: 'desc' },
@@ -603,21 +557,16 @@ export async function getDashboardSummary(req, res, next) {
               gradeLevel: true,
               isActive: true,
               _count: { select: { questions: true, schedules: true } },
+              schedules: {
+                select: { slotsTaken: true },
+              },
             },
           }),
           prisma.exam.count({ where: { deletedAt: null } }),
           prisma.examRegistration.count({ where: { status: 'done' } }),
+          pendingEssaysPromise,
         ]);
-
-        const slotCountsByExam = exams.length
-          ? await prisma.examSchedule.groupBy({
-              by: ['examId'],
-              where: { examId: { in: exams.map((exam) => exam.id) } },
-              _sum: { slotsTaken: true },
-            })
-          : [];
-
-        const slotsTakenByExam = new Map(slotCountsByExam.map((row) => [row.examId, row._sum.slotsTaken || 0]));
+        pendingEssays = pendingEssaysCount;
         examActivity = exams.map((exam) => {
           return {
             id: exam.id,
@@ -626,17 +575,15 @@ export async function getDashboardSummary(req, res, next) {
             questionCount: exam._count.questions,
             scheduleCount: exam._count.schedules,
             isActive: exam.isActive,
-            registrations: slotsTakenByExam.get(exam.id) || 0,
+            registrations: exam.schedules.reduce((sum, schedule) => sum + (schedule.slotsTaken || 0), 0),
           };
         });
 
         examCount = totalExams;
         completed = completedCount;
+      } else {
+        pendingEssays = await pendingEssaysPromise;
       }
-
-      const pendingEssays = includeResults
-        ? await prisma.essayAnswer.count({ where: { scored: false } })
-        : 0;
 
       return {
         stats,
