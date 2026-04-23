@@ -208,13 +208,23 @@ export async function getSchedules(req, res, next) {
       ];
     }
 
-    const [schedules, total] = await Promise.all([
-      prisma.examSchedule.findMany({
-        where, ...(pg && { skip: pg.skip, take: pg.take }), orderBy: { scheduledDate: 'desc' },
-        include: { exam: { select: { title: true, gradeLevel: true } } },
-      }),
-      prisma.examSchedule.count({ where }),
-    ]);
+    const cacheKey = `schedules:list:${JSON.stringify({
+      examId: examId ? Number(examId) : null,
+      search: search || null,
+      page: pg?.page || 1,
+      limit: pg?.limit || null,
+    })}`;
+
+    const { schedules, total } = await cached(cacheKey, async () => {
+      const [rows, count] = await Promise.all([
+        prisma.examSchedule.findMany({
+          where, ...(pg && { skip: pg.skip, take: pg.take }), orderBy: { scheduledDate: 'desc' },
+          include: { exam: { select: { title: true, gradeLevel: true } } },
+        }),
+        prisma.examSchedule.count({ where }),
+      ]);
+      return { schedules: rows, total: count };
+    }, 45_000);
 
     const withStatus = schedules.map((schedule) => attachExamWindowStatus(schedule));
     res.json(paginatedResponse(withStatus, total, pg));
@@ -372,6 +382,7 @@ export async function createSchedule(req, res, next) {
     });
 
     invalidatePrefix('schedules:available:');
+    invalidatePrefix('schedules:list:');
 
     res.status(201).json(attachExamWindowStatus(schedule));
   } catch (err) { next(err); }
@@ -459,6 +470,7 @@ export async function updateSchedule(req, res, next) {
     });
 
     invalidatePrefix('schedules:available:');
+    invalidatePrefix('schedules:list:');
 
     res.json(attachExamWindowStatus(schedule));
   } catch (err) { next(err); }
@@ -472,6 +484,7 @@ export async function deleteSchedule(req, res, next) {
     await prisma.examRegistration.deleteMany({ where: { scheduleId: id } });
     await prisma.examSchedule.delete({ where: { id } });
     invalidatePrefix('schedules:available:');
+    invalidatePrefix('schedules:list:');
     res.status(204).end();
   } catch (err) { next(err); }
 }

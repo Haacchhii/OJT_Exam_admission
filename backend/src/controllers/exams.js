@@ -293,7 +293,7 @@ export async function getReadiness(req, res, next) {
         prisma.examRegistration.count({ where }),
       ]);
       return { rows: listRows, total: count };
-    }, 45_000);
+    }, 120_000);
 
     res.json(paginatedResponse(rows, total, pg));
   } catch (err) { next(err); }

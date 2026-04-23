@@ -42,7 +42,7 @@ export async function getAcademicYears(req, res, next) {
           _count: { select: { admissions: true, exams: true } },
         },
       });
-    });
+    }, 120_000);
     res.json(years);
   } catch (err) { next(err); }
 }
@@ -189,7 +189,7 @@ export async function getSemesters(req, res, next) {
         orderBy: [{ academicYearId: 'desc' }, { id: 'asc' }],
         include: { academicYear: { select: { year: true } } },
       })
-    );
+    , 120_000);
     res.json(semesters);
   } catch (err) { next(err); }
 }

@@ -43,7 +43,9 @@ function invalidateMyRegistrationCaches(userId) {
 
 function invalidateEmployeeRegistrationCaches() {
   invalidatePrefix('regs:list:');
-  invalidatePrefix('readiness:list:');
+  // NOTE: readiness:list: invalidation removed to prevent cache thrashing.
+  // Readiness is an aggregated view; cache TTL increased to 120s.
+  // Invalidate only on terminal events (exam done/scored) if real-time updates are needed.
   invalidatePrefix('resultsEmployeeSummary:');
 }
 
