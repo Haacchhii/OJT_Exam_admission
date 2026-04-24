@@ -1,8 +1,9 @@
 import { z } from 'zod';
-import { ROLES, ADMISSION_STATUSES, MAX_BULK_OPERATIONS } from './constants.js';
+import { ROLES, ADMISSION_STATUSES, MAX_BULK_OPERATIONS, EXAM_GRADE_LEVELS } from './constants.js';
 
 const ROLE_VALUES = /** @type {[string, ...string[]]} */ (Object.values(ROLES));
 const STATUS_VALUES = /** @type {[string, ...string[]]} */ (ADMISSION_STATUSES);
+const EXAM_GRADE_LEVEL_VALUES = /** @type {[string, ...string[]]} */ (EXAM_GRADE_LEVELS);
 
 // ─── Shared helpers ─────────────────────────────────
 const passwordSchema = z.string()
@@ -243,7 +244,7 @@ const questionSchema = z.object({
 
 export const createExamSchema = z.object({
   title: z.string().min(1).max(200),
-  gradeLevel: z.string().min(1),
+  gradeLevel: z.enum(EXAM_GRADE_LEVEL_VALUES),
   durationMinutes: z.number().int().positive(),
   passingScore: z.number().min(0).max(100),
   isActive: z.boolean().default(true),
@@ -383,7 +384,7 @@ export const auditLogQuerySchema = z.object({
 // ─── Missing update / create schemas ──────────────────
 export const updateExamSchema = z.object({
   title:           z.string().min(1).max(200).optional(),
-  gradeLevel:      z.string().min(1).optional(),
+  gradeLevel:      z.enum(EXAM_GRADE_LEVEL_VALUES).optional(),
   durationMinutes: z.number().int().positive().optional(),
   passingScore:    z.number().min(0).max(100).optional(),
   isActive:        z.boolean().optional(),

@@ -152,8 +152,6 @@ function resolveGradeKey(gradeLevel = '') {
 
 function inferLegacyGradeBucket(gradeLevel = '') {
   const g = normalizeGradeLabel(gradeLevel);
-  if (g.includes('nursery') || g.includes('kinder')) return 'Preschool';
-  if (/grade\s*[1-6](\b|\D)/.test(g)) return 'Grade 1-6';
   if (/grade\s*(7|8|9|10)(\b|\D)/.test(g)) return 'Grade 7-10';
   if (/grade\s*(11|12)(\b|\D)/.test(g)) return 'Grade 11-12';
   return null;

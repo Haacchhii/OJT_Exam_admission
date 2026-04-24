@@ -37,7 +37,7 @@ export function shouldSkipEntranceExam(gradeLevel: string | null | undefined): b
 
 export const ALL_GRADE_LEVELS: string[] = GRADE_OPTIONS.flatMap(g => g.items);
 
-export const EXAM_GRADE_LEVELS: string[] = ['Preschool', 'Grade 1-6', 'Grade 7-10', 'Grade 11-12', 'All Levels'];
+export const EXAM_GRADE_LEVELS: string[] = ['Grade 7-10', 'Grade 11-12', 'All Levels'];
 
 export const SEMESTER_NAMES: string[] = ['First Semester', 'Second Semester', 'Summer'];
 

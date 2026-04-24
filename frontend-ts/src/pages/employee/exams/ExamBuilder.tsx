@@ -32,7 +32,10 @@ function questionTypeLabel(type: BuilderQuestionType) {
 }
 
 export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | null; onDone: () => void }) {
-  const examGradeGroups = [...GRADE_OPTIONS, { group: 'General', items: ['All Levels'] }];
+  const examGradeGroups = [
+    ...GRADE_OPTIONS.filter((group) => group.group === 'Junior High School' || group.group === 'Senior High School'),
+    { group: 'General', items: ['All Levels'] },
+  ];
   const detectExamStage = (gradeLevel: string) => examGradeGroups.find(g => g.items.includes(gradeLevel))?.group || '';
 
   const [title, setTitle] = useState(editExam?.title || '');

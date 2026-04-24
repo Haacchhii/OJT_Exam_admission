@@ -57,16 +57,24 @@ export const DEFAULT_PAGE_SIZE      = 10;
 export const MAX_PAGE_SIZE          = 100;
 export const SCHOOL_NAME            = 'Golden Key Integrated School of St. Joseph';
 
+export const EXAM_GRADE_LEVELS = [
+  'Grade 7',
+  'Grade 8',
+  'Grade 9',
+  'Grade 10',
+  'Grade 11 — ABM',
+  'Grade 11 — STEM',
+  'Grade 11 — HUMSS',
+  'Grade 12 — ABM',
+  'Grade 12 — STEM',
+  'Grade 12 — HUMSS',
+  'Grade 7-10',
+  'Grade 11-12',
+  'All Levels',
+];
+
 // Map specific student grade levels to exact exam grade-level targets
 export const GRADE_TO_EXAM_LEVEL = {
-  'Nursery':          'Nursery',
-  'Kinder':           'Kinder',
-  'Grade 1':          'Grade 1',
-  'Grade 2':          'Grade 2',
-  'Grade 3':          'Grade 3',
-  'Grade 4':          'Grade 4',
-  'Grade 5':          'Grade 5',
-  'Grade 6':          'Grade 6',
   'Grade 7':          'Grade 7',
   'Grade 8':          'Grade 8',
   'Grade 9':          'Grade 9',
@@ -81,14 +89,6 @@ export const GRADE_TO_EXAM_LEVEL = {
 
 // Temporary compatibility map for old grouped exams already in existing databases.
 export const GRADE_TO_LEGACY_EXAM_LEVEL = {
-  'Nursery':          'Preschool',
-  'Kinder':           'Preschool',
-  'Grade 1':          'Grade 1-6',
-  'Grade 2':          'Grade 1-6',
-  'Grade 3':          'Grade 1-6',
-  'Grade 4':          'Grade 1-6',
-  'Grade 5':          'Grade 1-6',
-  'Grade 6':          'Grade 1-6',
   'Grade 7':          'Grade 7-10',
   'Grade 8':          'Grade 7-10',
   'Grade 9':          'Grade 7-10',

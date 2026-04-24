@@ -115,7 +115,7 @@ export default function StudentDashboard() {
               <p className="text-gray-500 text-sm mb-4">
                 {requiresEntranceExam
                   ? "You're all set. Here's what to do next to complete your application:"
-                  : 'Preschool and Grade School applicants can go straight to the online application form.'}
+                  : 'Applicants for Grade 6 and below can go straight to the online application form.'}
               </p>
               <div className="flex flex-wrap gap-4 mb-5">
                 {(requiresEntranceExam ? [

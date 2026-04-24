@@ -279,7 +279,7 @@ export async function createRegistration(req, res, next) {
       const requiresExam = await applicantRequiresEntranceExam(targetUserId);
       if (!requiresExam) {
         return res.status(400).json({
-          error: 'Preschool and Grade School applicants do not require an entrance exam. Please continue from the online application dashboard.',
+          error: 'Applicants for Grade 6 and below do not require an entrance exam. Please continue from the online application dashboard.',
           code: 'VALIDATION_ERROR',
         });
       }

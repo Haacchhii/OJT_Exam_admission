@@ -1,6 +1,6 @@
 import prisma from '../config/db.js';
 import { paginate, paginatedResponse } from '../utils/pagination.js';
-import { EMPLOYEE_ROLES, getLevelGroup, shouldSkipEntranceExam } from '../utils/constants.js';
+import { EMPLOYEE_ROLES, EXAM_GRADE_LEVELS, getLevelGroup, shouldSkipEntranceExam } from '../utils/constants.js';
 import { logAudit } from '../utils/auditLog.js';
 import { getIo } from '../utils/socket.js';
 import { cached, invalidatePrefix } from '../utils/cache.js';
@@ -384,6 +384,9 @@ export async function createExam(req, res, next) {
     if (!title || !gradeLevel || !durationMinutes || passingScore == null) {
       return res.status(400).json({ error: 'Please provide title, grade level, duration, and passing score.', code: 'VALIDATION_ERROR' });
     }
+    if (!EXAM_GRADE_LEVELS.includes(gradeLevel)) {
+      return res.status(400).json({ error: 'Entrance exams are only available for Grade 7 and above.', code: 'VALIDATION_ERROR' });
+    }
 
     const exam = await prisma.exam.create({
       data: {
@@ -416,6 +419,9 @@ export async function updateExam(req, res, next) {
   try {
     const id = Number(req.params.id);
     const { title, gradeLevel, durationMinutes, passingScore, isActive, questions } = req.body;
+    if (gradeLevel !== undefined && !EXAM_GRADE_LEVELS.includes(gradeLevel)) {
+      return res.status(400).json({ error: 'Entrance exams are only available for Grade 7 and above.', code: 'VALIDATION_ERROR' });
+    }
 
     // Update exam fields
     const data = {};

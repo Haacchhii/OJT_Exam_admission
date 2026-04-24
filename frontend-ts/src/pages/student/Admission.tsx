@@ -115,7 +115,7 @@ export default function StudentAdmission() {
           <p><strong>Procedure:</strong> {requiresEntranceExam ? '1) Complete Entrance Exam, then 2) Submit Application and Documents, then 3) Screening and Evaluation, then 4) Admission Confirmation' : '1) Complete the online application form, then 2) Upload documents, then 3) Screening and Evaluation, then 4) Admission Confirmation'}</p>
           <p><strong>Age Requirement:</strong> Kindergarten applicants must be 5 years old by October 31 of the school year. Grade 1 requires proof of kindergarten completion.</p>
           <p><strong>Late Admission:</strong> Accepted up to 2 weeks after the first day of classes with School Head approval.</p>
-          <p className="text-gray-500">New students may undergo an interview and/or diagnostic entrance test as required. Preschool and Grade School applicants use the online application form directly. All data handled per RA 10173 (Data Privacy Act).</p>
+          <p className="text-gray-500">New students may undergo an interview and/or diagnostic entrance test as required. Applicants for Grade 6 and below use the online application form directly. All data handled per RA 10173 (Data Privacy Act).</p>
         </div>
       </div>
 
