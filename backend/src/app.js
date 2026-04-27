@@ -219,13 +219,7 @@ app.get('/api/warmup', async (req, res) => {
 
   const startedAt = Date.now();
   try {
-    const [db, admissions, results, essays, exams] = await Promise.all([
-      prisma.$queryRaw`SELECT 1`,
-      prisma.admission.count(),
-      prisma.examResult.count(),
-      prisma.essayAnswer.count(),
-      prisma.exam.count({ where: { deletedAt: null } }),
-    ]);
+    const db = await prisma.$queryRaw`SELECT 1`;
 
     const dbConnected = Array.isArray(db) && db.length > 0;
     return res.json({
@@ -233,12 +227,6 @@ app.get('/api/warmup', async (req, res) => {
       warmed: true,
       dbConnected,
       durationMs: Date.now() - startedAt,
-      sampledCounts: {
-        admissions,
-        results,
-        essays,
-        exams,
-      },
     });
   } catch {
     return res.status(503).json({

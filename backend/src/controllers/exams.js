@@ -107,6 +107,92 @@ function toQuestionCreateInput(q, qi) {
   };
 }
 
+function toQuestionCreateManyInput(q, qi) {
+  const questionType = normalizeQuestionType(q.questionType);
+  return {
+    questionText: q.questionText,
+    questionType,
+    points: q.points,
+    orderNum: q.orderNum ?? qi + 1,
+    identificationAnswer: questionType === 'identification' ? String(q.identificationAnswer || '').trim() : null,
+    identificationMatchMode: questionType === 'identification' ? normalizeIdentificationMatchMode(q.identificationMatchMode) : null,
+  };
+}
+
+function buildQuestionChoiceRows(questions, savedQuestions) {
+  const questionIdByOrderNum = new Map(
+    savedQuestions.map((question) => [question.orderNum, question.id])
+  );
+
+  const rows = [];
+
+  questions.forEach((question, qi) => {
+    const questionType = normalizeQuestionType(question.questionType);
+    const savedQuestionId = questionIdByOrderNum.get(question.orderNum ?? qi + 1);
+    if (!savedQuestionId) return;
+
+    const inputChoices = Array.isArray(question.choices) ? question.choices : [];
+
+    if (questionType === 'mc') {
+      inputChoices
+        .filter((choice) => String(choice?.choiceText || '').trim())
+        .forEach((choice, ci) => {
+          rows.push({
+            questionId: savedQuestionId,
+            choiceText: String(choice.choiceText || '').trim(),
+            isCorrect: Boolean(choice.isCorrect),
+            orderNum: choice.orderNum ?? ci + 1,
+          });
+        });
+      return;
+    }
+
+    if (questionType === 'true_false') {
+      let trueIsCorrect = false;
+      let falseIsCorrect = false;
+
+      for (const choice of inputChoices) {
+        const token = normalizeTrueFalseToken(choice?.choiceText);
+        if (token === 'true') trueIsCorrect = Boolean(choice?.isCorrect);
+        if (token === 'false') falseIsCorrect = Boolean(choice?.isCorrect);
+      }
+
+      if (!trueIsCorrect && !falseIsCorrect) trueIsCorrect = true;
+      if (trueIsCorrect && falseIsCorrect) falseIsCorrect = false;
+
+      rows.push(
+        { questionId: savedQuestionId, choiceText: 'True', isCorrect: trueIsCorrect, orderNum: 1 },
+        { questionId: savedQuestionId, choiceText: 'False', isCorrect: !trueIsCorrect && falseIsCorrect ? true : !trueIsCorrect, orderNum: 2 },
+      );
+    }
+  });
+
+  return rows;
+}
+
+async function persistQuestionsAndChoices(tx, examId, questions) {
+  if (!questions?.length) {
+    return;
+  }
+
+  const questionRows = questions.map((question, qi) => toQuestionCreateManyInput(question, qi));
+  const savedQuestions = await tx.examQuestion.createManyAndReturn({
+    data: questionRows,
+    select: { id: true, orderNum: true },
+  });
+  const choiceRows = buildQuestionChoiceRows(questions, savedQuestions);
+
+  if (choiceRows.length > 0) {
+    await tx.questionChoice.createMany({ data: choiceRows });
+  }
+}
+
+async function createExamWithQuestions(tx, examData, questions) {
+  const exam = await tx.exam.create({ data: examData });
+  await persistQuestionsAndChoices(tx, exam.id, questions);
+  return exam;
+}
+
 async function findOwnedRegistrationForExamStatus({ user, examId, status, select }) {
   return prisma.examRegistration.findFirst({
     where: {
@@ -388,8 +474,8 @@ export async function createExam(req, res, next) {
       return res.status(400).json({ error: 'Entrance exams are only available for Grade 7 and above.', code: 'VALIDATION_ERROR' });
     }
 
-    const exam = await prisma.exam.create({
-      data: {
+    const exam = await prisma.$transaction(async (tx) => {
+      const createdExam = await createExamWithQuestions(tx, {
         title,
         gradeLevel,
         levelGroup: getLevelGroup(gradeLevel),
@@ -399,12 +485,10 @@ export async function createExam(req, res, next) {
         ...(academicYearId && { academicYearId: Number(academicYearId) }),
         ...(semesterId && { semesterId: Number(semesterId) }),
         createdById: req.user.id,
-        questions: questions?.length ? {
-          create: questions.map((q, qi) => toQuestionCreateInput(q, qi)),
-        } : undefined,
-      },
-      include: examDetailInclude,
-    });
+      }, questions);
+
+      return tx.exam.findUnique({ where: { id: createdExam.id }, include: examDetailInclude });
+    }, { timeout: 20000 });
 
     invalidateExamCaches();
 
@@ -438,16 +522,12 @@ export async function updateExam(req, res, next) {
     if (questions) {
       const result = await prisma.$transaction(async (tx) => {
         await tx.examQuestion.deleteMany({ where: { examId: id } });
-        return tx.exam.update({
+        await tx.exam.update({
           where: { id },
-          data: {
-            ...data,
-            questions: {
-              create: questions.map((q, qi) => toQuestionCreateInput(q, qi)),
-            },
-          },
-          include: examDetailInclude,
+          data,
         });
+        await persistQuestionsAndChoices(tx, id, questions);
+        return tx.exam.findUnique({ where: { id }, include: examDetailInclude });
       }, { timeout: 20000 });  // Increased from 10s → 20s for Vercel cold starts
       invalidateExamCaches();
       return res.json(shapeExam(result));
@@ -501,8 +581,8 @@ export async function cloneExam(req, res, next) {
     const source = await prisma.exam.findUnique({ where: { id: sourceId }, include: examDetailInclude });
     if (!source || source.deletedAt) return res.status(404).json({ error: 'We could not find this exam.', code: 'NOT_FOUND' });
 
-    const clone = await prisma.exam.create({
-      data: {
+    const clone = await prisma.$transaction(async (tx) => {
+      const cloneExam = await createExamWithQuestions(tx, {
         title: `${source.title} (Copy)`,
         gradeLevel: source.gradeLevel,
         levelGroup: source.levelGroup,
@@ -512,12 +592,10 @@ export async function cloneExam(req, res, next) {
         academicYearId: source.academicYearId,
         semesterId: source.semesterId,
         createdById: req.user.id,
-        questions: {
-          create: source.questions.map((q, qi) => toQuestionCreateInput(q, qi)),
-        },
-      },
-      include: examDetailInclude,
-    });
+      }, source.questions);
+
+      return tx.exam.findUnique({ where: { id: cloneExam.id }, include: examDetailInclude });
+    }, { timeout: 20000 });
 
     invalidateExamCaches();
 
