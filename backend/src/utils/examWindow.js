@@ -16,35 +16,34 @@ function addMinutes(date, minutes) {
   return new Date(date.getTime() + Math.max(0, Number(minutes) || 0) * 60 * 1000);
 }
 
-function combineDateTime(dateIso, hhmm) {
-  if (!hasValue(dateIso) || !hasValue(hhmm)) return null;
-  const parsed = new Date(`${String(dateIso)}T${String(hhmm)}:00`);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return parsed;
-}
-
 function startOfDay(dateIso) {
+  if (dateIso instanceof Date) {
+    if (Number.isNaN(dateIso.getTime())) return null;
+    return new Date(dateIso.getFullYear(), dateIso.getMonth(), dateIso.getDate());
+  }
   if (!hasValue(dateIso)) return null;
-  const parsed = new Date(`${String(dateIso)}T00:00:00.000`);
+  const parsed = new Date(String(dateIso));
   if (Number.isNaN(parsed.getTime())) return null;
-  return parsed;
+  return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
 }
 
 function endOfDay(dateIso) {
+  if (dateIso instanceof Date) {
+    if (Number.isNaN(dateIso.getTime())) return null;
+    return new Date(dateIso.getFullYear(), dateIso.getMonth(), dateIso.getDate(), 23, 59, 59, 999);
+  }
   if (!hasValue(dateIso)) return null;
-  const parsed = new Date(`${String(dateIso)}T23:59:59.999`);
+  const parsed = new Date(String(dateIso));
   if (Number.isNaN(parsed.getTime())) return null;
-  return parsed;
+  return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate(), 23, 59, 59, 999);
 }
 
 function formatDateTimeLabel(value) {
   if (!(value instanceof Date) || Number.isNaN(value.getTime())) return 'TBD';
-  return value.toLocaleString('en-US', {
+  return value.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
   });
 }
 
@@ -56,17 +55,12 @@ export function getEffectiveExamWindow(schedule) {
   const explicitStart = asValidDate(schedule.examWindowStartAt);
   const explicitEnd = asValidDate(schedule.examWindowEndAt);
 
-  const legacyWindowStart = startOfDay(schedule.registrationOpenDate);
-  const legacyWindowEnd = endOfDay(schedule.registrationCloseDate);
-  const strictStart = combineDateTime(schedule.scheduledDate, schedule.startTime);
-  const strictEnd = combineDateTime(schedule.scheduledDate, schedule.endTime);
+  const scheduleDayStart = startOfDay(schedule.scheduledDate);
+  const scheduleDayEnd = endOfDay(schedule.scheduledDate);
+  const startAt = explicitStart ? startOfDay(explicitStart) : scheduleDayStart;
+  const endAt = explicitEnd ? endOfDay(explicitEnd) : scheduleDayEnd;
 
-  const startAt = explicitStart || legacyWindowStart || strictStart;
-  const endAt = explicitEnd || legacyWindowEnd || strictEnd;
-
-  let source = 'strict';
-  if (explicitStart || explicitEnd) source = 'datetime';
-  else if (legacyWindowStart || legacyWindowEnd) source = 'date-window';
+  const source = explicitStart || explicitEnd ? 'date-window' : 'scheduled-day';
 
   return { startAt, endAt, source };
 }

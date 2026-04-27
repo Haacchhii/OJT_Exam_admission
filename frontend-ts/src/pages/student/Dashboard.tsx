@@ -166,12 +166,11 @@ export default function StudentDashboard() {
 
       {/* Exam countdown */}
       {myReg && myReg.status === 'scheduled' && myReg.schedule && (() => {
-        const schedDate = new Date(myReg.schedule.scheduledDate + 'T' + (myReg.schedule.startTime || '09:00'));
+        const schedDate = new Date(myReg.schedule.scheduledDate + 'T00:00:00');
         const now = new Date();
         const diffMs = schedDate.getTime() - now.getTime();
         if (diffMs <= 0) return null;
-        const days = Math.floor(diffMs / 86400000);
-        const hours = Math.floor((diffMs % 86400000) / 3600000);
+        const days = Math.ceil(diffMs / 86400000);
         return (
           <div className="gk-section-card p-5 mb-6 border-l-4 border-amber-400 bg-gradient-to-r from-amber-50 to-white">
             <div className="flex items-center gap-4">
@@ -181,12 +180,12 @@ export default function StudentDashboard() {
               <div className="flex-1">
                 <h4 className="font-bold text-gray-800">Exam Coming Up!</h4>
                 <p className="text-sm text-gray-500">
-                  Your entrance exam is on <strong>{formatDate(myReg.schedule.scheduledDate)}</strong> at <strong>{formatTime(myReg.schedule.startTime)}</strong>
+                  Your entrance exam is on <strong>{formatDate(myReg.schedule.scheduledDate)}</strong> and will be available all day.
                 </p>
               </div>
               <div className="text-center px-4">
-                <div className="text-2xl font-extrabold text-amber-600">{days > 0 ? `${days}d ${hours}h` : `${hours}h`}</div>
-                <div className="text-sm text-gray-500">until exam</div>
+                <div className="text-2xl font-extrabold text-amber-600">{days}d</div>
+                <div className="text-sm text-gray-500">until available</div>
               </div>
               <Link to="/student/exam" className="gk-btn-primary px-4 py-2 text-sm whitespace-nowrap">
                 <Icon name="exam" className="w-4 h-4 mr-1.5 inline" />Go to Exam

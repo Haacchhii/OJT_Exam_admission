@@ -379,7 +379,7 @@ function ScheduledView({ myReg, onLobby, onCancel, isCanceling, showBookedSucces
         {canStart && exam ? (
           <ActionButton onClick={() => onLobby(exam)} className="px-8 py-3 bg-gradient-to-r from-forest-500 to-forest-400 hover:from-gold-500 hover:to-gold-600 shadow-md">Take Exam Now</ActionButton>
         ) : (
-          <p className="text-gray-400 text-sm flex items-center justify-center gap-1.5"><Icon name="clock" className="w-4 h-4" /> Exam will open on <strong>{formatDisplayDate(schedule?.scheduledDate || null)}</strong> at <strong>{formatTime(schedule?.startTime)}</strong></p>
+          <p className="text-gray-400 text-sm flex items-center justify-center gap-1.5"><Icon name="clock" className="w-4 h-4" /> Exam will open on <strong>{formatDisplayDate(schedule?.scheduledDate || null)}</strong> and will be available all day.</p>
         )}
         {myReg.status === 'scheduled' && (
           <div className="mt-4">
