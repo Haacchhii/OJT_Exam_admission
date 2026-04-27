@@ -16,6 +16,7 @@
     "db:backup": "node prisma/backup-data.js",
     "db:restore": "node prisma/restore-backup.js",
     "db:audit-accounts": "node prisma/audit-accounts.js",
+    "db:audit-exam-registrations": "node prisma/audit-exam-registrations.js",
     "db:test-role-aspects": "node prisma/test-role-aspects.js",
     "db:reset": "node prisma/safe-reset.js",
     "db:studio": "npx prisma studio",

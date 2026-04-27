@@ -6,3 +6,5 @@ node_modules/
 *.db-journal
 uploads/
 dist/
+.vercel
+.env*.local

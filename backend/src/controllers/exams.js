@@ -109,11 +109,13 @@ function toQuestionCreateInput(q, qi) {
 
 function toQuestionCreateManyInput(q, qi) {
   const questionType = normalizeQuestionType(q.questionType);
+  const parsedPoints = Number(q.points);
+  const parsedOrderNum = Number(q.orderNum);
   return {
-    questionText: q.questionText,
+    questionText: String(q.questionText || '').trim(),
     questionType,
-    points: q.points,
-    orderNum: q.orderNum ?? qi + 1,
+    points: Number.isFinite(parsedPoints) && parsedPoints > 0 ? parsedPoints : 1,
+    orderNum: Number.isFinite(parsedOrderNum) && parsedOrderNum > 0 ? parsedOrderNum : qi + 1,
     identificationAnswer: questionType === 'identification' ? String(q.identificationAnswer || '').trim() : null,
     identificationMatchMode: questionType === 'identification' ? normalizeIdentificationMatchMode(q.identificationMatchMode) : null,
   };
@@ -175,9 +177,18 @@ async function persistQuestionsAndChoices(tx, examId, questions) {
     return;
   }
 
-  const questionRows = questions.map((question, qi) => toQuestionCreateManyInput(question, qi));
-  const savedQuestions = await tx.examQuestion.createManyAndReturn({
-    data: questionRows,
+  const questionRows = questions.map((question, qi) => ({
+    examId,
+    ...toQuestionCreateManyInput(question, qi),
+  }));
+  await tx.examQuestion.createMany({ data: questionRows });
+  const savedQuestions = await tx.examQuestion.findMany({
+    where: {
+      examId,
+      orderNum: {
+        in: questionRows.map((question) => question.orderNum),
+      },
+    },
     select: { id: true, orderNum: true },
   });
   const choiceRows = buildQuestionChoiceRows(questions, savedQuestions);

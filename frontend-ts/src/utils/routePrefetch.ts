@@ -8,18 +8,6 @@ const routePrefetchers: Record<string, PrefetchFn> = {
   '/student/admission': () => import('../pages/student/Admission'),
   '/student/exam': () => import('../pages/student/Exam'),
   '/student/results': () => import('../pages/student/Results'),
-  '/student/profile': () => import('../pages/shared/Profile'),
-
-  '/employee': () => import('../pages/employee/Dashboard'),
-  '/employee/dashboard': () => import('../pages/employee/Dashboard'),
-  '/employee/admissions': () => import('../pages/employee/Admissions'),
-  '/employee/exams': () => import('../pages/employee/Exams'),
-  '/employee/results': () => import('../pages/employee/Results'),
-  '/employee/reports': () => import('../pages/employee/Reports'),
-  '/employee/users': () => import('../pages/employee/Users'),
-  '/employee/audit': () => import('../pages/employee/AuditLog'),
-  '/employee/settings': () => import('../pages/employee/Settings'),
-  '/employee/profile': () => import('../pages/shared/Profile'),
 };
 
 const prefetched = new Set<string>();
@@ -77,7 +65,7 @@ export function prefetchLikelyRoutesForRole(role: UserRole | null, currentPath: 
   const normalizedCurrent = normalizePath(currentPath);
   const candidates = role === 'applicant'
     ? ['/student/admission', '/student/exam', '/student/results']
-    : ['/employee/admissions', '/employee/exams', '/employee/results', '/employee/reports'];
+    : [];
 
   const maxTargets = 1;
   const targets = candidates.filter((path) => path !== normalizedCurrent).slice(0, maxTargets);

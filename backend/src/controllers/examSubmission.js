@@ -11,6 +11,9 @@ function normalizeEmail(value) {
 
 function registrationBelongsToUser(registration, user) {
   if (!registration || !user) return false;
+  if (String(user.role || '').toLowerCase() === 'applicant') {
+    return registration.userId != null && registration.userId === user.id;
+  }
   if (registration.userId != null && registration.userId === user.id) return true;
   return normalizeEmail(registration.userEmail) === normalizeEmail(user.email);
 }

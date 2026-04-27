@@ -2,6 +2,11 @@
 
 A full-stack web application for managing entrance exams and student admissions.
 
+## Live Project URL
+
+- Application: **https://ojt-exam-admission.vercel.app**
+- API health check: **https://ojt-exam-admission.vercel.app/api/health**
+
 ## Tech Stack
 
 | Layer    | Technology                              |
@@ -14,7 +19,7 @@ A full-stack web application for managing entrance exams and student admissions.
 ## Project Structure
 
 ```
-├── frontend/   # React SPA (Vite + Tailwind CSS v4)
+├── frontend-ts/   # React SPA (Vite + Tailwind CSS v4)
 │   ├── src/
 │   ├── .env.example
 │   └── package.json
@@ -26,7 +31,7 @@ A full-stack web application for managing entrance exams and student admissions.
 └── README.md
 ```
 
-## Local Development
+## Local Development (Optional for Contributors)
 
 ### Prerequisites
 
@@ -45,7 +50,7 @@ cp .env.example .env   # ← fill in your Supabase credentials & JWT_SECRET
 npm install
 
 # Frontend
-cd ../frontend
+cd ../frontend-ts
 cp .env.example .env
 npm install
 ```
@@ -65,10 +70,11 @@ npx prisma db seed        # (optional) seed demo data
 cd backend && npm run dev
 
 # Terminal 2 — Frontend (port 5173)
-cd frontend && npm run dev
+cd frontend-ts && npm run dev
 ```
 
-Open **http://localhost:5173** — the Vite dev server proxies `/api` to the backend.
+For local-only testing, open **http://localhost:5173**.
+For regular usage, use the deployed URL above.
 
 ---
 
@@ -79,9 +85,9 @@ The app is designed as a **single-server deployment** — the Express backend se
 ### 1. Build the frontend
 
 ```bash
-cd frontend
+cd frontend-ts
 npm ci
-npm run build   # outputs to frontend/dist/
+npm run build   # outputs to frontend-ts/dist/
 ```
 
 ### 2. Prepare the backend
@@ -99,7 +105,8 @@ NODE_ENV=production
 DATABASE_URL=<supabase-pooler-url>
 DIRECT_URL=<supabase-direct-url>
 JWT_SECRET=<long-random-string>      # e.g. openssl rand -base64 48
-CORS_ORIGIN=https://your-domain.com
+CORS_ORIGIN=https://ojt-exam-admission.vercel.app
+APP_URL=https://ojt-exam-admission.vercel.app
 PORT=3000
 ```
 
@@ -117,13 +124,13 @@ cd backend
 npm start   # NODE_ENV=production node src/index.js
 ```
 
-The server serves the React SPA from `frontend/dist/` and handles all `/api/*` routes.
+The server serves the React SPA from `frontend-ts/dist/` and handles all `/api/*` routes.
 
 ### Deploy to Render / Railway
 
 | Setting       | Value                                |
 | ------------- | ------------------------------------ |
-| Build Command | `cd frontend && npm ci && npm run build && cd ../backend && npm ci && npm run build && npm run db:deploy` |
+| Build Command | `cd frontend-ts && npm ci && npm run build && cd ../backend && npm ci && npm run build && npm run db:deploy` |
 | Start Command | `cd backend && npm start`            |
 | Root Dir      | `.` (repo root)                      |
 | Node Version  | 18+                                  |
@@ -146,7 +153,7 @@ Set all environment variables from step 3 above in the platform's dashboard.
 | `npm run db:seed`    | Seed demo data                     |
 | `npm run db:studio`  | Open Prisma Studio (GUI)           |
 
-### Frontend (`cd frontend`)
+### Frontend (`cd frontend-ts`)
 
 | Script           | Description                            |
 | ---------------- | -------------------------------------- |

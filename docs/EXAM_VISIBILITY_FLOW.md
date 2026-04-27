@@ -76,7 +76,7 @@ model ExamSchedule {
 **Request:**
 ```bash
 curl -H "Authorization: Bearer <token>" \
-  https://api.gk-school.com/api/exams/schedules/available
+  https://ojt-exam-admission.vercel.app/api/exams/schedules/available
 ```
 
 ### Step 2: Backend Filtering Logic
@@ -186,7 +186,7 @@ For a **10-day visibility window**:
 **POST `/api/exams/schedules`**
 
 ```bash
-curl -X POST https://api.gk-school.com/api/exams/schedules \
+curl -X POST https://ojt-exam-admission.vercel.app/api/exams/schedules \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -208,7 +208,7 @@ curl -X POST https://api.gk-school.com/api/exams/schedules \
 **PUT `/api/exams/schedules/:id`**
 
 ```bash
-curl -X PUT https://api.gk-school.com/api/exams/schedules/42 \
+curl -X PUT https://ojt-exam-admission.vercel.app/api/exams/schedules/42 \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
