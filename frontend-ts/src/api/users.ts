@@ -23,6 +23,8 @@ interface UserParams {
   search?: string;
   role?: string;
   status?: string;
+  gradeLevel?: string;
+  sortBy?: 'newest' | 'oldest' | 'name' | 'gradeLevelAsc' | 'gradeLevelDesc';
   page?: number;
   limit?: number;
 }

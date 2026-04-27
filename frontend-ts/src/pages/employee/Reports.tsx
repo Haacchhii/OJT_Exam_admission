@@ -14,6 +14,7 @@ const PassRateMonthlyCharts = lazyWithRetry(() => import('./reports/charts/PassR
 const ResultsBreakdownCharts = lazyWithRetry(() => import('./reports/charts/ResultsBreakdownCharts'));
 const ScheduleUtilizationChart = lazyWithRetry(() => import('./reports/charts/ScheduleUtilizationChart'));
 const PreviousSchoolChart = lazyWithRetry(() => import('./reports/charts/PreviousSchoolChart'));
+const GradeLevelDistributionChart = lazyWithRetry(() => import('./reports/charts/GradeLevelDistributionChart'));
 
 const STATUS_COLORS: Record<string, string> = {
   Submitted: '#8b5cf6',
@@ -51,6 +52,7 @@ const REPORT_PRESETS: ReportPreset[] = [
 ];
 
 const APPLICANT_CHART_OPTIONS: ExportChartOption[] = [
+  { id: 'chart-grade-level-distribution', label: 'Grade-Level Distribution' },
   { id: 'chart-previous-school-distribution', label: 'Previous School Distribution' },
   { id: 'chart-admission-status-mix', label: 'Admission Status Mix' },
   { id: 'chart-applicant-volume', label: 'Applicant Volume (Monthly)' },
@@ -515,7 +517,7 @@ export default function EmployeeReports() {
       printPdfReport('Applicant List', [
         {
           subtitle: 'Admission Status Mix and Applicant Table',
-          chartSvg: pickExportChartSvg(getChartSvgMarkup, applicantChartSelection, ['chart-previous-school-distribution', 'chart-admission-status-mix', 'chart-applicant-volume']),
+          chartSvg: pickExportChartSvg(getChartSvgMarkup, applicantChartSelection, ['chart-grade-level-distribution', 'chart-previous-school-distribution', 'chart-admission-status-mix', 'chart-applicant-volume']),
           headers,
           rows,
         },
@@ -692,6 +694,24 @@ export default function EmployeeReports() {
       },
     ]
     : previousSchoolExpanded;
+
+  const knownGradeOrder = new Map(ALL_GRADE_LEVELS.map((grade, index) => [grade, index]));
+  const gradeLevelCounts = new Map<string, number>();
+  for (const admission of admissions) {
+    const grade = String(admission.gradeLevel || '').trim() || 'Unspecified';
+    gradeLevelCounts.set(grade, (gradeLevelCounts.get(grade) || 0) + 1);
+  }
+
+  const gradeLevelDistributionData = Array.from(gradeLevelCounts.entries())
+    .map(([gradeLevel, count]) => ({ gradeLevel, count }))
+    .sort((a, b) => {
+      const idxA = knownGradeOrder.has(a.gradeLevel) ? knownGradeOrder.get(a.gradeLevel)! : Number.MAX_SAFE_INTEGER;
+      const idxB = knownGradeOrder.has(b.gradeLevel) ? knownGradeOrder.get(b.gradeLevel)! : Number.MAX_SAFE_INTEGER;
+      if (idxA !== idxB) return idxA - idxB;
+      return a.gradeLevel.localeCompare(b.gradeLevel);
+    });
+
+  const gradeLevelApplicantsTotal = gradeLevelDistributionData.reduce((sum, item) => sum + item.count, 0);
 
   const admissionStatusCounts = new Map<string, number>();
   for (const admission of admissions) {
@@ -987,6 +1007,17 @@ export default function EmployeeReports() {
           showApplicantInsights={!isTeacherView}
         />
       </Suspense>
+
+      {!isTeacherView && (
+        <DeferredChartSection minHeight={380}>
+          <Suspense fallback={<LazyLoadingFallback />}>
+            <GradeLevelDistributionChart
+              data={gradeLevelDistributionData}
+              totalApplicants={gradeLevelApplicantsTotal}
+            />
+          </Suspense>
+        </DeferredChartSection>
+      )}
 
       {!isTeacherView && (
         <DeferredChartSection minHeight={380}>

@@ -370,6 +370,8 @@ export const usersQuerySchema = z.object({
   ...paginationQuery,
   role:   z.enum(ROLE_VALUES).optional(),
   status: z.enum(['Active', 'Inactive']).optional(),
+  gradeLevel: z.string().max(100).optional(),
+  sortBy: z.enum(['newest', 'oldest', 'name', 'gradeLevelAsc', 'gradeLevelDesc']).optional(),
 });
 
 export const auditLogQuerySchema = z.object({

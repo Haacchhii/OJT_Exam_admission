@@ -79,12 +79,19 @@ async function issueVerificationEmail(user) {
 // GET /api/users?search=&role=&status=&page=&limit=
 export async function getUsers(req, res, next) {
   try {
-    const { search, role, status, page, limit } = req.query;
+    const { search, role, status, gradeLevel, sortBy, page, limit } = req.query;
     const pg = paginate(page ?? 1, limit ?? 50);
 
     const where = { deletedAt: null };
     if (role)   where.role = role;
     if (status) where.status = status;
+    if (gradeLevel) {
+      where.applicantProfile = {
+        is: {
+          gradeLevel,
+        },
+      };
+    }
     if (search) {
       where.OR = [
         { firstName: { contains: search, mode: 'insensitive' } },
@@ -94,10 +101,23 @@ export async function getUsers(req, res, next) {
       ];
     }
 
+    let orderBy = { createdAt: 'desc' };
+    if (sortBy === 'oldest') {
+      orderBy = { createdAt: 'asc' };
+    } else if (sortBy === 'name') {
+      orderBy = [{ lastName: 'asc' }, { firstName: 'asc' }, { createdAt: 'desc' }];
+    } else if (sortBy === 'gradeLevelAsc') {
+      orderBy = [{ applicantProfile: { gradeLevel: 'asc' } }, { lastName: 'asc' }, { firstName: 'asc' }];
+    } else if (sortBy === 'gradeLevelDesc') {
+      orderBy = [{ applicantProfile: { gradeLevel: 'desc' } }, { lastName: 'asc' }, { firstName: 'asc' }];
+    }
+
     const cacheKey = `users:list:${JSON.stringify({
       search: search || null,
       role: role || null,
       status: status || null,
+      gradeLevel: gradeLevel || null,
+      sortBy: sortBy || 'newest',
       page: pg?.page || 1,
       limit: pg?.limit || null,
     })}`;
@@ -107,7 +127,7 @@ export async function getUsers(req, res, next) {
         prisma.user.findMany({
           where,
           ...(pg && { skip: pg.skip, take: pg.take }),
-          orderBy: { createdAt: 'desc' },
+          orderBy,
           select: userListSelect,
         }),
         prisma.user.count({ where }),

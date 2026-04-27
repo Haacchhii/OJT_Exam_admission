@@ -11,7 +11,7 @@ import BulkActionBar from '../../components/BulkActionBar';
 import { useSelection } from '../../hooks/useSelection';
 import { CSVUploader } from '../../components/CSVUploader';
 import { getPasswordRequirementChecks, isPasswordCompliant } from '../../utils/passwordStrength';
-import { USER_ROLE_OPTIONS } from '../../utils/constants';
+import { USER_ROLE_OPTIONS, ALL_GRADE_LEVELS } from '../../utils/constants';
 import { exportToCSV, formatPersonName } from '../../utils/helpers';
 import type { User } from '../../types';
 
@@ -41,6 +41,8 @@ export default function EmployeeUsers() {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [gradeFilter, setGradeFilter] = useState('all');
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'name' | 'gradeLevelAsc' | 'gradeLevelDesc'>('newest');
   const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
@@ -71,10 +73,12 @@ export default function EmployeeUsers() {
       search: search.trim() || undefined,
       role: roleFilter !== 'all' ? roleFilter : undefined,
       status: statusFilter !== 'all' ? statusFilter : undefined,
+      gradeLevel: gradeFilter !== 'all' ? gradeFilter : undefined,
+      sortBy,
       page,
       limit: USERS_PER_PAGE,
     });
-  }, [search, roleFilter, statusFilter, page], 0, { setLoadingOnReload: true });
+  }, [search, roleFilter, statusFilter, gradeFilter, sortBy, page], 0, { setLoadingOnReload: true });
 
   const { data: stats, refetch: refetchStats } = useAsync<UserStats>(() => getUserStats());
 
@@ -256,7 +260,8 @@ export default function EmployeeUsers() {
                 'Last Name': u.lastName,
                 'Email': u.email,
                 'Role': u.role,
-                'Status': u.status
+                'Status': u.status,
+                'Grade Level': u.applicantProfile?.gradeLevel || '',
               })), 'Users_Export.csv')}
               icon={<Icon name="download" className="w-4 h-4" />}
               title="Download current page as CSV"
@@ -308,6 +313,34 @@ export default function EmployeeUsers() {
           <option value="Active">Active</option>
           <option value="Inactive">Inactive</option>
         </select>
+        <select
+          value={gradeFilter}
+          onChange={e => {
+            const nextGrade = e.target.value;
+            setGradeFilter(nextGrade);
+            if (nextGrade !== 'all') {
+              setRoleFilter('applicant');
+            }
+            resetPage();
+          }}
+          aria-label="Filter applicants by grade level"
+          className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-forest-500/20 outline-none"
+        >
+          <option value="all">All Applicant Grades</option>
+          {ALL_GRADE_LEVELS.map(g => <option key={g} value={g}>{g}</option>)}
+        </select>
+        <select
+          value={sortBy}
+          onChange={e => { setSortBy(e.target.value as typeof sortBy); resetPage(); }}
+          aria-label="Sort users"
+          className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-forest-500/20 outline-none"
+        >
+          <option value="newest">Newest First</option>
+          <option value="oldest">Oldest First</option>
+          <option value="name">Name (A-Z)</option>
+          <option value="gradeLevelAsc">Grade Level (A-Z)</option>
+          <option value="gradeLevelDesc">Grade Level (Z-A)</option>
+        </select>
       </div>
 
       {users.length > 0 || loading ? (
@@ -318,12 +351,12 @@ export default function EmployeeUsers() {
           <table className="w-full text-sm">
             <thead><tr className="border-b border-gray-200 text-left text-gray-400 uppercase text-xs bg-gray-50/95 sticky top-0 z-10 backdrop-blur-sm">
               <th scope="col" className="py-3 px-2 w-8"><input type="checkbox" checked={isAllSelected(users)} onChange={() => togglePage(users)} className="accent-forest-500 rounded" aria-label="Select all users" /></th>
-              <th scope="col" className="py-3 px-4">Name</th><th scope="col" className="py-3 px-4">Email</th><th scope="col" className="py-3 px-4">Role</th><th scope="col" className="py-3 px-4">Status</th><th scope="col" className="py-3 px-4 text-right">Actions</th>
+              <th scope="col" className="py-3 px-4">Name</th><th scope="col" className="py-3 px-4">Email</th><th scope="col" className="py-3 px-4">Role</th><th scope="col" className="py-3 px-4">Grade Level</th><th scope="col" className="py-3 px-4">Status</th><th scope="col" className="py-3 px-4 text-right">Actions</th>
             </tr></thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="py-8 px-4" />
+                  <td colSpan={7} className="py-8 px-4" />
                 </tr>
               ) : users.map(u => (
                 <tr key={u.id} className={`border-b border-gray-50 hover:bg-gray-50/50 ${selected.has(u.id) ? 'bg-gold-50/50' : ''}`}>
@@ -331,6 +364,7 @@ export default function EmployeeUsers() {
                   <td className="py-3 px-4 font-medium text-forest-500">{formatPersonName(u)}</td>
                   <td className="py-3 px-4 text-gray-500">{u.email}</td>
                   <td className="py-3 px-4"><Badge variant="info">{roleLabel(u.role)}</Badge></td>
+                  <td className="py-3 px-4 text-gray-500">{u.applicantProfile?.gradeLevel || 'N/A'}</td>
                   <td className="py-3 px-4"><Badge variant={u.status === 'Active' ? 'success' : 'danger'}>{u.status}</Badge></td>
                   <td className="py-3 px-4 text-right">
                     <div className="inline-flex items-center gap-1">
