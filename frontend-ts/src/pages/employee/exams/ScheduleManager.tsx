@@ -88,7 +88,7 @@ export default function ScheduleManager() {
       return;
     }
     const today = getTodayLocalIso();
-    const regClose = addDaysIso(date, -1);
+    const regClose = date;
     const visEndCandidate = addDaysIso(today, 9);
     const visibilityEnd = visEndCandidate <= date ? visEndCandidate : date;
 

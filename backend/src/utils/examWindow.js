@@ -54,13 +54,17 @@ export function getEffectiveExamWindow(schedule) {
 
   const explicitStart = asValidDate(schedule.examWindowStartAt);
   const explicitEnd = asValidDate(schedule.examWindowEndAt);
+  const rollingStart = startOfDay(schedule.registrationOpenDate);
+  const rollingEnd = endOfDay(schedule.registrationCloseDate);
 
   const scheduleDayStart = startOfDay(schedule.scheduledDate);
   const scheduleDayEnd = endOfDay(schedule.scheduledDate);
-  const startAt = explicitStart ? startOfDay(explicitStart) : scheduleDayStart;
-  const endAt = explicitEnd ? endOfDay(explicitEnd) : scheduleDayEnd;
+  const startAt = explicitStart ? startOfDay(explicitStart) : (rollingStart || scheduleDayStart);
+  const endAt = explicitEnd ? endOfDay(explicitEnd) : (rollingEnd || scheduleDayEnd);
 
-  const source = explicitStart || explicitEnd ? 'date-window' : 'scheduled-day';
+  const source = explicitStart || explicitEnd
+    ? 'date-window'
+    : (rollingStart || rollingEnd ? 'rolling-window' : 'scheduled-day');
 
   return { startAt, endAt, source };
 }
