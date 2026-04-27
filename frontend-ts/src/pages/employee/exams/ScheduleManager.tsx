@@ -95,8 +95,9 @@ export default function ScheduleManager() {
     setForm(f => ({
       ...f,
       date,
-      start: f.start || '09:00',
-      end: f.end || '10:00',
+      // Add flow now schedules as all-day; start/end are edit-only display fields.
+      start: editId ? (f.start || DEFAULT_START_TIME) : '',
+      end: editId ? (f.end || DEFAULT_END_TIME) : '',
       openDate: f.openDate || today,
       closeDate: f.closeDate || regClose,
       visibilityStartDate: f.visibilityStartDate || today,
@@ -421,7 +422,7 @@ export default function ScheduleManager() {
         <div className="relative min-h-[140px]">
           <div className="space-y-3">
             {!schedLoading && paginatedScheds.map(s => {
-              const exam = exams.find(e => e.id === s.examId);
+              const exam = s.exam || exams.find(e => e.id === s.examId);
               const d = new Date(s.scheduledDate + 'T00:00:00');
               const remaining = s.maxSlots - s.slotsTaken;
               const registrationWindow = formatDateRange(s.registrationOpenDate, s.registrationCloseDate, {
