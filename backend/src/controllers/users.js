@@ -202,10 +202,34 @@ export async function createUser(req, res, next) {
       return res.status(400).json({ error: 'Please provide first name, middle name, last name, email, and password.', code: 'VALIDATION_ERROR' });
     }
 
-    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
-    const user = await prisma.user.create({
-      data: { firstName, middleName, lastName, email, passwordHash, role: role || ROLES.APPLICANT, status: status || 'Active' },
+    const normalizedEmail = String(email).trim();
+    const existingByEmail = await prisma.user.findFirst({
+      where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
+      select: { id: true, deletedAt: true },
     });
+
+    if (existingByEmail && !existingByEmail.deletedAt) {
+      return res.status(409).json({ error: 'Email already in use', code: 'CONFLICT' });
+    }
+
+    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+    const user = existingByEmail?.deletedAt
+      ? await prisma.user.update({
+          where: { id: existingByEmail.id },
+          data: {
+            firstName,
+            middleName,
+            lastName,
+            email: normalizedEmail,
+            passwordHash,
+            role: role || ROLES.APPLICANT,
+            status: status || 'Active',
+            deletedAt: null,
+          },
+        })
+      : await prisma.user.create({
+          data: { firstName, middleName, lastName, email: normalizedEmail, passwordHash, role: role || ROLES.APPLICANT, status: status || 'Active' },
+        });
 
     const verification = await issueVerificationEmail(user);
     const responseUser = verification.emailVerificationRequired
@@ -219,12 +243,12 @@ export async function createUser(req, res, next) {
       ...verification,
       message: verification.emailVerificationRequired
         ? (verification.verificationEmailSent
-          ? 'User created and verification email sent.'
-          : 'User created, but the verification email could not be sent right now.')
+          ? (existingByEmail?.deletedAt ? 'User account restored and verification email sent.' : 'User created and verification email sent.')
+          : (existingByEmail?.deletedAt ? 'User account restored, but the verification email could not be sent right now.' : 'User created, but the verification email could not be sent right now.'))
         : undefined,
     });
 
-    logAudit({ userId: req.user.id, action: 'user.create', entity: 'user', entityId: user.id, details: { email, role: role || ROLES.APPLICANT }, ipAddress: req.ip });
+    logAudit({ userId: req.user.id, action: existingByEmail?.deletedAt ? 'user.restore' : 'user.create', entity: 'user', entityId: user.id, details: { email: normalizedEmail, role: role || ROLES.APPLICANT }, ipAddress: req.ip });
   } catch (err) { next(err); }
 }
 
