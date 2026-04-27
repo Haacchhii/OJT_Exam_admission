@@ -235,6 +235,15 @@ export default function EmployeeUsers() {
 
   const roleLabel = (r: string) => ROLES.find(ro => ro.value === r)?.label || r;
 
+  const applyApplicantsOnlyPreset = () => {
+    setRoleFilter('applicant');
+    setStatusFilter('all');
+    setGradeFilter('all');
+    setSortBy('gradeLevelAsc');
+    resetPage();
+    showToast('Applied preset: Applicants Only', 'success');
+  };
+
   if (loading && !usersPage) return <SkeletonPage />;
   if (error) return <ErrorAlert error={error} onRetry={refetch} />;
 
@@ -313,6 +322,9 @@ export default function EmployeeUsers() {
           <option value="Active">Active</option>
           <option value="Inactive">Inactive</option>
         </select>
+        <ActionButton variant="secondary" onClick={applyApplicantsOnlyPreset} className="whitespace-nowrap">
+          Applicants Only
+        </ActionButton>
         <select
           value={gradeFilter}
           onChange={e => {
