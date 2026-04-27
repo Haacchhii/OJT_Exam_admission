@@ -55,11 +55,11 @@ export async function getUserByEmail(email: string) {
 }
 
 export async function addUser(user: Record<string, unknown>) {
-  return client.post<User>('/users', user);
+  return client.post<User & { emailVerificationRequired?: boolean; verificationEmailSent?: boolean; message?: string }>('/users', user);
 }
 
 export async function updateUser(id: number, updates: Record<string, unknown>) {
-  return client.put<User>(`/users/${id}`, updates);
+  return client.put<User & { emailVerificationRequired?: boolean; verificationEmailSent?: boolean; message?: string }>(`/users/${id}`, updates);
 }
 
 export async function deleteUser(id: number) {

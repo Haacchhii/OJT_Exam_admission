@@ -154,11 +154,17 @@ export default function EmployeeUsers() {
       if (editId) {
         const upd: Record<string, string> = { firstName: form.firstName, middleName: form.middleName, lastName: form.lastName, email: form.email, role: form.role, status: form.status };
         if (form.password) upd.password = form.password;
-        await updateUser(editId, upd);
-        showToast('User updated!', 'success');
+        const result = await updateUser(editId, upd);
+        showToast(result.verificationEmailSent
+          ? (result.message || 'User updated and verification email sent.')
+          : 'User updated!',
+          'success');
       } else {
-        await addUser({ ...form });
-        showToast('User added!', 'success');
+        const result = await addUser({ ...form });
+        showToast(result.verificationEmailSent
+          ? (result.message || 'User added and verification email sent.')
+          : 'User added!',
+          'success');
       }
       refetch();
       refetchStats();
@@ -257,7 +263,18 @@ export default function EmployeeUsers() {
             >
               Export
             </ActionButton>
-            <CSVUploader title="Bulk Import Users" isOpen={showBulkImport} onClose={() => setShowBulkImport(false)} onImport={handleBulkImportUsers} templateHeaders={['firstName', 'middleName', 'lastName', 'email', 'role', 'status', 'password']} />
+            <CSVUploader
+              title="Bulk Import Users"
+              isOpen={showBulkImport}
+              onClose={() => setShowBulkImport(false)}
+              onImport={handleBulkImportUsers}
+              templateHeaders={['firstName', 'middleName', 'lastName', 'email', 'role', 'status', 'password']}
+              templateRows={[
+                { firstName: 'Ana', middleName: 'Maria', lastName: 'Santos', email: 'ana.santos@goldenkey.edu', role: 'teacher', status: 'Active', password: 'Teacher123!' },
+                { firstName: 'Juan', middleName: 'Carlos', lastName: 'Reyes', email: 'juan.reyes@goldenkey.edu', role: 'registrar', status: 'Active', password: 'Registrar123!' },
+                { firstName: 'Maria', middleName: 'Luz', lastName: 'Cruz', email: 'maria.cruz@goldenkey.edu', role: 'administrator', status: 'Active', password: 'Admin123!' },
+              ]}
+            />
             <ActionButton variant="secondary" onClick={() => setShowBulkImport(true)}>
               <span>&#8690;</span> Import Users
             </ActionButton>

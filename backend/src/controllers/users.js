@@ -1,9 +1,12 @@
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import prisma from '../config/db.js';
+import env from '../config/env.js';
 import { paginate, paginatedResponse } from '../utils/pagination.js';
 import { logAudit } from '../utils/auditLog.js';
-import { ROLES, BCRYPT_ROUNDS } from '../utils/constants.js';
+import { ROLES, BCRYPT_ROUNDS, EMAIL_VERIFY_EXPIRY_MS } from '../utils/constants.js';
 import { cached, invalidatePrefix } from '../utils/cache.js';
+import { sendVerificationEmail } from '../utils/email.js';
 
 const userListSelect = {
   id: true,
@@ -49,6 +52,28 @@ function safifyUser(user) {
   if (!user) return null;
   const { passwordHash, ...rest } = user;
   return rest;
+}
+
+async function issueVerificationEmail(user) {
+  if (!env.EMAIL_VERIFICATION_REQUIRED) {
+    return { emailVerificationRequired: false, verificationEmailSent: false };
+  }
+
+  const verifyToken = crypto.randomBytes(32).toString('hex');
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      emailVerified: false,
+      emailVerifyToken: verifyToken,
+      emailVerifyExpires: new Date(Date.now() + EMAIL_VERIFY_EXPIRY_MS),
+    },
+  });
+
+  const verificationDispatch = await sendVerificationEmail({ to: user.email, firstName: user.firstName, verifyToken });
+  return {
+    emailVerificationRequired: true,
+    verificationEmailSent: verificationDispatch.ok,
+  };
 }
 
 // GET /api/users?search=&role=&status=&page=&limit=
@@ -162,9 +187,22 @@ export async function createUser(req, res, next) {
       data: { firstName, middleName, lastName, email, passwordHash, role: role || ROLES.APPLICANT, status: status || 'Active' },
     });
 
+    const verification = await issueVerificationEmail(user);
+    const responseUser = verification.emailVerificationRequired
+      ? await prisma.user.findUnique({ where: { id: user.id }, select: userDetailSelect })
+      : user;
+
     invalidateUserCaches();
 
-    res.status(201).json(safifyUser(user));
+    res.status(201).json({
+      ...safifyUser(responseUser),
+      ...verification,
+      message: verification.emailVerificationRequired
+        ? (verification.verificationEmailSent
+          ? 'User created and verification email sent.'
+          : 'User created, but the verification email could not be sent right now.')
+        : undefined,
+    });
 
     logAudit({ userId: req.user.id, action: 'user.create', entity: 'user', entityId: user.id, details: { email, role: role || ROLES.APPLICANT }, ipAddress: req.ip });
   } catch (err) { next(err); }
@@ -194,6 +232,13 @@ export async function updateUser(req, res, next) {
     if (email !== undefined) {
       const existing = await prisma.user.findUnique({ where: { id }, select: { email: true } });
       if (existing && existing.email !== email) {
+        const verifyToken = env.EMAIL_VERIFICATION_REQUIRED ? crypto.randomBytes(32).toString('hex') : null;
+        if (env.EMAIL_VERIFICATION_REQUIRED) {
+          data.emailVerified = false;
+          data.emailVerifyToken = verifyToken;
+          data.emailVerifyExpires = new Date(Date.now() + EMAIL_VERIFY_EXPIRY_MS);
+        }
+
         const [, user] = await prisma.$transaction([
           prisma.examRegistration.updateMany({
             where: { userEmail: existing.email },
@@ -201,8 +246,23 @@ export async function updateUser(req, res, next) {
           }),
           prisma.user.update({ where: { id }, data }),
         ]);
+
+        let verification = { emailVerificationRequired: false, verificationEmailSent: false };
+        if (env.EMAIL_VERIFICATION_REQUIRED && verifyToken) {
+          const dispatch = await sendVerificationEmail({ to: user.email, firstName: user.firstName, verifyToken });
+          verification = { emailVerificationRequired: true, verificationEmailSent: dispatch.ok };
+        }
+
         invalidateUserCaches();
-        return res.json(safifyUser(user));
+        return res.json({
+          ...safifyUser(user),
+          ...verification,
+          message: verification.emailVerificationRequired
+            ? (verification.verificationEmailSent
+              ? 'User updated and verification email sent.'
+              : 'User updated, but the verification email could not be sent right now.')
+            : undefined,
+        });
       }
     }
 

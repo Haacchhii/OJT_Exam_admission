@@ -129,9 +129,9 @@ export async function authenticate(req, res, next) {
       return res.status(401).json({ error: 'User not found or inactive', code: 'UNAUTHORIZED' });
     }
 
-    // Applicants must verify their email before accessing protected routes
-    // Allow /auth/me and /auth/profile so the frontend can check verification status
-    if (env.EMAIL_VERIFICATION_REQUIRED && user.role === ROLES.APPLICANT && !user.emailVerified) {
+    // Any unverified account must verify before accessing protected routes.
+    // Allow /auth/me and /auth/profile so the frontend can check verification status.
+    if (env.EMAIL_VERIFICATION_REQUIRED && !user.emailVerified) {
       const allowedPaths = ['/api/auth/me', '/api/auth/profile'];
       if (!allowedPaths.some(p => req.originalUrl.startsWith(p))) {
         return res.status(403).json({ error: 'Please verify your email address before continuing.', code: 'EMAIL_NOT_VERIFIED' });

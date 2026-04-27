@@ -1,4 +1,6 @@
-﻿import { Suspense, useEffect, useState } from 'react';
+﻿import { Suspense, useEffect, useMemo, useState } from 'react';
+import { useAsync } from '../../hooks/useAsync';
+import { getActivePeriod } from '../../api/academicYears';
 import Icon from '../../components/Icons';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
@@ -14,8 +16,15 @@ export default function EmployeeExams() {
   const { user } = useAuth();
   const { socket, isConnected } = useSocket();
   const isRegistrar = user?.role === 'registrar';
+  const { data: activePeriod } = useAsync(() => getActivePeriod());
   const [tab, setTab] = useState('exams');
   const [editExamData, setEditExamData] = useState<Exam | null>(null);
+
+  const activeYearLabel = activePeriod?.year || 'No active school year';
+  const activeSemesterLabel = useMemo(() => {
+    const activeSemester = activePeriod?.semesters?.find((semester) => semester.isActive) || null;
+    return activeSemester?.name || 'No active semester';
+  }, [activePeriod]);
 
   useEffect(() => {
     if (!socket || !isConnected) return;
@@ -36,6 +45,16 @@ export default function EmployeeExams() {
 
   return (
     <div>
+      <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+        <span className="inline-flex items-center gap-1 rounded-full border border-forest-200 bg-forest-50 px-3 py-1 font-semibold text-forest-700">
+          <Icon name="calendar" className="w-3.5 h-3.5" />
+          Active year: {activeYearLabel}
+        </span>
+        <span className="inline-flex items-center gap-1 rounded-full border border-gold-200 bg-gold-50 px-3 py-1 font-semibold text-gold-700">
+          <Icon name="calendar" className="w-3.5 h-3.5" />
+          Active semester: {activeSemesterLabel}
+        </span>
+      </div>
       <div className="mb-2 text-xs text-gray-500">Choose a tab to switch between exam records, authoring, and scheduling tools.{isRegistrar ? ' Registrar access is view-only for exam records.' : ''}</div>
       <div className="inline-flex flex-wrap gap-2 mb-6 p-1.5 rounded-2xl border border-gray-200 bg-white/80 shadow-sm" role="tablist" aria-label="Exams workspace tabs">
         {tabs.map(([k,l]) => {

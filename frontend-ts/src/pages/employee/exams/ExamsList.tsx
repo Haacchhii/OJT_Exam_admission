@@ -1,7 +1,7 @@
-﻿import { useState, useMemo } from 'react';
+﻿import { useState, useMemo, useEffect, useRef } from 'react';
 import { useAsync } from '../../../hooks/useAsync';
 import { getExams, getExam, updateExam, deleteExam, bulkDeleteExams, cloneExam, getExamSchedules, getExamRegistrations, getExamReadinessPage } from '../../../api/exams';
-import { getAcademicYears, getSemesters } from '../../../api/academicYears';
+import { getAcademicYears, getSemesters, getActivePeriod } from '../../../api/academicYears';
 import { showToast } from '../../../components/Toast';
 import { useConfirm } from '../../../components/ConfirmDialog';
 import { useSelection } from '../../../hooks/useSelection';
@@ -70,6 +70,16 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
 
   const { data: academicYears } = useAsync<AcademicYear[]>(() => getAcademicYears());
   const { data: allSemesters } = useAsync<Semester[]>(() => getSemesters());
+  const { data: activePeriod } = useAsync(() => getActivePeriod());
+  const appliedActivePeriodRef = useRef(false);
+
+  useEffect(() => {
+    if (appliedActivePeriodRef.current || !activePeriod) return;
+    appliedActivePeriodRef.current = true;
+    setYearFilterExam(String(activePeriod.id));
+    const activeSemester = activePeriod.semesters?.find((semester) => semester.isActive) || null;
+    setSemesterFilterExam(activeSemester ? String(activeSemester.id) : 'all');
+  }, [activePeriod]);
 
   const semesterOptionsExam = useMemo(() => {
     const list = allSemesters || [];
@@ -325,7 +335,31 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
           }}>
             Export
           </ActionButton>
-          <CSVUploader title="Bulk Import Exams" isOpen={showBulkImport} onClose={() => setShowBulkImport(false)} onImport={handleBulkImportExams} templateHeaders={['title', 'gradeLevel', 'durationMinutes', 'passingScore', 'isActive']} allowMultiple />
+          <CSVUploader
+            title="Bulk Import Exams"
+            isOpen={showBulkImport}
+            onClose={() => setShowBulkImport(false)}
+            onImport={handleBulkImportExams}
+            templateHeaders={['title', 'gradeLevel', 'durationMinutes', 'passingScore', 'isActive', 'q1_text', 'q1_type', 'q1_points', 'q1_a', 'q1_b', 'q1_c', 'q1_d', 'q1_ans']}
+            templateRows={[
+              {
+                title: 'Grade 10 Entrance Exam',
+                gradeLevel: 'Grade 10',
+                durationMinutes: 120,
+                passingScore: 60,
+                isActive: 'true',
+                q1_text: 'What is the capital of the Philippines?',
+                q1_type: 'mc',
+                q1_points: 2,
+                q1_a: 'Cebu',
+                q1_b: 'Manila',
+                q1_c: 'Davao',
+                q1_d: 'Quezon City',
+                q1_ans: 'B',
+              },
+            ]}
+            allowMultiple
+          />
           <ActionButton variant="secondary" onClick={() => setShowBulkImport(true)} icon={<Icon name="upload" className="w-4 h-4" />}>
             Import Exams
           </ActionButton>

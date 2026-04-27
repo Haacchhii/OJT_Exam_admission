@@ -104,7 +104,7 @@ export async function login(req, res, next) {
     const token = signToken(user);
     logAudit({ userId: user.id, action: 'auth.login', entity: 'user', entityId: user.id, ipAddress: req.ip });
     const response = { user: safeUser(user), token };
-    if (env.EMAIL_VERIFICATION_REQUIRED && user.role === ROLES.APPLICANT && !user.emailVerified) {
+    if (env.EMAIL_VERIFICATION_REQUIRED && !user.emailVerified) {
       response.emailVerificationRequired = true;
     }
     res.json(response);

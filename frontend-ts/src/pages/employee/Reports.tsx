@@ -1,6 +1,7 @@
 ﻿import { Suspense, useState, useMemo, useEffect, useRef, type ReactNode } from 'react';
 import { useAsync } from '../../hooks/useAsync';
 import { getReportsSummary } from '../../api/admissions';
+import { useAuth } from '../../context/AuthContext';
 import { formatPersonName, formatDate } from '../../utils/helpers';
 import { showToast } from '../../components/Toast';
 import { PageHeader, SkeletonPage, ErrorAlert, ActionButton } from '../../components/UI';
@@ -200,6 +201,8 @@ const EMPTY_REPORT_DATA: ReportData = {
 };
 
 export default function EmployeeReports() {
+  const { user } = useAuth();
+  const isTeacherView = user?.role === 'teacher';
   const [statusFilter, setStatusFilter] = useState('all');
   const [levelGroupFilter, setLevelGroupFilter] = useState('all');
   const [gradeFilter, setGradeFilter] = useState('all');
@@ -214,6 +217,9 @@ export default function EmployeeReports() {
   const [scheduleChartSelection, setScheduleChartSelection] = useState(SCHEDULE_CHART_OPTIONS[0].id);
 
   const hasInvalidDateRange = Boolean(dateFrom && dateTo && dateFrom > dateTo);
+  const visibleReportPresets = isTeacherView
+    ? REPORT_PRESETS.filter((preset) => preset.key === 'overview' || preset.key === 'latest-cycle')
+    : REPORT_PRESETS;
 
   const reportsParams = useMemo(() => {
     const params: {
@@ -232,10 +238,12 @@ export default function EmployeeReports() {
       sort: sortFilter,
     };
 
-    if (statusFilter !== 'all') params.status = statusFilter;
-    if (levelGroupFilter !== 'all') params.levelGroup = levelGroupFilter;
-    if (gradeFilter !== 'all') params.grade = gradeFilter;
-    if (schoolFilter.trim()) params.school = schoolFilter.trim();
+    if (!isTeacherView) {
+      if (statusFilter !== 'all') params.status = statusFilter;
+      if (levelGroupFilter !== 'all') params.levelGroup = levelGroupFilter;
+      if (gradeFilter !== 'all') params.grade = gradeFilter;
+      if (schoolFilter.trim()) params.school = schoolFilter.trim();
+    }
     if (yearFilter !== 'all') params.academicYearId = Number(yearFilter);
     if (semesterFilter !== 'all') params.semesterId = Number(semesterFilter);
     if (!hasInvalidDateRange) {
@@ -244,7 +252,7 @@ export default function EmployeeReports() {
     }
 
     return params;
-  }, [statusFilter, levelGroupFilter, gradeFilter, sortFilter, schoolFilter, yearFilter, semesterFilter, dateFrom, dateTo, hasInvalidDateRange]);
+  }, [statusFilter, levelGroupFilter, gradeFilter, sortFilter, schoolFilter, yearFilter, semesterFilter, dateFrom, dateTo, hasInvalidDateRange, isTeacherView]);
 
   const { data: rawData, loading, error, refetch } = useAsync<ReportData>(async () => {
     try {
@@ -426,11 +434,13 @@ export default function EmployeeReports() {
 
   const exportFilterSummary = useMemo(() => {
     const filters: string[] = [];
-    if (statusFilter !== 'all') filters.push(`Status: ${statusFilter}`);
-    if (levelGroupFilter !== 'all') filters.push(`Level Group: ${levelGroupFilter}`);
-    if (gradeFilter !== 'all') filters.push(`Grade: ${gradeFilter}`);
-    if (sortFilter !== 'newest') filters.push(`Sort: ${sortLabel(sortFilter)}`);
-    if (schoolFilter.trim()) filters.push(`Previous School: ${schoolFilter.trim()}`);
+    if (!isTeacherView) {
+      if (statusFilter !== 'all') filters.push(`Status: ${statusFilter}`);
+      if (levelGroupFilter !== 'all') filters.push(`Level Group: ${levelGroupFilter}`);
+      if (gradeFilter !== 'all') filters.push(`Grade: ${gradeFilter}`);
+      if (sortFilter !== 'newest') filters.push(`Sort: ${sortLabel(sortFilter)}`);
+      if (schoolFilter.trim()) filters.push(`Previous School: ${schoolFilter.trim()}`);
+    }
 
     if (yearFilter !== 'all') {
       const year = academicYears.find((item) => item.id === Number(yearFilter));
@@ -446,9 +456,11 @@ export default function EmployeeReports() {
       filters.push(`Submitted Date: ${dateFrom || 'Any'} to ${dateTo || 'Any'}`);
     }
 
-    if (filters.length === 0) return 'No filters are active. Exports include all currently loaded records.';
+    if (filters.length === 0) return isTeacherView
+      ? 'No filters are active. Exports include the loaded exam results and schedules.'
+      : 'No filters are active. Exports include all currently loaded records.';
     return filters.join(' | ');
-  }, [statusFilter, levelGroupFilter, gradeFilter, sortFilter, schoolFilter, yearFilter, semesterFilter, dateFrom, dateTo, academicYears, allSemesters]);
+  }, [statusFilter, levelGroupFilter, gradeFilter, sortFilter, schoolFilter, yearFilter, semesterFilter, dateFrom, dateTo, academicYears, allSemesters, isTeacherView]);
 
   if (loading && !rawData) return <SkeletonPage />;
   if (error) return <ErrorAlert error={error} onRetry={refetch} />;
@@ -745,7 +757,7 @@ export default function EmployeeReports() {
 
   return (
     <div>
-      <PageHeader title="Reports & Exports" subtitle="Generate and download reports for admissions and exam results." />
+      <PageHeader title="Reports & Exports" subtitle={isTeacherView ? 'Generate and download exam results, schedules, and performance summaries.' : 'Generate and download reports for admissions and exam results.'} />
 
       <div className="flex justify-end mb-4">
         <ActionButton variant="secondary" icon={<Icon name="refresh" className="w-4 h-4" />} onClick={refetch}>Refresh Data</ActionButton>
@@ -757,7 +769,7 @@ export default function EmployeeReports() {
         <div className="mb-4">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Quick Presets</p>
           <div className="flex flex-wrap gap-2">
-            {REPORT_PRESETS.map((preset) => (
+            {visibleReportPresets.map((preset) => (
               <button
                 key={preset.key}
                 type="button"
@@ -771,6 +783,8 @@ export default function EmployeeReports() {
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          {!isTeacherView && (
+            <>
           <div className="min-w-0">
             <label className="block text-xs font-semibold text-gray-500 mb-1">Status</label>
             <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} aria-label="Filter by status" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white text-sm">
@@ -815,6 +829,8 @@ export default function EmployeeReports() {
               className="w-full min-w-[170px] px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none text-sm bg-white"
             />
           </div>
+            </>
+          )}
 
           <div className="min-w-0">
             <label className="block text-xs font-semibold text-gray-500 mb-1">School Year</label>
@@ -853,7 +869,7 @@ export default function EmployeeReports() {
         {hasInvalidDateRange && (
           <p className="mt-2 text-xs text-red-600">Invalid date range: "From" must be before or equal to "To".</p>
         )}
-        {!hasInvalidDateRange && meta?.admissionsCapped && (
+        {!isTeacherView && !hasInvalidDateRange && meta?.admissionsCapped && (
           <p className="mt-2 text-xs text-amber-700">
             Showing the newest {meta.admissionCountReturned} of {meta.admissionCountTotal} matching admissions for performance. Apply narrower filters or date range for targeted reporting.
           </p>
@@ -866,42 +882,69 @@ export default function EmployeeReports() {
         <p className="text-xs text-sky-700 mt-1">{exportFilterSummary}</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        {[
-          {
-            icon: 'clipboard',
-            title: 'Applicant List',
-            desc: 'Download a full list of all applicants with their admission status.',
-            onCSV: () => exportApplicants('csv'),
-            onPDF: () => exportApplicants('pdf'),
-            color: 'forest',
-            chartOptions: APPLICANT_CHART_OPTIONS,
-            selectedChart: applicantChartSelection,
-            onChartChange: setApplicantChartSelection,
-          },
-          {
-            icon: 'chartBar',
-            title: 'Exam Results',
-            desc: 'Download exam scores and pass/fail data for all applicants.',
-            onCSV: () => exportResults('csv'),
-            onPDF: () => exportResults('pdf'),
-            color: 'gold',
-            chartOptions: RESULTS_CHART_OPTIONS,
-            selectedChart: resultsChartSelection,
-            onChartChange: setResultsChartSelection,
-          },
-          {
-            icon: 'calendar',
-            title: 'Exam Schedules',
-            desc: 'Download all exam schedule data and slot availability.',
-            onCSV: () => exportSchedules('csv'),
-            onPDF: () => exportSchedules('pdf'),
-            color: 'emerald',
-            chartOptions: SCHEDULE_CHART_OPTIONS,
-            selectedChart: scheduleChartSelection,
-            onChartChange: setScheduleChartSelection,
-          },
-        ].map((c, i) => {
+      <div className={`grid grid-cols-1 ${isTeacherView ? 'md:grid-cols-2' : 'md:grid-cols-3'} gap-4 mb-6`}>
+        {(
+          isTeacherView
+            ? [
+                {
+                  icon: 'chartBar',
+                  title: 'Exam Results',
+                  desc: 'Download exam scores, pass/fail data, and performance summaries.',
+                  onCSV: () => exportResults('csv'),
+                  onPDF: () => exportResults('pdf'),
+                  color: 'gold',
+                  chartOptions: RESULTS_CHART_OPTIONS,
+                  selectedChart: resultsChartSelection,
+                  onChartChange: setResultsChartSelection,
+                },
+                {
+                  icon: 'calendar',
+                  title: 'Exam Schedules',
+                  desc: 'Download schedule data and slot utilization for exams you manage.',
+                  onCSV: () => exportSchedules('csv'),
+                  onPDF: () => exportSchedules('pdf'),
+                  color: 'emerald',
+                  chartOptions: SCHEDULE_CHART_OPTIONS,
+                  selectedChart: scheduleChartSelection,
+                  onChartChange: setScheduleChartSelection,
+                },
+              ]
+            : [
+                {
+                  icon: 'clipboard',
+                  title: 'Applicant List',
+                  desc: 'Download a full list of all applicants with their admission status.',
+                  onCSV: () => exportApplicants('csv'),
+                  onPDF: () => exportApplicants('pdf'),
+                  color: 'forest',
+                  chartOptions: APPLICANT_CHART_OPTIONS,
+                  selectedChart: applicantChartSelection,
+                  onChartChange: setApplicantChartSelection,
+                },
+                {
+                  icon: 'chartBar',
+                  title: 'Exam Results',
+                  desc: 'Download exam scores and pass/fail data for all applicants.',
+                  onCSV: () => exportResults('csv'),
+                  onPDF: () => exportResults('pdf'),
+                  color: 'gold',
+                  chartOptions: RESULTS_CHART_OPTIONS,
+                  selectedChart: resultsChartSelection,
+                  onChartChange: setResultsChartSelection,
+                },
+                {
+                  icon: 'calendar',
+                  title: 'Exam Schedules',
+                  desc: 'Download all exam schedule data and slot availability.',
+                  onCSV: () => exportSchedules('csv'),
+                  onPDF: () => exportSchedules('pdf'),
+                  color: 'emerald',
+                  chartOptions: SCHEDULE_CHART_OPTIONS,
+                  selectedChart: scheduleChartSelection,
+                  onChartChange: setScheduleChartSelection,
+                },
+              ]
+        ).map((c, i) => {
           const bgGradient = c.color === 'gold' ? 'from-gold-50 to-gold-100' : c.color === 'emerald' ? 'from-emerald-50 to-teal-100' : 'from-forest-50 to-forest-100';
           const borderColor = c.color === 'gold' ? 'border-gold-200' : c.color === 'emerald' ? 'border-emerald-200' : 'border-forest-200';
           const iconBg = c.color === 'gold' ? 'bg-gold-100' : c.color === 'emerald' ? 'bg-emerald-100' : 'bg-forest-100';
@@ -910,28 +953,28 @@ export default function EmployeeReports() {
           const btn2Color = c.color === 'gold' ? 'bg-gold-600 hover:bg-gold-700' : c.color === 'emerald' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-forest-600 hover:bg-forest-700';
           const titleColor = c.color === 'gold' ? '#b45309' : c.color === 'emerald' ? '#059669' : '#1a3c2a';
           return (
-          <div key={i} className={`gk-section-card p-6 text-center bg-gradient-to-br ${bgGradient} border-2 ${borderColor} shadow-md hover:shadow-lg transition-all transform hover:scale-105`}>
-            <div className={`w-16 h-16 rounded-2xl ${iconBg} flex items-center justify-center mx-auto mb-3`}><Icon name={c.icon} className={`w-8 h-8 ${iconColor}`} /></div>
-            <h3 className="font-bold text-lg mb-1" style={{ color: titleColor }}>{c.title}</h3>
-            <p className="text-gray-600 text-sm mb-4 font-medium">{c.desc}</p>
-            <div className="mb-3 text-left">
-              <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Chart for PDF</label>
-              <select
-                value={c.selectedChart}
-                onChange={(event) => c.onChartChange(event.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-forest-500/20 outline-none"
-              >
-                {c.chartOptions.map((option) => (
-                  <option key={option.id} value={option.id}>{option.label}</option>
-                ))}
-              </select>
+            <div key={i} className={`gk-section-card p-6 text-center bg-gradient-to-br ${bgGradient} border-2 ${borderColor} shadow-md hover:shadow-lg transition-all transform hover:scale-105`}>
+              <div className={`w-16 h-16 rounded-2xl ${iconBg} flex items-center justify-center mx-auto mb-3`}><Icon name={c.icon} className={`w-8 h-8 ${iconColor}`} /></div>
+              <h3 className="font-bold text-lg mb-1" style={{ color: titleColor }}>{c.title}</h3>
+              <p className="text-gray-600 text-sm mb-4 font-medium">{c.desc}</p>
+              <div className="mb-3 text-left">
+                <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Chart for PDF</label>
+                <select
+                  value={c.selectedChart}
+                  onChange={(event) => c.onChartChange(event.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-forest-500/20 outline-none"
+                >
+                  {c.chartOptions.map((option) => (
+                    <option key={option.id} value={option.id}>{option.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex gap-2 justify-center flex-wrap">
+                <ActionButton variant="primary" className={`${btn1Color} font-bold shadow-md`} icon={<Icon name="document" className="w-4 h-4" />} onClick={c.onCSV}>CSV</ActionButton>
+                <ActionButton variant="primary" className={`${btn2Color} font-bold shadow-md`} icon={<Icon name="document" className="w-4 h-4" />} onClick={c.onPDF}>PDF</ActionButton>
+              </div>
             </div>
-            <div className="flex gap-2 justify-center flex-wrap">
-              <ActionButton variant="primary" className={`${btn1Color} font-bold shadow-md`} icon={<Icon name="document" className="w-4 h-4" />} onClick={c.onCSV}>CSV</ActionButton>
-              <ActionButton variant="primary" className={`${btn2Color} font-bold shadow-md`} icon={<Icon name="document" className="w-4 h-4" />} onClick={c.onPDF}>PDF</ActionButton>
-            </div>
-          </div>
-        );
+          );
         })}
       </div>
 
@@ -941,18 +984,21 @@ export default function EmployeeReports() {
           monthData={monthData}
           admissionStatusData={admissionStatusData}
           admissionStatusTotal={admissionStatusTotal}
+          showApplicantInsights={!isTeacherView}
         />
       </Suspense>
 
-      <DeferredChartSection minHeight={380}>
-        <Suspense fallback={<LazyLoadingFallback />}>
-          <PreviousSchoolChart
-            data={previousSchoolData}
-            totalApplicants={previousSchoolTotal}
-            distinctSchools={previousSchoolDistinct}
-          />
-        </Suspense>
-      </DeferredChartSection>
+      {!isTeacherView && (
+        <DeferredChartSection minHeight={380}>
+          <Suspense fallback={<LazyLoadingFallback />}>
+            <PreviousSchoolChart
+              data={previousSchoolData}
+              totalApplicants={previousSchoolTotal}
+              distinctSchools={previousSchoolDistinct}
+            />
+          </Suspense>
+        </DeferredChartSection>
+      )}
 
       <DeferredChartSection minHeight={430}>
         <Suspense fallback={<LazyLoadingFallback />}>
@@ -972,26 +1018,53 @@ export default function EmployeeReports() {
       
       {/* Key Metrics Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="gk-section-card p-4 text-center border-l-4 border-forest-500 hover:shadow-md transition-shadow">
-          <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Total Applicants</p>
-          <p className="text-2xl font-bold text-forest-700">{totalApplicants}</p>
-          <p className="text-xs text-gray-400 mt-2">+{thisMonth} this month</p>
-        </div>
-        <div className="gk-section-card p-4 text-center border-l-4 border-emerald-500 hover:shadow-md transition-shadow">
-          <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Acceptance Rate</p>
-          <p className="text-2xl font-bold text-emerald-700">{totalApplicants > 0 ? Math.round((accepted / totalApplicants) * 100) : 0}%</p>
-          <p className="text-xs text-gray-400 mt-2">{accepted} accepted</p>
-        </div>
-        <div className="gk-section-card p-4 text-center border-l-4 border-blue-500 hover:shadow-md transition-shadow">
-          <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Overall Pass Rate</p>
-          <p className="text-2xl font-bold text-blue-700">{results.length > 0 ? Math.round((passed / results.length) * 100) : 0}%</p>
-          <p className="text-xs text-gray-400 mt-2">{passed} of {results.length} passed</p>
-        </div>
-        <div className="gk-section-card p-4 text-center border-l-4 border-gold-500 hover:shadow-md transition-shadow">
-          <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Average Score</p>
-          <p className="text-2xl font-bold text-gold-700">{avg}%</p>
-          <p className="text-xs text-gray-400 mt-2">Across all exams</p>
-        </div>
+        {isTeacherView ? (
+          <>
+            <div className="gk-section-card p-4 text-center border-l-4 border-forest-500 hover:shadow-md transition-shadow">
+              <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Total Exams</p>
+              <p className="text-2xl font-bold text-forest-700">{exams.length}</p>
+              <p className="text-xs text-gray-400 mt-2">Published and draft exams</p>
+            </div>
+            <div className="gk-section-card p-4 text-center border-l-4 border-emerald-500 hover:shadow-md transition-shadow">
+              <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Exam Schedules</p>
+              <p className="text-2xl font-bold text-emerald-700">{schedules.length}</p>
+              <p className="text-xs text-gray-400 mt-2">Active and upcoming slots</p>
+            </div>
+            <div className="gk-section-card p-4 text-center border-l-4 border-blue-500 hover:shadow-md transition-shadow">
+              <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Overall Pass Rate</p>
+              <p className="text-2xl font-bold text-blue-700">{results.length > 0 ? Math.round((passed / results.length) * 100) : 0}%</p>
+              <p className="text-xs text-gray-400 mt-2">{passed} of {results.length} passed</p>
+            </div>
+            <div className="gk-section-card p-4 text-center border-l-4 border-gold-500 hover:shadow-md transition-shadow">
+              <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Average Score</p>
+              <p className="text-2xl font-bold text-gold-700">{avg}%</p>
+              <p className="text-xs text-gray-400 mt-2">Across all exams</p>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="gk-section-card p-4 text-center border-l-4 border-forest-500 hover:shadow-md transition-shadow">
+              <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Total Applicants</p>
+              <p className="text-2xl font-bold text-forest-700">{totalApplicants}</p>
+              <p className="text-xs text-gray-400 mt-2">+{thisMonth} this month</p>
+            </div>
+            <div className="gk-section-card p-4 text-center border-l-4 border-emerald-500 hover:shadow-md transition-shadow">
+              <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Acceptance Rate</p>
+              <p className="text-2xl font-bold text-emerald-700">{totalApplicants > 0 ? Math.round((accepted / totalApplicants) * 100) : 0}%</p>
+              <p className="text-xs text-gray-400 mt-2">{accepted} accepted</p>
+            </div>
+            <div className="gk-section-card p-4 text-center border-l-4 border-blue-500 hover:shadow-md transition-shadow">
+              <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Overall Pass Rate</p>
+              <p className="text-2xl font-bold text-blue-700">{results.length > 0 ? Math.round((passed / results.length) * 100) : 0}%</p>
+              <p className="text-xs text-gray-400 mt-2">{passed} of {results.length} passed</p>
+            </div>
+            <div className="gk-section-card p-4 text-center border-l-4 border-gold-500 hover:shadow-md transition-shadow">
+              <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Average Score</p>
+              <p className="text-2xl font-bold text-gold-700">{avg}%</p>
+              <p className="text-xs text-gray-400 mt-2">Across all exams</p>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

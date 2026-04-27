@@ -9,6 +9,7 @@ export function CSVUploader({
   onClose,
   onImport,
   templateHeaders,
+  templateRows = [],
   allowMultiple = false,
 }: {
   title: string;
@@ -16,6 +17,7 @@ export function CSVUploader({
   onClose: () => void;
   onImport: (data: any[]) => void;
   templateHeaders: string[];
+  templateRows?: Record<string, string | number | boolean | null | undefined>[];
   allowMultiple?: boolean;
 }) {
   const [error, setError] = useState<string | null>(null);
@@ -83,7 +85,8 @@ export function CSVUploader({
   };
 
   const downloadTemplate = () => {
-    const csv = Papa.unparse([templateHeaders]);
+    const blankRow = Object.fromEntries(templateHeaders.map((header) => [header, ''])) as Record<string, string>;
+    const csv = Papa.unparse(templateRows.length > 0 ? templateRows : [blankRow]);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
@@ -121,13 +124,13 @@ export function CSVUploader({
       )}
 
       <div className="text-sm text-gray-500 mb-4">
-        <p className="font-semibold text-gray-700 mb-1">Required Format:</p>
-        <p className="mb-3">Your CSV must include the following headers exact matches:</p>
+        <p className="font-semibold text-gray-700 mb-1">Accepted Format:</p>
+        <p className="mb-3">Download includes accepted sample values. Your CSV must still match these headers exactly:</p>
         <code className="bg-gray-100 px-2 py-1 rounded block text-xs break-all mb-4">
           {templateHeaders.join(", ")}
         </code>
         <button onClick={downloadTemplate} className="text-forest-600 hover:underline">
-          Download Template File
+          Download Sample Template File
         </button>
       </div>
 

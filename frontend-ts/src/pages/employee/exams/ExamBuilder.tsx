@@ -1,7 +1,7 @@
-﻿import { useState, useEffect, type ChangeEvent, type DragEvent } from 'react';
+﻿import { useState, useEffect, useRef, type ChangeEvent, type DragEvent } from 'react';
 import { useAsync } from '../../../hooks/useAsync';
 import { addExam, updateExam, getExam } from '../../../api/exams';
-import { getAcademicYears, getSemesters } from '../../../api/academicYears';
+import { getAcademicYears, getSemesters, getActivePeriod } from '../../../api/academicYears';
 import { showToast } from '../../../components/Toast';
 import Modal from '../../../components/Modal';
 import { useUnsavedChanges } from '../../../hooks/useUnsavedChanges';
@@ -78,8 +78,20 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
 
   const { data: years } = useAsync<AcademicYear[]>(() => getAcademicYears());
   const { data: allSems } = useAsync<Semester[]>(() => getSemesters());
+  const { data: activePeriod } = useAsync(() => getActivePeriod());
   const semesterOptions = (allSems || []).filter(s => !yearId || s.academicYearId === Number(yearId));
   const selectedExamGroup = examGradeGroups.find(g => g.group === gradeStage);
+  const appliedActivePeriodRef = useRef(false);
+
+  useEffect(() => {
+    if (editExam || appliedActivePeriodRef.current || !activePeriod) return;
+    appliedActivePeriodRef.current = true;
+    setYearId(activePeriod.id);
+    const activeSemester = activePeriod.semesters?.find((semester) => semester.isActive) || null;
+    if (activeSemester) {
+      setSemId(activeSemester.id);
+    }
+  }, [activePeriod, editExam]);
 
   useEffect(() => {
     if (!gradeStage) return;
