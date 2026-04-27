@@ -103,6 +103,18 @@ function canonicalSchoolKey(rawSchool: string) {
   return compact;
 }
 
+function normalizeGradeLevelLabel(value: string) {
+  return String(value || '').replace(/[\u2013\u2014]/g, '-').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+function canonicalGradeLevelLabel(value: string) {
+  const normalized = normalizeGradeLevelLabel(value);
+  if (!normalized) return 'Unspecified';
+
+  const matched = ALL_GRADE_LEVELS.find((grade) => normalizeGradeLevelLabel(grade) === normalized);
+  return matched || String(value || '').replace(/\s+/g, ' ').trim();
+}
+
 function sortLabel(sort: 'newest' | 'oldest' | 'alphabetical' | 'school') {
   if (sort === 'oldest') return 'Date: Oldest to Newest';
   if (sort === 'alphabetical') return 'Alphabetical: Last Name (A-Z)';
@@ -698,7 +710,7 @@ export default function EmployeeReports() {
   const knownGradeOrder = new Map(ALL_GRADE_LEVELS.map((grade, index) => [grade, index]));
   const gradeLevelCounts = new Map<string, number>();
   for (const admission of admissions) {
-    const grade = String(admission.gradeLevel || '').trim() || 'Unspecified';
+    const grade = canonicalGradeLevelLabel(String(admission.gradeLevel || ''));
     gradeLevelCounts.set(grade, (gradeLevelCounts.get(grade) || 0) + 1);
   }
 
