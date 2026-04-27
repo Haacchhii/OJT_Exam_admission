@@ -63,7 +63,7 @@ export default function ScheduleManager() {
   const confirm = useConfirm();
   const [editId, setEditId] = useState<number | null>(null);
   const [optimisticSchedule, setOptimisticSchedule] = useState<ExamSchedule | null>(null);
-  const [form, setForm] = useState({ examId: '', date: '', start: '', end: '', visibilityStartDate: '', visibilityEndDate: '', openDate: '', closeDate: '', windowStartAt: '', windowEndAt: '', slots: '' });
+  const [form, setForm] = useState({ examId: '', date: '', start: '', end: '', visibilityStartDate: '', visibilityEndDate: '', openDate: '', closeDate: '', slots: '' });
   const [selectedExamIds, setSelectedExamIds] = useState<number[]>([]);
   const [schedSearch, setSchedSearch] = useState('');
   const [schedExamFilter, setSchedExamFilter] = useState('all');
@@ -98,8 +98,6 @@ export default function ScheduleManager() {
       closeDate: f.closeDate || regClose,
       visibilityStartDate: f.visibilityStartDate || today,
       visibilityEndDate: f.visibilityEndDate || visibilityEnd,
-      windowStartAt: f.windowStartAt || `${date}T${f.start || '09:00'}`,
-      windowEndAt: f.windowEndAt || `${date}T${f.end || '10:00'}`,
       slots: f.slots || '30',
     }));
     showToast('Schedule defaults applied.', 'success');
@@ -178,14 +176,6 @@ export default function ScheduleManager() {
       showToast('Visibility end date must be on or after visibility start date.', 'error');
       return;
     }
-    if (form.windowStartAt && form.windowEndAt) {
-      const startAt = new Date(form.windowStartAt);
-      const endAt = new Date(form.windowEndAt);
-      if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime()) || startAt.getTime() >= endAt.getTime()) {
-        showToast('Exam window end datetime must be after exam window start datetime.', 'error');
-        return;
-      }
-    }
     if (form.date) {
       const today = getTodayLocalIso();
       if (form.date < today) {
@@ -209,8 +199,8 @@ export default function ScheduleManager() {
       visibilityEndDate: form.visibilityEndDate || null,
       registrationOpenDate: form.openDate || null,
       registrationCloseDate: form.closeDate || null,
-      examWindowStartAt: form.windowStartAt ? new Date(form.windowStartAt).toISOString() : null,
-      examWindowEndAt: form.windowEndAt ? new Date(form.windowEndAt).toISOString() : null,
+      examWindowStartAt: null,
+      examWindowEndAt: null,
       maxSlots: parseInt(form.slots),
     };
 
@@ -280,7 +270,7 @@ export default function ScheduleManager() {
     } finally {
       setIsSavingSched(false);
     }
-    setForm({ examId: '', date: '', start: '', end: '', visibilityStartDate: '', visibilityEndDate: '', openDate: '', closeDate: '', windowStartAt: '', windowEndAt: '', slots: '' });
+    setForm({ examId: '', date: '', start: '', end: '', visibilityStartDate: '', visibilityEndDate: '', openDate: '', closeDate: '', slots: '' });
     setSelectedExamIds([]);
     schedRefetch();
   };
@@ -297,8 +287,6 @@ export default function ScheduleManager() {
       visibilityEndDate: s.visibilityEndDate || '',
       openDate: s.registrationOpenDate || '',
       closeDate: s.registrationCloseDate || '',
-      windowStartAt: toLocalInputDateTime(s.examWindowStartAt || s.effectiveExamWindowStartAt || null),
-      windowEndAt: toLocalInputDateTime(s.examWindowEndAt || s.effectiveExamWindowEndAt || null),
       slots: String(s.maxSlots),
     });
     setSelectedExamIds([]);
@@ -408,8 +396,6 @@ export default function ScheduleManager() {
           <FormInput label="Visibility Ends" type="date" value={form.visibilityEndDate} onChange={set('visibilityEndDate')} />
           <FormInput label="Exam Window Opens" type="date" value={form.openDate} onChange={set('openDate')} />
           <FormInput label="Exam Window Closes" type="date" value={form.closeDate} onChange={set('closeDate')} />
-          <FormInput label="Exact Window Start (optional)" type="datetime-local" value={form.windowStartAt} onChange={set('windowStartAt')} />
-          <FormInput label="Exact Window End (optional)" type="datetime-local" value={form.windowEndAt} onChange={set('windowEndAt')} />
           <FormInput label="Max Applicants" type="number" value={form.slots} onChange={set('slots')} placeholder="30" required />
           <div className="md:col-span-2 lg:col-span-3 text-xs text-gray-500">
             Tip: students can start anytime while the exam window is open. Keep close date aligned with your intended exam deadline.
