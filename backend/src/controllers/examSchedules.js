@@ -311,9 +311,12 @@ export async function getAvailableSchedules(req, res, next) {
 export async function createSchedule(req, res, next) {
   try {
     const { examId, scheduledDate, startTime, endTime, visibilityStartDate, visibilityEndDate, registrationOpenDate, registrationCloseDate, examWindowStartAt, examWindowEndAt, maxSlots, venue } = req.body;
-    if (!examId || !scheduledDate || !startTime || !endTime || !maxSlots) {
-      return res.status(400).json({ error: 'examId, scheduledDate, startTime, endTime, maxSlots required', code: 'VALIDATION_ERROR' });
+    if (!examId || !scheduledDate || !maxSlots) {
+      return res.status(400).json({ error: 'examId, scheduledDate, maxSlots required', code: 'VALIDATION_ERROR' });
     }
+
+    const normalizedStartTime = startTime || '00:00';
+    const normalizedEndTime = endTime || '23:59';
 
     const exam = await prisma.exam.findUnique({
       where: { id: Number(examId) },
@@ -333,7 +336,7 @@ export async function createSchedule(req, res, next) {
       });
     }
 
-    const validationError = validateScheduleFields({ scheduledDate, startTime, endTime }, { checkPastDate: true });
+    const validationError = validateScheduleFields({ scheduledDate, startTime: normalizedStartTime, endTime: normalizedEndTime }, { checkPastDate: true });
     if (validationError) {
       return res.status(400).json({ error: validationError, code: 'VALIDATION_ERROR' });
     }
@@ -352,8 +355,8 @@ export async function createSchedule(req, res, next) {
       examWindowStartAt,
       examWindowEndAt,
       scheduledDate,
-      startTime,
-      endTime,
+      startTime: normalizedStartTime,
+      endTime: normalizedEndTime,
       registrationOpenDate,
       registrationCloseDate,
     });
@@ -365,8 +368,8 @@ export async function createSchedule(req, res, next) {
       data: {
         examId,
         scheduledDate,
-        startTime,
-        endTime,
+        startTime: normalizedStartTime,
+        endTime: normalizedEndTime,
         visibilityStartDate: visibility.start,
         visibilityEndDate: visibility.end,
         registrationOpenDate: registrationOpenDate || null,

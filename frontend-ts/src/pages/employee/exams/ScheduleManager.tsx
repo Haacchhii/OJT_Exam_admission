@@ -59,6 +59,9 @@ function statusBadgeClass(status?: string) {
   return 'gk-badge gk-badge-active';
 }
 
+const DEFAULT_START_TIME = '00:00';
+const DEFAULT_END_TIME = '23:59';
+
 export default function ScheduleManager() {
   const confirm = useConfirm();
   const [editId, setEditId] = useState<number | null>(null);
@@ -193,8 +196,8 @@ export default function ScheduleManager() {
     }
     const baseData = {
       scheduledDate: form.date,
-      startTime: form.start,
-      endTime: form.end,
+      startTime: form.start || DEFAULT_START_TIME,
+      endTime: form.end || DEFAULT_END_TIME,
       visibilityStartDate: form.visibilityStartDate || null,
       visibilityEndDate: form.visibilityEndDate || null,
       registrationOpenDate: form.openDate || null,
@@ -213,7 +216,7 @@ export default function ScheduleManager() {
     const saveMessage = editId
       ? 'Apply changes to this schedule?'
       : selectedExamIds.length > 0
-        ? `Create schedules for ${targetExamIds.length} selected exams on ${form.date} (${formatTime(form.start)} - ${formatTime(form.end)})?`
+        ? `Create schedules for ${targetExamIds.length} selected exams on ${form.date}?`
         : 'Create this schedule?';
 
     const ok = await confirm({
@@ -390,8 +393,8 @@ export default function ScheduleManager() {
             </div>
           )}
           <FormInput label="Date" type="date" value={form.date} onChange={set('date')} required />
-          <FormInput label="Start Time" type="time" value={form.start} onChange={set('start')} required />
-          <FormInput label="End Time" type="time" value={form.end} onChange={set('end')} required />
+          {editId && <FormInput label="Start Time" type="time" value={form.start} onChange={set('start')} required />}
+          {editId && <FormInput label="End Time" type="time" value={form.end} onChange={set('end')} required />}
           <FormInput label="Visibility Starts" type="date" value={form.visibilityStartDate} onChange={set('visibilityStartDate')} />
           <FormInput label="Visibility Ends" type="date" value={form.visibilityEndDate} onChange={set('visibilityEndDate')} />
           <FormInput label="Exam Window Opens" type="date" value={form.openDate} onChange={set('openDate')} />
