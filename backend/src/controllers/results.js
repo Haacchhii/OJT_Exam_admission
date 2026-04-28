@@ -410,7 +410,7 @@ export async function getEmployeeSummary(req, res, next) {
     const includeResults = parseBooleanQuery(req.query?.includeResults, true);
     const includeEssays = parseBooleanQuery(req.query?.includeEssays, true);
 
-    const cacheKey = `resultsEmployeeSummary:v4:${summaryLimit}:r${includeResults ? 1 : 0}:e${includeEssays ? 1 : 0}`;
+    const cacheKey = `resultsEmployeeSummary:v6:${summaryLimit}:r${includeResults ? 1 : 0}:e${includeEssays ? 1 : 0}`;
     const summary = await cached(cacheKey, async () => {
       const [
         totalResults,
@@ -437,6 +437,44 @@ export async function getEmployeeSummary(req, res, next) {
                 passed: true,
                 essayReviewed: true,
                 createdAt: true,
+                registration: {
+                  select: {
+                    id: true,
+                    scheduleId: true,
+                    userEmail: true,
+                    userId: true,
+                    status: true,
+                    user: {
+                      select: {
+                        id: true,
+                        firstName: true,
+                        middleName: true,
+                        lastName: true,
+                        email: true,
+                        applicantProfile: { select: { gradeLevel: true } },
+                      },
+                    },
+                    schedule: {
+                      select: {
+                        id: true,
+                        examId: true,
+                        scheduledDate: true,
+                        startTime: true,
+                        endTime: true,
+                        exam: {
+                          select: {
+                            id: true,
+                            title: true,
+                            gradeLevel: true,
+                            passingScore: true,
+                            academicYear: { select: { id: true } },
+                            semester: { select: { id: true } },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
               },
             })
           : Promise.resolve([]),
@@ -456,6 +494,44 @@ export async function getEmployeeSummary(req, res, next) {
                 scoredById: true,
                 scoredAt: true,
                 question: { select: { questionText: true } },
+                registration: {
+                  select: {
+                    id: true,
+                    scheduleId: true,
+                    userEmail: true,
+                    userId: true,
+                    status: true,
+                    user: {
+                      select: {
+                        id: true,
+                        firstName: true,
+                        middleName: true,
+                        lastName: true,
+                        email: true,
+                        applicantProfile: { select: { gradeLevel: true } },
+                      },
+                    },
+                    schedule: {
+                      select: {
+                        id: true,
+                        examId: true,
+                        scheduledDate: true,
+                        startTime: true,
+                        endTime: true,
+                        exam: {
+                          select: {
+                            id: true,
+                            title: true,
+                            gradeLevel: true,
+                            passingScore: true,
+                            academicYear: { select: { id: true } },
+                            semester: { select: { id: true } },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
               },
             })
           : Promise.resolve([]),
@@ -482,49 +558,82 @@ export async function getEmployeeSummary(req, res, next) {
         capped: (includeResults && totalResults > results.length) || (includeEssays && totalEssays > essays.length),
       };
 
-      const registrationIds = Array.from(new Set([
-        ...results.map((r) => r.registrationId),
-        ...essays.map((e) => e.registrationId),
-      ]));
+      const regsMap = new Map();
+      const usersById = new Map();
+      const usersByEmail = new Map();
+      const schedulesMap = new Map();
+      const examsMap = new Map();
 
-      if (!registrationIds.length) {
-        return {
-          results: [],
-          regs: [],
-          users: [],
-          schedules: [],
-          exams: [],
-          essays: [],
-          academicYears,
-          semesters,
-          meta,
-        };
+      const registerUser = (user) => {
+        if (!user || usersById.has(user.id)) return;
+        const normalizedEmail = normalizeEmail(user.email);
+        usersById.set(user.id, {
+          id: user.id,
+          firstName: user.firstName,
+          middleName: user.middleName,
+          lastName: user.lastName,
+          email: user.email,
+          applicantProfile: user.applicantProfile,
+        });
+        if (normalizedEmail && !usersByEmail.has(normalizedEmail)) {
+          usersByEmail.set(normalizedEmail, usersById.get(user.id));
+        }
+      };
+
+      const registerSchedule = (schedule) => {
+        if (!schedule || schedulesMap.has(schedule.id)) return;
+        schedulesMap.set(schedule.id, {
+          id: schedule.id,
+          examId: schedule.examId,
+          scheduledDate: schedule.scheduledDate,
+          startTime: schedule.startTime,
+          endTime: schedule.endTime,
+        });
+        const exam = schedule.exam;
+        if (exam && !examsMap.has(exam.id)) {
+          examsMap.set(exam.id, {
+            id: exam.id,
+            title: exam.title,
+            gradeLevel: exam.gradeLevel,
+            passingScore: exam.passingScore,
+            academicYear: exam.academicYear,
+            semester: exam.semester,
+          });
+        }
+      };
+
+      const registerRegistration = (registration) => {
+        if (!registration || regsMap.has(registration.id)) return;
+        regsMap.set(registration.id, {
+          id: registration.id,
+          scheduleId: registration.scheduleId,
+          userEmail: registration.userEmail,
+          userId: registration.userId,
+          status: registration.status,
+        });
+        registerUser(registration.user);
+        registerSchedule(registration.schedule);
+      };
+
+      for (const result of results) {
+        registerRegistration(result.registration);
+      }
+      for (const essay of essays) {
+        registerRegistration(essay.registration);
       }
 
-      const regs = await prisma.examRegistration.findMany({
-        where: { id: { in: registrationIds } },
-        orderBy: { createdAt: 'desc' },
-        select: {
-          id: true,
-          scheduleId: true,
-          userEmail: true,
-          userId: true,
-          status: true,
-        },
-      });
+      const fallbackEmails = new Set();
+      for (const registration of [...results.map((row) => row.registration), ...essays.map((row) => row.registration)]) {
+        if (!registration || registration.user) continue;
+        const normalizedEmail = normalizeEmail(registration.userEmail);
+        if (normalizedEmail) fallbackEmails.add(normalizedEmail);
+      }
 
-      const scheduleIds = Array.from(new Set(regs.map((r) => r.scheduleId)));
-      const userIds = Array.from(new Set(regs.map((r) => r.userId).filter((id) => typeof id === 'number')));
-      const userEmails = Array.from(new Set(regs.map((r) => r.userEmail).filter(Boolean)));
-
-      const [users, schedules] = await Promise.all([
-        prisma.user.findMany({
+      if (fallbackEmails.size > 0) {
+        const fallbackUsers = await prisma.user.findMany({
           where: {
             deletedAt: null,
-            OR: [
-              ...(userIds.length ? [{ id: { in: userIds } }] : []),
-              ...(userEmails.length ? [{ email: { in: userEmails } }] : []),
-            ],
+            email: { in: [...fallbackEmails] },
           },
           orderBy: { createdAt: 'desc' },
           select: {
@@ -535,39 +644,24 @@ export async function getEmployeeSummary(req, res, next) {
             email: true,
             applicantProfile: { select: { gradeLevel: true } },
           },
-        }),
-        scheduleIds.length
-          ? prisma.examSchedule.findMany({
-              where: { id: { in: scheduleIds } },
-              orderBy: { scheduledDate: 'desc' },
-              select: {
-                id: true,
-                examId: true,
-                scheduledDate: true,
-                startTime: true,
-                endTime: true,
-              },
-            })
-          : Promise.resolve([]),
-      ]);
+        });
 
-      const examIds = Array.from(new Set(schedules.map((s) => s.examId)));
-      const exams = examIds.length
-        ? await prisma.exam.findMany({
-            where: { id: { in: examIds }, deletedAt: null },
-            orderBy: { createdAt: 'desc' },
-            select: {
-              id: true,
-              title: true,
-              gradeLevel: true,
-              passingScore: true,
-              academicYear: { select: { id: true } },
-              semester: { select: { id: true } },
-            },
-          })
-        : [];
+        for (const user of fallbackUsers) {
+          registerUser(user);
+        }
+      }
 
-      return { results, regs, users, schedules, exams, essays, academicYears, semesters, meta };
+      return {
+        results,
+        regs: [...regsMap.values()],
+        users: [...usersById.values()],
+        schedules: [...schedulesMap.values()],
+        exams: [...examsMap.values()],
+        essays,
+        academicYears,
+        semesters,
+        meta,
+      };
     }, 120_000);
 
     res.json(summary);

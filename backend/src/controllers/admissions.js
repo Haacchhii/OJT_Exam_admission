@@ -82,7 +82,7 @@ async function resolveStoredDocumentPath(doc) {
 // Helper: shape admission for API response (include document names and file paths)
 function shapeAdmission(adm) {
   if (!adm) return null;
-  const { documents: docs, academicYear, semester, ...rest } = adm;
+  const { documents: docs, academicYear, semester, user, ...rest } = adm;
   return {
     ...rest,
     documentCount: docs ? docs.length : 0,
@@ -649,7 +649,7 @@ export async function getReportsSummary(req, res, next) {
     if (sort === 'alphabetical') admissionOrderBy = [{ lastName: 'asc' }, { firstName: 'asc' }, { submittedAt: 'desc' }];
     if (sort === 'school') admissionOrderBy = [{ prevSchool: 'asc' }, { lastName: 'asc' }, { firstName: 'asc' }, { submittedAt: 'desc' }];
 
-    const cacheKey = `reportsSummary:v2:${JSON.stringify({
+    const cacheKey = `reportsSummary:v3:${JSON.stringify({
       status: status || null,
       levelGroup: levelGroup || null,
       grade: grade || null,
@@ -682,6 +682,57 @@ export async function getReportsSummary(req, res, next) {
             submittedAt: true,
             academicYear: { select: { id: true, year: true, startDate: true, endDate: true } },
             semester: { select: { id: true, name: true, startDate: true, endDate: true } },
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                middleName: true,
+                lastName: true,
+                email: true,
+                applicantProfile: { select: { gradeLevel: true } },
+                examRegistrations: {
+                  select: {
+                    id: true,
+                    scheduleId: true,
+                    userEmail: true,
+                    userId: true,
+                    status: true,
+                    result: {
+                      select: {
+                        id: true,
+                        registrationId: true,
+                        totalScore: true,
+                        maxPossible: true,
+                        percentage: true,
+                        passed: true,
+                        essayReviewed: true,
+                        createdAt: true,
+                      },
+                    },
+                    schedule: {
+                      select: {
+                        id: true,
+                        examId: true,
+                        scheduledDate: true,
+                        startTime: true,
+                        endTime: true,
+                        registrationOpenDate: true,
+                        registrationCloseDate: true,
+                        maxSlots: true,
+                        slotsTaken: true,
+                        exam: {
+                          select: {
+                            id: true,
+                            title: true,
+                            gradeLevel: true,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
           },
         }),
         prisma.academicYear.findMany({
@@ -714,85 +765,58 @@ export async function getReportsSummary(req, res, next) {
         };
       }
 
-      const admissionUserIds = Array.from(new Set(admissions.map(a => a.userId).filter((id) => typeof id === 'number')));
-      const admissionEmails = Array.from(new Set(admissions.map(a => a.email).filter(Boolean)));
+      const regsMap = new Map();
+      const resultsMap = new Map();
+      const schedulesMap = new Map();
+      const examsMap = new Map();
 
-      const regOr = [];
-      if (admissionUserIds.length) regOr.push({ userId: { in: admissionUserIds } });
-      if (admissionEmails.length) regOr.push({ userEmail: { in: admissionEmails } });
+      for (const admission of admissions) {
+        const admissionUser = admission.user;
+        for (const reg of admissionUser?.examRegistrations || []) {
+          if (!regsMap.has(reg.id)) {
+            regsMap.set(reg.id, {
+              id: reg.id,
+              scheduleId: reg.scheduleId,
+              userEmail: reg.userEmail,
+              userId: reg.userId,
+              status: reg.status,
+            });
+          }
 
-      const regs = regOr.length
-        ? await prisma.examRegistration.findMany({
-            where: { OR: regOr },
-            select: {
-              id: true,
-              scheduleId: true,
-              userEmail: true,
-              userId: true,
-              status: true,
-            },
-          })
-        : [];
+          if (reg.result && !resultsMap.has(reg.result.id)) {
+            resultsMap.set(reg.result.id, reg.result);
+          }
 
-      if (!regs.length) {
-        return {
-          admissions,
-          results: [],
-          exams: [],
-          schedules: [],
-          regs: [],
-          academicYears,
-          semesters,
-          meta,
-        };
+          if (reg.schedule && !schedulesMap.has(reg.schedule.id)) {
+            schedulesMap.set(reg.schedule.id, {
+              id: reg.schedule.id,
+              examId: reg.schedule.examId,
+              scheduledDate: reg.schedule.scheduledDate,
+              startTime: reg.schedule.startTime,
+              endTime: reg.schedule.endTime,
+              registrationOpenDate: reg.schedule.registrationOpenDate,
+              registrationCloseDate: reg.schedule.registrationCloseDate,
+              maxSlots: reg.schedule.maxSlots,
+              slotsTaken: reg.schedule.slotsTaken,
+            });
+          }
+
+          if (reg.schedule?.exam && !examsMap.has(reg.schedule.exam.id)) {
+            examsMap.set(reg.schedule.exam.id, reg.schedule.exam);
+          }
+        }
       }
 
-      const registrationIds = regs.map(r => r.id);
-      const scheduleIds = Array.from(new Set(regs.map(r => r.scheduleId)));
-
-      const [results, schedules] = await Promise.all([
-        prisma.examResult.findMany({
-          where: { registrationId: { in: registrationIds } },
-          select: {
-            id: true,
-            registrationId: true,
-            totalScore: true,
-            maxPossible: true,
-            percentage: true,
-            passed: true,
-            essayReviewed: true,
-            createdAt: true,
-          },
-        }),
-        prisma.examSchedule.findMany({
-          where: { id: { in: scheduleIds } },
-          select: {
-            id: true,
-            examId: true,
-            scheduledDate: true,
-            startTime: true,
-            endTime: true,
-            registrationOpenDate: true,
-            registrationCloseDate: true,
-            maxSlots: true,
-            slotsTaken: true,
-          },
-        }),
-      ]);
-
-      const examIds = Array.from(new Set(schedules.map(s => s.examId)));
-      const exams = examIds.length
-        ? await prisma.exam.findMany({
-            where: { id: { in: examIds }, deletedAt: null },
-            select: {
-              id: true,
-              title: true,
-              gradeLevel: true,
-            },
-          })
-        : [];
-
-      return { admissions, results, exams, schedules, regs, academicYears, semesters, meta };
+      return {
+        admissions: admissions.map(shapeAdmission),
+        results: [...resultsMap.values()],
+        exams: [...examsMap.values()],
+        schedules: [...schedulesMap.values()],
+        regs: [...regsMap.values()],
+        academicYears,
+        semesters,
+        meta,
+      };
     }, 120_000);
 
     res.json(summary);
