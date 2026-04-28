@@ -104,8 +104,7 @@ export default function EmployeeUsers() {
         // 404 = email not found = no duplicate
       }
     }
-    if (!editId && !form.password.trim()) e.password = 'Required for new users';
-    else if (form.password) {
+    if (form.password) {
       if (!isPasswordCompliant(form.password)) e.password = firstPasswordRequirementMessage(form.password);
     }
     setErrors(e);
@@ -114,16 +113,10 @@ export default function EmployeeUsers() {
 
   const handleBulkImportUsers = async (data: any[]) => {
     let successCount = 0;
-    let skippedCount = 0;
     let failedCount = 0;
     setSaving(true);
     try {
       for (const row of data) {
-        const password = typeof row.password === 'string' ? row.password.trim() : '';
-        if (!password) {
-          skippedCount++;
-          continue;
-        }
         try {
           await addUser({
             firstName: row.firstName || '',
@@ -132,7 +125,6 @@ export default function EmployeeUsers() {
             email: row.email,
             role: row.role || 'applicant',
             status: row.status || 'Active',
-            password,
           });
           successCount++;
         } catch (e) {
@@ -140,9 +132,9 @@ export default function EmployeeUsers() {
         }
       }
       if (successCount > 0) {
-        showToast(`Imported ${successCount} user(s). Skipped ${skippedCount}, failed ${failedCount}.`, 'success');
+        showToast(`Imported ${successCount} user(s). Failed ${failedCount}.`, 'success');
       } else {
-        showToast('No users were imported. Ensure each row includes a valid password and email.', 'warning');
+        showToast('No users were imported. Ensure each row includes valid names and email.', 'warning');
       }
       refetch();
       refetchStats();
@@ -164,11 +156,15 @@ export default function EmployeeUsers() {
           : 'User updated!',
           'success');
       } else {
-        const result = await addUser({ ...form });
-        showToast(result.verificationEmailSent
-          ? (result.message || 'User added and verification email sent.')
-          : 'User added!',
-          'success');
+        const result = await addUser({
+          firstName: form.firstName,
+          middleName: form.middleName,
+          lastName: form.lastName,
+          email: form.email,
+          role: form.role,
+          status: form.status,
+        });
+        showToast(result.message || 'User added!', 'success');
       }
       refetch();
       refetchStats();
@@ -282,11 +278,11 @@ export default function EmployeeUsers() {
               isOpen={showBulkImport}
               onClose={() => setShowBulkImport(false)}
               onImport={handleBulkImportUsers}
-              templateHeaders={['firstName', 'middleName', 'lastName', 'email', 'role', 'status', 'password']}
+              templateHeaders={['firstName', 'middleName', 'lastName', 'email', 'role', 'status']}
               templateRows={[
-                { firstName: 'Ana', middleName: 'Maria', lastName: 'Santos', email: 'ana.santos@goldenkey.edu', role: 'teacher', status: 'Active', password: 'Teacher123!' },
-                { firstName: 'Juan', middleName: 'Carlos', lastName: 'Reyes', email: 'juan.reyes@goldenkey.edu', role: 'registrar', status: 'Active', password: 'Registrar123!' },
-                { firstName: 'Maria', middleName: 'Luz', lastName: 'Cruz', email: 'maria.cruz@goldenkey.edu', role: 'administrator', status: 'Active', password: 'Admin123!' },
+                { firstName: 'Ana', middleName: 'Maria', lastName: 'Santos', email: 'ana.santos@goldenkey.edu', role: 'teacher', status: 'Active' },
+                { firstName: 'Juan', middleName: 'Carlos', lastName: 'Reyes', email: 'juan.reyes@goldenkey.edu', role: 'registrar', status: 'Active' },
+                { firstName: 'Maria', middleName: 'Luz', lastName: 'Cruz', email: 'maria.cruz@goldenkey.edu', role: 'administrator', status: 'Active' },
               ]}
             />
             <ActionButton variant="secondary" onClick={() => setShowBulkImport(true)}>
@@ -446,21 +442,28 @@ export default function EmployeeUsers() {
               </select>
             </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{editId ? 'New Password (leave blank to keep)' : 'Password'}</label>
-            <input type="password" value={form.password} onChange={e => set('password', e.target.value)} aria-describedby={errors.password ? 'password-error' : undefined} className={`w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-forest-500/20 ${errors.password ? 'border-red-400' : 'border-gray-200'}`} />
-            {errors.password && <p id="password-error" className="text-red-500 text-xs mt-1" role="alert">{errors.password}</p>}
-            {form.password && (
-              <div className="mt-2 rounded-lg border border-gray-200 bg-gray-50 p-2.5 space-y-1.5">
-                {passwordChecks.map(rule => (
-                  <p key={rule.key} className={`text-xs flex items-center gap-1.5 ${rule.met ? 'text-emerald-700' : 'text-gray-500'}`}>
-                    <Icon name={rule.met ? 'checkCircle' : 'xCircle'} className="w-3.5 h-3.5" />
-                    {rule.label}
-                  </p>
-                ))}
-              </div>
-            )}
-          </div>
+          {!editId && (
+            <div className="rounded-lg border border-forest-100 bg-forest-50 px-4 py-3 text-xs text-forest-700">
+              A random temporary password will be generated by the system and sent to this email address.
+            </div>
+          )}
+          {editId && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">New Password (leave blank to keep)</label>
+              <input type="password" value={form.password} onChange={e => set('password', e.target.value)} aria-describedby={errors.password ? 'password-error' : undefined} className={`w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-forest-500/20 ${errors.password ? 'border-red-400' : 'border-gray-200'}`} />
+              {errors.password && <p id="password-error" className="text-red-500 text-xs mt-1" role="alert">{errors.password}</p>}
+              {form.password && (
+                <div className="mt-2 rounded-lg border border-gray-200 bg-gray-50 p-2.5 space-y-1.5">
+                  {passwordChecks.map(rule => (
+                    <p key={rule.key} className={`text-xs flex items-center gap-1.5 ${rule.met ? 'text-emerald-700' : 'text-gray-500'}`}>
+                      <Icon name={rule.met ? 'checkCircle' : 'xCircle'} className="w-3.5 h-3.5" />
+                      {rule.label}
+                    </p>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           <div className="flex justify-end gap-3 pt-2">
             <ActionButton variant="secondary" onClick={() => setShowModal(false)}>Cancel</ActionButton>
             <ActionButton onClick={handleSave} loading={saving}>{editId ? 'Save Changes' : 'Add User'}</ActionButton>
