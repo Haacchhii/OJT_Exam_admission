@@ -18,14 +18,14 @@ const ADMISSIONS_LIST_DATA_TTL_MS = 30_000;
 const ADMISSIONS_LIST_COUNT_TTL_MS = 45_000;
 const ADMISSIONS_STATS_TTL_MS = 60_000;
 
-function invalidateAdmissionCaches(userIds = []) {
-  invalidatePrefix('admStats:');
-  invalidatePrefix('admissions:list:');
-  invalidatePrefix('admissions:ops:');
-  invalidatePrefix('dashboardSummary:');
-  invalidatePrefix('reportsSummary:');
+async function invalidateAdmissionCaches(userIds = []) {
+  await invalidatePrefix('admStats:');
+  await invalidatePrefix('admissions:list:');
+  await invalidatePrefix('admissions:ops:');
+  await invalidatePrefix('dashboardSummary:');
+  await invalidatePrefix('reportsSummary:');
   for (const userId of userIds) {
-    if (userId) invalidatePrefix(`adm:mine:${userId}`);
+    if (userId) await invalidatePrefix(`adm:mine:${userId}`);
   }
 }
 
@@ -933,7 +933,7 @@ export async function createAdmission(req, res, next) {
 
     logAudit({ userId: req.user.id, action: 'admission.create', entity: 'admission', entityId: admission.id, details: { trackingId, gradeLevel, applicantType: applicantType || 'New' }, ipAddress: req.ip });
 
-    invalidateAdmissionCaches([req.user.id]);
+    await invalidateAdmissionCaches([req.user.id]);
 
     // Fire-and-forget confirmation email to the applicant
     sendAdmissionSubmittedEmail({ to: email, firstName, trackingId, gradeLevel });
@@ -1028,7 +1028,7 @@ export async function updateStatus(req, res, next) {
 
     logAudit({ userId: req.user.id, action: 'admission.status_update', entity: 'admission', entityId: id, details: { from: admission.status, to: status, notes: notes || null }, ipAddress: req.ip });
 
-    invalidateAdmissionCaches([admission.userId]);
+    await invalidateAdmissionCaches([admission.userId]);
 
     // Fire-and-forget status update email to the applicant
     sendAdmissionStatusEmail({
@@ -1079,7 +1079,7 @@ export async function bulkUpdateStatus(req, res, next) {
 
     logAudit({ userId: req.user.id, action: 'admission.bulk_status_update', entity: 'admission', entityId: null, details: { ids, to: status, count: result.count }, ipAddress: req.ip });
 
-    invalidateAdmissionCaches(admissions.map((adm) => adm.userId));
+    await invalidateAdmissionCaches(admissions.map((adm) => adm.userId));
 
     try {
       const io = getIo();
@@ -1184,7 +1184,7 @@ export async function bulkDeleteAdmissions(req, res, next) {
 
     logAudit({ userId: req.user.id, action: 'admission.bulkDelete', entity: 'admission', details: { count: ids.length, ids }, ipAddress: req.ip });
 
-    invalidateAdmissionCaches();
+    await invalidateAdmissionCaches();
 
     res.json({ deleted: ids.length });
   } catch (err) { next(err); }

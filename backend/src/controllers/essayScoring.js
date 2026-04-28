@@ -164,11 +164,11 @@ export async function scoreEssay(req, res, next) {
         });
 
         if (student?.id) {
-          invalidatePrefix(`results:mine:${student.id}:`);
+          await invalidatePrefix(`results:mine:${student.id}:`);
         }
-        invalidatePrefix(`results:answers:${essay.registrationId}`);
-        invalidatePrefix('readiness:list:');
-        invalidatePrefix('resultsEmployeeSummary:');
+        await invalidatePrefix(`results:answers:${essay.registrationId}`);
+        await invalidatePrefix('readiness:list:');
+        await invalidatePrefix('resultsEmployeeSummary:');
 
         if (student) {
           sendExamResultEmail({

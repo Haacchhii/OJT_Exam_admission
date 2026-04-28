@@ -35,18 +35,18 @@ function registrationBelongsToUser(registration, user) {
   return normalizeEmail(registration.userEmail) === normalizeEmail(user.email);
 }
 
-function invalidateMyRegistrationCaches(userId) {
+async function invalidateMyRegistrationCaches(userId) {
   if (!userId) return;
-  invalidatePrefix(`regs:mine-summary:${userId}:`);
-  invalidatePrefix(`regs:mine:${userId}:`);
+  await invalidatePrefix(`regs:mine-summary:${userId}:`);
+  await invalidatePrefix(`regs:mine:${userId}:`);
 }
 
-function invalidateEmployeeRegistrationCaches() {
-  invalidatePrefix('regs:list:');
+async function invalidateEmployeeRegistrationCaches() {
+  await invalidatePrefix('regs:list:');
   // NOTE: readiness:list: invalidation removed to prevent cache thrashing.
   // Readiness is an aggregated view; cache TTL increased to 120s.
   // Invalidate only on terminal events (exam done/scored) if real-time updates are needed.
-  invalidatePrefix('resultsEmployeeSummary:');
+  await invalidatePrefix('resultsEmployeeSummary:');
 }
 
 function getTodayLocalIso() {
@@ -370,9 +370,9 @@ export async function createRegistration(req, res, next) {
     });
 
     res.status(201).json(registration);
-    invalidateMyRegistrationCaches(targetUserId);
-    invalidateEmployeeRegistrationCaches();
-    invalidatePrefix('schedules:available:');
+    await invalidateMyRegistrationCaches(targetUserId);
+    await invalidateEmployeeRegistrationCaches();
+    await invalidatePrefix('schedules:available:');
 
     // Fire-and-forget booking confirmation email
     prisma.examSchedule.findUnique({
@@ -475,8 +475,8 @@ export async function startExam(req, res, next) {
       data: { status: 'started', startedAt: new Date() },
     });
 
-    invalidateMyRegistrationCaches(req.user.id);
-    invalidateEmployeeRegistrationCaches();
+    await invalidateMyRegistrationCaches(req.user.id);
+    await invalidateEmployeeRegistrationCaches();
     res.json(updated);
   } catch (err) { next(err); }
 }
@@ -529,9 +529,9 @@ export async function cancelRegistration(req, res, next) {
       });
     });
 
-    invalidateMyRegistrationCaches(req.user.id);
-    invalidateEmployeeRegistrationCaches();
-    invalidatePrefix('schedules:available:');
+    await invalidateMyRegistrationCaches(req.user.id);
+    await invalidateEmployeeRegistrationCaches();
+    await invalidatePrefix('schedules:available:');
     res.status(204).end();
   } catch (err) { next(err); }
 }

@@ -1,25 +1,18 @@
 import env from '../config/env.js';
 import { CACHE_DEFAULT_TTL_MS } from './constants.js';
 
-/**
- * Simple in-memory cache with TTL.
- * Used for rarely-changing data like academic years and semesters.
- */
-
 const store = new Map();
 const inflight = new Map();
 const CACHE_KEY_PREFIX = 'gk:cache:';
 
 let redisClient = null;
 let redisInitPromise = null;
-let redisPermanentlyDisabled = false;
 
 function cacheKey(key) {
   return `${CACHE_KEY_PREFIX}${key}`;
 }
 
 async function initRedisClient() {
-  if (redisPermanentlyDisabled) return null;
   if (!env.ENABLE_REDIS_CACHE || !env.REDIS_URL) return null;
   if (redisClient?.isOpen) return redisClient;
   if (redisInitPromise) return redisInitPromise;
@@ -31,18 +24,18 @@ async function initRedisClient() {
         url: env.REDIS_URL,
         socket: { connectTimeout: env.REDIS_CONNECT_TIMEOUT_MS },
       });
-
       client.on('error', (err) => {
-        console.warn(`[cache] Redis error; using in-memory fallback: ${err?.message || err}`);
+        console.warn(`[cache] Redis error: ${err?.message || err}`);
+        // Reset so next call can retry — don't permanently disable
+        redisClient = null;
       });
-
       await client.connect();
       redisClient = client;
-      console.log('[cache] Redis cache enabled');
+      console.log('[cache] Redis connected');
       return redisClient;
     } catch (err) {
-      redisPermanentlyDisabled = true;
-      console.warn(`[cache] Redis init failed; using in-memory fallback: ${err?.message || err}`);
+      console.warn(`[cache] Redis init failed, using in-memory: ${err?.message || err}`);
+      redisClient = null;
       return null;
     } finally {
       redisInitPromise = null;
@@ -57,11 +50,8 @@ async function readRedis(key) {
   if (!client) return null;
   try {
     const raw = await client.get(cacheKey(key));
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
 }
 
 async function writeRedis(key, value, ttlMs) {
@@ -69,19 +59,13 @@ async function writeRedis(key, value, ttlMs) {
   if (!client) return;
   try {
     await client.set(cacheKey(key), JSON.stringify(value), { PX: ttlMs });
-  } catch {
-    // Ignore Redis write errors and keep serving from in-memory fallback.
-  }
+  } catch { /* ignore write errors */ }
 }
 
 async function deleteRedisKey(key) {
   const client = await initRedisClient();
   if (!client) return;
-  try {
-    await client.del(cacheKey(key));
-  } catch {
-    // Best effort invalidation.
-  }
+  try { await client.del(cacheKey(key)); } catch { /* best effort */ }
 }
 
 async function deleteRedisByPrefix(prefix) {
@@ -89,51 +73,24 @@ async function deleteRedisByPrefix(prefix) {
   if (!client) return;
   try {
     const pattern = cacheKey(`${prefix}*`);
+    const keys = [];
     for await (const key of client.scanIterator({ MATCH: pattern, COUNT: 100 })) {
-      await client.del(key);
+      keys.push(key);
     }
-  } catch {
-    // Best effort invalidation.
-  }
+    if (keys.length) await client.del(keys); // batch delete, one round-trip
+  } catch { /* best effort */ }
 }
 
-async function clearRedisNamespace() {
-  const client = await initRedisClient();
-  if (!client) return;
-  try {
-    const pattern = cacheKey('*');
-    for await (const key of client.scanIterator({ MATCH: pattern, COUNT: 100 })) {
-      await client.del(key);
-    }
-  } catch {
-    // Best effort clear.
-  }
-}
-
-/**
- * Get a cached value, or compute & cache it if missing/expired.
- * @param {string} key Unique cache key
- * @param {Function} fn Async function that produces the value
- * @param {number} ttlMs Time-to-live in milliseconds
- */
 export async function cached(key, fn, ttlMs = CACHE_DEFAULT_TTL_MS) {
   const redisValue = await readRedis(key);
-  if (redisValue !== null) {
-    return redisValue;
-  }
+  if (redisValue !== null) return redisValue;
 
   const entry = store.get(key);
-  if (entry) {
-    if (Date.now() - entry.ts < ttlMs) {
-      return entry.value;
-    }
-    store.delete(key);
-  }
+  if (entry && Date.now() - entry.ts < ttlMs) return entry.value;
+  store.delete(key);
 
   const pending = inflight.get(key);
-  if (pending) {
-    return pending;
-  }
+  if (pending) return pending;
 
   const pendingCompute = (async () => {
     const value = await fn();
@@ -150,27 +107,23 @@ export async function cached(key, fn, ttlMs = CACHE_DEFAULT_TTL_MS) {
   }
 }
 
-/** Invalidate a specific cache key. */
-export function invalidate(key) {
+export async function invalidate(key) {
   store.delete(key);
   inflight.delete(key);
-  void deleteRedisKey(key);
+  await deleteRedisKey(key);
 }
 
-/** Invalidate all keys matching a prefix. */
-export function invalidatePrefix(prefix) {
+export async function invalidatePrefix(prefix) {
   for (const key of store.keys()) {
     if (key.startsWith(prefix)) store.delete(key);
   }
   for (const key of inflight.keys()) {
     if (key.startsWith(prefix)) inflight.delete(key);
   }
-  void deleteRedisByPrefix(prefix);
+  await deleteRedisByPrefix(prefix); // awaited now
 }
 
-/** Clear the entire cache. */
-export function clearCache() {
+export async function clearCache() {
   store.clear();
   inflight.clear();
-  void clearRedisNamespace();
 }

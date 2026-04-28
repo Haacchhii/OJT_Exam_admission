@@ -210,13 +210,13 @@ export async function submitExam(req, res, next) {
       }),
     ]);
 
-    invalidatePrefix(`regs:mine-summary:${req.user.id}:`);
-    invalidatePrefix(`regs:mine:${req.user.id}:`);
-    invalidatePrefix(`results:mine:${req.user.id}:`);
-    invalidatePrefix(`results:answers:${registrationId}`);
-    invalidatePrefix('regs:list:');
-    invalidatePrefix('readiness:list:');
-    invalidatePrefix('resultsEmployeeSummary:');
+    await invalidatePrefix(`regs:mine-summary:${req.user.id}:`);
+    await invalidatePrefix(`regs:mine:${req.user.id}:`);
+    await invalidatePrefix(`results:mine:${req.user.id}:`);
+    await invalidatePrefix(`results:answers:${registrationId}`);
+    await invalidatePrefix('regs:list:');
+    await invalidatePrefix('readiness:list:');
+    await invalidatePrefix('resultsEmployeeSummary:');
 
     res.json({ totalScore, maxPossible, percentage, passed, essayReviewed: !hasEssays });
 

@@ -215,10 +215,10 @@ async function findOwnedRegistrationForExamStatus({ user, examId, status, select
   });
 }
 
-function invalidateExamCaches() {
-  invalidatePrefix('exams:list:');
-  invalidatePrefix('exams:detail:');
-  invalidatePrefix('schedules:available:');
+async function invalidateExamCaches() {
+  await invalidatePrefix('exams:list:');
+  await invalidatePrefix('exams:detail:');
+  await invalidatePrefix('schedules:available:');
 }
 
 async function getExamDetailCached(examId) {
@@ -501,7 +501,7 @@ export async function createExam(req, res, next) {
       return tx.exam.findUnique({ where: { id: createdExam.id }, include: examDetailInclude });
     }, { timeout: 20000 });
 
-    invalidateExamCaches();
+    await invalidateExamCaches();
 
     res.status(201).json(shapeExam(exam));
 
@@ -540,7 +540,7 @@ export async function updateExam(req, res, next) {
         await persistQuestionsAndChoices(tx, id, questions);
         return tx.exam.findUnique({ where: { id }, include: examDetailInclude });
       }, { timeout: 20000 });  // Increased from 10s → 20s for Vercel cold starts
-      invalidateExamCaches();
+      await invalidateExamCaches();
       return res.json(shapeExam(result));
     }
 
@@ -550,7 +550,7 @@ export async function updateExam(req, res, next) {
       include: examDetailInclude,
     });
 
-    invalidateExamCaches();
+    await invalidateExamCaches();
 
     res.json(shapeExam(exam));
   } catch (err) { next(err); }
@@ -562,7 +562,7 @@ export async function deleteExam(req, res, next) {
     const id = Number(req.params.id);
     await prisma.exam.update({ where: { id }, data: { deletedAt: new Date() } });
 
-    invalidateExamCaches();
+    await invalidateExamCaches();
 
     logAudit({ userId: req.user.id, action: 'exam.delete', entity: 'exam', entityId: id, ipAddress: req.ip });
 
@@ -577,7 +577,7 @@ export async function bulkDeleteExams(req, res, next) {
 
     await prisma.exam.updateMany({ where: { id: { in: ids } }, data: { deletedAt: new Date() } });
 
-    invalidateExamCaches();
+    await invalidateExamCaches();
 
     logAudit({ userId: req.user.id, action: 'exam.bulkDelete', entity: 'exam', details: { count: ids.length, ids }, ipAddress: req.ip });
 
@@ -608,7 +608,7 @@ export async function cloneExam(req, res, next) {
       return tx.exam.findUnique({ where: { id: cloneExam.id }, include: examDetailInclude });
     }, { timeout: 20000 });
 
-    invalidateExamCaches();
+    await invalidateExamCaches();
 
     logAudit({ userId: req.user.id, action: 'exam.clone', entity: 'exam', entityId: clone.id, details: { sourceId, title: clone.title }, ipAddress: req.ip });
 

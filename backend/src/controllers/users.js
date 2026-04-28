@@ -6,7 +6,7 @@ import { paginate, paginatedResponse } from '../utils/pagination.js';
 import { logAudit } from '../utils/auditLog.js';
 import { ROLES, BCRYPT_ROUNDS, EMAIL_VERIFY_EXPIRY_MS } from '../utils/constants.js';
 import { cached, invalidatePrefix } from '../utils/cache.js';
-import { sendTemporaryPasswordEmail, sendVerificationEmail } from '../utils/email.js';
+import { sendVerificationEmail } from '../utils/email.js';
 
 const userListSelect = {
   id: true,
@@ -41,11 +41,11 @@ const userDetailSelect = {
   deletedAt: true,
 };
 
-function invalidateUserCaches() {
-  invalidatePrefix('users:list:');
-  invalidatePrefix('users:stats');
-  invalidatePrefix('users:id:');
-  invalidatePrefix('users:email:');
+async function invalidateUserCaches() {
+  await invalidatePrefix('users:list:');
+  await invalidatePrefix('users:stats');
+  await invalidatePrefix('users:id:');
+  await invalidatePrefix('users:email:');
 }
 
 function safifyUser(user) {
@@ -74,33 +74,6 @@ async function issueVerificationEmail(user) {
     emailVerificationRequired: true,
     verificationEmailSent: verificationDispatch.ok,
   };
-}
-
-function generateTemporaryPassword(length = 12) {
-  const groups = {
-    upper: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
-    lower: 'abcdefghijklmnopqrstuvwxyz',
-    digit: '0123456789',
-    special: '!@#$%^&*()-_=+[]{}:,.?',
-  };
-  const allCharacters = Object.values(groups).join('');
-  const passwordCharacters = [
-    groups.upper[crypto.randomInt(groups.upper.length)],
-    groups.lower[crypto.randomInt(groups.lower.length)],
-    groups.digit[crypto.randomInt(groups.digit.length)],
-    groups.special[crypto.randomInt(groups.special.length)],
-  ];
-
-  while (passwordCharacters.length < length) {
-    passwordCharacters.push(allCharacters[crypto.randomInt(allCharacters.length)]);
-  }
-
-  for (let index = passwordCharacters.length - 1; index > 0; index -= 1) {
-    const swapIndex = crypto.randomInt(index + 1);
-    [passwordCharacters[index], passwordCharacters[swapIndex]] = [passwordCharacters[swapIndex], passwordCharacters[index]];
-  }
-
-  return passwordCharacters.join('');
 }
 
 // GET /api/users?search=&role=&status=&page=&limit=
@@ -224,9 +197,9 @@ export async function getUserByEmail(req, res, next) {
 // POST /api/users
 export async function createUser(req, res, next) {
   try {
-    const { firstName, middleName, lastName, email, role, status } = req.body;
-    if (!firstName || !middleName || !lastName || !email) {
-      return res.status(400).json({ error: 'Please provide first name, middle name, last name, and email.', code: 'VALIDATION_ERROR' });
+    const { firstName, middleName, lastName, email, role, status, password } = req.body;
+    if (!firstName || !middleName || !lastName || !email || !password) {
+      return res.status(400).json({ error: 'Please provide first name, middle name, last name, email, and password.', code: 'VALIDATION_ERROR' });
     }
 
     const normalizedEmail = String(email).trim();
@@ -239,8 +212,7 @@ export async function createUser(req, res, next) {
       return res.status(409).json({ error: 'Email already in use', code: 'CONFLICT' });
     }
 
-    const tempPassword = generateTemporaryPassword();
-    const passwordHash = await bcrypt.hash(tempPassword, BCRYPT_ROUNDS);
+    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
     const user = existingByEmail?.deletedAt
       ? await prisma.user.update({
           where: { id: existingByEmail.id },
@@ -260,28 +232,20 @@ export async function createUser(req, res, next) {
         });
 
     const verification = await issueVerificationEmail(user);
-    const temporaryPasswordEmail = await sendTemporaryPasswordEmail({
-      to: user.email,
-      firstName: user.firstName,
-      tempPassword,
-    });
     const responseUser = verification.emailVerificationRequired
       ? await prisma.user.findUnique({ where: { id: user.id }, select: userDetailSelect })
       : user;
 
-    invalidateUserCaches();
-
-    const messageParts = [existingByEmail?.deletedAt ? 'User account restored' : 'User created'];
-    messageParts.push(temporaryPasswordEmail.ok ? 'temporary password emailed' : 'the temporary password email could not be sent right now');
-    if (verification.emailVerificationRequired) {
-      messageParts.push(verification.verificationEmailSent ? 'verification email sent' : 'the verification email could not be sent right now');
-    }
+    await invalidateUserCaches();
 
     res.status(201).json({
       ...safifyUser(responseUser),
       ...verification,
-      temporaryPasswordEmailSent: temporaryPasswordEmail.ok,
-      message: `${messageParts[0]}. ${messageParts.slice(1).map(part => part.charAt(0).toUpperCase() + part.slice(1)).join('. ')}.`,
+      message: verification.emailVerificationRequired
+        ? (verification.verificationEmailSent
+          ? (existingByEmail?.deletedAt ? 'User account restored and verification email sent.' : 'User created and verification email sent.')
+          : (existingByEmail?.deletedAt ? 'User account restored, but the verification email could not be sent right now.' : 'User created, but the verification email could not be sent right now.'))
+        : undefined,
     });
 
     logAudit({ userId: req.user.id, action: existingByEmail?.deletedAt ? 'user.restore' : 'user.create', entity: 'user', entityId: user.id, details: { email: normalizedEmail, role: role || ROLES.APPLICANT }, ipAddress: req.ip });
@@ -333,7 +297,7 @@ export async function updateUser(req, res, next) {
           verification = { emailVerificationRequired: true, verificationEmailSent: dispatch.ok };
         }
 
-        invalidateUserCaches();
+        await invalidateUserCaches();
         return res.json({
           ...safifyUser(user),
           ...verification,
@@ -351,7 +315,7 @@ export async function updateUser(req, res, next) {
       data,
     });
 
-    invalidateUserCaches();
+    await invalidateUserCaches();
 
     logAudit({ userId: req.user.id, action: 'user.update', entity: 'user', entityId: id, details: { fields: Object.keys(data) }, ipAddress: req.ip });
 
@@ -371,7 +335,7 @@ export async function deleteUser(req, res, next) {
 
     await prisma.user.update({ where: { id }, data: { deletedAt: new Date() } });
 
-    invalidateUserCaches();
+    await invalidateUserCaches();
 
     logAudit({ userId: req.user.id, action: 'user.delete', entity: 'user', entityId: id, details: { email: user.email, role: user.role }, ipAddress: req.ip });
 
@@ -394,7 +358,7 @@ export async function bulkDeleteUsers(req, res, next) {
 
     await prisma.user.updateMany({ where: { id: { in: foundIds } }, data: { deletedAt: new Date() } });
 
-    invalidateUserCaches();
+    await invalidateUserCaches();
 
     logAudit({ userId: req.user.id, action: 'user.bulkDelete', entity: 'user', details: { count: users.length, ids: foundIds }, ipAddress: req.ip });
 

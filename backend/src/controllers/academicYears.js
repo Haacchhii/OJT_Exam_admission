@@ -98,7 +98,7 @@ export async function createAcademicYear(req, res, next) {
         changedCount: createSync.changedCount,
       });
     }
-    invalidatePrefix('ay:');
+    await invalidatePrefix('ay:');
     res.status(201).json(created);
   } catch (err) {
     if (err.code === 'P2002') return res.status(409).json({ error: 'A school year with that name already exists', code: 'CONFLICT' });
@@ -144,7 +144,7 @@ export async function updateAcademicYear(req, res, next) {
         changedCount: updateSync.changedCount,
       });
     }
-    invalidatePrefix('ay:');
+    await invalidatePrefix('ay:');
     res.json(updated);
   } catch (err) {
     if (err.code === 'P2025') return res.status(404).json({ error: 'Academic year not found', code: 'NOT_FOUND' });
@@ -166,7 +166,7 @@ export async function deleteAcademicYear(req, res, next) {
         changedCount: deleteSync.changedCount,
       });
     }
-    invalidatePrefix('ay:');
+    await invalidatePrefix('ay:');
     res.json({ message: 'Academic year deleted' });
   } catch (err) {
     if (err.code === 'P2025') return res.status(404).json({ error: 'Academic year not found', code: 'NOT_FOUND' });
@@ -232,7 +232,7 @@ export async function createSemester(req, res, next) {
         changedCount: createSemesterSync.changedCount,
       });
     }
-    invalidatePrefix('ay:');
+    await invalidatePrefix('ay:');
     res.status(201).json(created);
   } catch (err) {
     if (err.code === 'P2002') return res.status(409).json({ error: 'A semester with that name already exists for this school year', code: 'CONFLICT' });
@@ -277,7 +277,7 @@ export async function updateSemester(req, res, next) {
         changedCount: updateSemesterSync.changedCount,
       });
     }
-    invalidatePrefix('ay:');
+    await invalidatePrefix('ay:');
     res.json(updated);
   } catch (err) {
     if (err.code === 'P2025') return res.status(404).json({ error: 'Semester not found', code: 'NOT_FOUND' });
@@ -299,7 +299,7 @@ export async function deleteSemester(req, res, next) {
         changedCount: deleteSemesterSync.changedCount,
       });
     }
-    invalidatePrefix('ay:');
+    await invalidatePrefix('ay:');
     res.json({ message: 'Semester deleted' });
   } catch (err) {
     if (err.code === 'P2025') return res.status(404).json({ error: 'Semester not found', code: 'NOT_FOUND' });

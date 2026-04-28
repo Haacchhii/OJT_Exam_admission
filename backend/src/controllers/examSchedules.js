@@ -382,8 +382,8 @@ export async function createSchedule(req, res, next) {
       },
     });
 
-    invalidatePrefix('schedules:available:');
-    invalidatePrefix('schedules:list:');
+    await invalidatePrefix('schedules:available:');
+    await invalidatePrefix('schedules:list:');
 
     res.status(201).json(attachExamWindowStatus(schedule));
   } catch (err) { next(err); }
@@ -470,8 +470,8 @@ export async function updateSchedule(req, res, next) {
       data,
     });
 
-    invalidatePrefix('schedules:available:');
-    invalidatePrefix('schedules:list:');
+    await invalidatePrefix('schedules:available:');
+    await invalidatePrefix('schedules:list:');
 
     res.json(attachExamWindowStatus(schedule));
   } catch (err) { next(err); }
@@ -484,8 +484,8 @@ export async function deleteSchedule(req, res, next) {
     // Cascade: delete registrations first (which cascade to results/answers)
     await prisma.examRegistration.deleteMany({ where: { scheduleId: id } });
     await prisma.examSchedule.delete({ where: { id } });
-    invalidatePrefix('schedules:available:');
-    invalidatePrefix('schedules:list:');
+    await invalidatePrefix('schedules:available:');
+    await invalidatePrefix('schedules:list:');
     res.status(204).end();
   } catch (err) { next(err); }
 }
