@@ -37,7 +37,7 @@ export async function authenticate(req, res, next) {
             ? { include: { applicantProfile: true, staffProfile: true } }
             : { select: { id: true, role: true, status: true, emailVerified: true, deletedAt: true } }),
         });
-      }, env.AUTH_USER_CACHE_TTL_MS);
+      }, 300_000);
     }
 
     if (user?.role === ROLES.APPLICANT) {
