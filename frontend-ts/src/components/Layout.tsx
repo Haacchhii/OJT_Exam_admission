@@ -52,7 +52,6 @@ export function StudentLayout() {
   return (
     <KeyboardShortcutsProvider navigate={navigate} role={user.role}>
       <div className="min-h-screen gk-mesh-bg">
-        <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[100] focus:bg-forest-500 focus:text-white focus:px-4 focus:py-2 focus:rounded-lg focus:shadow-lg">Skip to main content</a>
         <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} role="student" collapsed={collapsed} onToggleCollapse={() => setCollapsed(c => !c)} />
         <div className={`transition-all duration-300 ${collapsed ? 'lg:ml-[72px]' : 'lg:ml-[270px]'}`}>
           <Topbar title="Student Portal" onMenuToggle={() => setSidebarOpen(o => !o)} userId={user.id} user={user} />
@@ -95,7 +94,6 @@ export function EmployeeLayout() {
   return (
     <KeyboardShortcutsProvider navigate={navigate} role={user.role}>
       <div className="min-h-screen gk-mesh-bg">
-        <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[100] focus:bg-forest-500 focus:text-white focus:px-4 focus:py-2 focus:rounded-lg focus:shadow-lg">Skip to main content</a>
         <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} role="employee" collapsed={collapsed} onToggleCollapse={() => setCollapsed(c => !c)} />
         <div className={`transition-all duration-300 ${collapsed ? 'lg:ml-[72px]' : 'lg:ml-[270px]'}`}>
           <Topbar title={portalTitle} onMenuToggle={() => setSidebarOpen(o => !o)} userId={user.id} user={user} />
