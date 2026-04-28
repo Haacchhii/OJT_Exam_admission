@@ -1,4 +1,5 @@
 ﻿import { useState } from 'react';
+import Papa from 'papaparse';
 import { useAsync } from '../../hooks/useAsync';
 import { getUsersPage, getUserStats, addUser, updateUser, deleteUser, getUserByEmail, bulkDeleteUsers, type UserStats } from '../../api/users';
 import { useAuth } from '../../context/AuthContext';
@@ -10,6 +11,8 @@ import { useConfirm } from '../../components/ConfirmDialog';
 import BulkActionBar from '../../components/BulkActionBar';
 import { useSelection } from '../../hooks/useSelection';
 import { CSVUploader } from '../../components/CSVUploader';
+import { UserImportPreviewModal, type ValidatedUserRow } from './UserImportPreviewModal';
+import { validateUserBatch } from './userImportValidation';
 import { getPasswordRequirementChecks, isPasswordCompliant } from '../../utils/passwordStrength';
 import { USER_ROLE_OPTIONS, ALL_GRADE_LEVELS } from '../../utils/constants';
 import { exportToCSV, formatPersonName } from '../../utils/helpers';
@@ -46,6 +49,9 @@ export default function EmployeeUsers() {
   const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewFileName, setPreviewFileName] = useState('');
+  const [validatedRows, setValidatedRows] = useState<ValidatedUserRow[]>([]);
   const [editId, setEditId] = useState<number | null>(null);
   const [form, setForm] = useState<UserForm>({ ...emptyForm });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -104,42 +110,72 @@ export default function EmployeeUsers() {
         // 404 = email not found = no duplicate
       }
     }
-    if (form.password) {
+    if (!editId && !form.password.trim()) e.password = 'Required for new users';
+    else if (form.password) {
       if (!isPasswordCompliant(form.password)) e.password = firstPasswordRequirementMessage(form.password);
     }
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
-  const handleBulkImportUsers = async (data: any[]) => {
+  const handleBulkImportUsersWithPreview = async (data: any[]) => {
+    if (data.length === 0) {
+      showToast('No data to import.', 'error');
+      return;
+    }
+
+    // Parse and validate all rows
+    const validated = validateUserBatch(data);
+    setValidatedRows(validated);
+    setPreviewFileName(`users_import_${new Date().toLocaleDateString()}.csv`);
+    setShowBulkImport(false);
+    setShowPreview(true);
+  };
+
+  const confirmUserImport = async () => {
+    const validRows = validatedRows.filter(r => r.isValid);
+    if (validRows.length === 0) {
+      showToast('No valid users to import.', 'error');
+      return;
+    }
+
     let successCount = 0;
     let failedCount = 0;
     setSaving(true);
+
     try {
-      for (const row of data) {
+      for (const validRow of validRows) {
         try {
           await addUser({
-            firstName: row.firstName || '',
-            middleName: row.middleName || '',
-            lastName: row.lastName || '',
-            email: row.email,
-            role: row.role || 'applicant',
-            status: row.status || 'Active',
+            firstName: validRow.data.firstName,
+            middleName: validRow.data.middleName,
+            lastName: validRow.data.lastName,
+            email: validRow.data.email,
+            role: validRow.data.role,
+            status: validRow.data.status,
+            password: validRow.data.password,
           });
           successCount++;
         } catch (e) {
           failedCount++;
         }
       }
+
       if (successCount > 0) {
-        showToast(`Imported ${successCount} user(s). Failed ${failedCount}.`, 'success');
+        showToast(
+          `Successfully imported ${successCount} user(s).${failedCount ? ` ${failedCount} failed.` : ''}`,
+          failedCount ? 'info' : 'success'
+        );
+        refetch();
+        refetchStats();
       } else {
-        showToast('No users were imported. Ensure each row includes valid names and email.', 'warning');
+        showToast('Import failed. No users were created.', 'error');
       }
-      refetch();
-      refetchStats();
     } finally {
       setSaving(false);
+      setShowPreview(false);
+      setValidatedRows([]);
+      setPreviewFileName('');
     }
   };
 
@@ -156,15 +192,11 @@ export default function EmployeeUsers() {
           : 'User updated!',
           'success');
       } else {
-        const result = await addUser({
-          firstName: form.firstName,
-          middleName: form.middleName,
-          lastName: form.lastName,
-          email: form.email,
-          role: form.role,
-          status: form.status,
-        });
-        showToast(result.message || 'User added!', 'success');
+        const result = await addUser({ ...form });
+        showToast(result.verificationEmailSent
+          ? (result.message || 'User added and verification email sent.')
+          : 'User added!',
+          'success');
       }
       refetch();
       refetchStats();
@@ -277,13 +309,21 @@ export default function EmployeeUsers() {
               title="Bulk Import Users"
               isOpen={showBulkImport}
               onClose={() => setShowBulkImport(false)}
-              onImport={handleBulkImportUsers}
-              templateHeaders={['firstName', 'middleName', 'lastName', 'email', 'role', 'status']}
+              onImport={handleBulkImportUsersWithPreview}
+              templateHeaders={['firstName', 'middleName', 'lastName', 'email', 'role', 'status', 'password']}
               templateRows={[
-                { firstName: 'Ana', middleName: 'Maria', lastName: 'Santos', email: 'ana.santos@goldenkey.edu', role: 'teacher', status: 'Active' },
-                { firstName: 'Juan', middleName: 'Carlos', lastName: 'Reyes', email: 'juan.reyes@goldenkey.edu', role: 'registrar', status: 'Active' },
-                { firstName: 'Maria', middleName: 'Luz', lastName: 'Cruz', email: 'maria.cruz@goldenkey.edu', role: 'administrator', status: 'Active' },
+                { firstName: 'Ana', middleName: 'Maria', lastName: 'Santos', email: 'ana.santos@goldenkey.edu', role: 'teacher', status: 'Active', password: 'Teacher123!' },
+                { firstName: 'Juan', middleName: 'Carlos', lastName: 'Reyes', email: 'juan.reyes@goldenkey.edu', role: 'registrar', status: 'Active', password: 'Registrar123!' },
+                { firstName: 'Maria', middleName: 'Luz', lastName: 'Cruz', email: 'maria.cruz@goldenkey.edu', role: 'administrator', status: 'Active', password: 'Admin123!' },
               ]}
+            />
+            <UserImportPreviewModal
+              isOpen={showPreview}
+              validatedRows={validatedRows}
+              fileName={previewFileName}
+              onConfirm={confirmUserImport}
+              onCancel={() => { setShowPreview(false); setValidatedRows([]); setPreviewFileName(''); }}
+              isLoading={saving}
             />
             <ActionButton variant="secondary" onClick={() => setShowBulkImport(true)}>
               <span>&#8690;</span> Import Users
@@ -442,28 +482,21 @@ export default function EmployeeUsers() {
               </select>
             </div>
           </div>
-          {!editId && (
-            <div className="rounded-lg border border-forest-100 bg-forest-50 px-4 py-3 text-xs text-forest-700">
-              A random temporary password will be generated by the system and sent to this email address.
-            </div>
-          )}
-          {editId && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">New Password (leave blank to keep)</label>
-              <input type="password" value={form.password} onChange={e => set('password', e.target.value)} aria-describedby={errors.password ? 'password-error' : undefined} className={`w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-forest-500/20 ${errors.password ? 'border-red-400' : 'border-gray-200'}`} />
-              {errors.password && <p id="password-error" className="text-red-500 text-xs mt-1" role="alert">{errors.password}</p>}
-              {form.password && (
-                <div className="mt-2 rounded-lg border border-gray-200 bg-gray-50 p-2.5 space-y-1.5">
-                  {passwordChecks.map(rule => (
-                    <p key={rule.key} className={`text-xs flex items-center gap-1.5 ${rule.met ? 'text-emerald-700' : 'text-gray-500'}`}>
-                      <Icon name={rule.met ? 'checkCircle' : 'xCircle'} className="w-3.5 h-3.5" />
-                      {rule.label}
-                    </p>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{editId ? 'New Password (leave blank to keep)' : 'Password'}</label>
+            <input type="password" value={form.password} onChange={e => set('password', e.target.value)} aria-describedby={errors.password ? 'password-error' : undefined} className={`w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-forest-500/20 ${errors.password ? 'border-red-400' : 'border-gray-200'}`} />
+            {errors.password && <p id="password-error" className="text-red-500 text-xs mt-1" role="alert">{errors.password}</p>}
+            {form.password && (
+              <div className="mt-2 rounded-lg border border-gray-200 bg-gray-50 p-2.5 space-y-1.5">
+                {passwordChecks.map(rule => (
+                  <p key={rule.key} className={`text-xs flex items-center gap-1.5 ${rule.met ? 'text-emerald-700' : 'text-gray-500'}`}>
+                    <Icon name={rule.met ? 'checkCircle' : 'xCircle'} className="w-3.5 h-3.5" />
+                    {rule.label}
+                  </p>
+                ))}
+              </div>
+            )}
+          </div>
           <div className="flex justify-end gap-3 pt-2">
             <ActionButton variant="secondary" onClick={() => setShowModal(false)}>Cancel</ActionButton>
             <ActionButton onClick={handleSave} loading={saving}>{editId ? 'Save Changes' : 'Add User'}</ActionButton>
