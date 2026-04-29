@@ -27,7 +27,6 @@ export function validateUserRow(
   if (!middleName) errors.push('Middle name is required');
   if (!lastName) errors.push('Last name is required');
   if (!email) errors.push('Email is required');
-  if (!password) errors.push('Password is required');
 
   // Validate email format
   if (email && !/\S+@\S+\.\S+/.test(email)) {
@@ -64,7 +63,7 @@ export function validateUserRow(
     email,
     role: role || 'applicant',
     status: status || 'Active',
-    password,
+    password: password || undefined,
   };
 
   return {

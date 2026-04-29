@@ -6,7 +6,8 @@ import { paginate, paginatedResponse } from '../utils/pagination.js';
 import { logAudit } from '../utils/auditLog.js';
 import { ROLES, BCRYPT_ROUNDS, EMAIL_VERIFY_EXPIRY_MS } from '../utils/constants.js';
 import { cached, invalidatePrefix } from '../utils/cache.js';
-import { sendVerificationEmail } from '../utils/email.js';
+import { sendTemporaryPasswordEmail, sendVerificationEmail } from '../utils/email.js';
+import { passwordSchema } from '../utils/schemas.js';
 
 const userListSelect = {
   id: true,
@@ -52,6 +53,31 @@ function safifyUser(user) {
   if (!user) return null;
   const { passwordHash, ...rest } = user;
   return rest;
+}
+
+function generateTemporaryPassword(length = 12) {
+  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const lower = 'abcdefghijkmnopqrstuvwxyz';
+  const digits = '23456789';
+  const special = '!@#$%&*?';
+  const all = upper + lower + digits + special;
+  const chars = [
+    upper[crypto.randomInt(0, upper.length)],
+    lower[crypto.randomInt(0, lower.length)],
+    digits[crypto.randomInt(0, digits.length)],
+    special[crypto.randomInt(0, special.length)],
+  ];
+
+  while (chars.length < length) {
+    chars.push(all[crypto.randomInt(0, all.length)]);
+  }
+
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = crypto.randomInt(0, i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+
+  return chars.join('');
 }
 
 async function issueVerificationEmail(user) {
@@ -198,8 +224,16 @@ export async function getUserByEmail(req, res, next) {
 export async function createUser(req, res, next) {
   try {
     const { firstName, middleName, lastName, email, role, status, password } = req.body;
-    if (!firstName || !middleName || !lastName || !email || !password) {
-      return res.status(400).json({ error: 'Please provide first name, middle name, last name, email, and password.', code: 'VALIDATION_ERROR' });
+    if (!firstName || !middleName || !lastName || !email) {
+      return res.status(400).json({ error: 'Please provide first name, middle name, last name, and email.', code: 'VALIDATION_ERROR' });
+    }
+
+    const explicitPassword = String(password || '').trim();
+    if (explicitPassword) {
+      const passwordCheck = passwordSchema.safeParse(explicitPassword);
+      if (!passwordCheck.success) {
+        return res.status(400).json({ error: passwordCheck.error.issues[0]?.message || 'Invalid password.', code: 'VALIDATION_ERROR' });
+      }
     }
 
     const normalizedEmail = String(email).trim();
@@ -212,7 +246,8 @@ export async function createUser(req, res, next) {
       return res.status(409).json({ error: 'Email already in use', code: 'CONFLICT' });
     }
 
-    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+    const tempPassword = explicitPassword || generateTemporaryPassword();
+    const passwordHash = await bcrypt.hash(tempPassword, BCRYPT_ROUNDS);
     const user = existingByEmail?.deletedAt
       ? await prisma.user.update({
           where: { id: existingByEmail.id },
@@ -225,27 +260,60 @@ export async function createUser(req, res, next) {
             role: role || ROLES.APPLICANT,
             status: status || 'Active',
             deletedAt: null,
+            emailVerified: true,
+            emailVerifyToken: null,
+            emailVerifyExpires: null,
           },
         })
       : await prisma.user.create({
-          data: { firstName, middleName, lastName, email: normalizedEmail, passwordHash, role: role || ROLES.APPLICANT, status: status || 'Active' },
+          data: {
+            firstName,
+            middleName,
+            lastName,
+            email: normalizedEmail,
+            passwordHash,
+            role: role || ROLES.APPLICANT,
+            status: status || 'Active',
+            emailVerified: true,
+          },
         });
 
-    const verification = await issueVerificationEmail(user);
-    const responseUser = verification.emailVerificationRequired
-      ? await prisma.user.findUnique({ where: { id: user.id }, select: userDetailSelect })
-      : user;
+    let verification = { emailVerificationRequired: false, verificationEmailSent: false };
+    let message;
+    if (explicitPassword) {
+      verification = await issueVerificationEmail(user);
+      message = verification.emailVerificationRequired
+        ? (verification.verificationEmailSent
+          ? (existingByEmail?.deletedAt ? 'User account restored and verification email sent.' : 'User created and verification email sent.')
+          : (existingByEmail?.deletedAt ? 'User account restored, but the verification email could not be sent right now.' : 'User created, but the verification email could not be sent right now.'))
+        : undefined;
+    } else {
+      const tempPasswordDispatch = await sendTemporaryPasswordEmail({
+        to: user.email,
+        firstName: user.firstName,
+        tempPassword,
+      });
+      verification = {
+        emailVerificationRequired: false,
+        verificationEmailSent: tempPasswordDispatch.ok,
+      };
+      message = tempPasswordDispatch.ok
+        ? (existingByEmail?.deletedAt
+          ? 'User account restored and a temporary password was emailed.'
+          : 'User created and a temporary password was emailed.')
+        : (existingByEmail?.deletedAt
+          ? 'User account restored, but the temporary password email could not be sent right now.'
+          : 'User created, but the temporary password email could not be sent right now.');
+    }
+
+    const responseUser = await prisma.user.findUnique({ where: { id: user.id }, select: userDetailSelect });
 
     await invalidateUserCaches();
 
     res.status(201).json({
       ...safifyUser(responseUser),
       ...verification,
-      message: verification.emailVerificationRequired
-        ? (verification.verificationEmailSent
-          ? (existingByEmail?.deletedAt ? 'User account restored and verification email sent.' : 'User created and verification email sent.')
-          : (existingByEmail?.deletedAt ? 'User account restored, but the verification email could not be sent right now.' : 'User created, but the verification email could not be sent right now.'))
-        : undefined,
+      message,
     });
 
     logAudit({ userId: req.user.id, action: existingByEmail?.deletedAt ? 'user.restore' : 'user.create', entity: 'user', entityId: user.id, details: { email: normalizedEmail, role: role || ROLES.APPLICANT }, ipAddress: req.ip });

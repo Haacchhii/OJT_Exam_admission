@@ -10,7 +10,7 @@ export interface UserImportRow {
   email: string;
   role: string;
   status: string;
-  password: string;
+  password?: string;
 }
 
 export interface ValidatedUserRow {

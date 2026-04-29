@@ -86,7 +86,10 @@ export function CSVUploader({
 
   const downloadTemplate = () => {
     const blankRow = Object.fromEntries(templateHeaders.map((header) => [header, ''])) as Record<string, string>;
-    const csv = Papa.unparse(templateRows.length > 0 ? templateRows : [blankRow]);
+    const csv = Papa.unparse(templateRows.length > 0 ? templateRows : [blankRow], {
+      columns: templateHeaders,
+      header: true,
+    });
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);

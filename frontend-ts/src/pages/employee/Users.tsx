@@ -110,8 +110,7 @@ export default function EmployeeUsers() {
         // 404 = email not found = no duplicate
       }
     }
-    if (!editId && !form.password.trim()) e.password = 'Required for new users';
-    else if (form.password) {
+    if (form.password) {
       if (!isPasswordCompliant(form.password)) e.password = firstPasswordRequirementMessage(form.password);
     }
     setErrors(e);
@@ -146,15 +145,18 @@ export default function EmployeeUsers() {
     try {
       for (const validRow of validRows) {
         try {
-          await addUser({
+          const payload: Record<string, unknown> = {
             firstName: validRow.data.firstName,
             middleName: validRow.data.middleName,
             lastName: validRow.data.lastName,
             email: validRow.data.email,
             role: validRow.data.role,
             status: validRow.data.status,
-            password: validRow.data.password,
-          });
+          };
+          if (validRow.data.password) {
+            payload.password = validRow.data.password;
+          }
+          await addUser(payload);
           successCount++;
         } catch (e) {
           failedCount++;
@@ -192,10 +194,21 @@ export default function EmployeeUsers() {
           : 'User updated!',
           'success');
       } else {
-        const result = await addUser({ ...form });
-        showToast(result.verificationEmailSent
-          ? (result.message || 'User added and verification email sent.')
-          : 'User added!',
+        const payload: Record<string, unknown> = {
+          firstName: form.firstName,
+          middleName: form.middleName,
+          lastName: form.lastName,
+          email: form.email,
+          role: form.role,
+          status: form.status,
+        };
+        if (form.password.trim()) {
+          payload.password = form.password;
+        }
+        const result = await addUser(payload);
+        showToast(result.message || (result.verificationEmailSent
+          ? 'User added and verification email sent.'
+          : 'User added!'),
           'success');
       }
       refetch();
@@ -310,11 +323,11 @@ export default function EmployeeUsers() {
               isOpen={showBulkImport}
               onClose={() => setShowBulkImport(false)}
               onImport={handleBulkImportUsersWithPreview}
-              templateHeaders={['firstName', 'middleName', 'lastName', 'email', 'role', 'status', 'password']}
+              templateHeaders={['firstName', 'middleName', 'lastName', 'email', 'role', 'status']}
               templateRows={[
-                { firstName: 'Ana', middleName: 'Maria', lastName: 'Santos', email: 'ana.santos@goldenkey.edu', role: 'teacher', status: 'Active', password: 'Teacher123!' },
-                { firstName: 'Juan', middleName: 'Carlos', lastName: 'Reyes', email: 'juan.reyes@goldenkey.edu', role: 'registrar', status: 'Active', password: 'Registrar123!' },
-                { firstName: 'Maria', middleName: 'Luz', lastName: 'Cruz', email: 'maria.cruz@goldenkey.edu', role: 'administrator', status: 'Active', password: 'Admin123!' },
+                { firstName: 'Ana', middleName: 'Maria', lastName: 'Santos', email: 'ana.santos@goldenkey.edu', role: 'teacher', status: 'Active' },
+                { firstName: 'Juan', middleName: 'Carlos', lastName: 'Reyes', email: 'juan.reyes@goldenkey.edu', role: 'registrar', status: 'Active' },
+                { firstName: 'Maria', middleName: 'Luz', lastName: 'Cruz', email: 'maria.cruz@goldenkey.edu', role: 'administrator', status: 'Active' },
               ]}
             />
             <UserImportPreviewModal
