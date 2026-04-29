@@ -4,7 +4,7 @@ interface UseAsyncResult<T> {
   data: T | null;
   loading: boolean;
   error: Error | null;
-  refetch: () => void;
+  refetch: () => Promise<void>;
 }
 
 interface UseAsyncOptions {
@@ -49,6 +49,9 @@ export function useAsync<T>(
   const isFirstLoad = useRef(true);
   const lastAutoRefreshAt = useRef(0);
   const AUTO_REFRESH_MIN_INTERVAL_MS = 1000;
+  
+  // Promise-based refetch: resolves when current fetch completes
+  const refetchPromiseRef = useRef<{ resolve: () => void; reject: (err: Error) => void } | null>(null);
 
   const triggerAutoRefresh = useCallback((force = false) => {
     const now = Date.now();
@@ -57,7 +60,12 @@ export function useAsync<T>(
     setRefreshCount(c => c + 1);
   }, []);
 
-  const refetch = useCallback(() => setRefreshCount(c => c + 1), []);
+  const refetch = useCallback(() => {
+    return new Promise<void>((resolve, reject) => {
+      refetchPromiseRef.current = { resolve, reject };
+      setRefreshCount(c => c + 1);
+    });
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -73,6 +81,11 @@ export function useAsync<T>(
           setData(result);
           setLoading(false);
           isFirstLoad.current = false;
+          // Resolve any pending refetch promise
+          if (refetchPromiseRef.current) {
+            refetchPromiseRef.current.resolve();
+            refetchPromiseRef.current = null;
+          }
         }
       })
       .catch(err => {
@@ -80,6 +93,11 @@ export function useAsync<T>(
           setError(err as Error);
           setLoading(false);
           isFirstLoad.current = false;
+          // Reject any pending refetch promise
+          if (refetchPromiseRef.current) {
+            refetchPromiseRef.current.reject(err as Error);
+            refetchPromiseRef.current = null;
+          }
         }
       });
 
