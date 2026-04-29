@@ -445,20 +445,25 @@ export async function deleteUser(req, res, next) {
     if (id === req.user.id) {
       return res.status(400).json({ error: 'You cannot delete your own account.', code: 'VALIDATION_ERROR' });
     }
-    const user = await prisma.user.findUnique({ where: { id } });
-    if (!user) return res.status(404).json({ error: 'We could not find this user.', code: 'NOT_FOUND' });
+    // Perform an atomic update and detect whether any row was changed.
+    const updateResult = await prisma.user.updateMany({ where: { id, deletedAt: null }, data: { deletedAt: new Date() } });
 
-    if (user.deletedAt) {
+    if (updateResult.count === 0) {
+      // No rows were changed: either user not found or already deleted.
+      // Attempt to confirm existence for accurate response.
+      const existing = await prisma.user.findUnique({ where: { id } });
+      if (!existing) return res.status(404).json({ error: 'We could not find this user.', code: 'NOT_FOUND' });
+
+      // Already deleted: still ensure caches are invalidated so other instances refresh.
+      console.log(`[users] delete called for id=${id} but already deleted`);
       await invalidateUserCaches();
       return res.status(204).end();
     }
 
-    await prisma.user.update({ where: { id }, data: { deletedAt: new Date() } });
-
+    // Successfully marked deleted
+    console.log(`[users] deleted user id=${id}; rowsAffected=${updateResult.count}`);
     await invalidateUserCaches();
-
-    logAudit({ userId: req.user.id, action: 'user.delete', entity: 'user', entityId: id, details: { email: user.email, role: user.role }, ipAddress: req.ip });
-
+    logAudit({ userId: req.user.id, action: 'user.delete', entity: 'user', entityId: id, details: { id }, ipAddress: req.ip });
     res.status(204).end();
   } catch (err) { next(err); }
 }
