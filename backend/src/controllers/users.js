@@ -305,45 +305,30 @@ export async function createUser(req, res, next) {
           },
         });
 
-    let verification = { emailVerificationRequired: false, verificationEmailSent: false };
-    let message;
-    if (explicitPassword) {
-      verification = await issueVerificationEmail(user);
-      message = verification.emailVerificationRequired
-        ? (verification.verificationEmailSent
-          ? (existingByEmail?.deletedAt ? 'User account restored and verification email sent.' : 'User created and verification email sent.')
-          : (existingByEmail?.deletedAt ? 'User account restored, but the verification email could not be sent right now.' : 'User created, but the verification email could not be sent right now.'))
-        : undefined;
-    } else {
-      const tempPasswordDispatch = await sendTemporaryPasswordEmail({
-        to: user.email,
-        firstName: user.firstName,
-        tempPassword,
-      });
-      verification = {
-        emailVerificationRequired: false,
-        verificationEmailSent: tempPasswordDispatch.ok,
-      };
-      message = tempPasswordDispatch.ok
-        ? (existingByEmail?.deletedAt
-          ? 'User account restored and a temporary password was emailed.'
-          : 'User created and a temporary password was emailed.')
-        : (existingByEmail?.deletedAt
-          ? 'User account restored, but the temporary password email could not be sent right now.'
-          : 'User created, but the temporary password email could not be sent right now.');
-    }
-
     const responseUser = await prisma.user.findUnique({ where: { id: user.id }, select: userDetailSelect });
 
     await invalidateUserCaches();
 
+    // Send response immediately — do not wait for email
     res.status(201).json({
       ...safifyUser(responseUser),
-      ...verification,
-      message,
+      emailVerificationRequired: !explicitPassword ? false : !!env.EMAIL_VERIFICATION_REQUIRED,
+      verificationEmailSent: false, // optimistic — email fires below
+      message: existingByEmail?.deletedAt ? 'User account restored.' : 'User created.',
     });
 
+    // Fire-and-forget: email after response so user sees success immediately
     logAudit({ userId: req.user.id, action: existingByEmail?.deletedAt ? 'user.restore' : 'user.create', entity: 'user', entityId: user.id, details: { email: normalizedEmail, role: role || ROLES.APPLICANT }, ipAddress: req.ip });
+    
+    if (explicitPassword) {
+      issueVerificationEmail(user).catch(err => {
+        console.error('[createUser] verification email failed:', err?.message || err);
+      });
+    } else {
+      sendTemporaryPasswordEmail({ to: user.email, firstName: user.firstName, tempPassword }).catch(err => {
+        console.error('[createUser] temp password email failed:', err?.message || err);
+      });
+    }
   } catch (err) { next(err); }
 }
 
