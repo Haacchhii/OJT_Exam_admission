@@ -426,7 +426,12 @@ export async function deleteUser(req, res, next) {
       return res.status(400).json({ error: 'You cannot delete your own account.', code: 'VALIDATION_ERROR' });
     }
     const user = await prisma.user.findUnique({ where: { id } });
-    if (!user || user.deletedAt) return res.status(404).json({ error: 'We could not find this user.', code: 'NOT_FOUND' });
+    if (!user) return res.status(404).json({ error: 'We could not find this user.', code: 'NOT_FOUND' });
+
+    if (user.deletedAt) {
+      await invalidateUserCaches();
+      return res.status(204).end();
+    }
 
     await prisma.user.update({ where: { id }, data: { deletedAt: new Date() } });
 
@@ -448,15 +453,19 @@ export async function bulkDeleteUsers(req, res, next) {
       return res.status(400).json({ error: 'No eligible users were selected. You cannot delete your own account.', code: 'VALIDATION_ERROR' });
     }
 
-    const users = await prisma.user.findMany({ where: { id: { in: safeIds }, deletedAt: null } });
+    const users = await prisma.user.findMany({ where: { id: { in: safeIds } } });
     const foundIds = users.map(u => u.id);
+    const alreadyDeleted = users.filter(u => u.deletedAt).map(u => u.id);
 
-    await prisma.user.updateMany({ where: { id: { in: foundIds } }, data: { deletedAt: new Date() } });
+    const idsToDelete = users.filter(u => !u.deletedAt).map(u => u.id);
+    if (idsToDelete.length > 0) {
+      await prisma.user.updateMany({ where: { id: { in: idsToDelete } }, data: { deletedAt: new Date() } });
+    }
 
     await invalidateUserCaches();
 
-    logAudit({ userId: req.user.id, action: 'user.bulkDelete', entity: 'user', details: { count: users.length, ids: foundIds }, ipAddress: req.ip });
+    logAudit({ userId: req.user.id, action: 'user.bulkDelete', entity: 'user', details: { count: foundIds.length, ids: foundIds, alreadyDeleted }, ipAddress: req.ip });
 
-    res.json({ deleted: users.length });
+    res.json({ deleted: foundIds.length });
   } catch (err) { next(err); }
 }
