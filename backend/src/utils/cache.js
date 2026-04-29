@@ -135,6 +135,14 @@ export async function invalidatePrefix(prefix) {
 }
 
 export async function clearCache() {
+  // Clear in-process stores first
   store.clear();
   inflight.clear();
+  // Also attempt to remove all keys from Redis backing store and await completion
+  try {
+    await deleteRedisByPrefix(''); // deletes all keys under the cache prefix
+  } catch (err) {
+    // Best-effort: don't throw if Redis deletion fails
+    console.warn('[cache] clearCache: failed to clear redis keys', err?.message || err);
+  }
 }
