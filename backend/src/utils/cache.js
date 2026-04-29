@@ -85,9 +85,20 @@ export async function cached(key, fn, ttlMs = CACHE_DEFAULT_TTL_MS) {
   const redisValue = await readRedis(key);
   if (redisValue !== null) return redisValue;
 
+  // If Redis caching is enabled but the key is missing from Redis, we must
+  // avoid returning a possibly-stale value from the local in-memory store.
+  // Otherwise cross-instance invalidation (which deletes keys from Redis)
+  // would leave other instances serving stale data from their local `store`.
   const entry = store.get(key);
-  if (entry && Date.now() - entry.ts < ttlMs) return entry.value;
-  store.delete(key);
+  if (!env.ENABLE_REDIS_CACHE) {
+    // Redis disabled: continue using local store as before.
+    if (entry && Date.now() - entry.ts < ttlMs) return entry.value;
+    store.delete(key);
+  } else {
+    // Redis enabled but key missing: treat as cache miss and force recompute.
+    // Do not return local store value here to avoid serving stale data.
+    store.delete(key);
+  }
 
   const pending = inflight.get(key);
   if (pending) return pending;
