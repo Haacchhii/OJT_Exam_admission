@@ -442,7 +442,7 @@ export async function deleteUser(req, res, next) {
       // Already deleted: still ensure caches are invalidated so other instances refresh.
       console.log(`[users] delete called for id=${id} but already deleted`);
       await invalidateUserCaches();
-      return res.status(204).end();
+      return res.json({ ok: true, deleted: 0 });
     }
 
     // Successfully marked deleted
