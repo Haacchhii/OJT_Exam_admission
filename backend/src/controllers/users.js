@@ -367,6 +367,26 @@ export async function updateUser(req, res, next) {
     if (status    !== undefined) data.status    = status;
     if (password) data.passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
+    if (role !== undefined && role !== ROLES.APPLICANT) {
+      await prisma.applicantProfile.deleteMany({ where: { userId: id } });
+    }
+
+    if (role === ROLES.APPLICANT && req.body.gradeLevel !== undefined) {
+      const gradeLevel = req.body.gradeLevel || null;
+      await prisma.applicantProfile.upsert({
+        where: { userId: id },
+        update: {
+          gradeLevel,
+          levelGroup: null,
+        },
+        create: {
+          userId: id,
+          gradeLevel,
+          levelGroup: null,
+        },
+      });
+    }
+
     // If email is changing, also update ExamRegistration.userEmail to keep the link intact
     if (email !== undefined) {
       const existing = await prisma.user.findUnique({ where: { id }, select: { email: true } });

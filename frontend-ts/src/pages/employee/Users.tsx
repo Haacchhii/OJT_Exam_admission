@@ -57,6 +57,7 @@ export default function EmployeeUsers() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [optimisticDeletedIds, setOptimisticDeletedIds] = useState<Set<number>>(new Set());
   const confirm = useConfirm();
   const { selected, toggle, togglePage, clear: clearSelection, isAllSelected, count: selectedCount } = useSelection();
   const passwordChecks = getPasswordRequirementChecks(form.password);
@@ -93,7 +94,7 @@ export default function EmployeeUsers() {
     resourcePrefixes: ['/users'],
   });
 
-  const users: User[] = usersPage?.data || [];
+  const users: User[] = (usersPage?.data || []).filter(u => !optimisticDeletedIds.has(u.id));
   const pagination = usersPage?.pagination || { page: 1, limit: USERS_PER_PAGE, total: 0, totalPages: 1 };
   const resetPage = () => setPage(1);
 
@@ -235,12 +236,22 @@ export default function EmployeeUsers() {
       confirmLabel: 'Delete',
     });
     if (ok) {
+      setOptimisticDeletedIds(prev => {
+        const next = new Set(prev);
+        next.add(userId);
+        return next;
+      });
       try {
         await deleteUser(userId);
         refetch();
         refetchStats();
         showToast('User deleted.', 'info');
       } catch (err) {
+        setOptimisticDeletedIds(prev => {
+          const next = new Set(prev);
+          next.delete(userId);
+          return next;
+        });
         showToast(friendlyActionError(err, 'We could not delete this user right now.'), 'error');
       }
     }
@@ -263,6 +274,11 @@ export default function EmployeeUsers() {
     });
     if (!ok) return;
     setBulkDeleting(true);
+    setOptimisticDeletedIds(prev => {
+      const next = new Set(prev);
+      ids.forEach(id => next.add(id));
+      return next;
+    });
     try {
       await bulkDeleteUsers(ids);
       showToast(`${ids.length} user(s) deleted.`, 'info');
@@ -270,6 +286,11 @@ export default function EmployeeUsers() {
       refetch();
       refetchStats();
     } catch (err) {
+      setOptimisticDeletedIds(prev => {
+        const next = new Set(prev);
+        ids.forEach(id => next.delete(id));
+        return next;
+      });
       showToast(friendlyActionError(err, 'We could not delete the selected users right now.'), 'error');
     } finally {
       setBulkDeleting(false);
@@ -313,7 +334,7 @@ export default function EmployeeUsers() {
                 'Email': u.email,
                 'Role': u.role,
                 'Status': u.status,
-                'Grade Level': u.applicantProfile?.gradeLevel || '',
+                'Grade Level': u.role === 'applicant' ? (u.applicantProfile?.gradeLevel || '') : '',
               })), 'Users_Export.csv')}
               icon={<Icon name="download" className="w-4 h-4" />}
               title="Download current page as CSV"
@@ -427,7 +448,7 @@ export default function EmployeeUsers() {
                   <td className="py-3 px-4 font-medium text-forest-500">{formatPersonName(u)}</td>
                   <td className="py-3 px-4 text-gray-500">{u.email}</td>
                   <td className="py-3 px-4"><Badge variant="info">{roleLabel(u.role)}</Badge></td>
-                  <td className="py-3 px-4 text-gray-500">{u.applicantProfile?.gradeLevel || 'N/A'}</td>
+                  <td className="py-3 px-4 text-gray-500">{u.role === 'applicant' ? (u.applicantProfile?.gradeLevel || 'N/A') : 'N/A'}</td>
                   <td className="py-3 px-4"><Badge variant={u.status === 'Active' ? 'success' : 'danger'}>{u.status}</Badge></td>
                   <td className="py-3 px-4 text-right">
                     <div className="inline-flex items-center gap-1">
