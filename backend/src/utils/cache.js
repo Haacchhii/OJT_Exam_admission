@@ -50,6 +50,7 @@ async function readRedis(key) {
   if (!client) return null;
   try {
     const raw = await client.get(cacheKey(key));
+    if (raw) console.log(`[cache] Redis HIT: ${key}`);
     return raw ? JSON.parse(raw) : null;
   } catch { return null; }
 }
@@ -125,6 +126,7 @@ export async function invalidate(key) {
 }
 
 export async function invalidatePrefix(prefix) {
+  const start = Date.now();
   for (const key of store.keys()) {
     if (key.startsWith(prefix)) store.delete(key);
   }
@@ -132,6 +134,10 @@ export async function invalidatePrefix(prefix) {
     if (key.startsWith(prefix)) inflight.delete(key);
   }
   await deleteRedisByPrefix(prefix); // awaited now
+  const elapsed = Date.now() - start;
+  if (elapsed > 100) {
+    console.log(`[cache] invalidatePrefix("${prefix}") took ${elapsed}ms`);
+  }
 }
 
 export async function clearCache() {
