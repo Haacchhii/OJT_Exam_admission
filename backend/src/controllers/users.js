@@ -80,6 +80,29 @@ function generateTemporaryPassword(length = 12) {
   return chars.join('');
 }
 
+function deriveNamePartsFromEmail(email) {
+  const localPart = String(email || '')
+    .trim()
+    .toLowerCase()
+    .split('@')[0]
+    .replace(/[._-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!localPart) {
+    return { firstName: 'User', middleName: '', lastName: '' };
+  }
+
+  const parts = localPart.split(' ');
+  const firstToken = parts[0] || 'User';
+  const lastToken = parts.length > 1 ? parts[parts.length - 1] : '';
+  return {
+    firstName: firstToken.charAt(0).toUpperCase() + firstToken.slice(1),
+    middleName: parts.length > 2 ? parts.slice(1, -1).join(' ') : '',
+    lastName: lastToken ? lastToken.charAt(0).toUpperCase() + lastToken.slice(1) : '',
+  };
+}
+
 async function issueVerificationEmail(user) {
   if (!env.EMAIL_VERIFICATION_REQUIRED) {
     return { emailVerificationRequired: false, verificationEmailSent: false };
@@ -224,8 +247,8 @@ export async function getUserByEmail(req, res, next) {
 export async function createUser(req, res, next) {
   try {
     const { firstName, middleName, lastName, email, role, status, password } = req.body;
-    if (!firstName || !middleName || !lastName || !email) {
-      return res.status(400).json({ error: 'Please provide first name, middle name, last name, and email.', code: 'VALIDATION_ERROR' });
+    if (!email) {
+      return res.status(400).json({ error: 'Please provide an email address.', code: 'VALIDATION_ERROR' });
     }
 
     const explicitPassword = String(password || '').trim();
@@ -237,6 +260,10 @@ export async function createUser(req, res, next) {
     }
 
     const normalizedEmail = String(email).trim();
+    const derivedNames = deriveNamePartsFromEmail(normalizedEmail);
+    const normalizedFirstName = String(firstName || '').trim() || derivedNames.firstName;
+    const normalizedMiddleName = String(middleName || '').trim() || derivedNames.middleName;
+    const normalizedLastName = String(lastName || '').trim() || derivedNames.lastName;
     const existingByEmail = await prisma.user.findFirst({
       where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
       select: { id: true, deletedAt: true },
@@ -252,9 +279,9 @@ export async function createUser(req, res, next) {
       ? await prisma.user.update({
           where: { id: existingByEmail.id },
           data: {
-            firstName,
-            middleName,
-            lastName,
+            firstName: normalizedFirstName,
+            middleName: normalizedMiddleName,
+            lastName: normalizedLastName,
             email: normalizedEmail,
             passwordHash,
             role: role || ROLES.APPLICANT,
@@ -267,9 +294,9 @@ export async function createUser(req, res, next) {
         })
       : await prisma.user.create({
           data: {
-            firstName,
-            middleName,
-            lastName,
+            firstName: normalizedFirstName,
+            middleName: normalizedMiddleName,
+            lastName: normalizedLastName,
             email: normalizedEmail,
             passwordHash,
             role: role || ROLES.APPLICANT,

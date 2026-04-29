@@ -97,9 +97,6 @@ export default function EmployeeUsers() {
 
   const validate = async (): Promise<boolean> => {
     const e: Record<string, string> = {};
-    if (!form.firstName.trim()) e.firstName = 'Required';
-    if (!form.middleName.trim()) e.middleName = 'Required';
-    if (!form.lastName.trim()) e.lastName = 'Required';
     if (!form.email.trim()) e.email = 'Required';
     else if (!/\S+@\S+\.\S+/.test(form.email)) e.email = 'Invalid email';
     else {
@@ -146,13 +143,13 @@ export default function EmployeeUsers() {
       for (const validRow of validRows) {
         try {
           const payload: Record<string, unknown> = {
-            firstName: validRow.data.firstName,
-            middleName: validRow.data.middleName,
-            lastName: validRow.data.lastName,
             email: validRow.data.email,
             role: validRow.data.role,
             status: validRow.data.status,
           };
+          if (validRow.data.firstName) payload.firstName = validRow.data.firstName;
+          if (validRow.data.middleName) payload.middleName = validRow.data.middleName;
+          if (validRow.data.lastName) payload.lastName = validRow.data.lastName;
           if (validRow.data.password) {
             payload.password = validRow.data.password;
           }
@@ -195,13 +192,13 @@ export default function EmployeeUsers() {
           'success');
       } else {
         const payload: Record<string, unknown> = {
-          firstName: form.firstName,
-          middleName: form.middleName,
-          lastName: form.lastName,
           email: form.email,
           role: form.role,
           status: form.status,
         };
+        if (form.firstName.trim()) payload.firstName = form.firstName;
+        if (form.middleName.trim()) payload.middleName = form.middleName;
+        if (form.lastName.trim()) payload.lastName = form.lastName;
         if (form.password.trim()) {
           payload.password = form.password;
         }

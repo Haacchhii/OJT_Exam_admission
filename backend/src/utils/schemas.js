@@ -271,9 +271,9 @@ export const createScheduleSchema = z.object({
 
 // ─── User Schemas ─────────────────────────────────────
 export const createUserSchema = z.object({
-  firstName: z.string().min(1).max(100),
-  middleName: z.string().min(1).max(100),
-  lastName: z.string().min(1).max(100),
+  firstName: z.string().max(100).optional(),
+  middleName: z.string().max(100).optional(),
+  lastName: z.string().max(100).optional(),
   email: z.string().email(),
   password: passwordSchema.optional(),
   role: z.enum(ROLE_VALUES),

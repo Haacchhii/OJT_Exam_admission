@@ -23,9 +23,6 @@ export function validateUserRow(
   const password = String(row.password || '').trim();
 
   // Validate required fields
-  if (!firstName) errors.push('First name is required');
-  if (!middleName) errors.push('Middle name is required');
-  if (!lastName) errors.push('Last name is required');
   if (!email) errors.push('Email is required');
 
   // Validate email format
@@ -57,7 +54,7 @@ export function validateUserRow(
   }
 
   const data = {
-    firstName,
+    firstName: firstName || deriveNameFromEmail(email),
     middleName,
     lastName,
     email,
@@ -72,6 +69,20 @@ export function validateUserRow(
     isValid: errors.length === 0,
     errors,
   };
+}
+
+function deriveNameFromEmail(email: string): string {
+  const localPart = String(email || '')
+    .trim()
+    .toLowerCase()
+    .split('@')[0]
+    .replace(/[._-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!localPart) return 'User';
+  const firstToken = localPart.split(' ')[0] || 'User';
+  return firstToken.charAt(0).toUpperCase() + firstToken.slice(1);
 }
 
 /**
