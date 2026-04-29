@@ -171,8 +171,8 @@ export default function EmployeeUsers() {
           `Successfully imported ${successCount} user(s).${failedCount ? ` ${failedCount} failed.` : ''}`,
           failedCount ? 'info' : 'success'
         );
-        refetch();
-        refetchStats();
+        await refetch();
+        await refetchStats();
       } else {
         showToast('Import failed. No users were created.', 'error');
       }
@@ -214,8 +214,8 @@ export default function EmployeeUsers() {
           : 'User added!'),
           'success');
       }
-      refetch();
-      refetchStats();
+      await refetch();
+      await refetchStats();
       setShowModal(false);
     } catch (err) {
       showToast(friendlyActionError(err, 'We could not save this user right now.'), 'error');
@@ -247,6 +247,7 @@ export default function EmployeeUsers() {
         // Await refetch and stats to ensure UI updates before completing
         await refetch();
         await refetchStats();
+        setOptimisticDeletedIds(new Set());
         // If backend reports that no rows were changed, the user was already deleted.
         if (!resp || typeof resp.deleted !== 'number') {
           showToast('User deletion processed.', 'info');
@@ -294,6 +295,7 @@ export default function EmployeeUsers() {
       // Await refetch and stats to ensure UI updates before completing
       await refetch();
       await refetchStats();
+      setOptimisticDeletedIds(new Set());
       showToast(`${resp.deleted || ids.length} user(s) deleted successfully.`, 'success');
       clearSelection();
     } catch (err) {
