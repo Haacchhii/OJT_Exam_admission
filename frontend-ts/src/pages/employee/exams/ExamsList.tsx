@@ -51,6 +51,8 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
       getExams(), getExamSchedules(), getExamRegistrations(),
     ]);
     return { exams: asArray<Exam>(rawExm), schedules: asArray<ExamSchedule>(rawSched), regs: asArray<ExamRegistration>(rawRegs) };
+  }, [], 0, {
+    resourcePrefixes: ['/exams'],
   });
 
   const { data: readinessPage, loading: readinessLoading } = useAsync(async () => {
@@ -60,17 +62,25 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
       page: readPage,
       limit: READINESS_PER_PAGE,
     });
-  }, [readSearch, readStatusFilter, readPage], 0, { setLoadingOnReload: true });
+  }, [readSearch, readStatusFilter, readPage], 0, { setLoadingOnReload: true, resourcePrefixes: ['/exams'] });
 
   // Fetch full exam (with questions) when viewing detail
   const { data: fullExam, loading: examDetailLoading } = useAsync<Exam | null>(
     () => detailId ? getExam(detailId) : Promise.resolve(null),
-    [detailId]
+    [detailId],
+    0,
+    { resourcePrefixes: ['/exams'] }
   );
 
-  const { data: academicYears } = useAsync<AcademicYear[]>(() => getAcademicYears());
-  const { data: allSemesters } = useAsync<Semester[]>(() => getSemesters());
-  const { data: activePeriod } = useAsync(() => getActivePeriod());
+  const { data: academicYears } = useAsync<AcademicYear[]>(() => getAcademicYears(), [], 0, {
+    resourcePrefixes: ['/academic-years'],
+  });
+  const { data: allSemesters } = useAsync<Semester[]>(() => getSemesters(), [], 0, {
+    resourcePrefixes: ['/academic-years'],
+  });
+  const { data: activePeriod } = useAsync(() => getActivePeriod(), [], 0, {
+    resourcePrefixes: ['/academic-years'],
+  });
   const appliedActivePeriodRef = useRef(false);
 
   useEffect(() => {

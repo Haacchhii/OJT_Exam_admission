@@ -84,9 +84,14 @@ export default function EmployeeUsers() {
       page,
       limit: USERS_PER_PAGE,
     });
-  }, [search, roleFilter, statusFilter, gradeFilter, sortBy, page], 0, { setLoadingOnReload: true });
+  }, [search, roleFilter, statusFilter, gradeFilter, sortBy, page], 0, {
+    setLoadingOnReload: true,
+    resourcePrefixes: ['/users'],
+  });
 
-  const { data: stats, refetch: refetchStats } = useAsync<UserStats>(() => getUserStats());
+  const { data: stats, refetch: refetchStats } = useAsync<UserStats>(() => getUserStats(), [], 0, {
+    resourcePrefixes: ['/users'],
+  });
 
   const users: User[] = usersPage?.data || [];
   const pagination = usersPage?.pagination || { page: 1, limit: USERS_PER_PAGE, total: 0, totalPages: 1 };

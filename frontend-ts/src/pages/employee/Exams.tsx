@@ -16,7 +16,9 @@ export default function EmployeeExams() {
   const { user } = useAuth();
   const { socket, isConnected } = useSocket();
   const isRegistrar = user?.role === 'registrar';
-  const { data: activePeriod } = useAsync(() => getActivePeriod());
+  const { data: activePeriod } = useAsync(() => getActivePeriod(), [], 0, {
+    resourcePrefixes: ['/academic-years'],
+  });
   const [tab, setTab] = useState('exams');
   const [editExamData, setEditExamData] = useState<Exam | null>(null);
 

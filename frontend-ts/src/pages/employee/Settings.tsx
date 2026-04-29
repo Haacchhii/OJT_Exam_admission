@@ -33,8 +33,12 @@ const emptySemForm: SemForm = {
 };
 
 export default function EmployeeSettings() {
-  const { data: academicYears, loading: ayLoading, error: ayError, refetch: refetchAY } = useAsync<AcademicYear[]>(() => getAcademicYears());
-  const { data: allSemesters, loading: semLoading, error: semError, refetch: refetchSem } = useAsync<Semester[]>(() => getSemesters());
+  const { data: academicYears, loading: ayLoading, error: ayError, refetch: refetchAY } = useAsync<AcademicYear[]>(() => getAcademicYears(), [], 0, {
+    resourcePrefixes: ['/academic-years'],
+  });
+  const { data: allSemesters, loading: semLoading, error: semError, refetch: refetchSem } = useAsync<Semester[]>(() => getSemesters(), [], 0, {
+    resourcePrefixes: ['/academic-years'],
+  });
 
   const [selectedYearId, setSelectedYearId] = useState<number | null>(null);
 

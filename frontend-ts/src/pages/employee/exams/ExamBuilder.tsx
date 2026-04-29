@@ -76,9 +76,15 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
     }
   }, [fullExam]);
 
-  const { data: years } = useAsync<AcademicYear[]>(() => getAcademicYears());
-  const { data: allSems } = useAsync<Semester[]>(() => getSemesters());
-  const { data: activePeriod } = useAsync(() => getActivePeriod());
+  const { data: years } = useAsync<AcademicYear[]>(() => getAcademicYears(), [], 0, {
+    resourcePrefixes: ['/academic-years'],
+  });
+  const { data: allSems } = useAsync<Semester[]>(() => getSemesters(), [], 0, {
+    resourcePrefixes: ['/academic-years'],
+  });
+  const { data: activePeriod } = useAsync(() => getActivePeriod(), [], 0, {
+    resourcePrefixes: ['/academic-years'],
+  });
   const semesterOptions = (allSems || []).filter(s => !yearId || s.academicYearId === Number(yearId));
   const selectedExamGroup = examGradeGroups.find(g => g.group === gradeStage);
   const appliedActivePeriodRef = useRef(false);
