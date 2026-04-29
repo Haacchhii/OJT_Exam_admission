@@ -76,8 +76,8 @@ export async function login(req, res, next) {
       return res.status(400).json({ error: 'Email and password are required', code: 'VALIDATION_ERROR' });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: normalizedEmail },
+    const user = await prisma.user.findFirst({
+      where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
       include: { applicantProfile: true, staffProfile: true },
     });
     if (!user || user.deletedAt) {

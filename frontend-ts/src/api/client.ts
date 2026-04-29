@@ -34,6 +34,34 @@ export function setToken(token: string | null): void {
 
 export function getToken(): string | null { return authToken; }
 
+// Cross-tab cache invalidation: BroadcastChannel when available,
+// fallback to storage events. Messages are rebroadcast as the
+// existing `gk:data-changed-scoped` CustomEvent so `useAsync` can react.
+let _gkBroadcast: BroadcastChannel | null = null;
+try {
+  if (typeof BroadcastChannel !== 'undefined') {
+    _gkBroadcast = new BroadcastChannel('gk:cache');
+    _gkBroadcast.onmessage = (ev) => {
+      try {
+        const prefixes = ev.data?.prefixes;
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('gk:data-changed-scoped', { detail: { prefixes } }));
+        }
+      } catch {}
+    };
+  } else if (typeof window !== 'undefined') {
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'gk:data-changed-scoped') {
+        try {
+          const payload = JSON.parse(String(e.newValue || 'null'));
+          const prefixes = payload?.prefixes;
+          window.dispatchEvent(new CustomEvent('gk:data-changed-scoped', { detail: { prefixes } }));
+        } catch {}
+      }
+    });
+  }
+} catch {}
+
 // ---- Auto-logout on 401 ----
 let onAuthError: (() => void) | null = null;
 export function setAuthErrorHandler(handler: () => void): void { onAuthError = handler; }
@@ -165,6 +193,19 @@ function invalidateGetCache(prefixes?: string[]) {
     window.dispatchEvent(new CustomEvent('gk:data-changed-scoped', {
       detail: { prefixes: scopedPrefixes },
     }));
+
+    // Broadcast to other tabs/windows so they also receive the scoped event.
+    try {
+      if (_gkBroadcast) {
+        _gkBroadcast.postMessage({ prefixes: scopedPrefixes });
+      } else {
+        // localStorage trick to trigger storage events in other tabs.
+        try {
+          localStorage.setItem('gk:data-changed-scoped', JSON.stringify({ t: Date.now(), prefixes: scopedPrefixes }));
+          localStorage.removeItem('gk:data-changed-scoped');
+        } catch {}
+      }
+    } catch {}
   }
 }
 

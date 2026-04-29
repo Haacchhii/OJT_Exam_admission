@@ -259,7 +259,7 @@ export async function createUser(req, res, next) {
       }
     }
 
-    const normalizedEmail = String(email).trim();
+    const normalizedEmail = String(email).trim().toLowerCase();
     const derivedNames = deriveNamePartsFromEmail(normalizedEmail);
     const normalizedFirstName = String(firstName || '').trim() || derivedNames.firstName;
     const normalizedMiddleName = String(middleName || '').trim() || derivedNames.middleName;
