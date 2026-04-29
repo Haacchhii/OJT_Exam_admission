@@ -11,8 +11,6 @@ import Icon from '../../../components/Icons';
 import { formatTime, badgeClass, asArray, exportToCSV, formatPersonName, formatDate } from '../../../utils/helpers';
 import { DetailField, QuestionCard } from './ExamComponents';
 import ExamPreviewModal from './ExamPreviewModal';
-import { CSVUploader } from '../../../components/CSVUploader';
-import { addExam } from '../../../api/exams';
 import type { Exam, ExamSchedule, ExamRegistration, AcademicYear, Semester } from '../../../types';
 import { GRADE_OPTIONS, ALL_GRADE_LEVELS } from '../../../utils/constants';
 
@@ -32,7 +30,6 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
   const confirm = useConfirm();
   const [detailId, setDetailId] = useState<number | null>(null);
   const [previewExam, setPreviewExam] = useState<Exam | null>(null);
-  const [showBulkImport, setShowBulkImport] = useState(false);
   const [saving, setSaving] = useState(false);
   const [searchExam, setSearchExam] = useState('');    const [levelGroupFilterExam, setLevelGroupFilterExam] = useState('all');  const [gradeFilterExam, setGradeFilterExam] = useState('all');
   const [statusFilterExam, setStatusFilterExam] = useState('all');
@@ -120,99 +117,6 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
 
   const { paginated: paginatedExams, totalPages: examTotalPages, safePage: examSafePage, totalItems: examTotal } = usePaginationSlice(filteredExams, examPage, EXAMS_PER_PAGE);
   const resetExamPage = () => setExamPage(1);
-
-  const handleBulkImportExams = async (data: any[]) => {
-    if (!data.length) {
-      showToast('No exam rows found to import.', 'error');
-      return;
-    }
-    const ok = await confirm({
-      title: 'Bulk Import Exams',
-      message: `Import ${data.length} exam row(s)? Existing exams will remain unchanged.`,
-      confirmLabel: 'Import Exams',
-      variant: 'info',
-    });
-    if (!ok) return;
-
-    let successCount = 0;
-    let failedCount = 0;
-    setSaving(true);
-    try {
-      for (const row of data) {
-        try {
-          const questions = [];
-          for (let i = 1; i <= 200; i++) {
-            const qtext = row['q' + i + '_text'];
-            if (!qtext) continue;
-            
-            const rawType = String(row['q' + i + '_type'] || 'mc').toLowerCase().trim();
-            const qType = rawType === 'truefalse' || rawType === 'true_false' || rawType === 'true/false' ? 'true_false' : rawType === 'identification' ? 'identification' : rawType === 'essay' ? 'essay' : 'mc';
-            const qPoints = parseInt(row['q' + i + '_points']) || 1;
-
-            const choices = [];
-            const correctAns = String(row['q' + i + '_ans'] || 'a').toLowerCase().trim();
-            const optionMap = ['a', 'b', 'c', 'd'];
-
-            if (qType === 'mc') {
-              for (let j = 0; j < 4; j++) {
-                const choiceText = row['q' + i + '_' + optionMap[j]];
-                if (choiceText) {
-                  choices.push({
-                    choiceText,
-                    isCorrect: correctAns === optionMap[j] || correctAns === String(j + 1),
-                    orderNum: j + 1,
-                  });
-                }
-              }
-            }
-
-            if (qType === 'true_false') {
-              const trueIsCorrect = !['false', 'f', 'b', '2', 'no', '0'].includes(correctAns);
-              choices.push(
-                { choiceText: 'True', isCorrect: trueIsCorrect, orderNum: 1 },
-                { choiceText: 'False', isCorrect: !trueIsCorrect, orderNum: 2 }
-              );
-            }
-
-            const questionPayload: Record<string, unknown> = {
-              questionText: qtext,
-              questionType: qType,
-              points: qPoints,
-              orderNum: questions.length + 1,
-              choices,
-            };
-
-            if (qType === 'identification') {
-              questionPayload.identificationAnswer = String(row['q' + i + '_ans'] || '').trim();
-              questionPayload.identificationMatchMode = String(row['q' + i + '_match'] || '').toLowerCase() === 'partial' ? 'partial' : 'exact';
-            }
-
-            questions.push(questionPayload);
-          }
-
-          await addExam({
-            title: row.title || 'Untitled Exam',
-            gradeLevel: row.gradeLevel || 'Grade 10',
-            durationMinutes: parseInt(row.durationMinutes) || 60,
-            passingScore: parseInt(row.passingScore) || 50,
-            isActive: row.isActive === 'true' || row.isActive === '1' || row.isActive?.toLowerCase() === 'yes',
-            questions
-          });
-          successCount++;
-        } catch (e) {
-          failedCount++;
-        }
-      }
-      if (successCount > 0) {
-        showToast(`Successfully imported ${successCount} exam(s).${failedCount ? ` ${failedCount} failed.` : ''}`, failedCount ? 'info' : 'success');
-      } else {
-        showToast('Import failed. No exams were created.', 'error');
-      }
-      refetch();
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const handleBulkDelete = async () => {
     if (selectedCount === 0 || bulkDeleting) return;
@@ -344,34 +248,6 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
             exportToCSV(exportData, 'exams_export.csv');
           }}>
             Export
-          </ActionButton>
-          <CSVUploader
-            title="Bulk Import Exams"
-            isOpen={showBulkImport}
-            onClose={() => setShowBulkImport(false)}
-            onImport={handleBulkImportExams}
-            templateHeaders={['title', 'gradeLevel', 'durationMinutes', 'passingScore', 'isActive', 'q1_text', 'q1_type', 'q1_points', 'q1_a', 'q1_b', 'q1_c', 'q1_d', 'q1_ans']}
-            templateRows={[
-              {
-                title: 'Grade 10 Entrance Exam',
-                gradeLevel: 'Grade 10',
-                durationMinutes: 120,
-                passingScore: 60,
-                isActive: 'true',
-                q1_text: 'What is the capital of the Philippines?',
-                q1_type: 'mc',
-                q1_points: 2,
-                q1_a: 'Cebu',
-                q1_b: 'Manila',
-                q1_c: 'Davao',
-                q1_d: 'Quezon City',
-                q1_ans: 'B',
-              },
-            ]}
-            allowMultiple
-          />
-          <ActionButton variant="secondary" onClick={() => setShowBulkImport(true)} icon={<Icon name="upload" className="w-4 h-4" />}>
-            Import Exams
           </ActionButton>
         </div>
       </PageHeader>
