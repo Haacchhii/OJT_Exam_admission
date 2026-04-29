@@ -184,6 +184,7 @@ export async function getUsers(req, res, next) {
       return { users: rows, total: count };
     }, 120_000);
 
+    res.set('Cache-Control', 'private, max-age=0, must-revalidate');
     res.json(paginatedResponse(users.map(safifyUser), total, pg));
   } catch (err) { next(err); }
 }
@@ -212,6 +213,7 @@ export async function getUserStats(req, res, next) {
       };
     }, 120_000);
 
+    res.set('Cache-Control', 'private, max-age=0, must-revalidate');
     res.json(stats);
   } catch (err) { next(err); }
 }
