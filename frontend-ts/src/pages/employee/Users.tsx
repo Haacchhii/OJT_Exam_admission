@@ -242,22 +242,18 @@ export default function EmployeeUsers() {
         return next;
       });
       try {
+        const toastId = showToast('Deleting user and refreshing data...', 'info');
         const resp = await deleteUser(userId);
+        // Await refetch and stats to ensure UI updates before completing
+        await refetch();
+        await refetchStats();
         // If backend reports that no rows were changed, the user was already deleted.
         if (!resp || typeof resp.deleted !== 'number') {
-          // Fallback: refetch to be safe
-          await refetch();
-          await refetchStats();
           showToast('User deletion processed.', 'info');
         } else if (resp.deleted === 0) {
-          await refetch();
-          await refetchStats();
           showToast('User was already deleted.', 'info');
         } else {
-          // Successful deletion
-          refetch();
-          refetchStats();
-          showToast('User deleted.', 'info');
+          showToast('User deleted successfully.', 'success');
         }
       } catch (err) {
         setOptimisticDeletedIds(prev => {
@@ -293,11 +289,13 @@ export default function EmployeeUsers() {
       return next;
     });
     try {
-      await bulkDeleteUsers(ids);
-      showToast(`${ids.length} user(s) deleted.`, 'info');
+      showToast(`Deleting ${ids.length} user(s) and refreshing data...`, 'info');
+      const resp = await bulkDeleteUsers(ids);
+      // Await refetch and stats to ensure UI updates before completing
+      await refetch();
+      await refetchStats();
+      showToast(`${resp.deleted || ids.length} user(s) deleted successfully.`, 'success');
       clearSelection();
-      refetch();
-      refetchStats();
     } catch (err) {
       setOptimisticDeletedIds(prev => {
         const next = new Set(prev);
