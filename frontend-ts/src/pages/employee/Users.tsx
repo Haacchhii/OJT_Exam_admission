@@ -242,10 +242,23 @@ export default function EmployeeUsers() {
         return next;
       });
       try {
-        await deleteUser(userId);
-        refetch();
-        refetchStats();
-        showToast('User deleted.', 'info');
+        const resp = await deleteUser(userId);
+        // If backend reports that no rows were changed, the user was already deleted.
+        if (!resp || typeof resp.deleted !== 'number') {
+          // Fallback: refetch to be safe
+          await refetch();
+          await refetchStats();
+          showToast('User deletion processed.', 'info');
+        } else if (resp.deleted === 0) {
+          await refetch();
+          await refetchStats();
+          showToast('User was already deleted.', 'info');
+        } else {
+          // Successful deletion
+          refetch();
+          refetchStats();
+          showToast('User deleted.', 'info');
+        }
       } catch (err) {
         setOptimisticDeletedIds(prev => {
           const next = new Set(prev);

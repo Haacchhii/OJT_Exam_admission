@@ -464,7 +464,7 @@ export async function deleteUser(req, res, next) {
     console.log(`[users] deleted user id=${id}; rowsAffected=${updateResult.count}`);
     await invalidateUserCaches();
     logAudit({ userId: req.user.id, action: 'user.delete', entity: 'user', entityId: id, details: { id }, ipAddress: req.ip });
-    res.status(204).end();
+    res.json({ ok: true, deleted: updateResult.count });
   } catch (err) { next(err); }
 }
 
