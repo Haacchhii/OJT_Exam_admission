@@ -15,5 +15,5 @@ export async function loginViaUi(page: Page, email: string, password: string) {
   await page.getByTestId('login-submit').click();
 
   // Wait for the auth context + redirect to settle before downstream assertions.
-  await expect(page).toHaveURL(/#\/(student|employee)/);
+  await expect(page).toHaveURL(/#\/(student|employee|change-password)/);
 }

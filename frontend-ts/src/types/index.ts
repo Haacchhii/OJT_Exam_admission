@@ -29,6 +29,7 @@ export interface User {
   email: string;
   role: UserRole;
   status: 'Active' | 'Inactive';
+  mustChangePassword?: boolean;
   phone?: string | null;
   address?: string | null;
   createdAt: string;
@@ -42,6 +43,7 @@ export interface AuthResponse {
   token?: string;
   msg?: string;
   emailVerificationRequired?: boolean;
+  mustChangePassword?: boolean;
 }
 
 // ─── Admissions ──────────────────────────────────────

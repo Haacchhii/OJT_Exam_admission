@@ -23,6 +23,7 @@ function signToken(user) {
     role: user.role,
     status: user.status,
     emailVerified: user.emailVerified,
+    mustChangePassword: user.mustChangePassword,
   }, env.JWT_SECRET, {
     expiresIn: env.JWT_EXPIRES_IN,
   });
@@ -378,7 +379,7 @@ export async function resetPassword(req, res, next) {
       return res.status(404).json({ error: 'User not found', code: 'NOT_FOUND' });
     }
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
-    await prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
+    await prisma.user.update({ where: { id: user.id }, data: { passwordHash, mustChangePassword: false } });
     logAudit({ userId: user.id, action: 'auth.password_reset', entity: 'user', entityId: user.id, ipAddress: req.ip });
     res.json({ ok: true, message: 'Password updated successfully.' });
   } catch (err) { next(err); }
@@ -414,6 +415,7 @@ export async function updateProfile(req, res, next) {
         return res.status(400).json({ error: pwErr, code: 'VALIDATION_ERROR' });
       }
       data.passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+      data.mustChangePassword = false;
     }
 
     if (Object.keys(data).length === 0) {

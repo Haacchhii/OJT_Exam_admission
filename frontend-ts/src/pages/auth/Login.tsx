@@ -1,6 +1,6 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { getPostAuthRoute, useAuth } from '../../context/AuthContext';
 import { client } from '../../api/client';
 import { showToast } from '../../components/Toast';
 import { ActionButton } from '../../components/UI';
@@ -21,7 +21,7 @@ export default function Login() {
 
   useEffect(() => {
     if (user) {
-      navigate(user.role === 'applicant' ? '/student' : '/employee', { replace: true });
+      navigate(getPostAuthRoute(user), { replace: true });
     }
   }, [user, navigate]);
 
@@ -54,8 +54,7 @@ export default function Login() {
       if (!result.ok) { showToast(result.msg || 'Login failed', 'error'); return; }
       if (remember) localStorage.setItem('gk_remember_email', email);
       else localStorage.removeItem('gk_remember_email');
-      if (result.user?.role === 'applicant') navigate('/student');
-      else navigate('/employee');
+      navigate(getPostAuthRoute(result.user), { replace: true });
     } finally {
       setLoading(false);
     }

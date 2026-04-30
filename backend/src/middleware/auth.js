@@ -18,16 +18,18 @@ export async function authenticate(req, res, next) {
     const token = header.split(' ')[1];
     const payload = jwt.verify(token, env.JWT_SECRET);
     const includeProfiles = req.originalUrl.startsWith('/api/auth/me');
-    const cacheKey = `user:${payload.sub}:${includeProfiles ? 'full' : 'base'}`;
+    const needsFreshUser = includeProfiles || payload.mustChangePassword !== false;
+    const cacheKey = `user:${payload.sub}:${needsFreshUser ? 'full' : 'base'}`;
 
     let user = null;
-    if (!includeProfiles && payload.role && payload.status) {
+    if (!needsFreshUser && payload.role && payload.status) {
       // For non-/auth/me routes, trust JWT claims to avoid DB round-trips on every request.
       user = {
         id: payload.sub,
         role: payload.role,
         status: payload.status,
         emailVerified: payload.emailVerified ?? true,
+        mustChangePassword: payload.mustChangePassword ?? false,
       };
     } else {
       user = await cached(cacheKey, async () => {
@@ -35,7 +37,7 @@ export async function authenticate(req, res, next) {
           where: { id: payload.sub },
           ...(includeProfiles
             ? { include: { applicantProfile: true, staffProfile: true } }
-            : { select: { id: true, role: true, status: true, emailVerified: true, deletedAt: true } }),
+            : { select: { id: true, role: true, status: true, emailVerified: true, mustChangePassword: true, deletedAt: true } }),
         });
       }, 300_000);
     }
@@ -55,6 +57,13 @@ export async function authenticate(req, res, next) {
 
     if (!user || user.deletedAt || user.status !== 'Active') {
       return res.status(401).json({ error: 'User not found or inactive', code: 'UNAUTHORIZED' });
+    }
+
+    if (user.mustChangePassword) {
+      const allowedPaths = ['/api/auth/me', '/api/auth/profile'];
+      if (!allowedPaths.some(p => req.originalUrl.startsWith(p))) {
+        return res.status(403).json({ error: 'You must change your temporary password before continuing.', code: 'PASSWORD_CHANGE_REQUIRED' });
+      }
     }
 
     // Any unverified account must verify before accessing protected routes.

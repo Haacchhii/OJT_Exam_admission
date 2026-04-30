@@ -17,6 +17,7 @@ const userListSelect = {
   email: true,
   role: true,
   status: true,
+  mustChangePassword: true,
   phone: true,
   address: true,
   emailVerified: true,
@@ -34,6 +35,7 @@ const userDetailSelect = {
   email: true,
   role: true,
   status: true,
+  mustChangePassword: true,
   phone: true,
   address: true,
   emailVerified: true,
@@ -292,6 +294,7 @@ export async function createUser(req, res, next) {
             emailVerified: true,
             emailVerifyToken: null,
             emailVerifyExpires: null,
+            mustChangePassword: !explicitPassword,
           },
         })
       : await prisma.user.create({
@@ -304,6 +307,7 @@ export async function createUser(req, res, next) {
             role: role || ROLES.APPLICANT,
             status: status || 'Active',
             emailVerified: true,
+            mustChangePassword: !explicitPassword,
           },
         });
 

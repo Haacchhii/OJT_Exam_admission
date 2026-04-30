@@ -19,6 +19,7 @@ model User {
   passwordHash  String   @map("password_hash")
   role          String   @default("applicant") // administrator | registrar | teacher | applicant
   status        String   @default("Active")    // Active | Inactive
+  mustChangePassword Boolean @default(false) @map("must_change_password")
   phone         String?
   address       String?
   emailVerified Boolean  @default(false) @map("email_verified")

@@ -1,6 +1,6 @@
-import { HashRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { Suspense, useEffect, type ReactNode } from 'react';
-import { AuthProvider, ROLE_PERMISSIONS, type Permission } from './context/AuthContext';
+import { AuthProvider, ROLE_PERMISSIONS, useAuth, type Permission } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 import { ToastContainer } from './components/Toast';
 import { ConfirmProvider } from './components/ConfirmDialog';
@@ -9,7 +9,6 @@ import ErrorBoundary from './components/ErrorBoundary';
 import PageErrorBoundary from './components/PageErrorBoundary';
 import ScrollToTop from './components/ScrollToTop';
 import NotFound from './pages/NotFound';
-import { useAuth } from './context/AuthContext';
 import { LoadingSpinner } from './components/UI';
 import { lazyWithRetry, LazyLoadingFallback } from './components/lazyWithRetry';
 import { prefetchLikelyRoutesForRole } from './utils/routePrefetch';
@@ -19,6 +18,7 @@ import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import ForgotPassword from './pages/auth/ForgotPassword';
 import ResetPassword from './pages/auth/ResetPassword';
+import ChangePassword from './pages/auth/ChangePassword';
 import VerifyEmail from './pages/auth/VerifyEmail';
 
 /* Student pages (lazy with retry) */
@@ -81,6 +81,25 @@ function StudentGuard({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+function FirstLoginGuard({ children }: { children: ReactNode }) {
+  const { user, authReady } = useAuth();
+  const location = useLocation();
+
+  if (!authReady) {
+    return (
+      <div className="min-h-screen grid place-items-center gk-mesh-bg">
+        <LoadingSpinner />
+      </div>
+    );
+  }
+
+  if (user?.mustChangePassword && location.pathname !== '/change-password') {
+    return <Navigate to="/change-password" replace />;
+  }
+
+  return <>{children}</>;
+}
+
 function RoleRoutePrefetcher() {
   const { user, authReady } = useAuth();
 
@@ -123,12 +142,14 @@ export default function App() {
       <HashRouter>
         <ScrollToTop />
         <RoleRoutePrefetcher />
+        <FirstLoginGuard>
         <Routes>
           {/* Public auth routes */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/change-password" element={<ChangePassword />} />
           <Route path="verify-email" element={<VerifyEmail />} />
 
           {/* Student routes */}
@@ -162,6 +183,7 @@ export default function App() {
           {/* Catch-all 404 */}
           <Route path="*" element={<NotFound />} />
         </Routes>
+        </FirstLoginGuard>
       </HashRouter>
       </ConfirmProvider>
         </SocketProvider>

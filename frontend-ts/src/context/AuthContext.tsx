@@ -51,6 +51,12 @@ function computeHash(user: User): string {
 export { ROLE_PERMISSIONS, ROLE_LABELS };
 export type { Permission };
 
+export function getPostAuthRoute(user: Pick<User, 'role' | 'mustChangePassword'> | null | undefined): string {
+  if (!user) return '/login';
+  if (user.mustChangePassword) return '/change-password';
+  return user.role === 'applicant' ? '/student' : '/employee';
+}
+
 interface LoginResult {
   ok: boolean;
   user?: User;
