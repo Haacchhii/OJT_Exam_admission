@@ -131,6 +131,24 @@ export default function EmployeeDashboard() {
   if (error) return <ErrorAlert error={error} onRetry={refetch} />;
   if (canViewAdmissions && admissionsError && !admissionsPage) return <ErrorAlert error={admissionsError} onRetry={refetchAdmissions} />;
 
+  const activePeriod = rawData?.activePeriod;
+  const yearStatus = activePeriod?.academicYearStatus || 'missing';
+  const semesterStatus = activePeriod?.semesterStatus || 'missing';
+  const periodNeedsAttention = !!activePeriod?.needsAttention;
+  const isAdmin = user?.role === 'administrator';
+
+  const periodBadgeClass = (status: 'active' | 'overdue' | 'missing') => {
+    if (status === 'active') return 'gk-badge gk-badge-active';
+    if (status === 'overdue') return 'gk-badge gk-badge-rejected';
+    return 'gk-badge gk-badge-pending';
+  };
+
+  const periodStatusLabel = (status: 'active' | 'overdue' | 'missing') => {
+    if (status === 'active') return 'Active';
+    if (status === 'overdue') return 'Overdue';
+    return 'Not Set';
+  };
+
   return (
     <div className="animate-[fadeIn_0.3s_ease-out]">
       <PageHeader title={`${roleLabel} Dashboard`} subtitle={
@@ -139,6 +157,45 @@ export default function EmployeeDashboard() {
         user?.role === 'teacher' ? 'Monitor exam registrations, scores, and essay reviews.' :
         'Monitor admission applications and exam activity.'
       } />
+
+      <div className={`mb-6 rounded-2xl border px-5 py-4 ${periodNeedsAttention ? 'border-amber-300 bg-amber-50' : 'border-emerald-200 bg-emerald-50/60'}`}>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-gray-800">Current Academic Period</p>
+            <p className="text-xs text-gray-600 mt-1">
+              Keep admissions and exam operations aligned to the active school year and semester.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-700">
+              <span className="font-semibold">SY:</span> {activePeriod?.academicYear?.year || 'No active school year'}
+            </span>
+            <Badge className={periodBadgeClass(yearStatus as 'active' | 'overdue' | 'missing')}>{periodStatusLabel(yearStatus as 'active' | 'overdue' | 'missing')}</Badge>
+
+            <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-700">
+              <span className="font-semibold">Semester:</span> {activePeriod?.semester?.name || 'No active semester'}
+            </span>
+            <Badge className={periodBadgeClass(semesterStatus as 'active' | 'overdue' | 'missing')}>{periodStatusLabel(semesterStatus as 'active' | 'overdue' | 'missing')}</Badge>
+          </div>
+        </div>
+
+        {periodNeedsAttention && (
+          <div className="mt-3 flex flex-col gap-2 text-xs text-amber-900 sm:flex-row sm:items-center sm:justify-between">
+            <p>
+              {isAdmin
+                ? 'Active period is missing or overdue. Create or activate a new school year/semester in Settings.'
+                : 'Active period is missing or overdue. Please coordinate with an administrator to update Settings.'}
+            </p>
+            {isAdmin && (
+              <Link to="/employee/settings" className="inline-flex items-center gap-1 font-semibold text-amber-900 hover:text-amber-950">
+                Open Settings
+                <Icon name="arrowRight" className="w-3.5 h-3.5" />
+              </Link>
+            )}
+          </div>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8 animate-stagger">
         {canViewAdmissions && <>

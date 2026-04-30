@@ -49,6 +49,22 @@ function isWithinPeriod(day, start, end) {
   return true;
 }
 
+function getPeriodStatus(todayDay, period) {
+  if (!period) return 'missing';
+  const endDay = toIsoDay(period.endDate);
+  if (endDay && todayDay && todayDay > endDay) return 'overdue';
+  return 'active';
+}
+
+function pickActiveSemester(activeSemesters, activeAcademicYearId) {
+  if (!Array.isArray(activeSemesters) || activeSemesters.length === 0) return null;
+  if (activeAcademicYearId) {
+    const inActiveYear = activeSemesters.find((semester) => semester.academicYearId === activeAcademicYearId);
+    if (inActiveYear) return inActiveYear;
+  }
+  return activeSemesters[0];
+}
+
 async function resolveStoredDocumentPath(doc) {
   const candidates = [];
   if (doc.filePath) candidates.push(doc.filePath);
@@ -449,6 +465,38 @@ export async function getDashboardSummary(req, res, next) {
 
     const cacheKey = `dashboardSummary:${role}:a${includeAdmissions ? 1 : 0}:e${includeExams ? 1 : 0}:r${includeResults ? 1 : 0}`;
     const summary = await cached(cacheKey, async () => {
+      const [activeAcademicYear, activeSemesters] = await Promise.all([
+        cached('ay:active:lite', () =>
+          prisma.academicYear.findFirst({
+            where: { isActive: true },
+            select: {
+              id: true,
+              year: true,
+              startDate: true,
+              endDate: true,
+            },
+          })
+        , 120_000),
+        cached('ay:semesters:active', () =>
+          prisma.semester.findMany({
+            where: { isActive: true },
+            orderBy: [{ academicYearId: 'desc' }, { id: 'asc' }],
+            select: {
+              id: true,
+              name: true,
+              academicYearId: true,
+              startDate: true,
+              endDate: true,
+            },
+          })
+        , 120_000),
+      ]);
+
+      const activeSemester = pickActiveSemester(activeSemesters, activeAcademicYear?.id);
+      const todayDay = toIsoDay(new Date());
+      const academicYearStatus = getPeriodStatus(todayDay, activeAcademicYear);
+      const semesterStatus = getPeriodStatus(todayDay, activeSemester);
+
       let stats = {
         total: 0,
         submitted: 0,
@@ -594,6 +642,13 @@ export async function getDashboardSummary(req, res, next) {
         examCount,
         completed,
         pendingEssays,
+        activePeriod: {
+          academicYear: activeAcademicYear || null,
+          semester: activeSemester || null,
+          academicYearStatus,
+          semesterStatus,
+          needsAttention: academicYearStatus !== 'active' || semesterStatus !== 'active',
+        },
       };
     }, 120_000);
 

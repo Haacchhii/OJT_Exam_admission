@@ -109,6 +109,24 @@ export interface EmployeeDashboardSummary {
   completed: number;
   trends: { total: number; accepted: number; inProgress: number; rejected: number };
   overdue: number;
+  activePeriod?: {
+    academicYear: {
+      id: number;
+      year: string;
+      startDate?: string | null;
+      endDate?: string | null;
+    } | null;
+    semester: {
+      id: number;
+      name: string;
+      academicYearId: number;
+      startDate?: string | null;
+      endDate?: string | null;
+    } | null;
+    academicYearStatus: 'active' | 'overdue' | 'missing';
+    semesterStatus: 'active' | 'overdue' | 'missing';
+    needsAttention: boolean;
+  };
 }
 
 export interface StudentHomeSummary {
