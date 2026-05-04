@@ -12,6 +12,7 @@ import { ADMISSION_STATUSES, ADMISSION_IN_PROGRESS, GRADE_OPTIONS, ALL_GRADE_LEV
 import { useAuth } from '../../../context/AuthContext';
 import { useSocket } from '../../../context/SocketContext';
 import type { Admission, Semester } from '../../../types';
+import { bulkHandoffAdmissions } from '../../../api/admissions';
 
 const PER_PAGE = 10;
 const SLA_DAYS = 7;
@@ -49,8 +50,8 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
   const [staleOnly, setStaleOnly] = useState(false);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [bulkStatus, setBulkStatus] = useState<string>('Submitted');
   const [saving, setSaving] = useState(false);
+  const [handoffing, setHandoffing] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [focusedRowIndex, setFocusedRowIndex] = useState<number | null>(null);
 
@@ -144,6 +145,12 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
     }
   };
 
+  const selectedAdmissions = useMemo(() => admissions.filter((a: Admission) => selected.has(a.id)), [admissions, selected]);
+  const canBulkHandoff = selectedAdmissions.length > 0 && selectedAdmissions.every((adm: Admission) => adm.status === 'Accepted');
+  const bulkActionLabel = selectedAdmissions.length > 0
+    ? `${selectedAdmissions.length} selected (${selectedAdmissions.filter((adm: Admission) => adm.status === 'Accepted').length} accepted)`
+    : 'No applications selected';
+
   const handleRowKeyDown = (index: number, e: React.KeyboardEvent<HTMLTableRowElement>, admission: Admission) => {
     if (e.key === 'ArrowUp' && index > 0) {
       e.preventDefault();
@@ -157,7 +164,7 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
     }
   };
 
-  const handleBulkAction = async () => {
+  const handleBulkAction = async (targetStatus: string) => {
     if (selected.size === 0 || saving) return;
     const validIds: number[] = [];
     const skippedIds: number[] = [];
@@ -165,28 +172,28 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
       const adm = admissions.find(a => a.id === id);
       if (!adm) return;
       const allowed = VALID_TRANSITIONS[adm.status] || [];
-      if (adm.status === bulkStatus || (allowed as string[]).includes(bulkStatus)) {
+      if (adm.status === targetStatus || (allowed as string[]).includes(targetStatus)) {
         validIds.push(id);
       } else {
         skippedIds.push(id);
       }
     });
     if (validIds.length === 0) {
-      showToast(`None of the selected applications can transition to "${bulkStatus}".`, 'error');
+      showToast(`None of the selected applications can transition to "${targetStatus}".`, 'error');
       return;
     }
     const skipNote = skippedIds.length > 0 ? ` (${skippedIds.length} will be skipped due to invalid transitions)` : '';
     const ok = await confirm({
-      title: `Bulk ${bulkStatus}`,
-      message: `Are you sure you want to mark ${validIds.length} application(s) as "${bulkStatus}"?${skipNote}`,
-      confirmLabel: `${bulkStatus} All`,
-      variant: bulkStatus === 'Rejected' ? 'danger' : 'info',
+      title: `Bulk ${targetStatus}`,
+      message: `Are you sure you want to mark ${validIds.length} application(s) as "${targetStatus}"?${skipNote}`,
+      confirmLabel: `${targetStatus} All`,
+      variant: targetStatus === 'Rejected' ? 'danger' : 'info',
     });
     if (!ok) return;
     setSaving(true);
     try {
-      await bulkUpdateStatus(validIds, bulkStatus);
-      showToast(`${validIds.length} application(s) updated to ${bulkStatus}.${skippedIds.length ? ` ${skippedIds.length} skipped.` : ''}`, 'success');
+      await bulkUpdateStatus(validIds, targetStatus);
+      showToast(`${validIds.length} application(s) updated to ${targetStatus}.${skippedIds.length ? ` ${skippedIds.length} skipped.` : ''}`, 'success');
       setSelected(new Set());
       refetch();
     } catch (err: any) {
@@ -216,6 +223,34 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
       showToast('Failed to delete applications.', 'error');
     } finally {
       setBulkDeleting(false);
+    }
+  };
+
+  const handleBulkHandoff = async () => {
+    if (selected.size === 0 || handoffing) return;
+    const ids = [...selected];
+    const acceptedCount = selectedAdmissions.filter((adm: Admission) => adm.status === 'Accepted').length;
+    if (acceptedCount !== ids.length) {
+      showToast('Only Accepted applications can be handed off. Remove non-accepted selections and try again.', 'error');
+      return;
+    }
+    const ok = await confirm({
+      title: 'Bulk Handoff',
+      message: `Mark ${ids.length} accepted application(s) as handed off to Registrar? This will add a handoff note to each record.`,
+      variant: 'info',
+      confirmLabel: `Hand off ${ids.length} Application(s)`,
+    });
+    if (!ok) return;
+    setHandoffing(true);
+    try {
+      await bulkHandoffAdmissions(ids);
+      showToast(`${ids.length} application(s) handed off successfully.`, 'success');
+      setSelected(new Set());
+      refetch();
+    } catch (err: any) {
+      showToast('Bulk handoff failed: ' + (err.message || 'Unknown error'), 'error');
+    } finally {
+      setHandoffing(false);
     }
   };
 
@@ -416,19 +451,46 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
 
       {/* Bulk action bar */}
       {canManage && selected.size > 0 ? (
-        <div className="flex items-center gap-3 mb-4 bg-forest-50 border border-forest-200 rounded-lg px-4 py-3 animate-[fadeInUp_0.2s_ease-out]">
-          <span className="text-sm font-semibold text-forest-700">{selected.size} selected</span>
-          <select value={bulkStatus} onChange={e => setBulkStatus(e.target.value)} className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-forest-500/20 outline-none">
-            {ADMISSION_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <ActionButton onClick={handleBulkAction} loading={saving} className="min-w-[120px]">{saving ? 'Applying...' : 'Apply Status'}</ActionButton>
-          <ActionButton onClick={handleBulkDelete} loading={bulkDeleting} variant="danger" icon={!bulkDeleting ? <Icon name="trash" className="w-3.5 h-3.5" /> : undefined} className="min-w-[140px]">{bulkDeleting ? 'Deleting...' : 'Delete Selected'}</ActionButton>
-          <ActionButton onClick={() => setSelected(new Set())} variant="ghost" className="ml-auto">Clear selection</ActionButton>
+        <div className="flex flex-col gap-3 mb-4 bg-forest-50 border border-forest-200 rounded-lg px-4 py-3 animate-[fadeInUp_0.2s_ease-out]">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-semibold text-forest-700">{bulkActionLabel}</span>
+            <span className="text-xs text-gray-500">Selected items stay on the current page while actions are applied.</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <ActionButton
+              onClick={() => handleBulkAction('Accepted')}
+              loading={saving}
+              className="min-w-[120px]"
+            >
+              {saving ? 'Approving...' : 'Bulk Approve'}
+            </ActionButton>
+            <ActionButton
+              onClick={() => handleBulkAction('Rejected')}
+              loading={saving}
+              variant="danger"
+              className="min-w-[120px]"
+            >
+              {saving ? 'Rejecting...' : 'Bulk Reject'}
+            </ActionButton>
+            <ActionButton
+              onClick={handleBulkHandoff}
+              loading={handoffing}
+              variant="secondary"
+              icon={<Icon name="clipboard" className="w-3.5 h-3.5" />}
+              className="min-w-[140px]"
+              disabled={!canBulkHandoff}
+              title={canBulkHandoff ? 'Hand off accepted applications' : 'Only accepted applications can be handed off'}
+            >
+              {handoffing ? 'Handing Off...' : 'Bulk Handoff'}
+            </ActionButton>
+            <ActionButton onClick={handleBulkDelete} loading={bulkDeleting} variant="danger" icon={!bulkDeleting ? <Icon name="trash" className="w-3.5 h-3.5" /> : undefined} className="min-w-[140px]">{bulkDeleting ? 'Deleting...' : 'Delete Selected'}</ActionButton>
+            <ActionButton onClick={() => setSelected(new Set())} variant="ghost" className="ml-auto">Clear selection</ActionButton>
+          </div>
         </div>
       ) : canManage ? (
         <div className="flex items-center gap-2 mb-4 text-xs text-gray-400">
           <Icon name="info" className="w-3.5 h-3.5" />
-          <span>Use checkboxes to select multiple applications for bulk status changes or deletion.</span>
+          <span>Use checkboxes to select multiple applications for bulk approve, reject, handoff, or deletion.</span>
         </div>
       ) : null}
 

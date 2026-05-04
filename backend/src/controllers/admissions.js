@@ -1131,6 +1131,60 @@ export async function handoffAdmission(req, res, next) {
   } catch (err) { next(err); }
 }
 
+// POST /api/admissions/bulk-handoff — registrar marks multiple accepted applications as handed off
+export async function bulkHandoffAdmissions(req, res, next) {
+  try {
+    const { ids } = req.body;
+    if (!ids?.length) {
+      return res.status(400).json({ error: 'Please select at least one admission.', code: 'VALIDATION_ERROR' });
+    }
+    if (ids.length > MAX_BULK_OPERATIONS) {
+      return res.status(400).json({ error: `Please select ${MAX_BULK_OPERATIONS} admissions or fewer per bulk handoff.`, code: 'VALIDATION_ERROR' });
+    }
+
+    const admissions = await prisma.admission.findMany({ where: { id: { in: ids } } });
+    for (const adm of admissions) {
+      if (adm.deletedAt) {
+        return res.status(404).json({ error: `Admission #${adm.id} could not be found.`, code: 'NOT_FOUND' });
+      }
+      if (adm.status !== 'Accepted') {
+        return res.status(400).json({ error: `Admission #${adm.id} must be Accepted before handoff.`, code: 'VALIDATION_ERROR' });
+      }
+    }
+
+    const timestamp = new Date().toISOString();
+    const updates = await prisma.$transaction(admissions.map((adm) => {
+      const handoffNote = `Enrollment handoff completed by ${req.user.firstName || req.user.email} (${req.user.role}) on ${timestamp}`;
+      return prisma.admission.update({
+        where: { id: adm.id },
+        data: { notes: (adm.notes ? adm.notes + '\n\n' : '') + handoffNote },
+        include: { documents: true, academicYear: true, semester: true },
+      });
+    }));
+
+    logAudit({
+      userId: req.user.id,
+      action: 'admission.bulk_handoff',
+      entity: 'admission',
+      entityId: null,
+      details: { ids, count: updates.length, handoffBy: req.user.role },
+      ipAddress: req.ip,
+    });
+
+    await invalidateAdmissionCaches(admissions.map((adm) => adm.userId));
+
+    try {
+      const io = getIo();
+      io.to('role_registrar').emit('admission_bulk_handoff', { ids, count: updates.length });
+      for (const adm of admissions) {
+        io.to(`user_${adm.userId}`).emit('admission_handoff', { id: adm.id, bulk: true });
+      }
+    } catch (_) {}
+
+    res.json({ updated: updates.length });
+  } catch (err) { next(err); }
+}
+
 // PATCH /api/admissions/bulk-status
 export async function bulkUpdateStatus(req, res, next) {
   try {

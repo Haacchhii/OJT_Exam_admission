@@ -4,7 +4,7 @@ import { authorize } from '../middleware/rbac.js';
 import { upload } from '../middleware/upload.js';
 import { verifyMime } from '../middleware/verifyMime.js';
 import { validate, validateQuery } from '../middleware/validate.js';
-import { createAdmissionSchema, updateStatusSchema, bulkUpdateStatusSchema, bulkDeleteSchema, reviewDocumentSchema, admissionsQuerySchema, admissionsStatsQuerySchema, reportsSummaryQuerySchema } from '../utils/schemas.js';
+import { createAdmissionSchema, updateStatusSchema, bulkUpdateStatusSchema, bulkHandoffSchema, bulkDeleteSchema, reviewDocumentSchema, admissionsQuerySchema, admissionsStatsQuerySchema, reportsSummaryQuerySchema } from '../utils/schemas.js';
 import { writeLimiter } from '../middleware/rateLimits.js';
 import * as ctrl from '../controllers/admissions.js';
 import { previewDocument, extractDocument, getExtractionJobStatus } from '../controllers/documentPreview.js';
@@ -48,6 +48,7 @@ router.patch('/:id/documents/:docId/review', authorize(ROLES.ADMIN, ROLES.REGIST
 
 // Bulk operations (MUST come before /:id to avoid param capture)
 router.patch('/bulk-status',  authorize(ROLES.ADMIN, ROLES.REGISTRAR), validate(bulkUpdateStatusSchema), ctrl.bulkUpdateStatus);
+router.post('/bulk-handoff',  authorize(ROLES.ADMIN, ROLES.REGISTRAR), validate(bulkHandoffSchema), ctrl.bulkHandoffAdmissions);
 router.post('/bulk-delete',   authorize(ROLES.ADMIN, ROLES.REGISTRAR), validate(bulkDeleteSchema), ctrl.bulkDeleteAdmissions);
 router.patch('/:id/status',  authorize(ROLES.ADMIN, ROLES.REGISTRAR), validate(updateStatusSchema), ctrl.updateStatus);
 router.post('/:id/handoff',  authorize(ROLES.ADMIN, ROLES.REGISTRAR), ctrl.handoffAdmission);
