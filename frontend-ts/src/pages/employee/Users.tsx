@@ -604,6 +604,29 @@ export default function EmployeeUsers() {
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <ActionButton variant="secondary" onClick={() => setShowModal(false)}>Cancel</ActionButton>
+            {editId && (
+              <ActionButton
+                variant="ghost"
+                size="sm"
+                className="text-amber-700 border-amber-200"
+                onClick={async () => {
+                  const ok = await confirm({ title: 'Force Password Reset', message: 'Require this user to change their password on next login?', confirmLabel: 'Force Reset', variant: 'danger' });
+                  if (!ok || !editId) return;
+                  try {
+                    showToast('Forcing password reset...', 'info');
+                    await forcePasswordReset(editId);
+                    showToast('Password reset forced for user.', 'success');
+                    await refetch();
+                    await refetchStats();
+                    setShowModal(false);
+                  } catch (err) {
+                    showToast(friendlyActionError(err, 'Could not force password reset.'), 'error');
+                  }
+                }}
+              >
+                Force Password
+              </ActionButton>
+            )}
             <ActionButton onClick={handleSave} loading={saving}>{editId ? 'Save Changes' : 'Add User'}</ActionButton>
           </div>
         </div>

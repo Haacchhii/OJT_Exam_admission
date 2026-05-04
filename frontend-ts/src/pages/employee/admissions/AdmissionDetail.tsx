@@ -210,7 +210,8 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
     try {
       setSaving(true);
       const updated = await (await import('../../../api/admissions')).handoffAdmission(adm.id);
-      setAdm(updated.data);
+      // `handoffAdmission` returns the updated Admission object directly
+      setAdm(updated);
       showToast('Enrollment handoff recorded and noted in application.', 'success');
       refetch();
     } catch (err: any) {

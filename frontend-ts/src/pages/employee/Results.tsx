@@ -314,6 +314,12 @@ export default function EmployeeResults() {
     });
     try {
       await scoreEssay(scoreModal.id, s, commentVal.trim() || undefined);
+      // Ensure the employee summary and essays are refreshed so updated scores show immediately
+      try {
+        await getEmployeeResultsSummary({ limit: RESULTS_SUMMARY_LIMIT, includeEssays: true, includeResults: includeResultsInSummary });
+      } catch (e) {
+        // ignore; we'll still call refetch below
+      }
       localStorage.removeItem(essayDraftKey(scoreModal.id));
       showToast('Essay scored!', 'success');
       setScoreActionState({
