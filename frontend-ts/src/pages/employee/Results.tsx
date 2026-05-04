@@ -85,7 +85,7 @@ export default function EmployeeResults() {
   const location = useLocation();
   const confirm = useConfirm();
   const canScoreEssays = authUser?.role === 'administrator' || authUser?.role === 'teacher';
-  const [tab, setTab] = useState<'results' | 'essays' | 'analytics'>('results');
+  const [tab, setTab] = useState<'dashboard' | 'results' | 'essays' | 'analytics'>(canScoreEssays ? 'dashboard' : 'results');
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const [examFilter, setExamFilter] = useState('all');
@@ -106,8 +106,8 @@ export default function EmployeeResults() {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [selectedEssayExamId, setSelectedEssayExamId] = useState<number | null>(null);
   const [scoreActionState, setScoreActionState] = useState<{ tone: 'info' | 'success' | 'danger'; title: string; message?: string } | null>(null);
-  const includeResultsInSummary = tab === 'results' || tab === 'analytics';
-  const includeEssaysInSummary = tab === 'essays';
+  const includeResultsInSummary = tab === 'dashboard' || tab === 'results' || tab === 'analytics';
+  const includeEssaysInSummary = tab === 'dashboard' || tab === 'essays';
 
   useEffect(() => {
     if (!scoreActionState || scoreActionState.tone === 'info') return;
@@ -196,6 +196,10 @@ export default function EmployeeResults() {
   const pending = essays.filter(e => !e.scored);
   const scored = essays.filter(e => e.scored);
   const pendingEssaysCount = summaryMeta?.totalPendingEssays ?? pending.length;
+  const essayScoreAverage = scored.length > 0
+    ? (scored.reduce((sum, essay) => sum + ((essay.pointsAwarded ?? 0) / Math.max(1, essay.maxPoints)), 0) / scored.length) * 100
+    : 0;
+  const passRate = results.length > 0 ? (passed / results.length) * 100 : 0;
 
   const enrichedEssays: EnrichedEssay[] = useMemo(() => essays.map(e => {
     const reg = regsById.get(e.registrationId);
@@ -209,6 +213,13 @@ export default function EmployeeResults() {
       questionText: e.question?.questionText || getQuestionText(e.questionId),
     };
   }), [essays, regsById, schedulesById, examsById, usersById, usersByEmail]);
+
+  const recentScoredEssays = useMemo(() => {
+    return [...enrichedEssays]
+      .filter(e => e.scored)
+      .sort((a, b) => new Date(b.scoredAt || 0).getTime() - new Date(a.scoredAt || 0).getTime())
+      .slice(0, 5);
+  }, [enrichedEssays]);
 
   const examEssaySummary = useMemo<ExamEssaySummary[]>(() => {
     const map = new Map<number, ExamEssaySummary>();
@@ -449,6 +460,11 @@ export default function EmployeeResults() {
   return (
     <div>
       <div className="flex gap-2 mb-6 flex-wrap" role="tablist">
+        {canScoreEssays && (
+          <button role="tab" aria-selected={tab === 'dashboard'} onClick={() => setTab('dashboard')} className={`px-4 py-2 rounded-lg text-sm font-medium transition inline-flex items-center gap-1.5 ${tab === 'dashboard' ? 'bg-forest-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+            <Icon name="chartBar" className="w-4 h-4" /> Score Dashboard
+          </button>
+        )}
         <button role="tab" aria-selected={tab === 'results'} onClick={() => setTab('results')} className={`px-4 py-2 rounded-lg text-sm font-medium transition inline-flex items-center gap-1.5 ${tab === 'results' ? 'bg-forest-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}><Icon name="chartBar" className="w-4 h-4" /> All Results</button>
         {canScoreEssays && (
           <button role="tab" aria-selected={tab === 'essays'} onClick={() => setTab('essays')} className={`px-4 py-2 rounded-lg text-sm font-medium transition inline-flex items-center gap-1.5 ${tab === 'essays' ? 'bg-forest-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}><Icon name="documentText" className="w-4 h-4" /> Essay Review ({pendingEssaysCount})</button>
@@ -472,6 +488,115 @@ export default function EmployeeResults() {
           {summaryMeta.includeResults && summaryMeta.includeEssays ? ' and' : ''}
           {summaryMeta.includeEssays ? ` ${summaryMeta.returnedEssays} of ${summaryMeta.totalEssays} essays` : ''}
           {' '}for performance. Use specific filters to review targeted records.
+        </div>
+      )}
+
+      {tab === 'dashboard' && canScoreEssays && (
+        <div>
+          <PageHeader title="Teacher Score Dashboard" subtitle="Track essay scoring load, review progress, and exam performance at a glance.">
+            <div className="flex gap-2 flex-wrap">
+              <ActionButton variant="secondary" icon={<Icon name="documentText" className="w-4 h-4" />} onClick={() => setTab('essays')}>
+                Open Essay Queue
+              </ActionButton>
+              <ActionButton variant="secondary" icon={<Icon name="refresh" className="w-4 h-4" />} onClick={refetch}>
+                Refresh
+              </ActionButton>
+            </div>
+          </PageHeader>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <StatCard icon="documentText" value={pendingEssaysCount} label="Pending Essays" color={pendingEssaysCount > 0 ? 'amber' : 'emerald'} />
+            <StatCard icon="checkCircle" value={scored.length} label="Scored Essays" color="emerald" />
+            <StatCard icon="chartBar" value={`${essayScoreAverage.toFixed(1)}%`} label="Average Essay Score" color="blue" />
+            <StatCard icon="arrowTrendUp" value={`${passRate.toFixed(1)}%`} label="Result Pass Rate" color="amber" />
+          </div>
+
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6">
+            <div className="gk-section-card p-5 xl:col-span-2">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-bold text-forest-500">Exams Needing Attention</h3>
+                  <p className="text-xs text-gray-500">Ranked by pending essay reviews and completion progress.</p>
+                </div>
+                <span className="text-xs text-gray-400">{examEssaySummary.length} exams with essay activity</span>
+              </div>
+
+              {examEssaySummary.length === 0 ? (
+                <p className="text-sm text-gray-500 py-6 text-center">No essay activity found yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {examEssaySummary.slice(0, 6).map(row => (
+                    <div key={row.examId} className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                      <div className="flex items-start justify-between gap-3 mb-2">
+                        <div>
+                          <p className="font-semibold text-gray-800">{row.examTitle}</p>
+                          <p className="text-xs text-gray-500">Grade {row.gradeLevel} · {row.studentCount} student{row.studentCount === 1 ? '' : 's'}</p>
+                        </div>
+                        <ActionButton
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => {
+                            setTab('essays');
+                            setSelectedEssayExamId(row.examId);
+                            setEssayExamsPage(1);
+                            setEssayRowsPage(1);
+                          }}
+                        >
+                          Review
+                        </ActionButton>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs mb-2">
+                        <div className="rounded-lg bg-white border border-gray-200 px-2 py-1.5">
+                          <p className="text-gray-500">Pending</p>
+                          <p className="font-semibold text-amber-700">{row.pendingCount}</p>
+                        </div>
+                        <div className="rounded-lg bg-white border border-gray-200 px-2 py-1.5">
+                          <p className="text-gray-500">Reviewed</p>
+                          <p className="font-semibold text-forest-700">{row.scoredCount}</p>
+                        </div>
+                        <div className="rounded-lg bg-white border border-gray-200 px-2 py-1.5">
+                          <p className="text-gray-500">Progress</p>
+                          <p className="font-semibold text-gray-700">{row.completionRate}%</p>
+                        </div>
+                      </div>
+                      <div className="h-2 rounded-full bg-white border border-gray-200 overflow-hidden">
+                        <div className="h-full bg-forest-500" style={{ width: `${row.completionRate}%` }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="gk-section-card p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-bold text-forest-500">Recent Scoring Activity</h3>
+                  <p className="text-xs text-gray-500">Latest scored essays and feedback updates.</p>
+                </div>
+              </div>
+
+              {recentScoredEssays.length === 0 ? (
+                <p className="text-sm text-gray-500 py-6 text-center">No scored essays yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {recentScoredEssays.map(essay => (
+                    <div key={essay.id} className="rounded-xl border border-gray-200 bg-white px-3 py-3">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div>
+                          <p className="text-sm font-semibold text-gray-800">{essay.studentName}</p>
+                          <p className="text-xs text-gray-500">{essay.examTitle}</p>
+                        </div>
+                        <Badge className="gk-badge gk-badge-reviewed">{essay.pointsAwarded ?? 0}/{essay.maxPoints}</Badge>
+                      </div>
+                      <p className="text-xs text-gray-600 line-clamp-3" title={essay.questionText}>{essay.questionText}</p>
+                      <p className="mt-2 text-[11px] text-gray-400">Scored {essay.scoredAt ? formatDate(essay.scoredAt) : 'recently'}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
