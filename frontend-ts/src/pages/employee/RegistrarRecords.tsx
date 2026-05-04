@@ -8,7 +8,7 @@ import type { Admission } from '../../types';
 
 export default function RegistrarRecords() {
   const { data, loading, refetch } = useAsync<Admission[]>(
-    () => getAdmissions({ status: 'Accepted', limit: 200 }).then(r => r.data),
+    () => getAdmissions({ status: 'Accepted', limit: 200 }),
     [], 0, { resourcePrefixes: ['/admissions'] }
   );
 
