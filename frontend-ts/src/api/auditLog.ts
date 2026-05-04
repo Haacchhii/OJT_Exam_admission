@@ -4,6 +4,7 @@ import type { AuditLog } from '../types';
 interface AuditLogParams {
   action?: string;
   entity?: string;
+  entityId?: number | string;
   userId?: string;
   from?: string;
   to?: string;

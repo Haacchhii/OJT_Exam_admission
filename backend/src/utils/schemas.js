@@ -378,6 +378,7 @@ export const auditLogQuerySchema = z.object({
   ...paginationQuery,
   action: optionalString,
   entity: optionalString,
+  entityId: coerceOptionalInt,
   userId: coerceOptionalInt,
   from:   isoDateStr.optional(),
   to:     isoDateStr.optional(),

@@ -5,12 +5,13 @@ import { cached } from '../utils/cache.js';
 // GET /api/audit-logs?action=&entity=&userId=&from=&to=&page=&limit=
 export async function getAuditLogs(req, res, next) {
   try {
-    const { action, entity, userId, from, to, search, page, limit } = req.query;
+    const { action, entity, entityId, userId, from, to, search, page, limit } = req.query;
     const pg = paginate(page ?? 1, limit ?? 100);
 
     const where = {};
     if (action) where.action = { contains: action, mode: 'insensitive' };
     if (entity) where.entity = entity;
+    if (entityId) where.entityId = Number(entityId);
     if (userId) where.userId = Number(userId);
 
     if (from || to) {
@@ -30,6 +31,7 @@ export async function getAuditLogs(req, res, next) {
     const cacheKey = `audit:logs:${JSON.stringify({
       action: action || null,
       entity: entity || null,
+      entityId: entityId ? Number(entityId) : null,
       userId: userId ? Number(userId) : null,
       from: from || null,
       to: to || null,
