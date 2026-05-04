@@ -1,3 +1,4 @@
+import React from 'react';
 import type { ReactNode, InputHTMLAttributes, SelectHTMLAttributes } from 'react';
 
 /* ─── Input ─── */

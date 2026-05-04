@@ -7,7 +7,7 @@ import Icon from '../../components/Icons';
 import type { Admission } from '../../types';
 
 export default function RegistrarRecords() {
-  const { data, loading, refetch } = useAsync<{ id: number; firstName: string; lastName: string; gradeLevel: string; trackingId: string; submittedAt: string; status: string }[]>(
+  const { data, loading, refetch } = useAsync<Admission[]>(
     () => getAdmissions({ status: 'Accepted', limit: 200 }).then(r => r.data),
     [], 0, { resourcePrefixes: ['/admissions'] }
   );

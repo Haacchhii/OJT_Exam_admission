@@ -393,12 +393,12 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
   };
 
   const saveExam = async (): Promise<Exam | null> => {
-    if (!title.trim() || !grade || !duration || !passing) { showToast('Fill in all required exam details (title, grade, duration, passing score).', 'error'); return; }
+    if (!title.trim() || !grade || !duration || !passing) { showToast('Fill in all required exam details (title, grade, duration, passing score).', 'error'); return null; }
     const dur = parseInt(String(duration));
     const pass = parseFloat(String(passing));
-    if (isNaN(dur) || dur <= 0) { showToast('Duration must be a positive number of minutes.', 'error'); return; }
-    if (isNaN(pass) || pass < 0 || pass > 100) { showToast('Passing score must be between 0 and 100.', 'error'); return; }
-    if (questions.length === 0) { showToast('Add at least one question before saving.', 'error'); return; }
+    if (isNaN(dur) || dur <= 0) { showToast('Duration must be a positive number of minutes.', 'error'); return null; }
+    if (isNaN(pass) || pass < 0 || pass > 100) { showToast('Passing score must be between 0 and 100.', 'error'); return null; }
+    if (questions.length === 0) { showToast('Add at least one question before saving.', 'error'); return null; }
     setIsSaving(true);
     try {
       const payload = {
@@ -413,11 +413,11 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
       if (editExam) {
         const res = await updateExam(editExam.id, payload);
         showToast('Exam updated successfully!', 'success');
-        return res.data as Exam;
+        return res as Exam;
       } else {
         const res = await addExam(payload);
         showToast('Exam created successfully!', 'success');
-        return res.data as Exam;
+        return res as Exam;
       }
       clear();
       onDone();
