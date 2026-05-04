@@ -285,8 +285,6 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
             </div>
           </>
         )}
-          </div>
-        )}
         <div className="flex items-center justify-between mb-2">
           <h3 className="font-bold text-forest-500 text-lg">{exam.title}</h3>
           <div className={`flex items-center gap-2 font-mono text-lg font-bold ${timerColor}`} role="timer" aria-live="polite" aria-label={`Time remaining: ${mins} minutes ${secs} seconds`}>
