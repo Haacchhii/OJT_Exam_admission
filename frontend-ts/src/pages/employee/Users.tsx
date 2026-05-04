@@ -514,15 +514,9 @@ export default function EmployeeUsers() {
                   <td className="py-3 px-4 text-gray-500">{u.role === 'applicant' ? (u.applicantProfile?.gradeLevel || 'N/A') : 'N/A'}</td>
                   <td className="py-3 px-4"><Badge variant={u.status === 'Active' ? 'success' : 'danger'}>{u.status}</Badge></td>
                   <td className="py-3 px-4 text-right">
-                    <div className="flex flex-col gap-2">
-                      <div className="inline-flex items-center gap-1">
-                        <ActionButton size="sm" variant="ghost" onClick={() => openEdit(u)} icon={<Icon name="edit" className="w-3.5 h-3.5" />} className="text-forest-600 hover:bg-forest-50">Edit</ActionButton>
-                        <ActionButton size="sm" variant="ghost" onClick={() => confirmDelete(u.id)} icon={<Icon name="trash" className="w-3.5 h-3.5" />} className="text-red-600 hover:bg-red-50">Delete</ActionButton>
-                      </div>
-                      <div className="inline-flex items-center gap-1">
-                        <ActionButton size="sm" variant="ghost" onClick={() => handleForcePasswordReset(u)} icon={<Icon name="key" className="w-3.5 h-3.5" />} className="text-amber-600 hover:bg-amber-50" title="Force password reset">Force Password</ActionButton>
-                        <ActionButton size="sm" variant="ghost" onClick={() => handleOpenRoleModal(u)} icon={<Icon name="shieldCheck" className="w-3.5 h-3.5" />} className="text-blue-600 hover:bg-blue-50" title="Change user role">Set Role</ActionButton>
-                      </div>
+                    <div className="inline-flex items-center gap-1">
+                      <ActionButton size="sm" variant="ghost" onClick={() => openEdit(u)} icon={<Icon name="edit" className="w-3.5 h-3.5" />} className="text-forest-600 hover:bg-forest-50">Edit</ActionButton>
+                      <ActionButton size="sm" variant="ghost" onClick={() => confirmDelete(u.id)} icon={<Icon name="trash" className="w-3.5 h-3.5" />} className="text-red-600 hover:bg-red-50">Delete</ActionButton>
                     </div>
                   </td>
                 </tr>
@@ -605,27 +599,42 @@ export default function EmployeeUsers() {
           <div className="flex justify-end gap-3 pt-2">
             <ActionButton variant="secondary" onClick={() => setShowModal(false)}>Cancel</ActionButton>
             {editId && (
-              <ActionButton
-                variant="ghost"
-                size="sm"
-                className="text-amber-700 border-amber-200"
-                onClick={async () => {
-                  const ok = await confirm({ title: 'Force Password Reset', message: 'Require this user to change their password on next login?', confirmLabel: 'Force Reset', variant: 'danger' });
-                  if (!ok || !editId) return;
-                  try {
-                    showToast('Forcing password reset...', 'info');
-                    await forcePasswordReset(editId);
-                    showToast('Password reset forced for user.', 'success');
-                    await refetch();
-                    await refetchStats();
-                    setShowModal(false);
-                  } catch (err) {
-                    showToast(friendlyActionError(err, 'Could not force password reset.'), 'error');
-                  }
-                }}
-              >
-                Force Password
-              </ActionButton>
+              <>
+                <ActionButton
+                  variant="ghost"
+                  size="sm"
+                  className="text-blue-700 border-blue-200"
+                  onClick={() => {
+                    setSelectedUserForRole(users.find(u => u.id === editId) || null);
+                    setSelectedRoleForChange(users.find(u => u.id === editId)?.role || '');
+                    setShowRoleModal(true);
+                  }}
+                  title="Change user role"
+                >
+                  Set Role
+                </ActionButton>
+                <ActionButton
+                  variant="ghost"
+                  size="sm"
+                  className="text-amber-700 border-amber-200"
+                  onClick={async () => {
+                    const ok = await confirm({ title: 'Force Password Reset', message: 'Require this user to change their password on next login?', confirmLabel: 'Force Reset', variant: 'danger' });
+                    if (!ok || !editId) return;
+                    try {
+                      showToast('Forcing password reset...', 'info');
+                      await forcePasswordReset(editId);
+                      showToast('Password reset forced for user.', 'success');
+                      await refetch();
+                      await refetchStats();
+                      setShowModal(false);
+                    } catch (err) {
+                      showToast(friendlyActionError(err, 'Could not force password reset.'), 'error');
+                    }
+                  }}
+                >
+                  Force Password
+                </ActionButton>
+              </>
             )}
             <ActionButton onClick={handleSave} loading={saving}>{editId ? 'Save Changes' : 'Add User'}</ActionButton>
           </div>
