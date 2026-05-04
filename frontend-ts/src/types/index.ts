@@ -237,7 +237,7 @@ export interface AuditLog {
   details: string | null;
   ipAddress: string | null;
   createdAt: string;
-  user?: { firstName: string; middleName?: string | null; lastName: string; email: string } | null;
+  user?: { firstName: string; middleName?: string | null; lastName: string; email: string; role?: string } | null;
 }
 
 // ─── Academic ──────────────────────────────────────
