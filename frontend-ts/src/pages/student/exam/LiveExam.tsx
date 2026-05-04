@@ -370,10 +370,20 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-            <div className="h-full bg-gold-400 transition-all" style={{ width: `${progressPct}%` }} />
+          <div className="flex-1">
+            <div className="h-2 bg-gray-200 rounded-full overflow-hidden mb-1.5">
+              <div className="h-full bg-gold-400 transition-all" style={{ width: `${progressPct}%` }} />
+            </div>
+            <div className="flex items-center justify-between text-xs text-gray-500">
+              <span>{answered} / {questions.length} answered</span>
+              <span className="font-semibold text-forest-600">{Math.round(progressPct)}% complete</span>
+            </div>
           </div>
-          <span className="text-sm text-gray-500">{answered} / {questions.length} answered</span>
+          <div className="text-right text-xs font-medium text-gray-600 whitespace-nowrap" role="status" aria-label={`Progress: ${answered} answered, ${flaggedCount} flagged, ${questions.length - answered} unanswered`}>
+            <div className="text-forest-700">{answered} answered</div>
+            <div className="text-gold-600">{flaggedCount} flagged</div>
+            <div className="text-gray-400">{questions.length - answered} left</div>
+          </div>
         </div>
         {cheatFlags > 0 && (
           <div className="mt-2 bg-red-50 border border-red-200 text-red-600 text-sm px-3 py-1.5 rounded-lg" role="alert">
