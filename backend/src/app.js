@@ -24,6 +24,7 @@ import resultsRoutes       from './routes/results.js';
 import usersRoutes         from './routes/users.js';
 import auditLogRoutes      from './routes/auditLog.js';
 import academicYearsRoutes from './routes/academicYears.js';
+import questionTemplatesRoutes from './routes/questionTemplates.js';
 import perfRoutes          from './routes/perf.js';
 
 const app = express();
@@ -190,6 +191,7 @@ app.use('/api/auth', authLimiter, noStore, authRoutes);
 app.use('/api/perf', noStore, perfRoutes);
 app.use('/api/admissions',    cachePrivate, admissionsRoutes);
 app.use('/api/exams',         cachePrivate, examsRoutes);
+app.use('/api/question-templates', cachePrivate, questionTemplatesRoutes);
 app.use('/api/results',       cachePrivate, resultsRoutes);
 app.use('/api/users',         cachePrivate, usersRoutes);
 app.use('/api/audit-logs',    cachePrivate, auditLogRoutes);

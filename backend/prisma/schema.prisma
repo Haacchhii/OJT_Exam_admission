@@ -38,6 +38,7 @@ model User {
   reviewedDocSubmissions AdmissionDocumentSubmission[] @relation("DocumentSubmissionReviewer")
   auditLogs       AuditLog[]
   examRegistrations ExamRegistration[] @relation("ExamRegistrationUser")
+  questionTemplates QuestionTemplate[] @relation("TemplateCreator")
 
   applicantProfile  ApplicantProfile?
   staffProfile      StaffProfile?
@@ -47,6 +48,31 @@ model User {
   @@index([deletedAt, status, createdAt])
   @@index([deletedAt, role])
   @@map("users")
+}
+
+// ─── Question Templates (Reusable Questions) ──────────
+model QuestionTemplate {
+  id           Int    @id @default(autoincrement())
+  createdById  Int    @map("created_by")
+  title        String // Template name
+  questionText String @map("question_text")
+  questionType String @map("question_type") // mc | essay | identification | true_false
+  identificationAnswer String? @map("identification_answer")
+  identificationMatchMode String? @map("identification_match_mode") // exact | partial
+  points       Int    @default(1)
+  choices      String // Stored as JSON array
+  description  String?
+  isPublic     Boolean @default(false) @map("is_public")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  createdBy    User @relation("TemplateCreator", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([createdById])
+  @@index([questionType])
+  @@index([isPublic])
+  @@index([createdAt])
+  @@map("question_templates")
 }
 
 // ─── Admissions ───────────────────────────────────────
