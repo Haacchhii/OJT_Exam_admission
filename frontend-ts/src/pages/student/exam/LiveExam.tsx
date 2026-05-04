@@ -10,6 +10,7 @@ import { useOfflineExamQueue } from '../../../hooks/useOfflineExamQueue';
 import type { Exam, ExamRegistration, ExamQuestion, QuestionChoice } from '../../../types';
 
 type AnswerMap = Record<number, number | string>;
+type FlagSet = Set<number>;
 
 function formatDraftAge(lastSavedAt: number | null): string {
   if (!lastSavedAt) return 'Not saved yet';
@@ -30,6 +31,7 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
   const navigate = useNavigate();
   const { enqueueSubmission, getQueue, removeFromQueue, incrementAttemptCount } = useOfflineExamQueue();
   const draftStorageKey = `gk_exam_answers_${registration.id}`;
+  const flagStorageKey = `gk_exam_flags_${registration.id}`;
 
   const [currentQ, setCurrentQ] = useState(0);
   const [answers, setAnswers] = useState<AnswerMap>(() => {
@@ -43,6 +45,14 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
       return {};
     } catch { return {}; }
   });
+  const [flags, setFlags] = useState<FlagSet>(() => {
+    try {
+      const saved = sessionStorage.getItem(flagStorageKey);
+      if (saved) return new Set(JSON.parse(saved));
+      return new Set();
+    } catch { return new Set(); }
+  });
+  const [showFlaggedOnly, setShowFlaggedOnly] = useState(false);
   const calcRemaining = () => {
     if (registration.startedAt) {
       const elapsed = Math.floor((Date.now() - new Date(registration.startedAt).getTime()) / 1000);
@@ -78,6 +88,10 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
     try { sessionStorage.setItem(draftStorageKey, JSON.stringify(answers)); } catch { /* ignore */ }
   }, [answers, registration.id]);
 
+  useEffect(() => {
+    try { sessionStorage.setItem(flagStorageKey, JSON.stringify(Array.from(flags))); } catch { /* ignore */ }
+  }, [flags, registration.id]);
+
   const answersRef = useRef(answers);
   answersRef.current = answers;
 
@@ -92,6 +106,18 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
       setDraftStatus('error');
     }
   }, [registration.id, isOnline]);
+
+  const toggleFlag = useCallback((questionId: number) => {
+    setFlags(prev => {
+      const newFlags = new Set(prev);
+      if (newFlags.has(questionId)) {
+        newFlags.delete(questionId);
+      } else {
+        newFlags.add(questionId);
+      }
+      return newFlags;
+    });
+  }, []);
 
   const doSubmit = useCallback(async (title: string | null, msg: string | null) => {
     if (submittedRef.current) return;
@@ -132,7 +158,10 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
       showToast((err as Error).message || 'Failed to submit exam. Please try again.', 'error');
       return;
     }
-    try { sessionStorage.removeItem(draftStorageKey); } catch { /* ignore */ }
+    try { 
+      sessionStorage.removeItem(draftStorageKey);
+      sessionStorage.removeItem(flagStorageKey);
+    } catch { /* ignore */ }
     if (title && msg) {
       setSubmitPhase('idle');
       setSubmitFeedback(null);
@@ -253,6 +282,11 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
   const secs = timeLeft % 60;
   const timerColor = timeLeft <= 60 ? 'text-red-500' : timeLeft <= 300 ? 'text-gold-500' : 'text-forest-500';
 
+  // Filter questions for display if showing flagged only
+  const displayQuestions = showFlaggedOnly ? questions.filter(qu => flags.has(qu.id)) : questions;
+  const displayedQ = displayQuestions.length > 0 ? displayQuestions[Math.min(currentQ, displayQuestions.length - 1)] : null;
+  const flaggedCount = flags.size;
+
   if (submitPhase === 'submitting' && submitFeedback) {
     return (
       <div className="min-h-screen bg-gray-50 p-4">
@@ -307,6 +341,8 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
     );
   }
 
+  const displayingFiltered = showFlaggedOnly && displayQuestions.length === 0;
+
   return (
     <div className="min-h-screen bg-gray-50">
       <a href="#exam-content" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:bg-white focus:p-2 focus:rounded focus:shadow focus:z-[100]">Skip to exam content</a>
@@ -348,11 +384,23 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
 
       <div id="exam-content" className="max-w-3xl mx-auto p-4">
         <div className="gk-section-card p-6 mb-4">
-          <div className="flex items-center gap-3 mb-4">
-            <span className="text-sm font-bold text-gray-400">Question {currentQ + 1} of {questions.length}</span>
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${q.questionType === 'mc' ? 'bg-forest-100 text-forest-700' : q.questionType === 'essay' ? 'bg-gold-100 text-gold-700' : q.questionType === 'identification' ? 'bg-indigo-100 text-indigo-700' : 'bg-blue-100 text-blue-700'}`}>
-              {q.questionType === 'mc' ? 'Multiple Choice' : q.questionType === 'essay' ? 'Essay' : q.questionType === 'identification' ? 'Identification' : 'True / False'}
-            </span>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-bold text-gray-400">Question {currentQ + 1} of {questions.length}</span>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${q.questionType === 'mc' ? 'bg-forest-100 text-forest-700' : q.questionType === 'essay' ? 'bg-gold-100 text-gold-700' : q.questionType === 'identification' ? 'bg-indigo-100 text-indigo-700' : 'bg-blue-100 text-blue-700'}`}>
+                {q.questionType === 'mc' ? 'Multiple Choice' : q.questionType === 'essay' ? 'Essay' : q.questionType === 'identification' ? 'Identification' : 'True / False'}
+              </span>
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer hover:text-forest-600 transition">
+              <input 
+                type="checkbox" 
+                checked={flags.has(q.id)} 
+                onChange={() => toggleFlag(q.id)}
+                className="accent-gold-500 w-4 h-4"
+              />
+              <Icon name={flags.has(q.id) ? 'star' : 'star'} className={`w-4 h-4 ${flags.has(q.id) ? 'text-gold-500' : 'text-gray-300'}`} />
+              <span className="text-sm font-medium">{flags.has(q.id) ? 'Flagged' : 'Flag for review'}</span>
+            </label>
           </div>
           <p className="text-forest-500 text-lg font-medium mb-4">{q.questionText}</p>
 
@@ -389,17 +437,41 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
           )}
         </div>
 
-        <div className="flex flex-wrap gap-1.5 justify-center mb-4">
-          {questions.map((qu: ExamQuestion, i: number) => {
-            const isAnswered = answers[qu.id] !== undefined && answers[qu.id] !== '';
-            return (
-              <button key={i} onClick={() => setCurrentQ(i)}
-                aria-label={`Question ${i + 1}${isAnswered ? ', answered' : ', unanswered'}${i === currentQ ? ', current' : ''}`}
-                className={`w-8 h-8 rounded-full text-xs font-bold transition ${i === currentQ ? 'bg-forest-500 text-white' : isAnswered ? 'bg-forest-100 text-forest-700 border border-forest-300' : 'bg-gray-100 text-gray-400 border border-gray-200'}`}>
-                {i + 1}
+        <div className="flex flex-col gap-3 mb-4">
+          <div className="flex items-center justify-center gap-2">
+            <button 
+              onClick={() => setShowFlaggedOnly(!showFlaggedOnly)}
+              className={`text-sm font-medium px-3 py-1.5 rounded-full transition flex items-center gap-1.5 ${showFlaggedOnly ? 'bg-gold-100 text-gold-700 border border-gold-300' : 'bg-gray-100 text-gray-600 border border-gray-200 hover:border-gray-300'}`}
+            >
+              <Icon name="star" className={`w-4 h-4 ${showFlaggedOnly ? 'text-gold-500' : ''}`} />
+              Flagged: {flaggedCount}
+            </button>
+            {showFlaggedOnly && (
+              <button 
+                onClick={() => setShowFlaggedOnly(false)}
+                className="text-xs px-2 py-1 rounded text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+              >
+                Show all
               </button>
-            );
-          })}
+            )}
+          </div>
+          <div className="flex flex-wrap gap-1.5 justify-center">
+            {questions.map((qu: ExamQuestion, i: number) => {
+              const isAnswered = answers[qu.id] !== undefined && answers[qu.id] !== '';
+              const isFlagged = flags.has(qu.id);
+              const isCurrentQuestion = qu.id === q.id;
+              return (
+                <button key={i} onClick={() => setCurrentQ(i)}
+                  aria-label={`Question ${i + 1}${isAnswered ? ', answered' : ', unanswered'}${isFlagged ? ', flagged' : ''}${isCurrentQuestion ? ', current' : ''}`}
+                  className={`w-8 h-8 rounded-full text-xs font-bold transition relative ${isCurrentQuestion ? 'bg-forest-500 text-white' : isAnswered ? 'bg-forest-100 text-forest-700 border border-forest-300' : 'bg-gray-100 text-gray-400 border border-gray-200'}`}>
+                  {i + 1}
+                  {isFlagged && (
+                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-gold-500 rounded-full border border-white"></span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         <div className="flex items-center justify-between">
