@@ -11,6 +11,16 @@ import type { Exam, ExamRegistration, ExamQuestion, QuestionChoice } from '../..
 
 type AnswerMap = Record<number, number | string>;
 
+function formatDraftAge(lastSavedAt: number | null): string {
+  if (!lastSavedAt) return 'Not saved yet';
+  const elapsedSeconds = Math.max(0, Math.floor((Date.now() - lastSavedAt) / 1000));
+  if (elapsedSeconds < 60) return `${elapsedSeconds}s ago`;
+  const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+  if (elapsedMinutes < 60) return `${elapsedMinutes}m ago`;
+  const elapsedHours = Math.floor(elapsedMinutes / 60);
+  return `${elapsedHours}h ago`;
+}
+
 interface LiveExamProps {
   exam: Exam;
   registration: ExamRegistration;
@@ -19,11 +29,12 @@ interface LiveExamProps {
 export default function LiveExam({ exam, registration }: LiveExamProps) {
   const navigate = useNavigate();
   const { enqueueSubmission, getQueue, removeFromQueue, incrementAttemptCount } = useOfflineExamQueue();
+  const draftStorageKey = `gk_exam_answers_${registration.id}`;
 
   const [currentQ, setCurrentQ] = useState(0);
   const [answers, setAnswers] = useState<AnswerMap>(() => {
     try {
-      const saved = sessionStorage.getItem(`gk_exam_answers_${registration.id}`);
+      const saved = sessionStorage.getItem(draftStorageKey);
       if (saved) return JSON.parse(saved);
       // Fall back to server-saved draft
       if ((registration as any).draftAnswers) {
@@ -46,7 +57,10 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
   const [submitPhase, setSubmitPhase] = useState<'idle' | 'submitting' | 'submitted'>('idle');
   const [submitFeedback, setSubmitFeedback] = useState<{ title: string; message: string } | null>(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [draftStatus, setDraftStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [lastDraftSavedAt, setLastDraftSavedAt] = useState<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const submittedRef = useRef(false);
 
   const questions = Array.isArray(exam.questions) ? exam.questions : [];
@@ -61,11 +75,23 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
   }, [questions.length, currentQ]);
 
   useEffect(() => {
-    try { sessionStorage.setItem(`gk_exam_answers_${registration.id}`, JSON.stringify(answers)); } catch { /* ignore */ }
+    try { sessionStorage.setItem(draftStorageKey, JSON.stringify(answers)); } catch { /* ignore */ }
   }, [answers, registration.id]);
 
   const answersRef = useRef(answers);
   answersRef.current = answers;
+
+  const saveDraftToServer = useCallback(async () => {
+    if (submittedRef.current || !isOnline) return;
+    setDraftStatus('saving');
+    try {
+      await saveDraftAnswers(registration.id, answersRef.current);
+      setDraftStatus('saved');
+      setLastDraftSavedAt(Date.now());
+    } catch {
+      setDraftStatus('error');
+    }
+  }, [registration.id, isOnline]);
 
   const doSubmit = useCallback(async (title: string | null, msg: string | null) => {
     if (submittedRef.current) return;
@@ -106,7 +132,7 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
       showToast((err as Error).message || 'Failed to submit exam. Please try again.', 'error');
       return;
     }
-    try { sessionStorage.removeItem(`gk_exam_answers_${registration.id}`); } catch { /* ignore */ }
+    try { sessionStorage.removeItem(draftStorageKey); } catch { /* ignore */ }
     if (title && msg) {
       setSubmitPhase('idle');
       setSubmitFeedback(null);
@@ -121,7 +147,7 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
       showToast('Exam submitted successfully!', 'success');
       setTimeout(() => navigate('/student/results'), 1500);
     }
-  }, [registration.id, navigate, isOnline, enqueueSubmission]);
+  }, [registration.id, navigate, isOnline, enqueueSubmission, draftStorageKey]);
 
   const doSubmitRef = useRef(doSubmit);
   doSubmitRef.current = doSubmit;
@@ -190,6 +216,7 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
       setIsOnline(true);
       showToast('Connection restored. Retrying to submit your exam...', 'info');
       retryOfflineSubmissions();
+      void saveDraftToServer();
     };
     const handleOffline = () => setIsOnline(false);
     window.addEventListener('online', handleOnline);
@@ -198,17 +225,26 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [getQueue, removeFromQueue, incrementAttemptCount]);
+  }, [getQueue, removeFromQueue, incrementAttemptCount, saveDraftToServer]);
 
-  // Auto-save answers to server every 30 seconds
+  // Auto-save answers after a short pause, with a periodic backup.
   useEffect(() => {
+    if (submittedRef.current) return;
+    setDraftStatus('saving');
+    if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+    draftTimerRef.current = setTimeout(() => {
+      void saveDraftToServer();
+    }, 4_000);
+
     const autoSaveInterval = setInterval(() => {
-      if (!submittedRef.current) {
-        saveDraftAnswers(registration.id, answersRef.current).catch(() => {});
-      }
+      void saveDraftToServer();
     }, 30_000);
-    return () => clearInterval(autoSaveInterval);
-  }, [registration.id]);
+
+    return () => {
+      if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+      clearInterval(autoSaveInterval);
+    };
+  }, [answers, saveDraftToServer]);
 
   const q = questions[currentQ] || null;
   const answered = Object.keys(answers).filter(k => answers[Number(k)] !== undefined && answers[Number(k)] !== '').length;
@@ -287,8 +323,14 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
         )}
         <div className="flex items-center justify-between mb-2">
           <h3 className="font-bold text-forest-500 text-lg">{exam.title}</h3>
-          <div className={`flex items-center gap-2 font-mono text-lg font-bold ${timerColor}`} role="timer" aria-live="polite" aria-label={`Time remaining: ${mins} minutes ${secs} seconds`}>
-            <Icon name="clock" className="w-5 h-5" /> {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
+          <div className="flex items-center gap-3 flex-wrap justify-end">
+            <div className={`flex items-center gap-2 font-mono text-lg font-bold ${timerColor}`} role="timer" aria-live="polite" aria-label={`Time remaining: ${mins} minutes ${secs} seconds`}>
+              <Icon name="clock" className="w-5 h-5" /> {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
+            </div>
+            <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${draftStatus === 'saving' ? 'border-gold-200 bg-gold-50 text-gold-700' : draftStatus === 'saved' ? 'border-forest-200 bg-forest-50 text-forest-700' : draftStatus === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-gray-200 bg-gray-50 text-gray-600'}`} role="status" aria-live="polite">
+              <span className={`h-2.5 w-2.5 rounded-full ${draftStatus === 'saving' ? 'bg-gold-500 animate-pulse' : draftStatus === 'saved' ? 'bg-forest-500' : draftStatus === 'error' ? 'bg-red-500' : 'bg-gray-400'}`} />
+              {draftStatus === 'saving' ? 'Saving draft...' : draftStatus === 'saved' ? `Draft saved ${formatDraftAge(lastDraftSavedAt)}` : draftStatus === 'error' ? 'Draft save failed' : 'Draft not saved yet'}
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-3">
