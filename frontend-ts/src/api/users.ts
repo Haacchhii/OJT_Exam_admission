@@ -64,6 +64,14 @@ export async function updateUser(id: number, updates: Record<string, unknown>) {
   return client.put<User & { emailVerificationRequired?: boolean; verificationEmailSent?: boolean; message?: string }>(`/users/${id}`, updates);
 }
 
+export async function forcePasswordReset(id: number) {
+  return client.post<User>(`/users/${id}/force-password-reset`, {});
+}
+
+export async function setUserRole(id: number, role: string) {
+  return client.post<User>(`/users/${id}/set-role`, { role });
+}
+
 export async function deleteUser(id: number) {
   return client.delete<{ deleted: number }>(`/users/${id}`);
 }

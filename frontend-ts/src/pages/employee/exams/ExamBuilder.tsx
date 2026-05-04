@@ -392,7 +392,7 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
     }
   };
 
-  const saveExam = async () => {
+  const saveExam = async (): Promise<Exam | null> => {
     if (!title.trim() || !grade || !duration || !passing) { showToast('Fill in all required exam details (title, grade, duration, passing score).', 'error'); return; }
     const dur = parseInt(String(duration));
     const pass = parseFloat(String(passing));
@@ -411,16 +411,37 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
         questions,
       };
       if (editExam) {
-        await updateExam(editExam.id, payload);
+        const res = await updateExam(editExam.id, payload);
         showToast('Exam updated successfully!', 'success');
+        return res.data as Exam;
       } else {
-        await addExam(payload);
+        const res = await addExam(payload);
         showToast('Exam created successfully!', 'success');
+        return res.data as Exam;
       }
       clear();
       onDone();
     } catch (err: any) {
       showToast('Failed to save exam: ' + (err.message || 'Unknown error'), 'error');
+    } finally {
+      setIsSaving(false);
+    }
+    return null;
+  };
+
+  const handleAssignAndPublish = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
+    try {
+      const saved = await saveExam();
+      if (!saved) return;
+      // publish
+      const pubRes = await import('../../../api/exams').then(m => m.publishExam(saved.id));
+      showToast(`Exam "${saved.title}" published and activated.`, 'success');
+      clear();
+      onDone();
+    } catch (err: any) {
+      showToast('Failed to publish exam: ' + (err.message || 'Unknown error'), 'error');
     } finally {
       setIsSaving(false);
     }
@@ -745,6 +766,9 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
       <div className="flex gap-3">
         <button onClick={saveExam} disabled={isSaving} className="bg-forest-500 text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-forest-600 shadow-md inline-flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed">
           {isSaving ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Saving...</> : <><Icon name="check" className="w-4 h-4" /> Save Exam</>}
+        </button>
+        <button onClick={handleAssignAndPublish} disabled={isSaving} className="border border-gold-400 text-gold-700 bg-gold-50 px-5 py-2.5 rounded-lg hover:bg-gold-100 disabled:opacity-60 inline-flex items-center gap-2">
+          <Icon name="rocket" className="w-4 h-4" /> Assign & Publish
         </button>
         <button onClick={onDone} disabled={isSaving} className="border border-gray-300 text-gray-700 px-5 py-2.5 rounded-lg hover:bg-gray-50 disabled:opacity-50">Cancel</button>
       </div>

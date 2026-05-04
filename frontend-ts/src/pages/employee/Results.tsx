@@ -1,4 +1,5 @@
 ﻿import { Fragment, useEffect, useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAsync } from '../../hooks/useAsync';
 import { getEmployeeResultsSummary, scoreEssay, getQuestionAnalyticsPage } from '../../api/results';
 import { SCHOOL_NAME, SCHOOL_BRAND, SCHOOL_SUBTITLE, SCHOOL_LOGO_PATH, SCHOOL_ADDRESS, SCHOOL_PHONE } from '../../utils/constants';
@@ -81,6 +82,7 @@ function getRegUserId(reg: ExamRegistration): number | null {
 
 export default function EmployeeResults() {
   const { user: authUser } = useAuth();
+  const location = useLocation();
   const confirm = useConfirm();
   const canScoreEssays = authUser?.role === 'administrator' || authUser?.role === 'teacher';
   const [tab, setTab] = useState<'results' | 'essays' | 'analytics'>('results');
@@ -337,6 +339,20 @@ export default function EmployeeResults() {
     if (!scoreModal) return;
     localStorage.setItem(essayDraftKey(scoreModal.id), JSON.stringify({ scoreVal, commentVal }));
   }, [scoreModal, scoreVal, commentVal]);
+
+  // Support deep-linking to the essays tab via `#essays` or `?tab=essays`
+  useEffect(() => {
+    try {
+      if (location.hash === '#essays') {
+        if (canScoreEssays) setTab('essays');
+        return;
+      }
+      const q = new URLSearchParams(location.search).get('tab');
+      if (q === 'essays' && canScoreEssays) setTab('essays');
+    } catch {
+      // ignore malformed URL
+    }
+  }, [location, canScoreEssays]);
 
   const openScoreModal = (essay: EssayAnswer, defaults?: { scoreVal?: string; commentVal?: string }) => {
     setScoreModal(essay);

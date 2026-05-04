@@ -184,6 +184,10 @@ export async function updateAdmissionStatus(id: number, status: string, notes?: 
   return client.patch<Admission>(`/admissions/${id}/status`, { status, notes });
 }
 
+export async function handoffAdmission(id: number) {
+  return client.post<Admission>(`/admissions/${id}/handoff`, {});
+}
+
 export async function bulkUpdateStatus(ids: number[], status: string) {
   return client.patch<{ updated: number }>('/admissions/bulk-status', { ids, status });
 }

@@ -485,3 +485,61 @@ export async function bulkDeleteUsers(req, res, next) {
     res.json({ deleted: foundIds.length });
   } catch (err) { next(err); }
 }
+
+// POST /api/users/:id/force-password-reset
+// Admin action: force a user to reset their password on next login
+export async function forcePasswordReset(req, res, next) {
+  try {
+    const id = Number(req.params.id);
+    if (id === req.user.id) {
+      return res.status(400).json({ error: 'You cannot force your own password reset.', code: 'VALIDATION_ERROR' });
+    }
+
+    const user = await prisma.user.update({
+      where: { id },
+      data: { mustChangePassword: true },
+    });
+
+    await invalidateUserCaches();
+
+    logAudit({ userId: req.user.id, action: 'user.forcePasswordReset', entity: 'user', entityId: id, details: { userId: id }, ipAddress: req.ip });
+
+    res.json(safifyUser(user));
+  } catch (err) { next(err); }
+}
+
+// POST /api/users/:id/set-role
+// Admin action: assign a new role to a user
+export async function setUserRole(req, res, next) {
+  try {
+    const { role } = req.body;
+    const id = Number(req.params.id);
+
+    if (!role || !ROLES.find(r => r.value === role)) {
+      return res.status(400).json({ error: 'Invalid role.', code: 'VALIDATION_ERROR' });
+    }
+
+    // Only administrators can assign the administrator role
+    if (role === ROLES.ADMIN && req.user.role !== ROLES.ADMIN) {
+      return res.status(403).json({ error: 'Only administrators can assign the administrator role.', code: 'FORBIDDEN' });
+    }
+
+    const data = { role };
+
+    // If changing to non-applicant role, remove applicant profile
+    if (role !== ROLES.APPLICANT) {
+      await prisma.applicantProfile.deleteMany({ where: { userId: id } });
+    }
+
+    const user = await prisma.user.update({
+      where: { id },
+      data,
+    });
+
+    await invalidateUserCaches();
+
+    logAudit({ userId: req.user.id, action: 'user.setRole', entity: 'user', entityId: id, details: { newRole: role }, ipAddress: req.ip });
+
+    res.json(safifyUser(user));
+  } catch (err) { next(err); }
+}

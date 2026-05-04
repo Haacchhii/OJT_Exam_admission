@@ -19,6 +19,8 @@ router.post('/bulk-delete',  authorize(ROLES.ADMIN), validate(bulkDeleteSchema),
 router.get('/:id',          authorize(ROLES.ADMIN), ctrl.getUser);
 router.post('/',            authorize(ROLES.ADMIN), writeLimiter, validate(createUserSchema), ctrl.createUser);
 router.put('/:id',          authorize(ROLES.ADMIN), writeLimiter, validate(updateUserSchema), ctrl.updateUser);
+router.post('/:id/force-password-reset', authorize(ROLES.ADMIN), writeLimiter, ctrl.forcePasswordReset);
+router.post('/:id/set-role', authorize(ROLES.ADMIN), writeLimiter, ctrl.setUserRole);
 router.delete('/:id',       authorize(ROLES.ADMIN), writeLimiter, ctrl.deleteUser);
 
 export default router;

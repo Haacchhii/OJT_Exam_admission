@@ -38,5 +38,6 @@ router.get('/:id/review',  authorize(ROLES.APPLICANT), ctrl.getExamForReview);
 router.post('/',    authorize(ROLES.ADMIN, ROLES.TEACHER), validate(createExamSchema), ctrl.createExam);
 router.put('/:id',  authorize(ROLES.ADMIN, ROLES.TEACHER), validate(updateExamSchema), ctrl.updateExam);
 router.delete('/:id', authorize(ROLES.ADMIN, ROLES.TEACHER), ctrl.deleteExam);
+router.post('/:id/publish', authorize(ROLES.ADMIN, ROLES.TEACHER), ctrl.publishExam);
 
 export default router;

@@ -50,5 +50,6 @@ router.patch('/:id/documents/:docId/review', authorize(ROLES.ADMIN, ROLES.REGIST
 router.patch('/bulk-status',  authorize(ROLES.ADMIN, ROLES.REGISTRAR), validate(bulkUpdateStatusSchema), ctrl.bulkUpdateStatus);
 router.post('/bulk-delete',   authorize(ROLES.ADMIN, ROLES.REGISTRAR), validate(bulkDeleteSchema), ctrl.bulkDeleteAdmissions);
 router.patch('/:id/status',  authorize(ROLES.ADMIN, ROLES.REGISTRAR), validate(updateStatusSchema), ctrl.updateStatus);
+router.post('/:id/handoff',  authorize(ROLES.ADMIN, ROLES.REGISTRAR), ctrl.handoffAdmission);
 
 export default router;

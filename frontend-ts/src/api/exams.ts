@@ -91,6 +91,10 @@ export async function updateExam(id: number, updates: Record<string, unknown>) {
   return client.put<Exam>(`/exams/${id}`, updates);
 }
 
+export async function publishExam(id: number) {
+  return client.post<Exam>(`/exams/${id}/publish`, {});
+}
+
 export async function deleteExam(id: number) {
   return client.delete<void>(`/exams/${id}`);
 }

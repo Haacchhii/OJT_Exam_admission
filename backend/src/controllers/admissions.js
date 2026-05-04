@@ -1104,6 +1104,33 @@ export async function updateStatus(req, res, next) {
   } catch (err) { next(err); }
 }
 
+// POST /api/admissions/:id/handoff  — registrar marks enrollment handoff completed
+export async function handoffAdmission(req, res, next) {
+  try {
+    const id = Number(req.params.id);
+    const admission = await prisma.admission.findUnique({ where: { id } });
+    if (!admission || admission.deletedAt) return res.status(404).json({ error: 'We could not find this admission record.', code: 'NOT_FOUND' });
+    if (admission.status !== 'Accepted') return res.status(400).json({ error: 'Only accepted applications can be handed off to the registrar.', code: 'VALIDATION_ERROR' });
+
+    const timestamp = new Date().toISOString();
+    const handoffNote = `Enrollment handoff completed by ${req.user.firstName || req.user.email} (${req.user.role}) on ${timestamp}`;
+
+    const updated = await prisma.admission.update({ where: { id }, data: { notes: (admission.notes ? admission.notes + '\n\n' : '') + handoffNote }, include: { documents: true, academicYear: true, semester: true } });
+
+    logAudit({ userId: req.user.id, action: 'admission.handoff', entity: 'admission', entityId: id, details: { handoffNote }, ipAddress: req.ip });
+
+    await invalidateAdmissionCaches([admission.userId]);
+
+    try {
+      const io = getIo();
+      io.to('role_registrar').emit('admission_handoff', { id, handoffNote });
+      io.to(`user_${admission.userId}`).emit('admission_handoff', { id, handoffNote });
+    } catch (_) {}
+
+    res.json(shapeAdmission(updated));
+  } catch (err) { next(err); }
+}
+
 // PATCH /api/admissions/bulk-status
 export async function bulkUpdateStatus(req, res, next) {
   try {

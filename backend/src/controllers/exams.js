@@ -616,6 +616,25 @@ export async function cloneExam(req, res, next) {
   } catch (err) { next(err); }
 }
 
+// POST /api/exams/:id/publish  — mark exam as active and ready for scheduling/registrations
+export async function publishExam(req, res, next) {
+  try {
+    const id = Number(req.params.id);
+    const existing = await prisma.exam.findUnique({ where: { id } });
+    if (!existing || existing.deletedAt) return res.status(404).json({ error: 'We could not find this exam.', code: 'NOT_FOUND' });
+
+    const exam = await prisma.exam.update({ where: { id }, data: { isActive: true } });
+
+    await invalidateExamCaches();
+
+    logAudit({ userId: req.user.id, action: 'exam.publish', entity: 'exam', entityId: id, details: { title: existing.title }, ipAddress: req.ip });
+
+    // Return full shaped exam detail
+    const detailed = await getExamDetailCached(id);
+    res.json(shapeExam(detailed));
+  } catch (err) { next(err); }
+}
+
 // ═══════════════════════════════════════════════════════
 // SCHEDULES & REGISTRATIONS → see examSchedules.js & examRegistrations.js
 // ═══════════════════════════════════════════════════════

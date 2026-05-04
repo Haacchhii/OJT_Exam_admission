@@ -34,6 +34,7 @@ const EmployeeAdmissions = lazyWithRetry(() => import('./pages/employee/Admissio
 const EmployeeExams = lazyWithRetry(() => import('./pages/employee/Exams'));
 const EmployeeResults = lazyWithRetry(() => import('./pages/employee/Results'));
 const EmployeeReports = lazyWithRetry(() => import('./pages/employee/Reports'));
+const EmployeeRegistrarRecords = lazyWithRetry(() => import('./pages/employee/RegistrarRecords'));
 const EmployeeUsers = lazyWithRetry(() => import('./pages/employee/Users'));
 const EmployeeAuditLog = lazyWithRetry(() => import('./pages/employee/AuditLog'));
 const EmployeeSettings = lazyWithRetry(() => import('./pages/employee/Settings'));
@@ -168,6 +169,7 @@ export default function App() {
             <Route index element={withLazyPageBoundary('Dashboard', <EmployeeDashboard />)} />
             <Route path="dashboard" element={withLazyPageBoundary('Dashboard', <EmployeeDashboard />)} />
             <Route path="admissions" element={<RoleGuard page="admissions">{withLazyPageBoundary('Admissions', <EmployeeAdmissions />)}</RoleGuard>} />
+            <Route path="registrar-records" element={<RoleGuard page="admissions">{withLazyPageBoundary('Registrar Records', <EmployeeRegistrarRecords />)}</RoleGuard>} />
             <Route path="exams" element={<RoleGuard page="exams">{withLazyPageBoundary('Exams', <EmployeeExams />)}</RoleGuard>} />
             <Route path="results" element={<RoleGuard page="results">{withLazyPageBoundary('Results', <EmployeeResults />)}</RoleGuard>} />
             <Route path="reports" element={<RoleGuard page="reports">{withLazyPageBoundary('Reports', <EmployeeReports />)}</RoleGuard>} />

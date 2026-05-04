@@ -203,6 +203,21 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
     }
   };
 
+  const handleHandoff = async () => {
+    if (!canManage) return;
+    const ok = await confirm({ title: 'Confirm Handoff', message: 'Mark this application as handed off to Registrar for enrollment processing?', confirmLabel: 'Hand off', variant: 'info' });
+    if (!ok) return;
+    try {
+      setSaving(true);
+      const updated = await (await import('../../../api/admissions')).handoffAdmission(adm.id);
+      setAdm(updated.data);
+      showToast('Enrollment handoff recorded and noted in application.', 'success');
+      refetch();
+    } catch (err: any) {
+      showToast('Failed to hand off: ' + (err.message || 'Unknown error'), 'error');
+    } finally { setSaving(false); }
+  };
+
   return (
     <div>
       <div className="flex items-center gap-2 mb-4">
@@ -314,6 +329,11 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
             <div className="flex gap-3">
               <ActionButton onClick={saveStatus} loading={saving} icon={!saving ? <Icon name="check" className="w-4 h-4" /> : undefined}>{saving ? 'Saving...' : 'Save Changes'}</ActionButton>
               <ActionButton onClick={onBack} variant="secondary">Cancel</ActionButton>
+              {adm.status === 'Accepted' && (user?.role === 'registrar' || user?.role === 'administrator') && (
+                <ActionButton onClick={handleHandoff} variant="ghost" size="sm" className="border border-forest-200 bg-white" loading={saving}>
+                  Mark Enrollment Handoff
+                </ActionButton>
+              )}
             </div>
           </>
         ) : (

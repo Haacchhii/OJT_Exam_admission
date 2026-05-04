@@ -1,7 +1,7 @@
 ﻿import { useState } from 'react';
 import Papa from 'papaparse';
 import { useAsync } from '../../hooks/useAsync';
-import { getUsersPage, getUserStats, addUser, updateUser, deleteUser, getUserByEmail, bulkDeleteUsers, type UserStats } from '../../api/users';
+import { getUsersPage, getUserStats, addUser, updateUser, deleteUser, getUserByEmail, bulkDeleteUsers, forcePasswordReset, setUserRole, type UserStats } from '../../api/users';
 import { useAuth } from '../../context/AuthContext';
 import { showToast } from '../../components/Toast';
 import { PageHeader, StatCard, Badge, EmptyState, Pagination, SkeletonPage, ErrorAlert, ActionButton, SearchInput } from '../../components/UI';
@@ -58,6 +58,10 @@ export default function EmployeeUsers() {
   const [saving, setSaving] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [optimisticDeletedIds, setOptimisticDeletedIds] = useState<Set<number>>(new Set());
+  const [showRoleModal, setShowRoleModal] = useState(false);
+  const [selectedUserForRole, setSelectedUserForRole] = useState<User | null>(null);
+  const [selectedRoleForChange, setSelectedRoleForChange] = useState('');
+  const [changingRole, setChangingRole] = useState(false);
   const confirm = useConfirm();
   const { selected, toggle, togglePage, clear: clearSelection, isAllSelected, count: selectedCount } = useSelection();
   const passwordChecks = getPasswordRequirementChecks(form.password);
@@ -269,6 +273,52 @@ export default function EmployeeUsers() {
 
   const set = (key: keyof UserForm, val: string) => setForm(p => ({ ...p, [key]: val }));
 
+  const handleForcePasswordReset = async (user: User) => {
+    const ok = await confirm({
+      title: 'Force Password Reset',
+      message: `${formatPersonName(user)} will be required to reset their password on next login.`,
+      confirmLabel: 'Force Reset',
+    });
+    if (!ok) return;
+
+    try {
+      showToast('Forcing password reset...', 'info');
+      await forcePasswordReset(user.id);
+      showToast('Password reset forced successfully.', 'success');
+      await refetch();
+    } catch (err) {
+      showToast(friendlyActionError(err, 'Could not force password reset.'), 'error');
+    }
+  };
+
+  const handleOpenRoleModal = (user: User) => {
+    setSelectedUserForRole(user);
+    setSelectedRoleForChange(user.role);
+    setShowRoleModal(true);
+  };
+
+  const handleSetRole = async () => {
+    if (!selectedUserForRole || !selectedRoleForChange || changingRole) return;
+    if (selectedRoleForChange === selectedUserForRole.role) {
+      showToast('No role change needed.', 'info');
+      setShowRoleModal(false);
+      return;
+    }
+
+    setChangingRole(true);
+    try {
+      showToast('Updating user role...', 'info');
+      await setUserRole(selectedUserForRole.id, selectedRoleForChange);
+      showToast('User role updated successfully.', 'success');
+      await refetch();
+      setShowRoleModal(false);
+    } catch (err) {
+      showToast(friendlyActionError(err, 'Could not update user role.'), 'error');
+    } finally {
+      setChangingRole(false);
+    }
+  };
+
   const handleBulkDelete = async () => {
     if (selectedCount === 0 || bulkDeleting) return;
     const ids = [...selected].filter(id => id !== authUser?.id);
@@ -464,9 +514,15 @@ export default function EmployeeUsers() {
                   <td className="py-3 px-4 text-gray-500">{u.role === 'applicant' ? (u.applicantProfile?.gradeLevel || 'N/A') : 'N/A'}</td>
                   <td className="py-3 px-4"><Badge variant={u.status === 'Active' ? 'success' : 'danger'}>{u.status}</Badge></td>
                   <td className="py-3 px-4 text-right">
-                    <div className="inline-flex items-center gap-1">
-                      <ActionButton size="sm" variant="ghost" onClick={() => openEdit(u)} icon={<Icon name="edit" className="w-3.5 h-3.5" />} className="text-forest-600 hover:bg-forest-50">Edit</ActionButton>
-                      <ActionButton size="sm" variant="ghost" onClick={() => confirmDelete(u.id)} icon={<Icon name="trash" className="w-3.5 h-3.5" />} className="text-red-600 hover:bg-red-50">Delete</ActionButton>
+                    <div className="flex flex-col gap-2">
+                      <div className="inline-flex items-center gap-1">
+                        <ActionButton size="sm" variant="ghost" onClick={() => openEdit(u)} icon={<Icon name="edit" className="w-3.5 h-3.5" />} className="text-forest-600 hover:bg-forest-50">Edit</ActionButton>
+                        <ActionButton size="sm" variant="ghost" onClick={() => confirmDelete(u.id)} icon={<Icon name="trash" className="w-3.5 h-3.5" />} className="text-red-600 hover:bg-red-50">Delete</ActionButton>
+                      </div>
+                      <div className="inline-flex items-center gap-1">
+                        <ActionButton size="sm" variant="ghost" onClick={() => handleForcePasswordReset(u)} icon={<Icon name="key" className="w-3.5 h-3.5" />} className="text-amber-600 hover:bg-amber-50" title="Force password reset">Force Password</ActionButton>
+                        <ActionButton size="sm" variant="ghost" onClick={() => handleOpenRoleModal(u)} icon={<Icon name="shieldCheck" className="w-3.5 h-3.5" />} className="text-blue-600 hover:bg-blue-50" title="Change user role">Set Role</ActionButton>
+                      </div>
                     </div>
                   </td>
                 </tr>
@@ -549,6 +605,39 @@ export default function EmployeeUsers() {
           <div className="flex justify-end gap-3 pt-2">
             <ActionButton variant="secondary" onClick={() => setShowModal(false)}>Cancel</ActionButton>
             <ActionButton onClick={handleSave} loading={saving}>{editId ? 'Save Changes' : 'Add User'}</ActionButton>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Set Role Modal */}
+      <Modal open={showRoleModal} onClose={() => setShowRoleModal(false)} title={`Set Role for ${selectedUserForRole ? formatPersonName(selectedUserForRole) : 'User'}`}>
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Select a new role for <span className="font-semibold">{selectedUserForRole?.email}</span>.
+          </p>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">New Role</label>
+            <select
+              value={selectedRoleForChange}
+              onChange={e => setSelectedRoleForChange(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-forest-500/20"
+            >
+              {ROLES.map(r => (
+                <option key={r.value} value={r.value}>
+                  {r.label}{selectedUserForRole && selectedUserForRole.role === r.value ? ' (current)' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p className="text-xs text-blue-700">
+              <Icon name="info" className="w-3.5 h-3.5 inline mr-1" />
+              Changing a user's role will update their permissions immediately.
+            </p>
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <ActionButton variant="secondary" onClick={() => setShowRoleModal(false)}>Cancel</ActionButton>
+            <ActionButton onClick={handleSetRole} loading={changingRole}>Set Role</ActionButton>
           </div>
         </div>
       </Modal>
