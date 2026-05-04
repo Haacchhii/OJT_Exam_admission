@@ -17,15 +17,16 @@ function validatePassword(password) {
 }
 
 
-function signToken(user) {
+function signToken(user, rememberMe = false) {
   return jwt.sign({
     sub: user.id,
     role: user.role,
     status: user.status,
     emailVerified: user.emailVerified,
     mustChangePassword: user.mustChangePassword,
+    tokenVersion: user.tokenVersion,
   }, env.JWT_SECRET, {
-    expiresIn: env.JWT_EXPIRES_IN,
+    expiresIn: rememberMe ? '30d' : env.JWT_EXPIRES_IN,
   });
 }
 
@@ -71,7 +72,7 @@ export async function getMe(req, res, next) {
 // POST /api/auth/login
 export async function login(req, res, next) {
   try {
-    const { email, password } = req.body;
+    const { email, password, rememberMe } = req.body;
     const normalizedEmail = String(email || '').trim().toLowerCase();
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required', code: 'VALIDATION_ERROR' });
@@ -102,7 +103,7 @@ export async function login(req, res, next) {
       return res.status(403).json({ error: 'Account is inactive', code: 'FORBIDDEN' });
     }
 
-    const token = signToken(user);
+    const token = signToken(user, rememberMe === true);
     logAudit({ userId: user.id, action: 'auth.login', entity: 'user', entityId: user.id, ipAddress: req.ip });
     const response = { user: safeUser(user), token };
     if (env.EMAIL_VERIFICATION_REQUIRED && !user.emailVerified) {

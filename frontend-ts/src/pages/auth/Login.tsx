@@ -45,7 +45,7 @@ export default function Login() {
     setLoading(true);
     setVerificationRequired(false);
     try {
-      const result = await login(email, password);
+      const result = await login(email, password, { rememberMe: remember });
       if (result.emailVerificationRequired) {
         setVerificationRequired(true);
         showToast(result.msg || 'Please verify your email before signing in.', 'warning');

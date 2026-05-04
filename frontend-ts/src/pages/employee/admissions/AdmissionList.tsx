@@ -52,6 +52,7 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
   const [bulkStatus, setBulkStatus] = useState<string>('Submitted');
   const [saving, setSaving] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [focusedRowIndex, setFocusedRowIndex] = useState<number | null>(null);
 
   const { socket, isConnected } = useSocket();
 
@@ -140,6 +141,19 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
       setSelected(s => { const n = new Set(s); admissions.forEach((a: Admission) => n.delete(a.id)); return n; });
     } else {
       setSelected(s => { const n = new Set(s); admissions.forEach((a: Admission) => n.add(a.id)); return n; });
+    }
+  };
+
+  const handleRowKeyDown = (index: number, e: React.KeyboardEvent<HTMLTableRowElement>, admission: Admission) => {
+    if (e.key === 'ArrowUp' && index > 0) {
+      e.preventDefault();
+      setFocusedRowIndex(index - 1);
+    } else if (e.key === 'ArrowDown' && index < admissions.length - 1) {
+      e.preventDefault();
+      setFocusedRowIndex(index + 1);
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onShowDetail(admission.id);
     }
   };
 
@@ -436,8 +450,16 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
                     <tr>
                       <td colSpan={canManage ? 11 : 10} className="py-8 px-4" />
                     </tr>
-                  ) : admissions.map((a: Admission) => (
-                    <tr key={a.id} onClick={() => onShowDetail(a.id)} className={`border-b border-gray-50 hover:bg-gray-50 cursor-pointer ${selected.has(a.id) ? 'bg-gold-50/50' : ''}`}>
+                  ) : admissions.map((a: Admission, index: number) => (
+                    <tr
+                      key={a.id}
+                      onClick={() => onShowDetail(a.id)}
+                      onKeyDown={(e) => handleRowKeyDown(index, e, a)}
+                      tabIndex={0}
+                      role="button"
+                      aria-label={`${formatPersonName(a)} - ${a.status}`}
+                      className={`border-b border-gray-50 hover:bg-gray-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-forest-500/20 focus:bg-forest-50/30 ${selected.has(a.id) ? 'bg-gold-50/50' : ''}`}
+                    >
                       {canManage && <td className="py-3 px-2" onClick={e => e.stopPropagation()}><input type="checkbox" checked={selected.has(a.id)} onChange={() => toggleSelect(a.id)} className="accent-forest-500 rounded" /></td>}
                       <td className="py-3 px-2 text-gray-400">{a.id}</td>
                       <td className="py-3 px-2 font-medium text-forest-500">{formatPersonName(a)}</td>

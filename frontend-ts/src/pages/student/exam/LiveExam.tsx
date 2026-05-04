@@ -6,6 +6,7 @@ import { showToast } from '../../../components/Toast';
 import Modal from '../../../components/Modal';
 import { ActionButton, ProcessStatePanel } from '../../../components/UI';
 import Icon from '../../../components/Icons';
+import { useOfflineExamQueue } from '../../../hooks/useOfflineExamQueue';
 import type { Exam, ExamRegistration, ExamQuestion, QuestionChoice } from '../../../types';
 
 type AnswerMap = Record<number, number | string>;
@@ -16,6 +17,9 @@ interface LiveExamProps {
 }
 
 export default function LiveExam({ exam, registration }: LiveExamProps) {
+  const navigate = useNavigate();
+  const { enqueueSubmission, getQueue, removeFromQueue, incrementAttemptCount } = useOfflineExamQueue();
+
   const [currentQ, setCurrentQ] = useState(0);
   const [answers, setAnswers] = useState<AnswerMap>(() => {
     try {
@@ -44,7 +48,6 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const submittedRef = useRef(false);
-  const navigate = useNavigate();
 
   const questions = Array.isArray(exam.questions) ? exam.questions : [];
 
@@ -73,9 +76,30 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
       message: 'Please wait while we securely save and grade your answers.',
     });
     if (timerRef.current) clearInterval(timerRef.current);
+
+    // If offline, save to queue instead of submitting
+    if (!isOnline) {
+      enqueueSubmission(registration.id, answersRef.current);
+      submittedRef.current = false;
+      setSubmitPhase('idle');
+      setSubmitFeedback(null);
+      showToast('You are offline. Your exam has been saved and will submit when your connection is restored.', 'warning');
+      return;
+    }
+
     try {
       await submitExamAnswers(registration.id, answersRef.current);
     } catch (err: unknown) {
+      // If submission fails due to network error, try to queue it
+      if (!navigator.onLine) {
+        enqueueSubmission(registration.id, answersRef.current);
+        submittedRef.current = false;
+        setSubmitPhase('idle');
+        setSubmitFeedback(null);
+        showToast('Connection lost. Your exam has been saved and will submit when connection is restored.', 'warning');
+        return;
+      }
+
       submittedRef.current = false;
       setSubmitPhase('idle');
       setSubmitFeedback(null);
@@ -97,7 +121,7 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
       showToast('Exam submitted successfully!', 'success');
       setTimeout(() => navigate('/student/results'), 1500);
     }
-  }, [registration.id, navigate]);
+  }, [registration.id, navigate, isOnline, enqueueSubmission]);
 
   const doSubmitRef = useRef(doSubmit);
   doSubmitRef.current = doSubmit;
@@ -144,7 +168,29 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
 
   // Network connection listeners
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
+    const retryOfflineSubmissions = async () => {
+      const queue = getQueue();
+      for (const submission of queue) {
+        try {
+          await submitExamAnswers(submission.examId as any, submission.answers);
+          removeFromQueue(submission.id);
+          showToast('Your queued exam was submitted successfully!', 'success');
+        } catch (error) {
+          incrementAttemptCount(submission.id);
+          const attempt = submission.attemptCount + 1;
+          if (attempt > 5) {
+            removeFromQueue(submission.id);
+            showToast('Unable to submit queued exam after multiple retries. Please try manually.', 'error');
+          }
+        }
+      }
+    };
+
+    const handleOnline = () => {
+      setIsOnline(true);
+      showToast('Connection restored. Retrying to submit your exam...', 'info');
+      retryOfflineSubmissions();
+    };
     const handleOffline = () => setIsOnline(false);
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
@@ -152,7 +198,7 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, []);
+  }, [getQueue, removeFromQueue, incrementAttemptCount]);
 
   // Auto-save answers to server every 30 seconds
   useEffect(() => {
@@ -230,8 +276,15 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
       <a href="#exam-content" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:bg-white focus:p-2 focus:rounded focus:shadow focus:z-[100]">Skip to exam content</a>
       <div className="bg-white border-b border-gray-200 sticky top-0 z-50 px-4 py-3">
         {!isOnline && (
-          <div className="bg-yellow-100 border-b border-yellow-300 text-yellow-800 text-sm px-4 py-2 font-semibold text-center mb-2 rounded-md">
-            Warning: You are offline. Please wait for your connection to return before submitting the exam.
+          <>
+            <div className="bg-yellow-100 border-b border-yellow-300 text-yellow-800 text-sm px-4 py-2 font-semibold text-center mb-2 rounded-md" role="alert" aria-live="assertive">
+              ⚠️ You are offline. Your answers are being saved locally and will submit when your connection is restored.
+            </div>
+            <div className="sr-only" role="status" aria-live="polite">
+              {getQueue().length > 0 && `${getQueue().length} exam submission(s) queued for retry`}
+            </div>
+          </>
+        )}
           </div>
         )}
         <div className="flex items-center justify-between mb-2">

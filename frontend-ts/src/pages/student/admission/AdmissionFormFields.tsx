@@ -65,27 +65,60 @@ interface UploadSlotProps {
 }
 
 export function UploadSlot({ label, required, slot, file, onFile, onRemove }: UploadSlotProps) {
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      inputRef.current?.click();
+    }
+  };
+
   return (
     <div>
       <p className="text-sm font-medium text-gray-700 mb-1">{label} {required && <span className="text-red-500">*</span>}</p>
       {file ? (
         <div className="border border-forest-200 bg-forest-50 rounded-lg p-3 flex items-center justify-between">
           <span className="text-sm text-forest-700">✅ {file.name} <span className="text-sm text-gray-500">({(file.size/1024).toFixed(1)} KB)</span></span>
-          <button onClick={() => onRemove(slot)} className="text-red-400 hover:text-red-600 text-lg">✕</button>
+          <button
+            onClick={() => onRemove(slot)}
+            className="text-red-400 hover:text-red-600 text-lg"
+            aria-label={`Remove ${file.name}`}
+          >
+            ✕
+          </button>
         </div>
       ) : (
-        <div
-          className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-gold-400 transition"
-          onClick={() => document.getElementById(`slot-${slot}`)?.click()}
-          onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add('border-gold-400'); }}
-          onDragLeave={e => e.currentTarget.classList.remove('border-gold-400')}
-          onDrop={e => { e.preventDefault(); e.currentTarget.classList.remove('border-gold-400'); if (e.dataTransfer.files[0]) onFile(slot, e.dataTransfer.files[0]); }}
-        >
-          <span className="text-2xl">📁</span>
-          <p className="text-gray-500 text-sm mt-1">Click or drag file here</p>
-        </div>
+        <>
+          <div
+            className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-gold-400 transition focus:outline-none focus:ring-2 focus:ring-blue-500"
+            onClick={() => inputRef.current?.click()}
+            onKeyDown={handleKeyDown}
+            onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add('border-gold-400'); }}
+            onDragLeave={e => e.currentTarget.classList.remove('border-gold-400')}
+            onDrop={e => { e.preventDefault(); e.currentTarget.classList.remove('border-gold-400'); if (e.dataTransfer.files[0]) onFile(slot, e.dataTransfer.files[0]); }}
+            role="button"
+            tabIndex={0}
+            aria-label={`Upload ${label}. Press Enter or Space to select files, or drag and drop.`}
+          >
+            <span className="text-2xl">📁</span>
+            <p className="text-gray-500 text-sm mt-1">Click or drag file here</p>
+          </div>
+          {/* Live region for screen readers */}
+          <div className="sr-only" role="status" aria-live="polite">
+            Press Enter or Space to upload, or drag and drop a file
+          </div>
+        </>
       )}
-      <input id={`slot-${slot}`} type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={e => { if (e.target.files?.[0]) onFile(slot, e.target.files[0]); e.target.value = ''; }} />
+      <input
+        ref={inputRef}
+        id={`slot-${slot}`}
+        type="file"
+        className="hidden"
+        accept=".pdf,.jpg,.jpeg,.png,.webp"
+        onChange={e => { if (e.target.files?.[0]) onFile(slot, e.target.files[0]); e.target.value = ''; }}
+        aria-hidden="true"
+      />
     </div>
   );
 }

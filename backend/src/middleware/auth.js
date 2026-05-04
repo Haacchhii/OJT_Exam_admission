@@ -22,14 +22,16 @@ export async function authenticate(req, res, next) {
     const cacheKey = `user:${payload.sub}:${needsFreshUser ? 'full' : 'base'}`;
 
     let user = null;
-    if (!needsFreshUser && payload.role && payload.status) {
+    if (!needsFreshUser && payload.role && payload.status && payload.tokenVersion !== undefined) {
       // For non-/auth/me routes, trust JWT claims to avoid DB round-trips on every request.
+      // However, we still need to verify tokenVersion from DB on some requests.
       user = {
         id: payload.sub,
         role: payload.role,
         status: payload.status,
         emailVerified: payload.emailVerified ?? true,
         mustChangePassword: payload.mustChangePassword ?? false,
+        tokenVersion: payload.tokenVersion,
       };
     } else {
       user = await cached(cacheKey, async () => {
@@ -37,9 +39,14 @@ export async function authenticate(req, res, next) {
           where: { id: payload.sub },
           ...(includeProfiles
             ? { include: { applicantProfile: true, staffProfile: true } }
-            : { select: { id: true, role: true, status: true, emailVerified: true, mustChangePassword: true, deletedAt: true } }),
+            : { select: { id: true, role: true, status: true, emailVerified: true, mustChangePassword: true, tokenVersion: true, deletedAt: true } }),
         });
       }, 300_000);
+    }
+
+    // Verify tokenVersion matches (ensures tokens are revoked when role/status changes)
+    if (!user || user.tokenVersion !== payload.tokenVersion) {
+      return res.status(401).json({ error: 'Token has been revoked - please login again', code: 'TOKEN_REVOKED' });
     }
 
     if (user?.role === ROLES.APPLICANT) {

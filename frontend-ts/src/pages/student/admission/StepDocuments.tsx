@@ -50,23 +50,35 @@ export default function StepDocuments({ form, requiredDocs, optionalDocs, slotFi
       </div>
       <h4 className="font-semibold text-forest-500 mb-3 flex items-center gap-1.5"><Icon name="upload" className="w-4 h-4" /> Other Supporting Files (Optional)</h4>
       <div
-        className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-gold-400 transition"
+        className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-gold-400 transition focus:outline-none focus:ring-2 focus:ring-blue-500"
         onClick={() => document.getElementById('extraFileInput')?.click()}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            document.getElementById('extraFileInput')?.click();
+          }
+        }}
         onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add('border-gold-400'); }}
         onDragLeave={e => e.currentTarget.classList.remove('border-gold-400')}
         onDrop={e => { e.preventDefault(); e.currentTarget.classList.remove('border-gold-400'); handleExtraFiles(e.dataTransfer.files); }}
+        role="button"
+        tabIndex={0}
+        aria-label="Upload additional files. Press Enter or Space to select files, or drag and drop."
       >
         <Icon name="upload" className="w-8 h-8 text-gray-400" />
         <p className="text-gray-500 mt-2">Drag & drop files here or <span className="text-forest-500 font-medium">browse</span></p>
         <p className="text-sm text-gray-500 mt-1">Medical records, recommendation letters, other certificates</p>
       </div>
-      <input id="extraFileInput" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden" onChange={e => { handleExtraFiles(e.target.files); e.target.value = ''; }} />
+      <div className="sr-only" role="status" aria-live="polite">
+        Press Enter or Space to upload additional files, or drag and drop files here
+      </div>
+      <input id="extraFileInput" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden" onChange={e => { handleExtraFiles(e.target.files); e.target.value = ''; }} aria-hidden="true" />
       {extraFiles.length > 0 && (
         <div className="mt-3 space-y-2">
           {extraFiles.map((f, i) => (
             <div key={i} className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded-lg text-sm">
               <span>File: {f.name} <span className="text-gray-500 text-sm">({(f.size/1024).toFixed(1)} KB)</span></span>
-              <button onClick={() => removeExtra(i)} className="text-red-400 hover:text-red-600" aria-label="Remove file">X</button>
+              <button onClick={() => removeExtra(i)} className="text-red-400 hover:text-red-600" aria-label={`Remove ${f.name}`}>X</button>
             </div>
           ))}
         </div>

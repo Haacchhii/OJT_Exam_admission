@@ -66,6 +66,7 @@ interface LoginResult {
 
 interface LoginOpts {
   registerPayload?: Record<string, unknown>;
+  rememberMe?: boolean;
 }
 
 interface AuthContextValue {
@@ -175,7 +176,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const res = opts.registerPayload
         ? await client.post<AuthResponse>('/auth/register', opts.registerPayload)
-        : await client.post<AuthResponse>('/auth/login', { email, password });
+        : await client.post<AuthResponse>('/auth/login', { 
+            email, 
+            password,
+            rememberMe: opts.rememberMe ?? false
+          });
       if (res.emailVerificationRequired) {
         setToken(null);
         sessionStorage.removeItem(USER_KEY);
@@ -233,7 +238,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const roleLabel = ROLE_LABELS[user?.role as string] || user?.role || '';
 
-  // Session inactivity timeout — logout after 60 minutes of no interaction
+  // Session inactivity timeout — logout after 30 minutes of no interaction
   useEffect(() => {
     if (!user) return;
     const INACTIVITY_MS = 30 * 60 * 1000;
