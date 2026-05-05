@@ -1,13 +1,13 @@
 {
   "version": 2,
+  "env": {
+    "TZ": "Asia/Manila"
+  },
   "crons": [
     {
       "path": "/api/warmup",
       "schedule": "0 3 * * *"
     }
-      "env": {
-        "TZ": "Asia/Manila"
-      },
   ],
   "rewrites": [
     {
