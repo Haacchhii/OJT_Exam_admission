@@ -50,16 +50,7 @@ export default function Sidebar({ open, onClose, role, collapsed, onToggleCollap
   const isEmployee = role === 'employee';
   const location = useLocation();
 
-  // Show a teacher/admin quick link to the essay scoring queue for faster access.
-  if (isEmployee && (user?.role === 'teacher' || user?.role === 'administrator')) {
-    const scoringLink: LinkItem = { to: '/employee/results#essays', icon: 'documentText', label: 'Scoring Queue', page: 'results' };
-    const idx = links.findIndex(l => l.to === '/employee/results');
-    if (idx >= 0) {
-      links = [...links.slice(0, idx + 1), scoringLink, ...links.slice(idx + 1)];
-    } else {
-      links = [scoringLink, ...links];
-    }
-  }
+  // Scoring Queue link intentionally removed — use Results → Essays or Essay Review.
 
   const roleBadgeText = isEmployee ? roleLabel : 'Student';
   const roleBadgeShort = isEmployee
