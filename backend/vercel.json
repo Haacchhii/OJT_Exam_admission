@@ -1,8 +1,5 @@
 {
   "version": 2,
-  "env": {
-    "TZ": "Asia/Manila"
-  },
   "crons": [
     {
       "path": "/api/warmup",
