@@ -1,3 +1,5 @@
+import { formatManilaDate } from './timezone';
+
 /** Generate a unique ID string, safe for high-frequency calls (CSV import). */
 let _uidCounter = 0;
 export function uid(): string {
@@ -20,7 +22,7 @@ export function formatDate(isoString: string | null | undefined): string {
     ? new Date(Number(dateOnlyMatch[1]), Number(dateOnlyMatch[2]) - 1, Number(dateOnlyMatch[3]))
     : new Date(isoString);
   if (isNaN(d.getTime())) return '—';
-  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  return formatManilaDate(d, { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
 interface FormatDateRangeOptions {

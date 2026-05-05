@@ -8,6 +8,7 @@ import { useConfirm } from '../../../components/ConfirmDialog';
 import { PageHeader, ActionButton, SkeletonPage, ErrorAlert, ProcessStatePanel, StatusBanner } from '../../../components/UI';
 import Icon from '../../../components/Icons';
 import { formatTime } from '../../../utils/helpers';
+import { formatManilaDate, toManilaIsoDay } from '../../../utils/timezone';
 import type { Exam, ExamSchedule, ExamRegistration, ExamResult, User } from '../../../types';
 
 interface ScheduleData {
@@ -26,13 +27,7 @@ interface ScheduleViewProps {
 }
 
 function toIsoDay(v: unknown): string | null {
-  if (!v) return null;
-  const d = new Date(String(v));
-  if (Number.isNaN(d.getTime())) return null;
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return toManilaIsoDay(v) || null;
 }
 
 function isWithinPeriod(today: string, start: string | null, end: string | null) {
@@ -45,7 +40,7 @@ function formatDisplayDate(value: string | null | undefined): string {
   if (!value) return 'Open';
   const parsed = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T00:00:00`) : new Date(String(value));
   if (Number.isNaN(parsed.getTime())) return String(value);
-  return parsed.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  return formatManilaDate(parsed, { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
 function statusBadgeClass(status?: string) {
@@ -255,12 +250,12 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, onBo
             {available.map((s: ExamSchedule) => {
               const exam = s.exam;
               const remaining = s.maxSlots - s.slotsTaken;
-              const d = new Date(s.scheduledDate + 'T00:00:00');
+              const d = new Date(`${s.scheduledDate}T00:00:00+08:00`);
               return (
                 <div key={s.id} className="flex items-center gap-4 bg-gray-50 rounded-lg p-4">
                   <div className="text-center bg-forest-500 text-white rounded-lg px-3 py-2 min-w-[60px]">
-                    <div className="text-xs uppercase">{d.toLocaleString('en-US', { month: 'short' })}</div>
-                    <div className="text-xl font-bold">{d.getDate()}</div>
+                    <div className="text-xs uppercase">{formatManilaDate(d, { month: 'short' })}</div>
+                    <div className="text-xl font-bold">{formatManilaDate(d, { day: 'numeric' })}</div>
                   </div>
                   <div className="flex-1">
                     <h4 className="font-semibold text-forest-500">{exam?.title || 'Exam'}</h4>

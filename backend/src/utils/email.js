@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 import env from '../config/env.js';
 import { SCHOOL_NAME } from './constants.js';
+import { getManilaYear } from './timezone.js';
 
 const appUrl = env.APP_URL;
 
@@ -124,7 +125,7 @@ function wrap(body) {
     <div class="footer">
       <p>This is an automated email from ${SCHOOL_NAME}.<br/>
       Please do not reply to this email. For inquiries, contact the registrar's office.<br/>
-      &copy; ${new Date().getFullYear()} ${SCHOOL_NAME}. All rights reserved.</p>
+      &copy; ${getManilaYear(new Date())} ${SCHOOL_NAME}. All rights reserved.</p>
     </div>
   </div>
 </body>

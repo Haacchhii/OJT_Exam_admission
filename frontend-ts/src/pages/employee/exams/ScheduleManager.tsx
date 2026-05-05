@@ -1,42 +1,32 @@
 ﻿import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useAsync } from '../../../hooks/useAsync';
-import { getExams, getExamSchedulesPage, addExamSchedule, updateExamSchedule, deleteExamSchedule } from '../../../api/exams';
+import { getExams, getExamSchedulesPage, addExamSchedule, updateExamSchedule, deleteExamSchedule, closeExamSchedule } from '../../../api/exams';
 import { showToast } from '../../../components/Toast';
 import { useConfirm } from '../../../components/ConfirmDialog';
 import { PageHeader, Badge, EmptyState, Pagination, SkeletonPage, ActionButton, SearchInput, StatusBanner } from '../../../components/UI';
 import Icon from '../../../components/Icons';
 import { formatTime, formatDateRange, asArray } from '../../../utils/helpers';
+import { formatManilaDate, getManilaDateTimeParts, toManilaIsoDay } from '../../../utils/timezone';
 import { FormInput } from './ExamComponents';
 import type { Exam, ExamSchedule } from '../../../types';
 
 const SCHED_PER_PAGE = 8;
 
 function getTodayLocalIso() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return toManilaIsoDay(new Date()) || '';
 }
 
 function addDaysIso(dateIso: string, days: number) {
   const d = new Date(`${dateIso}T00:00:00`);
   d.setDate(d.getDate() + days);
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return toManilaIsoDay(d) || dateIso;
 }
 
 function toLocalInputDateTime(value?: string | null) {
   if (!value) return '';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return '';
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  const hour = String(d.getHours()).padStart(2, '0');
-  const minute = String(d.getMinutes()).padStart(2, '0');
+  const parts = getManilaDateTimeParts(value);
+  if (!parts) return '';
+  const { year, month, day, hour, minute } = parts;
   return `${year}-${month}-${day}T${hour}:${minute}`;
 }
 
@@ -44,7 +34,7 @@ function formatDateTime(value?: string | null) {
   if (!value) return 'N/A';
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return String(value);
-  return d.toLocaleString('en-US', {
+  return formatManilaDate(d, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -438,8 +428,8 @@ export default function ScheduleManager() {
               return (
                 <div key={s.id} className="flex items-center gap-4 bg-gray-50 rounded-lg p-4">
                   <div className="text-center bg-forest-500 text-white rounded-lg px-3 py-2 min-w-[60px]">
-                    <div className="text-xs uppercase">{d.toLocaleString('en-US', { month: 'short' })}</div>
-                    <div className="text-xl font-bold">{d.getDate()}</div>
+                    <div className="text-xs uppercase">{formatManilaDate(d, { month: 'short' })}</div>
+                    <div className="text-xl font-bold">{formatManilaDate(d, { day: 'numeric' })}</div>
                   </div>
                   <div className="flex-1">
                     <h4 className="font-semibold text-forest-500">{exam?.title || 'Unknown Exam'}</h4>

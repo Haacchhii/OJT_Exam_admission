@@ -5,6 +5,7 @@ import Icon from '../../components/Icons';
 import { PageHeader, ActionButton } from '../../components/UI';
 import { client } from '../../api/client';
 import { formatPersonName, personInitials } from '../../utils/helpers';
+import { formatManilaDate } from '../../utils/timezone';
 
 // Validation patterns (must match backend validation)
 const NAME_REGEX = /^[\p{L}\p{M}\s\-'.]+$/u;
@@ -171,7 +172,7 @@ export default function Profile() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
             <div>
               <span className="text-gray-500 text-sm uppercase font-semibold">Account Created</span>
-              <p className="text-gray-700 mt-0.5">{user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : '-'}</p>
+              <p className="text-gray-700 mt-0.5">{user.createdAt ? formatManilaDate(new Date(user.createdAt), { year: 'numeric', month: 'long', day: 'numeric' }) : '-'}</p>
             </div>
             <div>
               <span className="text-gray-500 text-sm uppercase font-semibold">Status</span>

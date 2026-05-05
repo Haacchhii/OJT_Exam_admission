@@ -16,6 +16,7 @@ import { validateUserBatch } from './userImportValidation';
 import { getPasswordRequirementChecks, isPasswordCompliant } from '../../utils/passwordStrength';
 import { USER_ROLE_OPTIONS, ALL_GRADE_LEVELS } from '../../utils/constants';
 import { exportToCSV, formatPersonName } from '../../utils/helpers';
+import { toManilaIsoDay } from '../../utils/timezone';
 import type { User } from '../../types';
 
 const USERS_PER_PAGE = 10;
@@ -133,7 +134,7 @@ export default function EmployeeUsers() {
     // Parse and validate all rows
     const validated = validateUserBatch(data);
     setValidatedRows(validated);
-    setPreviewFileName(`users_import_${new Date().toLocaleDateString()}.csv`);
+    setPreviewFileName(`users_import_${toManilaIsoDay(new Date()) || 'date'}.csv`);
     setShowBulkImport(false);
     setShowPreview(true);
   };

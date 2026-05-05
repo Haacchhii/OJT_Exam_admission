@@ -1,4 +1,5 @@
 import type { GradeGroup, SelectOption } from '../types';
+import { getManilaDateParts } from './timezone';
 
 /**
  * Centralized school information constants.
@@ -9,7 +10,7 @@ export const SCHOOL_SUBTITLE = 'Integrated School of St. Joseph';
 export const SCHOOL_LOGO_PATH = '/school-logo.png';
 export const SCHOOL_ADDRESS = 'Lapolapo 1st, San Jose, Batangas, Philippines';
 export const SCHOOL_PHONE = '(043)-702-2153';
-export const SCHOOL_YEAR = String(new Date().getFullYear());
+export const SCHOOL_YEAR = String(getManilaDateParts(new Date())?.year || new Date().getFullYear());
 export const SCHOOL_COPYRIGHT = `\u00A9 ${SCHOOL_YEAR} ${SCHOOL_NAME}`;
 export const SCHOOL_SYSTEM_TITLE = 'Online Exam & Admission System';
 
@@ -57,9 +58,9 @@ export const ADMISSION_IN_PROGRESS: string[] = ['Submitted', 'Under Screening', 
 export const DEFAULT_PAGE_SIZE = 10;
 
 export function getCurrentSchoolYear(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
+  const parts = getManilaDateParts(new Date());
+  const year = Number(parts?.year || new Date().getFullYear());
+  const month = Number(parts?.month || '01') - 1;
   const startYear = month >= 5 ? year : year - 1;
   return `${startYear}-${startYear + 1}`;
 }

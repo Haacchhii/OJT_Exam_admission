@@ -5,23 +5,15 @@ import { getIo } from '../utils/socket.js';
 import { logAudit } from '../utils/auditLog.js';
 import { attachExamWindowStatus, computeExamWindowStatus, getEffectiveExamWindow } from '../utils/examWindow.js';
 import { cached, invalidatePrefix } from '../utils/cache.js';
+import { sendScheduleClosedEmail } from '../services/emailService.js';
+import { getManilaDateParts, toManilaIsoDay } from '../utils/timezone.js';
 
 function getTodayLocalIso() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return toManilaIsoDay(new Date()) || '';
 }
 
 function toIsoDay(value) {
-  if (!value) return null;
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return null;
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return toManilaIsoDay(value);
 }
 
 function isWithinPeriod(todayIso, startDate, endDate) {

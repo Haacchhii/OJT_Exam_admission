@@ -8,6 +8,7 @@ import { PageHeader, SkeletonPage, ErrorAlert, ActionButton } from '../../compon
 import Icon from '../../components/Icons';
 import { lazyWithRetry, LazyLoadingFallback } from '../../components/lazyWithRetry';
 import { ADMISSION_STATUSES, GRADE_OPTIONS, ALL_GRADE_LEVELS } from '../../utils/constants';
+import { getManilaDateParts, formatManilaDate } from '../../utils/timezone';
 import type { Admission, ExamResult, Exam, ExamSchedule, ExamRegistration, AcademicYear, Semester } from '../../types';
 
 const PassRateMonthlyCharts = lazyWithRetry(() => import('./reports/charts/PassRateMonthlyCharts'));
@@ -71,10 +72,8 @@ const SCHEDULE_CHART_OPTIONS: ExportChartOption[] = [
 ];
 
 function toLocalIsoDate(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  const parts = getManilaDateParts(date);
+  return parts ? `${parts.year}-${parts.month}-${parts.day}` : '';
 }
 
 function normalizeSchoolLabel(value: unknown) {
@@ -169,7 +168,7 @@ function compactDate(value?: string | null) {
     ? new Date(Number(dateOnlyMatch[1]), Number(dateOnlyMatch[2]) - 1, Number(dateOnlyMatch[3]))
     : new Date(value);
   if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  return formatManilaDate(d, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 function compactPeriod(a?: Admission) {
@@ -369,8 +368,9 @@ export default function EmployeeReports() {
 
   const applyReportPreset = (presetKey: ReportPreset['key']) => {
     const nowDate = new Date();
+    const nowParts = getManilaDateParts(nowDate);
     const todayIso = toLocalIsoDate(nowDate);
-    const firstDayOfMonthIso = toLocalIsoDate(new Date(nowDate.getFullYear(), nowDate.getMonth(), 1));
+    const firstDayOfMonthIso = nowParts ? `${nowParts.year}-${nowParts.month}-01` : '';
 
     clearAllFilters();
 
@@ -658,20 +658,23 @@ export default function EmployeeReports() {
   const monthKeyCounts = new Map<string, number>();
   for (const admission of admissions) {
     const d = new Date(admission.submittedAt);
-    const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`;
+    const parts = getManilaDateParts(d);
+    const key = parts ? `${parts.year}-${String(Number(parts.month) - 1).padStart(2, '0')}` : '';
     monthKeyCounts.set(key, (monthKeyCounts.get(key) || 0) + 1);
   }
 
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const monthData: { label: string; count: number }[] = [];
+  const nowParts = getManilaDateParts(now);
   for (let i = 5; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`;
+    const d = new Date(Date.UTC(Number(nowParts?.year || now.getFullYear()), Number(nowParts?.month || '01') - 1 - i, 1));
+    const parts = getManilaDateParts(d);
+    const key = parts ? `${parts.year}-${String(Number(parts.month) - 1).padStart(2, '0')}` : '';
     const count = monthKeyCounts.get(key) || 0;
-    monthData.push({ label: monthNames[d.getMonth()], count });
+    monthData.push({ label: monthNames[Number(parts?.month || '01') - 1], count });
   }
 
-  const thisMonthKey = `${now.getFullYear()}-${String(now.getMonth()).padStart(2, '0')}`;
+  const thisMonthKey = nowParts ? `${nowParts.year}-${String(Number(nowParts.month) - 1).padStart(2, '0')}` : '';
   const thisMonth = monthKeyCounts.get(thisMonthKey) || 0;
 
   const previousSchoolBuckets = new Map<string, { count: number; labels: Map<string, number> }>();

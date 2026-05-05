@@ -5,6 +5,7 @@ import { sendExamBookingEmail } from '../utils/email.js';
 import { ROLES, shouldSkipEntranceExam } from '../utils/constants.js';
 import { cached, invalidatePrefix } from '../utils/cache.js';
 import { attachExamWindowStatus, evaluateExamStartAvailability, isNowWithinExamWindow, computeExamWindowStatus } from '../utils/examWindow.js';
+import { formatManilaDate, toManilaIsoDay } from '../utils/timezone.js';
 
 function normalizeEmail(value) {
   return String(value || '').trim().toLowerCase();
@@ -50,11 +51,7 @@ async function invalidateEmployeeRegistrationCaches() {
 }
 
 function getTodayLocalIso() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return toManilaIsoDay(new Date()) || '';
 }
 
 function isWithinPeriod(todayIso, startDate, endDate) {
@@ -64,13 +61,7 @@ function isWithinPeriod(todayIso, startDate, endDate) {
 }
 
 function toIsoDay(value) {
-  if (!value) return null;
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return null;
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return toManilaIsoDay(value);
 }
 
 async function getActiveAcademicPeriod() {
@@ -382,16 +373,12 @@ export async function createRegistration(req, res, next) {
       if (!sched) return;
       let dateStr = 'TBD';
       if (sched.scheduledDate) {
-        const [year, month, day] = String(sched.scheduledDate).split('-').map(Number);
-        if (year && month && day) {
-          const scheduleDate = new Date(Date.UTC(year, month - 1, day));
-          dateStr = scheduleDate.toLocaleDateString('en-PH', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            timeZone: 'UTC',
-          });
-        }
+        const scheduleDate = new Date(`${sched.scheduledDate}T00:00:00+08:00`);
+        dateStr = formatManilaDate(scheduleDate, {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        });
       }
       const timeStr = sched.startTime && sched.endTime ? `${sched.startTime} - ${sched.endTime}` : 'See portal for details';
       sendExamBookingEmail({

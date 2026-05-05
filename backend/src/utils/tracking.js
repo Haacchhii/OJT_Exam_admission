@@ -1,4 +1,5 @@
 import prisma from '../config/db.js';
+import { getManilaYear } from './timezone.js';
 
 /**
  * Generate a unique tracking ID.
@@ -11,7 +12,7 @@ import prisma from '../config/db.js';
 const MAX_RETRIES = 5;
 
 export async function generateTrackingId(type = 'ADM') {
-  const year = new Date().getFullYear();
+  const year = getManilaYear(new Date());
   const prefix = `GK-${type}-${year}-`;
   const model = type === 'ADM' ? prisma.admission : prisma.examRegistration;
 
@@ -59,7 +60,7 @@ export async function generateTrackingId(type = 'ADM') {
  * already handles: lookup highest existing number → increment → retry.
  */
 export async function generateStudentNumber() {
-  const year = new Date().getFullYear();
+  const year = getManilaYear(new Date());
   const prefix = `GKISSJ-${year}-`;
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {

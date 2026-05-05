@@ -1,4 +1,7 @@
 {
+  "env": {
+    "TZ": "Asia/Manila"
+  },
   "rewrites": [
     {
       "source": "/api/(.*)",

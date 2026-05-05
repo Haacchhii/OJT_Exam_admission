@@ -1,3 +1,5 @@
+import { formatManilaDate, startOfManilaDay, endOfManilaDay } from './timezone.js';
+
 function hasValue(value) {
   return value !== undefined && value !== null && String(value).trim() !== '';
 }
@@ -17,30 +19,16 @@ function addMinutes(date, minutes) {
 }
 
 function startOfDay(dateIso) {
-  if (dateIso instanceof Date) {
-    if (Number.isNaN(dateIso.getTime())) return null;
-    return new Date(dateIso.getFullYear(), dateIso.getMonth(), dateIso.getDate());
-  }
-  if (!hasValue(dateIso)) return null;
-  const parsed = new Date(String(dateIso));
-  if (Number.isNaN(parsed.getTime())) return null;
-  return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+  return startOfManilaDay(dateIso);
 }
 
 function endOfDay(dateIso) {
-  if (dateIso instanceof Date) {
-    if (Number.isNaN(dateIso.getTime())) return null;
-    return new Date(dateIso.getFullYear(), dateIso.getMonth(), dateIso.getDate(), 23, 59, 59, 999);
-  }
-  if (!hasValue(dateIso)) return null;
-  const parsed = new Date(String(dateIso));
-  if (Number.isNaN(parsed.getTime())) return null;
-  return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate(), 23, 59, 59, 999);
+  return endOfManilaDay(dateIso);
 }
 
 function formatDateTimeLabel(value) {
   if (!(value instanceof Date) || Number.isNaN(value.getTime())) return 'TBD';
-  return value.toLocaleDateString('en-US', {
+  return formatManilaDate(value, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',

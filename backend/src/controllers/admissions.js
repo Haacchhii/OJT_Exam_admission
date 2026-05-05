@@ -10,6 +10,7 @@ import { sendAdmissionSubmittedEmail, sendAdmissionStatusEmail } from '../utils/
 import { cached, invalidatePrefix } from '../utils/cache.js';
 import env from '../config/env.js';
 import { resolveUploadedFilePath } from '../utils/uploadPaths.js';
+import { toManilaIsoDay } from '../utils/timezone.js';
 
 const ADMISSION_IN_PROGRESS = ['Submitted', 'Under Screening', 'Under Evaluation'];
 const REPORTS_DEFAULT_ADMISSIONS = 40;
@@ -30,13 +31,7 @@ async function invalidateAdmissionCaches(userIds = []) {
 }
 
 function toIsoDay(d) {
-  if (!d) return null;
-  const dt = new Date(d);
-  if (Number.isNaN(dt.getTime())) return null;
-  const y = dt.getFullYear();
-  const m = String(dt.getMonth() + 1).padStart(2, '0');
-  const day = String(dt.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+  return toManilaIsoDay(d);
 }
 
 function normalizeEmail(value) {
