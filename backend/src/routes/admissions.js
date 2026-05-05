@@ -7,6 +7,7 @@ import { validate, validateQuery } from '../middleware/validate.js';
 import { createAdmissionSchema, updateStatusSchema, bulkUpdateStatusSchema, bulkHandoffSchema, bulkDeleteSchema, reviewDocumentSchema, admissionsQuerySchema, admissionsStatsQuerySchema, reportsSummaryQuerySchema } from '../utils/schemas.js';
 import { writeLimiter } from '../middleware/rateLimits.js';
 import * as ctrl from '../controllers/admissions.js';
+import * as commentsCtrl from '../controllers/admissionComments.js';
 import { previewDocument, extractDocument, getExtractionJobStatus } from '../controllers/documentPreview.js';
 import { ROLES } from '../utils/constants.js';
 
@@ -24,6 +25,11 @@ router.get('/ops-bootstrap', authorize(ROLES.ADMIN, ROLES.REGISTRAR), validateQu
 
 // Tracking (search by tracking ID — any authenticated user)
 router.get('/track/:trackingId', ctrl.trackApplication);
+
+// Admission comments thread
+router.get('/:admissionId/comments', authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), commentsCtrl.getAdmissionComments);
+router.post('/:admissionId/comments', authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), commentsCtrl.addAdmissionComment);
+router.delete('/comments/:commentId', authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), commentsCtrl.deleteAdmissionComment);
 
 // CRUD
 router.get('/',      authorize(ROLES.ADMIN, ROLES.REGISTRAR), validateQuery(admissionsQuerySchema), ctrl.getAdmissions);

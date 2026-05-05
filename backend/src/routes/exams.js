@@ -14,6 +14,7 @@ router.get('/schedules',           validateQuery(schedulesQuerySchema), ctrl.get
 router.get('/schedules/available', ctrl.getAvailableSchedules);
 router.post('/schedules/notice',   authorize(ROLES.APPLICANT), ctrl.notifyNoSchedule);
 router.post('/schedules',          authorize(ROLES.ADMIN, ROLES.TEACHER), validate(createScheduleSchema), ctrl.createSchedule);
+router.post('/schedules/:id/close', authorize(ROLES.ADMIN, ROLES.TEACHER), ctrl.closeSchedule);
 router.put('/schedules/:id',       authorize(ROLES.ADMIN, ROLES.TEACHER), validate(updateScheduleSchema), ctrl.updateSchedule);
 router.delete('/schedules/:id',    authorize(ROLES.ADMIN, ROLES.TEACHER), ctrl.deleteSchedule);
 

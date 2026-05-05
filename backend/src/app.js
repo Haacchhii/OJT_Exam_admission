@@ -24,6 +24,7 @@ import resultsRoutes       from './routes/results.js';
 import usersRoutes         from './routes/users.js';
 import auditLogRoutes      from './routes/auditLog.js';
 import academicYearsRoutes from './routes/academicYears.js';
+import notificationPreferencesRoutes from './routes/notificationPreferences.js';
 import questionTemplatesRoutes from './routes/questionTemplates.js';
 import perfRoutes          from './routes/perf.js';
 
@@ -61,6 +62,8 @@ const corsConfig = {
   origin(origin, callback) {
     // Allow non-browser requests (no Origin header), e.g., health checks, curl, server-to-server.
     if (!origin) return callback(null, true);
+    // In development, allow all origins to simplify local testing (including localhost variants).
+    if (env.NODE_ENV !== 'production') return callback(null, true);
     if (allowedOrigins.includes(origin)) return callback(null, true);
     return callback(new Error(`CORS blocked for origin: ${origin}`));
   },
@@ -71,7 +74,6 @@ const corsConfig = {
   optionsSuccessStatus: 204,
 };
 app.use(cors(corsConfig));
-app.options('/{*path}', cors(corsConfig));
 
 app.use(express.json({ limit: BODY_SIZE_LIMIT }));
 app.use(express.urlencoded({ extended: true, limit: BODY_SIZE_LIMIT }));
@@ -192,6 +194,7 @@ app.use('/api/perf', noStore, perfRoutes);
 app.use('/api/admissions',    cachePrivate, admissionsRoutes);
 app.use('/api/exams',         cachePrivate, examsRoutes);
 app.use('/api/question-templates', cachePrivate, questionTemplatesRoutes);
+app.use('/api/notification-preferences', cachePrivate, notificationPreferencesRoutes);
 app.use('/api/results',       cachePrivate, resultsRoutes);
 app.use('/api/users',         cachePrivate, usersRoutes);
 app.use('/api/audit-logs',    cachePrivate, auditLogRoutes);

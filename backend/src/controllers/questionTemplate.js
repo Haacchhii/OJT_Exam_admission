@@ -1,5 +1,4 @@
-import { prisma } from '../db.js';
-import { validateSchema } from '../utils/schemas.js';
+import prisma from '../config/db.js';
 
 /**
  * List question templates for current teacher
