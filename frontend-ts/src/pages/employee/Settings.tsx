@@ -13,6 +13,7 @@ import { useConfirm } from '../../components/ConfirmDialog';
 import { SEMESTER_NAMES } from '../../utils/constants';
 import { formatDate } from '../../utils/helpers';
 import type { AcademicYear, Semester } from '../../types';
+import NotificationPreferences from '../settings/NotificationPreferences';
 
 interface YearForm { year: string; isActive: boolean }
 interface SemForm {
@@ -210,6 +211,19 @@ export default function EmployeeSettings() {
   return (
     <div className="space-y-8">
       <PageHeader title="Settings" subtitle="Manage academic years and semesters" />
+
+      <section className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="font-semibold text-gray-800">Notification Preferences</h2>
+            <p className="text-xs text-gray-500 mt-1">Control which system events send email notifications to your account.</p>
+          </div>
+          <Icon name="bell" className="w-5 h-5 text-forest-600" />
+        </div>
+        <div className="p-6">
+          <NotificationPreferences />
+        </div>
+      </section>
 
       {/* School Years Panel */}
       <section className="bg-white rounded-xl border border-gray-200 overflow-hidden">

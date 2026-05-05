@@ -140,6 +140,10 @@ export async function deleteExamSchedule(id: number) {
   return client.delete<void>(`/exams/schedules/${id}`);
 }
 
+export async function closeExamSchedule(id: number) {
+  return client.post<ExamSchedule>(`/exams/schedules/${id}/close`, {});
+}
+
 export async function getExamRegistrations(params?: ExamParams) {
   const mergedParams = withDefaultListParams(params);
   return client.get<ExamRegistration[]>(

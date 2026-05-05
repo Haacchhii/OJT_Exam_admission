@@ -27,9 +27,9 @@ type Permission =
 const ROLE_PERMISSIONS: Record<string, Permission[]> = {
   administrator: ['dashboard', 'admissions', 'exams', 'results', 'reports', 'users', 'audit', 'settings'],
   // Registrar: admission operations and reporting
-  registrar: ['dashboard', 'admissions', 'results', 'reports'],
+  registrar: ['dashboard', 'admissions', 'results', 'reports', 'settings'],
   // Teacher: exam operations, scoring, and reporting
-  teacher: ['dashboard', 'exams', 'results', 'reports'],
+  teacher: ['dashboard', 'exams', 'results', 'reports', 'settings'],
 };
 
 const ROLE_LABELS: Record<string, string> = {

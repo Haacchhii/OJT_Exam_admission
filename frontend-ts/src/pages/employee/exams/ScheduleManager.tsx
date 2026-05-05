@@ -1,6 +1,6 @@
 ﻿import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useAsync } from '../../../hooks/useAsync';
-import { getExams, getExamSchedulesPage, addExamSchedule, updateExamSchedule, deleteExamSchedule } from '../../../api/exams';
+import { getExams, getExamSchedulesPage, addExamSchedule, updateExamSchedule, deleteExamSchedule, closeExamSchedule } from '../../../api/exams';
 import { showToast } from '../../../components/Toast';
 import { useConfirm } from '../../../components/ConfirmDialog';
 import { PageHeader, Badge, EmptyState, Pagination, SkeletonPage, ActionButton, SearchInput, StatusBanner } from '../../../components/UI';
@@ -321,6 +321,41 @@ export default function ScheduleManager() {
     }
   };
 
+  const handleCloseSchedule = async (scheduleId: number) => {
+    const ok = await confirm({
+      title: 'Close Schedule',
+      message: 'Close this schedule now? Students will no longer be able to access it after closure.',
+      confirmLabel: 'Close Schedule',
+      variant: 'warning',
+    });
+    if (!ok) return;
+
+    setSchedActionBanner({
+      tone: 'info',
+      title: 'Closing schedule...',
+      message: 'Please wait while we mark this schedule as closed and notify staff.',
+    });
+
+    try {
+      const updated = await closeExamSchedule(scheduleId);
+      setOptimisticSchedule(updated);
+      setSchedActionBanner({
+        tone: 'success',
+        title: 'Schedule closed successfully.',
+        message: 'The schedule has been marked closed and the list is now updated.',
+      });
+      showToast('Schedule closed.', 'success');
+      schedRefetch();
+    } catch (err: any) {
+      setSchedActionBanner({
+        tone: 'danger',
+        title: 'Failed to close schedule.',
+        message: err?.message || 'Please try again.',
+      });
+      showToast('Failed to close schedule: ' + (err?.message || 'Unknown error'), 'error');
+    }
+  };
+
   if (schedLoading && !schedData) return <SkeletonPage />;
   if (schedError) return <div className="gk-section-card p-8 text-center"><p className="text-red-600 font-medium">Failed to load schedules.</p><div className="mt-3"><ActionButton variant="secondary" size="sm" onClick={schedRefetch}>Retry</ActionButton></div></div>;
 
@@ -457,6 +492,11 @@ export default function ScheduleManager() {
                   </div>
                   <div className="flex gap-2">
                     <ActionButton size="sm" variant="ghost" onClick={() => editSched(s)} icon={<Icon name="edit" className="w-3 h-3" />} className="text-forest-600">Edit</ActionButton>
+                    {s.examWindowStatus !== 'closed' && (
+                      <ActionButton size="sm" variant="ghost" onClick={() => handleCloseSchedule(s.id)} icon={<Icon name="x" className="w-3 h-3" />} className="text-amber-700 border border-amber-200 bg-amber-50 hover:bg-amber-100">
+                        Close
+                      </ActionButton>
+                    )}
                     <ActionButton size="sm" variant="ghost" onClick={() => handleDeleteSchedule(s.id)} icon={<Icon name="trash" className="w-3 h-3" />} className="text-red-600">Delete</ActionButton>
                   </div>
                 </div>

@@ -4,6 +4,7 @@ import { getAdmission, updateAdmissionStatus, VALID_TRANSITIONS } from '../../..
 import { useAsync } from '../../../hooks/useAsync';
 import { formatDate, formatDateRange, formatPersonName, badgeClass } from '../../../utils/helpers';
 import DocumentReview from '../../../components/DocumentReview';
+import CommentsThread from '../../../components/CommentsThread';
 import { PageHeader, Badge, SkeletonPage, ActionButton, StatusStepper, StatusBanner } from '../../../components/UI';
 import Icon from '../../../components/Icons';
 import { SCHOOL_NAME, SCHOOL_BRAND, SCHOOL_SUBTITLE, SCHOOL_LOGO_PATH, SCHOOL_ADDRESS, SCHOOL_PHONE } from '../../../utils/constants';
@@ -366,6 +367,12 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
           <p className="text-sm text-gray-500">You have view-only access to admission applications.</p>
         )}
       </div>
+
+      {canManage && (
+        <div className="mt-4">
+          <CommentsThread admissionId={adm.id} />
+        </div>
+      )}
 
       <div className="gk-section-card p-6 mt-4">
         <div className="flex items-center justify-between gap-3 mb-4">
