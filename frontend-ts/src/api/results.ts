@@ -139,3 +139,34 @@ export async function submitExamAnswers(
     answers: answersObj,
   });
 }
+
+export async function exportExamResultPdf(registrationId: number) {
+  const base = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
+  const url = `${base}/results/${registrationId}/export-pdf`;
+  
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    const blob = await response.blob();
+    const downloadUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = `exam-result-${registrationId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(downloadUrl);
+  } catch (error) {
+    console.error('PDF export failed:', error);
+    throw error;
+  }
+}

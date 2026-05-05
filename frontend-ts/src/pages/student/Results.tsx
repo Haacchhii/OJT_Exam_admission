@@ -1,6 +1,6 @@
 ﻿import { Link } from 'react-router-dom';
 import { getExamForReview, getMyRegistrationById } from '../../api/exams';
-import { getSubmittedAnswers } from '../../api/results';
+import { getSubmittedAnswers, exportExamResultPdf } from '../../api/results';
 import { getStudentHomeSummary } from '../../api/admissions';
 import { PageHeader, SkeletonPage, ErrorAlert, ActionButton } from '../../components/UI';
 import Icon from '../../components/Icons';
@@ -9,6 +9,7 @@ import { SCHOOL_NAME, SCHOOL_BRAND, SCHOOL_SUBTITLE, SCHOOL_LOGO_PATH, SCHOOL_AD
 import { useAuth } from '../../context/AuthContext';
 import { showToast } from '../../components/Toast';
 import { useAsync } from '../../hooks/useAsync';
+import { useState } from 'react';
 import type { ExamResult, Exam, ExamRegistration, SubmittedAnswer } from '../../types';
 
 interface EssayAnswer {
@@ -46,6 +47,7 @@ function isIdentificationMatch(answer: unknown, key: unknown, mode: 'exact' | 'p
 
 export default function StudentResults() {
   const { user } = useAuth();
+  const [exporting, setExporting] = useState(false);
 
   const { data: rawData, loading, error, refetch } = useAsync<ResultsData>(async () => {
     const summary = await getStudentHomeSummary();
@@ -133,6 +135,27 @@ export default function StudentResults() {
   const isPendingEssayReview = !myResult.essayReviewed;
   const passed = !isPendingEssayReview && myResult.passed;
 
+  const handleExportPdf = async () => {
+    if (!myReg) {
+      showToast('Unable to export: registration not found', 'error');
+      return;
+    }
+
+    setExporting(true);
+    try {
+      await exportExamResultPdf(myReg.id);
+      showToast('Exam result PDF downloaded successfully', 'success');
+    } catch (err) {
+      console.error('PDF export error:', err);
+      showToast(
+        err instanceof Error && err.message ? `Export failed: ${err.message}` : 'Failed to download PDF. Please try again.',
+        'error'
+      );
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const handlePrint = () => {
     const esc = (s: unknown) => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     const printWin = window.open('', '_blank');
@@ -189,7 +212,25 @@ export default function StudentResults() {
   return (
     <div>
       <PageHeader title="Exam Results" subtitle="View your entrance examination score and results.">
-        <ActionButton variant="secondary" onClick={handlePrint} icon={<Icon name="document" className="w-4 h-4" />} aria-label="Print exam result">Print / Export PDF</ActionButton>
+        <div className="flex gap-2">
+          <ActionButton 
+            variant="secondary" 
+            onClick={handleExportPdf}
+            disabled={exporting}
+            icon={<Icon name="download" className="w-4 h-4" />} 
+            aria-label="Download exam result PDF"
+          >
+            {exporting ? 'Exporting...' : 'Download PDF'}
+          </ActionButton>
+          <ActionButton 
+            variant="secondary" 
+            onClick={handlePrint} 
+            icon={<Icon name="printer" className="w-4 h-4" />} 
+            aria-label="Print exam result"
+          >
+            Print
+          </ActionButton>
+        </div>
       </PageHeader>
 
       <div className={`rounded-xl border-2 p-6 mb-6 ${isPendingEssayReview ? 'bg-gold-50 border-gold-200' : passed ? 'bg-forest-50 border-forest-200' : 'bg-red-50 border-red-200'}`}>

@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback, useRef } from 'react';
+﻿import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { submitExamAnswers } from '../../../api/results';
 import { saveDraftAnswers } from '../../../api/exams';
@@ -11,6 +11,24 @@ import type { Exam, ExamRegistration, ExamQuestion, QuestionChoice } from '../..
 
 type AnswerMap = Record<number, number | string>;
 type FlagSet = Set<number>;
+
+function deterministicShuffle<T>(items: T[], seed: number): T[] {
+  const out = [...items];
+  let state = seed || 1;
+  const next = () => {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
+
+  for (let i = out.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(next() * (i + 1));
+    const temp = out[i];
+    out[i] = out[j];
+    out[j] = temp;
+  }
+
+  return out;
+}
 
 function formatDraftAge(lastSavedAt: number | null): string {
   if (!lastSavedAt) return 'Not saved yet';
@@ -73,7 +91,12 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
   const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const submittedRef = useRef(false);
 
-  const questions = Array.isArray(exam.questions) ? exam.questions : [];
+  const baseQuestions = Array.isArray(exam.questions) ? exam.questions : [];
+  const questions = useMemo(() => {
+    if (baseQuestions.length <= 1) return baseQuestions;
+    // Stable per-applicant order using registration id as seed.
+    return deterministicShuffle(baseQuestions, registration.id);
+  }, [baseQuestions, registration.id]);
 
   useEffect(() => {
     if (questions.length === 0) {

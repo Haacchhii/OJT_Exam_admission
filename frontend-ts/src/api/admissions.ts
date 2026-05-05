@@ -262,3 +262,34 @@ export async function extractDocumentData(admissionId: number, docId: number): P
 export async function reviewDocument(admissionId: number, docId: number, reviewStatus: 'accepted' | 'rejected', reviewNote?: string) {
   return client.patch<{ id: number; reviewStatus: string; reviewNote: string | null; reviewedAt: string }>(`/admissions/${admissionId}/documents/${docId}/review`, { reviewStatus, reviewNote });
 }
+
+export async function exportAdmissionReceiptPdf(admissionId: number) {
+  const base = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
+  const url = `${base}/admissions/${admissionId}/export-pdf`;
+  
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    const blob = await response.blob();
+    const downloadUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = `admission-receipt-${admissionId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(downloadUrl);
+  } catch (error) {
+    console.error('PDF export failed:', error);
+    throw error;
+  }
+}

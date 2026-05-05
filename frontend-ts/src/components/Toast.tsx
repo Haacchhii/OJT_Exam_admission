@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { formatApiError } from '../utils/errorHandler';
 import type { ToastType } from '../types';
 
 let toastId = 0;
@@ -30,6 +31,14 @@ export function showToast(message: string, type: ToastType = 'success') {
     toastStore.toasts = toastStore.toasts.filter(t => t.id !== id);
     toastStore.listeners.forEach(fn => fn([...toastStore.toasts]));
   }, duration);
+}
+
+/**
+ * Show an error toast with automatic error message formatting
+ */
+export function showErrorToast(error: unknown, fallback = 'An error occurred') {
+  const message = formatApiError(error) || fallback;
+  showToast(message, 'error');
 }
 
 function dismissToast(id: number) {

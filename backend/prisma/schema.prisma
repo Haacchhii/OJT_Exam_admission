@@ -293,6 +293,19 @@ model NotificationPreference {
   @@map("notification_preferences")
 }
 
+model NotificationRolePreference {
+  id         Int      @id @default(autoincrement())
+  role       String
+  eventType  String   @map("event_type")
+  enabled    Boolean  @default(true)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime? @map("updated_at")
+
+  @@unique([role, eventType])
+  @@index([role])
+  @@map("notification_role_preferences")
+}
+
 model AdmissionComment {
   id          Int      @id @default(autoincrement())
   admissionId Int      @map("admission_id")

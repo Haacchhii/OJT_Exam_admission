@@ -137,13 +137,16 @@ export function StatusStepper({ steps, currentKey, className = '' }: StatusStepp
 
 /* ===== ErrorAlert ===== */
 export function ErrorAlert({ error, onRetry }: { error?: Error | null; onRetry?: () => void }) {
+  const { formatApiError } = require('../utils/errorHandler');
+  const displayMessage = error?.message ? formatApiError(error) : 'An unexpected error occurred. Please try again.';
+  
   return (
     <div className="gk-card p-8 text-center" role="alert">
       <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
         <Icon name="exclamation" className="w-7 h-7 text-red-500" />
       </div>
-      <p className="text-gray-800 font-semibold mb-1">Something went wrong</p>
-      <p className="text-gray-500 text-sm mb-5 max-w-md mx-auto">{error?.message || 'An unexpected error occurred.'}</p>
+      <p className="text-gray-800 font-semibold mb-1">Unable to Load</p>
+      <p className="text-gray-500 text-sm mb-5 max-w-md mx-auto">{displayMessage}</p>
       {onRetry && (
         <button onClick={onRetry} data-testid="error-retry" className="gk-btn-primary text-sm px-6 py-2.5 inline-flex items-center gap-2">
           <Icon name="refresh" className="w-4 h-4" />

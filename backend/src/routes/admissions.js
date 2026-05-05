@@ -9,6 +9,7 @@ import { writeLimiter } from '../middleware/rateLimits.js';
 import * as ctrl from '../controllers/admissions.js';
 import * as commentsCtrl from '../controllers/admissionComments.js';
 import { previewDocument, extractDocument, getExtractionJobStatus } from '../controllers/documentPreview.js';
+import { exportAdmissionReceiptPdf } from '../controllers/pdfExport.js';
 import { ROLES } from '../utils/constants.js';
 
 const router = Router();
@@ -35,6 +36,9 @@ router.delete('/comments/:commentId', authorize(ROLES.ADMIN, ROLES.REGISTRAR, RO
 router.get('/',      authorize(ROLES.ADMIN, ROLES.REGISTRAR), validateQuery(admissionsQuerySchema), ctrl.getAdmissions);
 router.get('/:id',   authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.APPLICANT), ctrl.getAdmission);  // ownership checked in controller
 router.post('/',     authorize(ROLES.APPLICANT), writeLimiter, validate(createAdmissionSchema), ctrl.createAdmission);
+
+// Export admission receipt as PDF
+router.get('/:id/export-pdf', authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.APPLICANT), exportAdmissionReceiptPdf);
 
 // Documents upload — ownership checked in controller
 router.post('/:id/documents', authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.APPLICANT), upload.array('documents', 10), verifyMime, ctrl.uploadDocuments);

@@ -4,6 +4,7 @@ import { authorize } from '../middleware/rbac.js';
 import { validate, validateQuery } from '../middleware/validate.js';
 import { resultsQuerySchema, essaysQuerySchema, scoreEssaySchema, submitExamSchema } from '../utils/schemas.js';
 import * as ctrl from '../controllers/results.js';
+import { exportExamResultPdf } from '../controllers/pdfExport.js';
 import { ROLES } from '../utils/constants.js';
 
 const router = Router();
@@ -11,6 +12,9 @@ router.use(authenticate);
 
 // Student scoped
 router.get('/mine', authorize(ROLES.APPLICANT), ctrl.getMyResult);
+
+// Export result as PDF
+router.get('/:registrationId/export-pdf', authorize(ROLES.APPLICANT, ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), exportExamResultPdf);
 
 // Essay review
 router.get('/essays',             authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), validateQuery(essaysQuerySchema), ctrl.getEssayAnswers);

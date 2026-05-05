@@ -4,7 +4,9 @@ import Icon from '../../../components/Icons';
 import { Detail } from './AdmissionFormFields';
 import { formatDate, badgeClass } from '../../../utils/helpers';
 import { showToast } from '../../../components/Toast';
+import { exportAdmissionReceiptPdf } from '../../../api/admissions';
 import { ADMISSION_PROGRESS_STEPS, SCHOOL_PHONE } from '../../../utils/constants';
+import { useState } from 'react';
 import type { Admission } from '../../../types';
 
 interface Props {
@@ -13,8 +15,25 @@ interface Props {
 }
 
 export default function ExistingApplication({ existingApp, onNewApplication }: Props) {
+  const [exporting, setExporting] = useState(false);
   const statusSteps = ADMISSION_PROGRESS_STEPS;
   const currentIdx = statusSteps.indexOf(existingApp.status);
+
+  const handleDownloadReceipt = async () => {
+    setExporting(true);
+    try {
+      await exportAdmissionReceiptPdf(existingApp.id);
+      showToast('Application receipt PDF downloaded successfully', 'success');
+    } catch (err) {
+      console.error('PDF export error:', err);
+      showToast(
+        err instanceof Error && err.message ? `Export failed: ${err.message}` : 'Failed to download receipt. Please try again.',
+        'error'
+      );
+    } finally {
+      setExporting(false);
+    }
+  };
 
   // Build a timeline from available data
   const timeline: { label: string; date?: string; done: boolean; icon: string }[] = [
@@ -29,7 +48,17 @@ export default function ExistingApplication({ existingApp, onNewApplication }: P
 
   return (
     <div>
-      <PageHeader title="Admission Application" subtitle="Track your admission progress below." />
+      <PageHeader title="Admission Application" subtitle="Track your admission progress below.">
+        <ActionButton 
+          variant="secondary" 
+          onClick={handleDownloadReceipt}
+          disabled={exporting}
+          icon={<Icon name="download" className="w-4 h-4" />} 
+          aria-label="Download application receipt PDF"
+        >
+          {exporting ? 'Exporting...' : 'Download Receipt'}
+        </ActionButton>
+      </PageHeader>
       <div className="gk-section-card p-6">
         <h3 className="text-lg font-bold text-forest-500 mb-4">Your Submitted Application</h3>
         {existingApp.status !== 'Rejected' && (
