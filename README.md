@@ -103,7 +103,7 @@ npm run build   # runs prisma generate
 ```bash
 NODE_ENV=production
 DATABASE_URL=<supabase-pooler-url>
-DIRECT_URL=<supabase-direct-url>
+DIRECT_URL=<supabase-direct-url>   # Required for Prisma migrations; the API will now boot with a warning if missing
 JWT_SECRET=<long-random-string>      # e.g. openssl rand -base64 48
 CORS_ORIGIN=https://ojt-exam-admission.vercel.app
 APP_URL=https://ojt-exam-admission.vercel.app

@@ -65,8 +65,7 @@ if (!env.DATABASE_URL) {
 }
 if (env.NODE_ENV === 'production') {
   if (!env.DIRECT_URL) {
-    console.error('FATAL: DIRECT_URL is required in production');
-    process.exit(1);
+    console.warn('WARNING: DIRECT_URL is not set in production. Prisma migrations will fail until it is configured, but the API can still start.');
   }
   if (env.JWT_SECRET === 'dev-secret') {
     console.error('FATAL: JWT_SECRET must be set in production');

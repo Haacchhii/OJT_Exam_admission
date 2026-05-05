@@ -80,3 +80,9 @@ export function formatManilaDate(value, options = {}) {
     ...options,
   }).format(date);
 }
+
+export function formatManilaDateTime(value) {
+  const parts = getManilaDateTimeParts(value);
+  if (!parts) return '';
+  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`;
+}
