@@ -62,6 +62,8 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
   const [dragOver, setDragOver] = useState(false);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [draftRestored, setDraftRestored] = useState(false);
+  const storageKey = `exam-builder-draft:${editExam?.id ?? 'new'}`;
 
   // Fetch full exam details (with questions) when editing
   const { data: fullExam, loading: examLoading } = useAsync<Exam | null>(
@@ -75,6 +77,37 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
       setQuestions(JSON.parse(JSON.stringify(fullExam.questions)));
     }
   }, [fullExam]);
+
+  const draftState = {
+    title,
+    grade,
+    gradeStage,
+    duration,
+    passing,
+    yearId,
+    semId,
+    questions,
+  };
+
+  const { restore, clear } = useUnsavedChanges(!!(title || grade || duration || passing || questions.length > 0), storageKey, draftState);
+
+  useEffect(() => {
+    setDraftRestored(false);
+    const restored = restore();
+    if (!restored) return;
+
+    if (typeof restored.title === 'string') setTitle(restored.title);
+    if (typeof restored.grade === 'string') setGrade(restored.grade);
+    if (typeof restored.gradeStage === 'string') setGradeStage(restored.gradeStage);
+    if (restored.duration !== undefined) setDuration(restored.duration as string | number);
+    if (restored.passing !== undefined) setPassing(restored.passing as string | number);
+    if (restored.yearId !== undefined) setYearId(restored.yearId as string | number);
+    if (restored.semId !== undefined) setSemId(restored.semId as string | number);
+    if (Array.isArray(restored.questions)) {
+      setQuestions(restored.questions as ParsedQuestion[]);
+    }
+    setDraftRestored(true);
+  }, [storageKey, restore, editExam?.id]);
 
   const { data: years } = useAsync<AcademicYear[]>(() => getAcademicYears(), [], 0, {
     resourcePrefixes: ['/academic-years'],
@@ -106,9 +139,6 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
       setGrade('');
     }
   }, [gradeStage, grade]);
-
-  const isDirty = !!(title || questions.length > 0);
-  const { clear } = useUnsavedChanges(isDirty);
 
   const moveQuestion = (fromIdx: number, toIdx: number) => {
     setQuestions(qs => {
@@ -413,14 +443,14 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
       if (editExam) {
         const res = await updateExam(editExam.id, payload);
         showToast('Exam updated successfully!', 'success');
+        clear();
         return res as Exam;
       } else {
         const res = await addExam(payload);
         showToast('Exam created successfully!', 'success');
+        clear();
         return res as Exam;
       }
-      clear();
-      onDone();
     } catch (err: any) {
       showToast('Failed to save exam: ' + (err.message || 'Unknown error'), 'error');
     } finally {
@@ -458,6 +488,11 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
   return (
     <div>
       <PageHeader title={editExam ? 'Edit Exam' : 'Create New Exam'} subtitle="Set up exam details and add questions manually or upload a file." />
+      {draftRestored && !editExam && (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Restored a saved draft for this exam builder. Continue editing and it will keep saving automatically.
+        </div>
+      )}
       <div className="gk-section-card p-6 mb-4">
         <h3 className="text-lg font-bold text-forest-500 mb-4">Exam Details</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

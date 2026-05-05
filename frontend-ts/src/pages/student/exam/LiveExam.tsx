@@ -10,6 +10,17 @@ import { useOfflineExamQueue } from '../../../hooks/useOfflineExamQueue';
 import type { Exam, ExamRegistration, ExamQuestion, QuestionChoice } from '../../../types';
 
 type AnswerMap = Record<number, number | string>;
+type FlagSet = Set<number>;
+
+function formatDraftAge(lastSavedAt: number | null): string {
+  if (!lastSavedAt) return 'Not saved yet';
+  const elapsedSeconds = Math.max(0, Math.floor((Date.now() - lastSavedAt) / 1000));
+  if (elapsedSeconds < 60) return `${elapsedSeconds}s ago`;
+  const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+  if (elapsedMinutes < 60) return `${elapsedMinutes}m ago`;
+  const elapsedHours = Math.floor(elapsedMinutes / 60);
+  return `${elapsedHours}h ago`;
+}
 
 interface LiveExamProps {
   exam: Exam;
@@ -19,11 +30,13 @@ interface LiveExamProps {
 export default function LiveExam({ exam, registration }: LiveExamProps) {
   const navigate = useNavigate();
   const { enqueueSubmission, getQueue, removeFromQueue, incrementAttemptCount } = useOfflineExamQueue();
+  const draftStorageKey = `gk_exam_answers_${registration.id}`;
+  const flagStorageKey = `gk_exam_flags_${registration.id}`;
 
   const [currentQ, setCurrentQ] = useState(0);
   const [answers, setAnswers] = useState<AnswerMap>(() => {
     try {
-      const saved = sessionStorage.getItem(`gk_exam_answers_${registration.id}`);
+      const saved = sessionStorage.getItem(draftStorageKey);
       if (saved) return JSON.parse(saved);
       // Fall back to server-saved draft
       if ((registration as any).draftAnswers) {
@@ -32,6 +45,14 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
       return {};
     } catch { return {}; }
   });
+  const [flags, setFlags] = useState<FlagSet>(() => {
+    try {
+      const saved = sessionStorage.getItem(flagStorageKey);
+      if (saved) return new Set(JSON.parse(saved));
+      return new Set();
+    } catch { return new Set(); }
+  });
+  const [showFlaggedOnly, setShowFlaggedOnly] = useState(false);
   const calcRemaining = () => {
     if (registration.startedAt) {
       const elapsed = Math.floor((Date.now() - new Date(registration.startedAt).getTime()) / 1000);
@@ -46,7 +67,10 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
   const [submitPhase, setSubmitPhase] = useState<'idle' | 'submitting' | 'submitted'>('idle');
   const [submitFeedback, setSubmitFeedback] = useState<{ title: string; message: string } | null>(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [draftStatus, setDraftStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [lastDraftSavedAt, setLastDraftSavedAt] = useState<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const submittedRef = useRef(false);
 
   const questions = Array.isArray(exam.questions) ? exam.questions : [];
@@ -61,11 +85,39 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
   }, [questions.length, currentQ]);
 
   useEffect(() => {
-    try { sessionStorage.setItem(`gk_exam_answers_${registration.id}`, JSON.stringify(answers)); } catch { /* ignore */ }
+    try { sessionStorage.setItem(draftStorageKey, JSON.stringify(answers)); } catch { /* ignore */ }
   }, [answers, registration.id]);
+
+  useEffect(() => {
+    try { sessionStorage.setItem(flagStorageKey, JSON.stringify(Array.from(flags))); } catch { /* ignore */ }
+  }, [flags, registration.id]);
 
   const answersRef = useRef(answers);
   answersRef.current = answers;
+
+  const saveDraftToServer = useCallback(async () => {
+    if (submittedRef.current || !isOnline) return;
+    setDraftStatus('saving');
+    try {
+      await saveDraftAnswers(registration.id, answersRef.current);
+      setDraftStatus('saved');
+      setLastDraftSavedAt(Date.now());
+    } catch {
+      setDraftStatus('error');
+    }
+  }, [registration.id, isOnline]);
+
+  const toggleFlag = useCallback((questionId: number) => {
+    setFlags(prev => {
+      const newFlags = new Set(prev);
+      if (newFlags.has(questionId)) {
+        newFlags.delete(questionId);
+      } else {
+        newFlags.add(questionId);
+      }
+      return newFlags;
+    });
+  }, []);
 
   const doSubmit = useCallback(async (title: string | null, msg: string | null) => {
     if (submittedRef.current) return;
@@ -106,7 +158,10 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
       showToast((err as Error).message || 'Failed to submit exam. Please try again.', 'error');
       return;
     }
-    try { sessionStorage.removeItem(`gk_exam_answers_${registration.id}`); } catch { /* ignore */ }
+    try { 
+      sessionStorage.removeItem(draftStorageKey);
+      sessionStorage.removeItem(flagStorageKey);
+    } catch { /* ignore */ }
     if (title && msg) {
       setSubmitPhase('idle');
       setSubmitFeedback(null);
@@ -121,7 +176,7 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
       showToast('Exam submitted successfully!', 'success');
       setTimeout(() => navigate('/student/results'), 1500);
     }
-  }, [registration.id, navigate, isOnline, enqueueSubmission]);
+  }, [registration.id, navigate, isOnline, enqueueSubmission, draftStorageKey]);
 
   const doSubmitRef = useRef(doSubmit);
   doSubmitRef.current = doSubmit;
@@ -190,6 +245,7 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
       setIsOnline(true);
       showToast('Connection restored. Retrying to submit your exam...', 'info');
       retryOfflineSubmissions();
+      void saveDraftToServer();
     };
     const handleOffline = () => setIsOnline(false);
     window.addEventListener('online', handleOnline);
@@ -198,17 +254,26 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [getQueue, removeFromQueue, incrementAttemptCount]);
+  }, [getQueue, removeFromQueue, incrementAttemptCount, saveDraftToServer]);
 
-  // Auto-save answers to server every 30 seconds
+  // Auto-save answers after a short pause, with a periodic backup.
   useEffect(() => {
+    if (submittedRef.current) return;
+    setDraftStatus('saving');
+    if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+    draftTimerRef.current = setTimeout(() => {
+      void saveDraftToServer();
+    }, 4_000);
+
     const autoSaveInterval = setInterval(() => {
-      if (!submittedRef.current) {
-        saveDraftAnswers(registration.id, answersRef.current).catch(() => {});
-      }
+      void saveDraftToServer();
     }, 30_000);
-    return () => clearInterval(autoSaveInterval);
-  }, [registration.id]);
+
+    return () => {
+      if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+      clearInterval(autoSaveInterval);
+    };
+  }, [answers, saveDraftToServer]);
 
   const q = questions[currentQ] || null;
   const answered = Object.keys(answers).filter(k => answers[Number(k)] !== undefined && answers[Number(k)] !== '').length;
@@ -216,6 +281,11 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
   const mins = Math.floor(timeLeft / 60);
   const secs = timeLeft % 60;
   const timerColor = timeLeft <= 60 ? 'text-red-500' : timeLeft <= 300 ? 'text-gold-500' : 'text-forest-500';
+
+  // Filter questions for display if showing flagged only
+  const displayQuestions = showFlaggedOnly ? questions.filter(qu => flags.has(qu.id)) : questions;
+  const displayedQ = displayQuestions.length > 0 ? displayQuestions[Math.min(currentQ, displayQuestions.length - 1)] : null;
+  const flaggedCount = flags.size;
 
   if (submitPhase === 'submitting' && submitFeedback) {
     return (
@@ -271,6 +341,8 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
     );
   }
 
+  const displayingFiltered = showFlaggedOnly && displayQuestions.length === 0;
+
   return (
     <div className="min-h-screen bg-gray-50">
       <a href="#exam-content" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:bg-white focus:p-2 focus:rounded focus:shadow focus:z-[100]">Skip to exam content</a>
@@ -287,15 +359,31 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
         )}
         <div className="flex items-center justify-between mb-2">
           <h3 className="font-bold text-forest-500 text-lg">{exam.title}</h3>
-          <div className={`flex items-center gap-2 font-mono text-lg font-bold ${timerColor}`} role="timer" aria-live="polite" aria-label={`Time remaining: ${mins} minutes ${secs} seconds`}>
-            <Icon name="clock" className="w-5 h-5" /> {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
+          <div className="flex items-center gap-3 flex-wrap justify-end">
+            <div className={`flex items-center gap-2 font-mono text-lg font-bold ${timerColor}`} role="timer" aria-live="polite" aria-label={`Time remaining: ${mins} minutes ${secs} seconds`}>
+              <Icon name="clock" className="w-5 h-5" /> {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
+            </div>
+            <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${draftStatus === 'saving' ? 'border-gold-200 bg-gold-50 text-gold-700' : draftStatus === 'saved' ? 'border-forest-200 bg-forest-50 text-forest-700' : draftStatus === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-gray-200 bg-gray-50 text-gray-600'}`} role="status" aria-live="polite">
+              <span className={`h-2.5 w-2.5 rounded-full ${draftStatus === 'saving' ? 'bg-gold-500 animate-pulse' : draftStatus === 'saved' ? 'bg-forest-500' : draftStatus === 'error' ? 'bg-red-500' : 'bg-gray-400'}`} />
+              {draftStatus === 'saving' ? 'Saving draft...' : draftStatus === 'saved' ? `Draft saved ${formatDraftAge(lastDraftSavedAt)}` : draftStatus === 'error' ? 'Draft save failed' : 'Draft not saved yet'}
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-            <div className="h-full bg-gold-400 transition-all" style={{ width: `${progressPct}%` }} />
+          <div className="flex-1">
+            <div className="h-2 bg-gray-200 rounded-full overflow-hidden mb-1.5">
+              <div className="h-full bg-gold-400 transition-all" style={{ width: `${progressPct}%` }} />
+            </div>
+            <div className="flex items-center justify-between text-xs text-gray-500">
+              <span>{answered} / {questions.length} answered</span>
+              <span className="font-semibold text-forest-600">{Math.round(progressPct)}% complete</span>
+            </div>
           </div>
-          <span className="text-sm text-gray-500">{answered} / {questions.length} answered</span>
+          <div className="text-right text-xs font-medium text-gray-600 whitespace-nowrap" role="status" aria-label={`Progress: ${answered} answered, ${flaggedCount} flagged, ${questions.length - answered} unanswered`}>
+            <div className="text-forest-700">{answered} answered</div>
+            <div className="text-gold-600">{flaggedCount} flagged</div>
+            <div className="text-gray-400">{questions.length - answered} left</div>
+          </div>
         </div>
         {cheatFlags > 0 && (
           <div className="mt-2 bg-red-50 border border-red-200 text-red-600 text-sm px-3 py-1.5 rounded-lg" role="alert">
@@ -306,11 +394,23 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
 
       <div id="exam-content" className="max-w-3xl mx-auto p-4">
         <div className="gk-section-card p-6 mb-4">
-          <div className="flex items-center gap-3 mb-4">
-            <span className="text-sm font-bold text-gray-400">Question {currentQ + 1} of {questions.length}</span>
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${q.questionType === 'mc' ? 'bg-forest-100 text-forest-700' : q.questionType === 'essay' ? 'bg-gold-100 text-gold-700' : q.questionType === 'identification' ? 'bg-indigo-100 text-indigo-700' : 'bg-blue-100 text-blue-700'}`}>
-              {q.questionType === 'mc' ? 'Multiple Choice' : q.questionType === 'essay' ? 'Essay' : q.questionType === 'identification' ? 'Identification' : 'True / False'}
-            </span>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-bold text-gray-400">Question {currentQ + 1} of {questions.length}</span>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${q.questionType === 'mc' ? 'bg-forest-100 text-forest-700' : q.questionType === 'essay' ? 'bg-gold-100 text-gold-700' : q.questionType === 'identification' ? 'bg-indigo-100 text-indigo-700' : 'bg-blue-100 text-blue-700'}`}>
+                {q.questionType === 'mc' ? 'Multiple Choice' : q.questionType === 'essay' ? 'Essay' : q.questionType === 'identification' ? 'Identification' : 'True / False'}
+              </span>
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer hover:text-forest-600 transition">
+              <input 
+                type="checkbox" 
+                checked={flags.has(q.id)} 
+                onChange={() => toggleFlag(q.id)}
+                className="accent-gold-500 w-4 h-4"
+              />
+              <Icon name={flags.has(q.id) ? 'star' : 'star'} className={`w-4 h-4 ${flags.has(q.id) ? 'text-gold-500' : 'text-gray-300'}`} />
+              <span className="text-sm font-medium">{flags.has(q.id) ? 'Flagged' : 'Flag for review'}</span>
+            </label>
           </div>
           <p className="text-forest-500 text-lg font-medium mb-4">{q.questionText}</p>
 
@@ -347,17 +447,41 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
           )}
         </div>
 
-        <div className="flex flex-wrap gap-1.5 justify-center mb-4">
-          {questions.map((qu: ExamQuestion, i: number) => {
-            const isAnswered = answers[qu.id] !== undefined && answers[qu.id] !== '';
-            return (
-              <button key={i} onClick={() => setCurrentQ(i)}
-                aria-label={`Question ${i + 1}${isAnswered ? ', answered' : ', unanswered'}${i === currentQ ? ', current' : ''}`}
-                className={`w-8 h-8 rounded-full text-xs font-bold transition ${i === currentQ ? 'bg-forest-500 text-white' : isAnswered ? 'bg-forest-100 text-forest-700 border border-forest-300' : 'bg-gray-100 text-gray-400 border border-gray-200'}`}>
-                {i + 1}
+        <div className="flex flex-col gap-3 mb-4">
+          <div className="flex items-center justify-center gap-2">
+            <button 
+              onClick={() => setShowFlaggedOnly(!showFlaggedOnly)}
+              className={`text-sm font-medium px-3 py-1.5 rounded-full transition flex items-center gap-1.5 ${showFlaggedOnly ? 'bg-gold-100 text-gold-700 border border-gold-300' : 'bg-gray-100 text-gray-600 border border-gray-200 hover:border-gray-300'}`}
+            >
+              <Icon name="star" className={`w-4 h-4 ${showFlaggedOnly ? 'text-gold-500' : ''}`} />
+              Flagged: {flaggedCount}
+            </button>
+            {showFlaggedOnly && (
+              <button 
+                onClick={() => setShowFlaggedOnly(false)}
+                className="text-xs px-2 py-1 rounded text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+              >
+                Show all
               </button>
-            );
-          })}
+            )}
+          </div>
+          <div className="flex flex-wrap gap-1.5 justify-center">
+            {questions.map((qu: ExamQuestion, i: number) => {
+              const isAnswered = answers[qu.id] !== undefined && answers[qu.id] !== '';
+              const isFlagged = flags.has(qu.id);
+              const isCurrentQuestion = qu.id === q.id;
+              return (
+                <button key={i} onClick={() => setCurrentQ(i)}
+                  aria-label={`Question ${i + 1}${isAnswered ? ', answered' : ', unanswered'}${isFlagged ? ', flagged' : ''}${isCurrentQuestion ? ', current' : ''}`}
+                  className={`w-8 h-8 rounded-full text-xs font-bold transition relative ${isCurrentQuestion ? 'bg-forest-500 text-white' : isAnswered ? 'bg-forest-100 text-forest-700 border border-forest-300' : 'bg-gray-100 text-gray-400 border border-gray-200'}`}>
+                  {i + 1}
+                  {isFlagged && (
+                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-gold-500 rounded-full border border-white"></span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         <div className="flex items-center justify-between">

@@ -9,7 +9,8 @@ import Icon from '../../../components/Icons';
 import { SCHOOL_NAME, SCHOOL_BRAND, SCHOOL_SUBTITLE, SCHOOL_LOGO_PATH, SCHOOL_ADDRESS, SCHOOL_PHONE } from '../../../utils/constants';
 import { useAuth } from '../../../context/AuthContext';
 import type { Admission } from '../../../types';
-import { useEffect, useState } from 'react';
+import { auditApi } from '../../../api/auditLog';
+import { useEffect, useMemo, useState } from 'react';
 
 interface DProps {
   label: string;
@@ -18,6 +19,16 @@ interface DProps {
 
 function D({ label, value }: DProps) {
   return <div><span className="block text-xs text-gray-400 uppercase tracking-wide">{label}</span><span className="text-sm text-forest-500 font-medium">{value}</span></div>;
+}
+
+function formatTimelineDate(date: string): string {
+  return new Date(date).toLocaleString('en-PH', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 interface Props {
@@ -37,6 +48,7 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
   const { user } = useAuth();
   const canManage = user?.role === 'administrator' || user?.role === 'registrar';
   const confirm = useConfirm();
+  const [adm, setAdm] = useState<Admission | null>(null);
   const { data: fetchedAdm, loading, refetch } = useAsync<Admission | null>(async () => {
     try {
       return await getAdmission(admissionId);
@@ -45,7 +57,10 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
     }
   }, [admissionId], 0, { autoRefreshOnDataChange: true, resourcePrefixes: ['/admissions'] });
 
-  const [adm, setAdm] = useState<Admission | null>(null);
+  const { data: historyData, loading: historyLoading, refetch: refetchHistory } = useAsync(async () => {
+    if (!adm?.id) return null;
+    return auditApi.list({ entity: 'admission', entityId: adm.id, limit: 20, page: 1 });
+  }, [adm?.id], 0, { resourcePrefixes: ['/audit-logs'] });
 
   const [statusVal, setStatusVal] = useState('');
   const [notes, setNotes] = useState('');
@@ -64,6 +79,16 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
     setStatusVal(fetchedAdm.status);
     setNotes(fetchedAdm.notes || '');
   }, [fetchedAdm?.id, fetchedAdm?.status, fetchedAdm?.notes]);
+
+  const statusHistory = useMemo(() => {
+    const logs = historyData?.data || [];
+    return logs.filter((log: any) =>
+      log.action === 'admission.status_update' ||
+      log.action === 'admission.handoff' ||
+      log.action === 'admission.create' ||
+      log.action === 'admission.bulk_status_update'
+    );
+  }, [historyData]);
 
   if (loading && !adm) return <SkeletonPage />;
   if (!adm) return <p className="text-gray-500 p-4">Application not found.</p>;
@@ -339,6 +364,55 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
           </>
         ) : (
           <p className="text-sm text-gray-500">You have view-only access to admission applications.</p>
+        )}
+      </div>
+
+      <div className="gk-section-card p-6 mt-4">
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <div>
+            <h3 className="text-lg font-bold text-forest-500">Admission Status History</h3>
+            <p className="text-xs text-gray-500">Audit-backed timeline of status changes and handoffs.</p>
+          </div>
+          <ActionButton variant="secondary" size="sm" onClick={() => refetchHistory()} loading={historyLoading} icon={<Icon name="refresh" className="w-4 h-4" />}>
+            Refresh
+          </ActionButton>
+        </div>
+        {historyLoading ? (
+          <p className="text-sm text-gray-500">Loading history...</p>
+        ) : statusHistory.length === 0 ? (
+          <p className="text-sm text-gray-500">No history entries found for this admission yet.</p>
+        ) : (
+          <div className="space-y-3">
+            {statusHistory.map((log: any) => {
+              const details = log.details && typeof log.details === 'object' ? log.details as Record<string, unknown> : {};
+              const summary = log.action === 'admission.status_update'
+                ? `${String(details.from || 'Unknown')} → ${String(details.to || 'Unknown')}`
+                : log.action === 'admission.handoff'
+                  ? 'Handoff to registrar recorded'
+                  : log.action === 'admission.bulk_status_update'
+                    ? `Bulk status update to ${String(details.to || 'Unknown')}`
+                    : 'Admission created';
+
+              return (
+                <div key={log.id} className="rounded-lg border border-gray-200 bg-white p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="font-medium text-forest-500">{summary}</p>
+                      <p className="text-xs text-gray-500">{formatTimelineDate(log.createdAt)}</p>
+                    </div>
+                    <span className="text-xs uppercase tracking-wide text-gray-400">{log.action}</span>
+                  </div>
+                  <div className="mt-2 text-sm text-gray-600">
+                    <p>
+                      Changed by: <span className="font-medium text-gray-700">{log.user ? formatPersonName(log.user) : 'System'}</span>
+                    </p>
+                    {details.notes ? <p className="mt-1 whitespace-pre-wrap">Notes: {String(details.notes)}</p> : null}
+                    {details.handoffNote ? <p className="mt-1 whitespace-pre-wrap">Handoff note: {String(details.handoffNote)}</p> : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
     </div>

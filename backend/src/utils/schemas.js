@@ -173,6 +173,10 @@ export const bulkUpdateStatusSchema = z.object({
   status: z.enum(STATUS_VALUES),
 });
 
+export const bulkHandoffSchema = z.object({
+  ids: z.array(z.number().int().positive()).min(1).max(MAX_BULK_OPERATIONS),
+});
+
 export const bulkDeleteSchema = z.object({
   ids: z.array(z.number().int().positive()).min(1).max(MAX_BULK_OPERATIONS),
 });
@@ -378,6 +382,7 @@ export const auditLogQuerySchema = z.object({
   ...paginationQuery,
   action: optionalString,
   entity: optionalString,
+  entityId: coerceOptionalInt,
   userId: coerceOptionalInt,
   from:   isoDateStr.optional(),
   to:     isoDateStr.optional(),

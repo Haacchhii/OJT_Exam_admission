@@ -7,7 +7,7 @@ import { cached, invalidatePrefix } from '../utils/cache.js';
 
 
 // Re-export schedule and registration controllers so routes/exams.js keeps working
-export { getSchedules, getAvailableSchedules, createSchedule, updateSchedule, deleteSchedule, notifyNoSchedule } from './examSchedules.js';
+export { getSchedules, getAvailableSchedules, createSchedule, updateSchedule, deleteSchedule, notifyNoSchedule, closeSchedule } from './examSchedules.js';
 export { getRegistrations, getMyRegistrations, getMyRegistrationById, getMyRegistrationSummary, createRegistration, startExam, saveDraftAnswers, cancelRegistration } from './examRegistrations.js';
 
 // ═══════════════════════════════════════════════════════

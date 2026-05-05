@@ -206,7 +206,7 @@ export async function submitExam(req, res, next) {
       // Mark registration as done
       prisma.examRegistration.update({
         where: { id: registrationId },
-        data: { status: 'done', submittedAt: new Date() },
+        data: { status: 'done', submittedAt: new Date(), draftAnswers: null },
       }),
     ]);
 

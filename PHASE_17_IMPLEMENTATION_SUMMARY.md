@@ -2,6 +2,10 @@
 
 **Date:** April 14-15, 2026
 **Scope:** Admissions, Exams, and Role-Based Admin Tasks
+
+**Local rollout policy:** Any new work in this phase should be implemented and previewed locally first. Do not deploy to production until the local preview has been validated and approved.
+
+**Removed from scope:** Rubric builder.
 **Status:** ✅ All Core Gaps Implemented
 
 ---
@@ -12,6 +16,8 @@ Phase 17 focused on implementing gap analysis items for three core user roles wi
 - **Teachers:** Exam builder improvements & essay scoring queue
 - **Registrars:** Enrollment handoff and records management
 - **Administrators:** User provisioning and active period controls
+
+Branch work on `feature/feature-update-and-additions` adds one more local-safe enhancement on top of the prior phase scope: an audit-backed admission status history timeline in the admission detail view. This uses existing audit data and does not require production-specific configuration.
 
 All identified gaps have been **fully implemented and committed** to the repository.
 

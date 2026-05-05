@@ -482,6 +482,80 @@ export async function deleteSchedule(req, res, next) {
   } catch (err) { next(err); }
 }
 
+// POST /api/exams/schedules/:id/close
+export async function closeSchedule(req, res, next) {
+  try {
+    const id = Number(req.params.id);
+    const existing = await prisma.examSchedule.findUnique({ where: { id }, include: { exam: { select: { title: true } } } });
+    if (!existing) return res.status(404).json({ error: 'Schedule not found', code: 'NOT_FOUND' });
+    if (existing.status === 'closed') return res.status(400).json({ error: 'Schedule already closed', code: 'INVALID_STATE' });
+
+    const closedAt = new Date();
+    const updated = await prisma.examSchedule.update({
+      where: { id },
+      data: {
+        status: 'closed',
+        closedAt,
+        closedBy: req.user?.id || null,
+        closureReason: 'manual',
+      },
+    });
+
+    // Invalidate caches
+    await invalidatePrefix('schedules:available:');
+    await invalidatePrefix('schedules:list:');
+
+    // Emit socket notification to staff roles (non-fatal)
+    try {
+      const payload = {
+        scheduleId: updated.id,
+        examTitle: existing.exam?.title || null,
+        closedAt: closedAt.toISOString(),
+        closedBy: req.user ? `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() : 'System',
+        closureReason: 'manual',
+      };
+      getIo().to('role_teacher').to('role_registrar').to('role_administrator').emit('exam_schedule_closed', payload);
+    } catch (e) { /* non-fatal */ }
+
+    // Send emails to staff who opted into schedule_closed notifications (non-fatal)
+    try {
+      const staff = await prisma.user.findMany({
+        where: { role: { in: [ROLES.TEACHER, ROLES.ADMIN] }, email: { not: null } },
+        select: { id: true, email: true, firstName: true, middleName: true, lastName: true },
+      });
+
+      if (staff.length > 0) {
+        const prefs = await prisma.notificationPreference.findMany({ where: { userId: { in: staff.map(s => s.id) }, eventType: 'schedule_closed' } });
+        const prefMap = new Map(prefs.map(p => [p.userId, p.enabled]));
+        const recipients = staff.filter(s => {
+          const val = prefMap.get(s.id);
+          return val === undefined ? true : Boolean(val);
+        }).map(s => s.email).filter(Boolean);
+
+        if (recipients.length > 0) {
+          const to = recipients.join(',');
+          const closedByName = req.user ? `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() : 'System';
+          await sendScheduleClosedEmail({
+            to,
+            examTitle: existing.exam?.title || 'Exam',
+            scheduledDate: existing.scheduledDate,
+            startTime: existing.startTime,
+            closedAt,
+            closureReason: 'manual',
+            closedByName,
+          });
+        }
+      }
+    } catch (e) {
+      console.error('Failed to notify staff about schedule closure', e?.message || e);
+    }
+
+    logAudit({ userId: req.user?.id, action: 'schedule.close', entity: 'exam_schedule', entityId: id, details: { closureReason: 'manual' }, ipAddress: req.ip });
+
+    res.json(attachExamWindowStatus(updated));
+  } catch (err) { next(err); }
+}
+
 // POST /api/exams/schedules/notice
 export async function notifyNoSchedule(req, res, next) {
   try {
