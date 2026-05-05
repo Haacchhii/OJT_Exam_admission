@@ -1,6 +1,6 @@
 ﻿import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useAsync } from '../../../hooks/useAsync';
-import { getExams, getExamSchedulesPage, addExamSchedule, updateExamSchedule, deleteExamSchedule, closeExamSchedule } from '../../../api/exams';
+import { getExams, getExamSchedulesPage, addExamSchedule, updateExamSchedule, deleteExamSchedule } from '../../../api/exams';
 import { showToast } from '../../../components/Toast';
 import { useConfirm } from '../../../components/ConfirmDialog';
 import { PageHeader, Badge, EmptyState, Pagination, SkeletonPage, ActionButton, SearchInput, StatusBanner } from '../../../components/UI';
