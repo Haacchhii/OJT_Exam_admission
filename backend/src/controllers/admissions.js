@@ -527,7 +527,22 @@ export async function getDashboardSummary(req, res, next) {
             where: { deletedAt: null },
             orderBy: { submittedAt: 'desc' },
             take: 5,
-            include: { documents: true, academicYear: true, semester: true },
+            select: {
+              id: true,
+              trackingId: true,
+              userId: true,
+              firstName: true,
+              middleName: true,
+              lastName: true,
+              email: true,
+              gradeLevel: true,
+              levelGroup: true,
+              prevSchool: true,
+              status: true,
+              submittedAt: true,
+              academicYear: { select: { id: true, year: true, startDate: true, endDate: true } },
+              semester: { select: { id: true, name: true, startDate: true, endDate: true } },
+            },
           }),
           prisma.admission.findMany({
             where: { deletedAt: null, submittedAt: { gte: twoWeeksAgo } },
@@ -536,7 +551,7 @@ export async function getDashboardSummary(req, res, next) {
         ]);
 
         overdueCount = overdue;
-        recentAdmissions = recentAdmissionsRows.map(shapeAdmission);
+        recentAdmissions = recentAdmissionsRows.map(shapeAdmissionList);
         const statusMap = Object.fromEntries(grouped.map(g => [g.status, g._count._all]));
         const total = Object.values(statusMap).reduce((sum, count) => sum + count, 0);
         stats = {
@@ -645,7 +660,7 @@ export async function getDashboardSummary(req, res, next) {
           needsAttention: academicYearStatus !== 'active' || semesterStatus !== 'active',
         },
       };
-    }, 120_000);
+    }, 300_000);
 
     res.json(summary);
   } catch (err) { next(err); }
@@ -732,57 +747,6 @@ export async function getReportsSummary(req, res, next) {
             submittedAt: true,
             academicYear: { select: { id: true, year: true, startDate: true, endDate: true } },
             semester: { select: { id: true, name: true, startDate: true, endDate: true } },
-            user: {
-              select: {
-                id: true,
-                firstName: true,
-                middleName: true,
-                lastName: true,
-                email: true,
-                applicantProfile: { select: { gradeLevel: true } },
-                examRegistrations: {
-                  select: {
-                    id: true,
-                    scheduleId: true,
-                    userEmail: true,
-                    userId: true,
-                    status: true,
-                    result: {
-                      select: {
-                        id: true,
-                        registrationId: true,
-                        totalScore: true,
-                        maxPossible: true,
-                        percentage: true,
-                        passed: true,
-                        essayReviewed: true,
-                        createdAt: true,
-                      },
-                    },
-                    schedule: {
-                      select: {
-                        id: true,
-                        examId: true,
-                        scheduledDate: true,
-                        startTime: true,
-                        endTime: true,
-                        registrationOpenDate: true,
-                        registrationCloseDate: true,
-                        maxSlots: true,
-                        slotsTaken: true,
-                        exam: {
-                          select: {
-                            id: true,
-                            title: true,
-                            gradeLevel: true,
-                          },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
           },
         }),
         prisma.academicYear.findMany({
@@ -815,45 +779,93 @@ export async function getReportsSummary(req, res, next) {
         };
       }
 
+      const admissionUserIds = new Set(admissions.map((admission) => admission.userId).filter((id) => typeof id === 'number'));
+      const admissionEmails = new Set(admissions.map((admission) => String(admission.email || '').trim().toLowerCase()).filter(Boolean));
+
+      const regs = admissionUserIds.size === 0 && admissionEmails.size === 0 ? [] : await prisma.examRegistration.findMany({
+        where: {
+          OR: [
+            admissionUserIds.size > 0 ? { userId: { in: [...admissionUserIds] } } : null,
+            admissionEmails.size > 0 ? { userEmail: { in: [...admissionEmails] } } : null,
+          ].filter(Boolean),
+        },
+        select: {
+          id: true,
+          scheduleId: true,
+          userEmail: true,
+          userId: true,
+          status: true,
+          result: {
+            select: {
+              id: true,
+              registrationId: true,
+              totalScore: true,
+              maxPossible: true,
+              percentage: true,
+              passed: true,
+              essayReviewed: true,
+              createdAt: true,
+            },
+          },
+          schedule: {
+            select: {
+              id: true,
+              examId: true,
+              scheduledDate: true,
+              startTime: true,
+              endTime: true,
+              registrationOpenDate: true,
+              registrationCloseDate: true,
+              maxSlots: true,
+              slotsTaken: true,
+              exam: {
+                select: {
+                  id: true,
+                  title: true,
+                  gradeLevel: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
       const regsMap = new Map();
       const resultsMap = new Map();
       const schedulesMap = new Map();
       const examsMap = new Map();
 
-      for (const admission of admissions) {
-        const admissionUser = admission.user;
-        for (const reg of admissionUser?.examRegistrations || []) {
-          if (!regsMap.has(reg.id)) {
-            regsMap.set(reg.id, {
-              id: reg.id,
-              scheduleId: reg.scheduleId,
-              userEmail: reg.userEmail,
-              userId: reg.userId,
-              status: reg.status,
-            });
-          }
+      for (const reg of regs) {
+        if (!regsMap.has(reg.id)) {
+          regsMap.set(reg.id, {
+            id: reg.id,
+            scheduleId: reg.scheduleId,
+            userEmail: reg.userEmail,
+            userId: reg.userId,
+            status: reg.status,
+          });
+        }
 
-          if (reg.result && !resultsMap.has(reg.result.id)) {
-            resultsMap.set(reg.result.id, reg.result);
-          }
+        if (reg.result && !resultsMap.has(reg.result.id)) {
+          resultsMap.set(reg.result.id, reg.result);
+        }
 
-          if (reg.schedule && !schedulesMap.has(reg.schedule.id)) {
-            schedulesMap.set(reg.schedule.id, {
-              id: reg.schedule.id,
-              examId: reg.schedule.examId,
-              scheduledDate: reg.schedule.scheduledDate,
-              startTime: reg.schedule.startTime,
-              endTime: reg.schedule.endTime,
-              registrationOpenDate: reg.schedule.registrationOpenDate,
-              registrationCloseDate: reg.schedule.registrationCloseDate,
-              maxSlots: reg.schedule.maxSlots,
-              slotsTaken: reg.schedule.slotsTaken,
-            });
-          }
+        if (reg.schedule && !schedulesMap.has(reg.schedule.id)) {
+          schedulesMap.set(reg.schedule.id, {
+            id: reg.schedule.id,
+            examId: reg.schedule.examId,
+            scheduledDate: reg.schedule.scheduledDate,
+            startTime: reg.schedule.startTime,
+            endTime: reg.schedule.endTime,
+            registrationOpenDate: reg.schedule.registrationOpenDate,
+            registrationCloseDate: reg.schedule.registrationCloseDate,
+            maxSlots: reg.schedule.maxSlots,
+            slotsTaken: reg.schedule.slotsTaken,
+          });
+        }
 
-          if (reg.schedule?.exam && !examsMap.has(reg.schedule.exam.id)) {
-            examsMap.set(reg.schedule.exam.id, reg.schedule.exam);
-          }
+        if (reg.schedule?.exam && !examsMap.has(reg.schedule.exam.id)) {
+          examsMap.set(reg.schedule.exam.id, reg.schedule.exam);
         }
       }
 
