@@ -233,7 +233,7 @@ async function loadAdmissionStatsSnapshot(query = {}) {
   const cacheKey = `admStats:${JSON.stringify({ where, staleThresholdDays })}`;
   return cached(cacheKey, async () => {
     const applicantWhere = { deletedAt: null, role: ROLES.APPLICANT };
-    const [total, grouped, overSlaCount, registeredApplicants, applicantsWithoutAdmissions, unverifiedApplicants, inactiveApplicants] = await Promise.all([
+    const [total, grouped, overSlaCount, applicantGroups, applicantsWithoutAdmissionsCount] = await Promise.all([
       prisma.admission.count({ where }),
       prisma.admission.groupBy({ by: ['status'], _count: { _all: true }, where }),
       prisma.admission.count({
@@ -243,16 +243,27 @@ async function loadAdmissionStatsSnapshot(query = {}) {
           submittedAt: { lt: staleThreshold },
         },
       }),
-      prisma.user.count({ where: applicantWhere }),
+      prisma.user.groupBy({
+        by: ['emailVerified', 'status'],
+        _count: { _all: true },
+        where: applicantWhere,
+      }),
       prisma.user.count({
         where: {
           ...applicantWhere,
           admissions: { none: { deletedAt: null } },
         },
       }),
-      prisma.user.count({ where: { ...applicantWhere, emailVerified: false } }),
-      prisma.user.count({ where: { ...applicantWhere, status: 'Inactive' } }),
     ]);
+
+    const registeredApplicants = applicantGroups.reduce((sum, group) => sum + group._count._all, 0);
+    const unverifiedApplicants = applicantGroups
+      .filter((group) => group.emailVerified === false)
+      .reduce((sum, group) => sum + group._count._all, 0);
+    const inactiveApplicants = applicantGroups
+      .filter((group) => group.status === 'Inactive')
+      .reduce((sum, group) => sum + group._count._all, 0);
+    const applicantsWithoutAdmissions = applicantsWithoutAdmissionsCount;
 
     const statusMap = Object.fromEntries(grouped.map(g => [g.status, g._count._all]));
     return {
