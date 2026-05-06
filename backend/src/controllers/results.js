@@ -488,16 +488,59 @@ export async function getEmployeeSummary(req, res, next) {
             }
           }
 
+          let essaysPayload = [];
+          let totalEssays = 0;
+          let totalPendingEssays = 0;
+
+          if (includeEssays) {
+            const [loadedEssays, essayCount, pendingCount] = await Promise.all([
+              prisma.essayAnswer.findMany({
+                orderBy: { createdAt: 'desc' },
+                take: summaryLimit,
+                select: {
+                  id: true,
+                  registrationId: true,
+                  questionId: true,
+                  essayResponse: true,
+                  pointsAwarded: true,
+                  maxPoints: true,
+                  comment: true,
+                  scored: true,
+                  scoredById: true,
+                  scoredAt: true,
+                  question: { select: { questionText: true } },
+                  registration: {
+                    select: {
+                      id: true,
+                      scheduleId: true,
+                      userEmail: true,
+                      userId: true,
+                      status: true,
+                      user: { select: { id: true, firstName: true, lastName: true, email: true } },
+                      schedule: { select: { id: true, examId: true, scheduledDate: true, startTime: true, endTime: true, exam: { select: { id: true, title: true, gradeLevel: true, passingScore: true } } } },
+                    },
+                  },
+                },
+              }),
+              prisma.essayAnswer.count(),
+              prisma.essayAnswer.count({ where: { scored: false } }),
+            ]);
+
+            essaysPayload = loadedEssays;
+            totalEssays = essayCount;
+            totalPendingEssays = pendingCount;
+          }
+
           return {
             results,
             regs: [...regsMap.values()],
             users: [...usersMap.values()],
             schedules: [...schedulesMap.values()],
             exams: [...examsMap.values()],
-            essays: [],
+            essays: essaysPayload,
             academicYears: [],
             semesters: [],
-            meta: { totalResults: mvRows.length, returnedResults: mvRows.length, totalEssays: 0, returnedEssays: 0, totalPendingEssays: 0, totalScoredEssays: 0, summaryLimit, includeResults, includeEssays, capped: false },
+            meta: { totalResults: mvRows.length, returnedResults: mvRows.length, totalEssays, returnedEssays: essaysPayload.length, totalPendingEssays, totalScoredEssays: Math.max(0, totalEssays - totalPendingEssays), summaryLimit, includeResults, includeEssays, capped: false },
           };
         } catch (err) {
           // Fall back to live query if materialized view not present or query fails
