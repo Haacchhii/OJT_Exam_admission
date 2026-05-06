@@ -1,4 +1,4 @@
-import { client, qs } from './client';
+import { client, qs, getToken } from './client';
 import type {
   AcademicYear,
   ExamResult,
@@ -140,22 +140,47 @@ export async function submitExamAnswers(
   });
 }
 
+async function readDownloadError(response: Response): Promise<string> {
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('json')) {
+    try {
+      const payload = await response.json();
+      if (payload && typeof payload === 'object') {
+        const error = (payload as { error?: unknown; message?: unknown }).error;
+        if (typeof error === 'string' && error.trim()) return error;
+        const message = (payload as { error?: unknown; message?: unknown }).message;
+        if (typeof message === 'string' && message.trim()) return message;
+      }
+    } catch {
+      // fall through to status text
+    }
+  }
+
+  try {
+    const text = await response.text();
+    if (text.trim()) return text.trim();
+  } catch {
+    // fall through
+  }
+
+  return `HTTP ${response.status}: ${response.statusText}`;
+}
+
 export async function exportExamResultPdf(registrationId: number) {
   const base = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
   const url = `${base}/results/${registrationId}/export-pdf`;
-  
+  const token = getToken();
+
   try {
     const response = await fetch(url, {
       method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
-      },
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
-    
+
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      throw new Error(await readDownloadError(response));
     }
-    
+
     const blob = await response.blob();
     const downloadUrl = URL.createObjectURL(blob);
     const link = document.createElement('a');

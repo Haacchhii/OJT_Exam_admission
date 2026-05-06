@@ -7,7 +7,7 @@ import Icon from '../../components/Icons';
 import { formatDate, formatPersonName } from '../../utils/helpers';
 import { SCHOOL_NAME, SCHOOL_BRAND, SCHOOL_SUBTITLE, SCHOOL_LOGO_PATH, SCHOOL_ADDRESS, SCHOOL_PHONE } from '../../utils/constants';
 import { useAuth } from '../../context/AuthContext';
-import { showToast } from '../../components/Toast';
+import { showToast, showErrorToast } from '../../components/Toast';
 import { useAsync } from '../../hooks/useAsync';
 import { useState } from 'react';
 import type { ExamResult, Exam, ExamRegistration, SubmittedAnswer } from '../../types';
@@ -76,7 +76,7 @@ export default function StudentResults() {
           try {
             return await getExamForReview(examId);
           } catch (err) {
-            showToast('Could not load exam review. Question breakdown may be incomplete.', 'error');
+            showErrorToast(err, 'Could not load exam review. Question breakdown may be incomplete.');
             console.error('getExamForReview failed:', err);
             return null;
           }
@@ -86,7 +86,7 @@ export default function StudentResults() {
             const rows = await getSubmittedAnswers(targetRegistrationId);
             return Array.isArray(rows) ? rows : [];
           } catch (err) {
-            showToast('Could not load your submitted answers.', 'error');
+            showErrorToast(err, 'Could not load your submitted answers.');
             console.error('getSubmittedAnswers failed:', err);
             return [];
           }
@@ -148,9 +148,7 @@ export default function StudentResults() {
     } catch (err) {
       console.error('PDF export error:', err);
       showToast(
-        err instanceof Error && err.message ? `Export failed: ${err.message}` : 'Failed to download PDF. Please try again.',
-        'error'
-      );
+        showErrorToast(err, 'Failed to download PDF. Please try again.');
     } finally {
       setExporting(false);
     }

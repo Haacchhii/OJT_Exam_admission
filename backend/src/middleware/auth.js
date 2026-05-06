@@ -27,6 +27,7 @@ export async function authenticate(req, res, next) {
       // However, we still need to verify tokenVersion from DB on some requests.
       user = {
         id: payload.sub,
+        email: payload.email,
         role: payload.role,
         status: payload.status,
         emailVerified: payload.emailVerified ?? true,
@@ -39,7 +40,7 @@ export async function authenticate(req, res, next) {
           where: { id: payload.sub },
           ...(includeProfiles
             ? { include: { applicantProfile: true, staffProfile: true } }
-            : { select: { id: true, role: true, status: true, emailVerified: true, mustChangePassword: true, tokenVersion: true, deletedAt: true } }),
+            : { select: { id: true, email: true, role: true, status: true, emailVerified: true, mustChangePassword: true, tokenVersion: true, deletedAt: true } }),
         });
       }, 300_000);
     }

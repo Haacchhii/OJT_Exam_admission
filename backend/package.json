@@ -22,7 +22,8 @@
     "db:studio": "npx prisma studio",
     "test": "vitest run",
     "test:watch": "vitest",
-    "perf:smoke": "node scripts/perf-smoke.mjs"
+    "perf:smoke": "node scripts/perf-smoke.mjs",
+    "smoke:postdeploy": "node scripts/post-deploy-smoke.mjs"
   },
   "keywords": [],
   "license": "ISC",

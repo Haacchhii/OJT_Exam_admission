@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useAsync } from '../../hooks/useAsync';
 import { startExam as apiStartExam, getExamForStudent } from '../../api/exams';
 import { getStudentHomeSummary } from '../../api/admissions';
-import { showToast } from '../../components/Toast';
+import { showToast, showErrorToast } from '../../components/Toast';
 import { useConfirm } from '../../components/ConfirmDialog';
 import { SkeletonPage, ErrorAlert, ActionButton, ProcessStatePanel } from '../../components/UI';
 import Icon from '../../components/Icons';
@@ -72,7 +72,7 @@ export default function StudentExam() {
       setView('exam');
       refetch();
     } catch (err: unknown) {
-      showToast((err as Error).message || 'Failed to start exam. Please try again.', 'error');
+      showErrorToast(err, 'Failed to start exam. Please try again.');
     } finally {
       setStartingExam(false);
     }
@@ -92,7 +92,7 @@ export default function StudentExam() {
           }
         } catch (err: unknown) {
           if (!cancelled) {
-            showToast((err as Error).message || 'Could not restore your in-progress exam.', 'error');
+            showErrorToast(err, 'Could not restore your in-progress exam.');
           }
           console.error('Exam recovery failed:', err);
         } finally {

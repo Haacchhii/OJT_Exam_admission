@@ -2,7 +2,7 @@
  * PDF generation service for exam results and admission receipts
  */
 
-import { PDFDocument, rgb, PDFPage } from 'pdf-lib';
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import env from '../config/env.js';
 
 // School branding
@@ -17,7 +17,7 @@ async function createBasePdf() {
   return await PDFDocument.create();
 }
 
-function addHeader(page, title, subtitle = '') {
+function addHeader(page, title, subtitle = '', helveticaBold) {
   const { width, height } = page.getSize();
   const margin = 40;
 
@@ -36,7 +36,7 @@ function addHeader(page, title, subtitle = '') {
     y: height - 35,
     size: 16,
     color: rgb(1, 1, 1),
-    font: page.getFont('Helvetica-Bold'),
+    font: helveticaBold,
   });
 
   // Title
@@ -45,7 +45,7 @@ function addHeader(page, title, subtitle = '') {
     y: height - 58,
     size: 14,
     color: ACCENT_COLOR,
-    font: page.getFont('Helvetica-Bold'),
+    font: helveticaBold,
   });
 
   if (subtitle) {
@@ -88,11 +88,13 @@ function addFooter(page, pageNum) {
 
 export async function generateExamResultPdf(result, registration, user, exam) {
   const pdf = await createBasePdf();
+  const helvetica = await pdf.embedFont(StandardFonts.Helvetica);
+  const helveticaBold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const page = pdf.addPage();
   const { width } = page.getSize();
   const margin = 40;
 
-  let y = addHeader(page, 'Exam Result Slip', `${exam.title}`);
+  let y = addHeader(page, 'Exam Result Slip', `${exam.title}`, helveticaBold);
   y -= 20;
 
   // Student info section
@@ -112,7 +114,7 @@ export async function generateExamResultPdf(result, registration, user, exam) {
     y: y - 20,
     size: 11,
     color: HEADER_COLOR,
-    font: page.getFont('Helvetica-Bold'),
+    font: helveticaBold,
   });
 
   page.drawText(`Name: ${studentName}`, {
@@ -150,7 +152,7 @@ export async function generateExamResultPdf(result, registration, user, exam) {
     y: y - 20,
     size: 11,
     color: HEADER_COLOR,
-    font: page.getFont('Helvetica-Bold'),
+    font: helveticaBold,
   });
 
   page.drawText(`Total Score: ${result.totalScore} / ${result.maxPossible}`, {
@@ -158,7 +160,7 @@ export async function generateExamResultPdf(result, registration, user, exam) {
     y: y - 35,
     size: 11,
     color: TEXT_DARK,
-    font: page.getFont('Helvetica-Bold'),
+    font: helveticaBold,
   });
 
   page.drawText(`Percentage: ${result.percentage.toFixed(2)}%`, {
@@ -166,7 +168,7 @@ export async function generateExamResultPdf(result, registration, user, exam) {
     y: y - 50,
     size: 11,
     color: TEXT_DARK,
-    font: page.getFont('Helvetica-Bold'),
+    font: helveticaBold,
   });
 
   page.drawText(`Status: ${passed}`, {
@@ -174,7 +176,7 @@ export async function generateExamResultPdf(result, registration, user, exam) {
     y: y - 65,
     size: 11,
     color: passColor,
-    font: page.getFont('Helvetica-Bold'),
+    font: helveticaBold,
   });
 
   y -= 110;
@@ -195,7 +197,7 @@ export async function generateExamResultPdf(result, registration, user, exam) {
     y: y - 20,
     size: 11,
     color: HEADER_COLOR,
-    font: page.getFont('Helvetica-Bold'),
+    font: helveticaBold,
   });
 
   page.drawText(`Date Taken: ${new Date(result.createdAt).toLocaleDateString('en-US', { timeZone: 'Asia/Manila' })}`, {
@@ -234,11 +236,13 @@ export async function generateExamResultPdf(result, registration, user, exam) {
 
 export async function generateAdmissionReceiptPdf(admission, user, academicYear, semester) {
   const pdf = await createBasePdf();
+  const helvetica = await pdf.embedFont(StandardFonts.Helvetica);
+  const helveticaBold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const page = pdf.addPage();
   const { width } = page.getSize();
   const margin = 40;
 
-  let y = addHeader(page, 'Application Receipt', `Status: ${admission.status}`);
+  let y = addHeader(page, 'Application Receipt', `Status: ${admission.status}`, helveticaBold);
   y -= 20;
 
   // Tracking info - prominent
@@ -257,7 +261,7 @@ export async function generateAdmissionReceiptPdf(admission, user, academicYear,
     y: y - 25,
     size: 9,
     color: rgb(1, 1, 1),
-    font: page.getFont('Helvetica-Bold'),
+    font: helveticaBold,
   });
 
   page.drawText(admission.trackingId || 'N/A', {
@@ -265,7 +269,7 @@ export async function generateAdmissionReceiptPdf(admission, user, academicYear,
     y: y - 42,
     size: 14,
     color: rgb(1, 1, 1),
-    font: page.getFont('Helvetica-Bold'),
+    font: helveticaBold,
   });
 
   y -= 70;
@@ -287,7 +291,7 @@ export async function generateAdmissionReceiptPdf(admission, user, academicYear,
     y: y - 20,
     size: 11,
     color: HEADER_COLOR,
-    font: page.getFont('Helvetica-Bold'),
+    font: helveticaBold,
   });
 
   page.drawText(`Name: ${applicantName}`, {
@@ -336,7 +340,7 @@ export async function generateAdmissionReceiptPdf(admission, user, academicYear,
     y: y - 20,
     size: 11,
     color: HEADER_COLOR,
-    font: page.getFont('Helvetica-Bold'),
+    font: helveticaBold,
   });
 
   page.drawText(`Status: ${admission.status}`, {
@@ -344,7 +348,7 @@ export async function generateAdmissionReceiptPdf(admission, user, academicYear,
     y: y - 35,
     size: 11,
     color: statusColor,
-    font: page.getFont('Helvetica-Bold'),
+    font: helveticaBold,
   });
 
   page.drawText(
@@ -375,7 +379,7 @@ export async function generateAdmissionReceiptPdf(admission, user, academicYear,
     y: y - 20,
     size: 11,
     color: HEADER_COLOR,
-    font: page.getFont('Helvetica-Bold'),
+    font: helveticaBold,
   });
 
   const yearDisplay = academicYear?.year || 'N/A';

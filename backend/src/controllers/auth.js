@@ -20,6 +20,7 @@ function validatePassword(password) {
 function signToken(user, rememberMe = false) {
   return jwt.sign({
     sub: user.id,
+    email: user.email,
     role: user.role,
     status: user.status,
     emailVerified: user.emailVerified,

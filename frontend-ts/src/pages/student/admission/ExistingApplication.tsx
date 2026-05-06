@@ -3,7 +3,7 @@ import { PageHeader, Badge, ActionButton } from '../../../components/UI';
 import Icon from '../../../components/Icons';
 import { Detail } from './AdmissionFormFields';
 import { formatDate, badgeClass } from '../../../utils/helpers';
-import { showToast } from '../../../components/Toast';
+import { showToast, showErrorToast } from '../../../components/Toast';
 import { exportAdmissionReceiptPdf } from '../../../api/admissions';
 import { ADMISSION_PROGRESS_STEPS, SCHOOL_PHONE } from '../../../utils/constants';
 import { useState } from 'react';
@@ -26,10 +26,7 @@ export default function ExistingApplication({ existingApp, onNewApplication }: P
       showToast('Application receipt PDF downloaded successfully', 'success');
     } catch (err) {
       console.error('PDF export error:', err);
-      showToast(
-        err instanceof Error && err.message ? `Export failed: ${err.message}` : 'Failed to download receipt. Please try again.',
-        'error'
-      );
+      showErrorToast(err, 'Failed to download receipt. Please try again.');
     } finally {
       setExporting(false);
     }

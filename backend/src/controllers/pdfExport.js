@@ -3,6 +3,7 @@
  */
 
 import prisma from '../config/db.js';
+import { ROLES } from '../utils/constants.js';
 import { generateExamResultPdf, generateAdmissionReceiptPdf, savePdfToBuffer } from '../services/pdfService.js';
 
 export async function exportExamResultPdf(req, res, next) {
@@ -33,10 +34,10 @@ export async function exportExamResultPdf(req, res, next) {
 
     // Ownership check: must be the result owner or staff
     const isOwner =
-      (user.role === 'APPLICANT' &&
+      (user.role === ROLES.APPLICANT &&
         (result.registration.userId === user.id ||
           result.registration.userEmail.toLowerCase() === user.email.toLowerCase())) ||
-      ['ADMIN', 'REGISTRAR', 'TEACHER'].includes(user.role);
+      [ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER].includes(user.role);
 
     if (!isOwner) {
       return res.status(403).json({ error: 'Not authorized to view this result', code: 'FORBIDDEN' });
@@ -96,8 +97,8 @@ export async function exportAdmissionReceiptPdf(req, res, next) {
 
     // Ownership check: must be the applicant or staff
     const isOwner =
-      (user.role === 'APPLICANT' && admission.userId === user.id) ||
-      ['ADMIN', 'REGISTRAR', 'TEACHER'].includes(user.role);
+      (user.role === ROLES.APPLICANT && admission.userId === user.id) ||
+      [ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER].includes(user.role);
 
     if (!isOwner) {
       return res.status(403).json({ error: 'Not authorized to view this admission', code: 'FORBIDDEN' });

@@ -4,7 +4,7 @@ import { useAsync } from '../../hooks/useAsync';
 import { getEmployeeResultsSummary, scoreEssay, getQuestionAnalyticsPage } from '../../api/results';
 import { SCHOOL_NAME, SCHOOL_BRAND, SCHOOL_SUBTITLE, SCHOOL_LOGO_PATH, SCHOOL_ADDRESS, SCHOOL_PHONE } from '../../utils/constants';
 import { useAuth } from '../../context/AuthContext';
-import { showToast } from '../../components/Toast';
+import { showToast, showErrorToast } from '../../components/Toast';
 import { useConfirm } from '../../components/ConfirmDialog';
 import Modal from '../../components/Modal';
 import { PageHeader, StatCard, Badge, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert, ActionButton, SearchInput, StatusBanner } from '../../components/UI';
@@ -340,13 +340,13 @@ export default function EmployeeResults() {
       });
       setScoreModal(null);
       refetch();
-    } catch {
+    } catch (err) {
       setScoreActionState({
         tone: 'danger',
         title: 'Failed to save essay score.',
         message: 'Please try again or check your network connection.',
       });
-      showToast('Failed to score essay.', 'error');
+      showErrorToast(err, 'Failed to score essay.');
     } finally {
       setSaving(false);
     }
@@ -450,7 +450,7 @@ export default function EmployeeResults() {
     try {
       const data = await getQuestionAnalyticsPage(examId, { page, limit: ANALYTICS_PER_PAGE });
       setAnalyticsData(data);
-    } catch { showToast('Failed to load analytics', 'error'); }
+    } catch (err) { showErrorToast(err, 'Failed to load analytics.'); }
     finally { setAnalyticsLoading(false); }
   };
 

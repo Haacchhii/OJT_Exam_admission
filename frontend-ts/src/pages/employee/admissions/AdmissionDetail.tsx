@@ -1,4 +1,4 @@
-﻿import { showToast } from '../../../components/Toast';
+﻿import { showToast, showErrorToast } from '../../../components/Toast';
 import { useConfirm } from '../../../components/ConfirmDialog';
 import { getAdmission, updateAdmissionStatus, VALID_TRANSITIONS } from '../../../api/admissions';
 import { useAsync } from '../../../hooks/useAsync';
@@ -223,7 +223,7 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
         title: 'Failed to update application status.',
         message: err?.message || 'Please try again.',
       });
-      showToast('Update failed: ' + (err.message || 'Unknown error'), 'error');
+      showErrorToast(err, 'Failed to update application status.');
     } finally {
       setSaving(false);
     }
@@ -241,7 +241,7 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
       showToast('Enrollment handoff recorded and noted in application.', 'success');
       refetch();
     } catch (err: any) {
-      showToast('Failed to hand off: ' + (err.message || 'Unknown error'), 'error');
+      showErrorToast(err, 'Failed to hand off admission.');
     } finally { setSaving(false); }
   };
 

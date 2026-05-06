@@ -35,26 +35,75 @@ function formatDateTimeLabel(value) {
   });
 }
 
+/**
+ * Parse time string (HH:MM) and combine with a date to produce a precise datetime in Manila timezone.
+ * @param {string} dateIso - ISO date string (YYYY-MM-DD)
+ * @param {string} timeStr - Time string (HH:MM or HH:MM:SS)
+ * @returns {Date|null} Combined datetime in Manila timezone
+ */
+function combineDateAndTime(dateIso, timeStr) {
+  if (!hasValue(dateIso) || !hasValue(timeStr)) return null;
+  try {
+    const [hour, minute, second] = String(timeStr).split(':').map(Number);
+    const dateStr = String(dateIso).split('T')[0];
+    const timeFormatted = `${String(hour || 0).padStart(2, '0')}:${String(minute || 0).padStart(2, '0')}:${String(second || 0).padStart(2, '0')}`;
+    const manilaIso = `${dateStr}T${timeFormatted}+08:00`;
+    const dt = new Date(manilaIso);
+    return Number.isNaN(dt.getTime()) ? null : dt;
+  } catch {
+    return null;
+  }
+}
+
 export function getEffectiveExamWindow(schedule) {
   if (!schedule) {
     return { startAt: null, endAt: null, source: 'none' };
   }
 
+  // Priority 1: Explicit datetime window
   const explicitStart = asValidDate(schedule.examWindowStartAt);
   const explicitEnd = asValidDate(schedule.examWindowEndAt);
-  const rollingStart = startOfDay(schedule.registrationOpenDate);
-  const rollingEnd = endOfDay(schedule.registrationCloseDate);
+  if (explicitStart && explicitEnd) {
+    return {
+      startAt: explicitStart,
+      endAt: explicitEnd,
+      source: 'date-window',
+    };
+  }
 
+  // Priority 2: Rolling window (registration open/close dates)
+  const hasRollingWindow = hasValue(schedule.registrationOpenDate) || hasValue(schedule.registrationCloseDate);
+  if (hasRollingWindow) {
+    const rollingStart = startOfDay(schedule.registrationOpenDate);
+    const rollingEnd = endOfDay(schedule.registrationCloseDate);
+    return {
+      startAt: rollingStart,
+      endAt: rollingEnd,
+      source: 'rolling-window',
+    };
+  }
+
+  // Priority 3: Strict schedule (scheduled date + start/end times)
+  const strictStart = combineDateAndTime(schedule.scheduledDate, schedule.startTime);
+  const strictEnd = combineDateAndTime(schedule.scheduledDate, schedule.endTime);
+  if (strictStart || strictEnd) {
+    const scheduleDayStart = startOfDay(schedule.scheduledDate);
+    const scheduleDayEnd = endOfDay(schedule.scheduledDate);
+    return {
+      startAt: strictStart || scheduleDayStart,
+      endAt: strictEnd || scheduleDayEnd,
+      source: 'scheduled-day',
+    };
+  }
+
+  // Fallback: entire scheduled day
   const scheduleDayStart = startOfDay(schedule.scheduledDate);
   const scheduleDayEnd = endOfDay(schedule.scheduledDate);
-  const startAt = explicitStart ? startOfDay(explicitStart) : (rollingStart || scheduleDayStart);
-  const endAt = explicitEnd ? endOfDay(explicitEnd) : (rollingEnd || scheduleDayEnd);
-
-  const source = explicitStart || explicitEnd
-    ? 'date-window'
-    : (rollingStart || rollingEnd ? 'rolling-window' : 'scheduled-day');
-
-  return { startAt, endAt, source };
+  return {
+    startAt: scheduleDayStart,
+    endAt: scheduleDayEnd,
+    source: 'scheduled-day',
+  };
 }
 
 export function computeExamWindowStatus(schedule, now = new Date()) {
