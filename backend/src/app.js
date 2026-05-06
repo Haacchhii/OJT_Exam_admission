@@ -8,7 +8,9 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import env from './config/env.js';
 import prisma from './config/db.js';
+import logger, { errorMetrics } from './config/logger.js';
 import { errorHandler } from './middleware/errors.js';
+import { trackErrors, logRequests } from './middleware/errorTracking.js';
 import { authenticate } from './middleware/auth.js';
 import { RATE_LIMITS, BODY_SIZE_LIMIT } from './utils/constants.js';
 import { cachePublic, cachePrivate, noStore } from './middleware/cache.js';
@@ -38,6 +40,12 @@ if (env.NODE_ENV === 'production') {
 
 // ─── Security middleware ──────────────────────────────
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+
+// ─── Error tracking middleware (early in chain) ──────
+app.use(trackErrors);
+if (env.NODE_ENV !== 'production') {
+  app.use(logRequests);
+}
 
 // ─── Compression ─────────────────────────────────────
 app.use(compression());
@@ -208,6 +216,15 @@ app.get('/api/health', async (_req, res) => {
   } catch {
     res.status(503).json({ status: 'degraded', uptime: process.uptime(), db: 'disconnected' });
   }
+});
+
+// Error metrics endpoint (internal observability)
+app.get('/api/metrics/errors', (_req, res) => {
+  res.json({
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    ...errorMetrics.getMetrics(),
+  });
 });
 
 // Warmup endpoint for scheduled pings to reduce serverless cold starts.

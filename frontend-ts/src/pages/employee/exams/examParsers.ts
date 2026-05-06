@@ -1,4 +1,3 @@
-import * as XLSX from 'xlsx';
 import { uid } from '../../../utils/helpers';
 import type { ParsedQuestion } from './types';
 
@@ -138,61 +137,7 @@ export function parseJSONQuestions(text: string): { parsed: ParsedQuestion[]; er
   return { parsed, errs };
 }
 
-export function parseExcelQuestions(arrayBuffer: ArrayBuffer): { parsed: ParsedQuestion[]; errs: number } {
-  const wb = XLSX.read(arrayBuffer, { type: 'array' });
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json<any[]>(ws, { header: 1, defval: '' });
-  const dataRows = rows.slice(1).filter((r: any[]) => r.some((c: any) => String(c).trim()));
-  const parsed: ParsedQuestion[] = [];
-  let errs = 0;
-  for (const cols of dataRows) {
-    const type = parseQuestionType(cols[0]);
-    const qText = String(cols[1] || '').trim();
-    const pts = parseInt(cols[2]) || 1;
-    if (!qText || !type) { errs++; continue; }
-    if (type === 'essay') {
-      parsed.push({ id: uid(), questionText: qText, questionType: 'essay', points: pts, orderNum: parsed.length + 1, choices: [] });
-    } else if (type === 'identification') {
-      const answer = String(cols[7] || '').trim();
-      if (!answer) { errs++; continue; }
-      parsed.push({
-        id: uid(),
-        questionText: qText,
-        questionType: 'identification',
-        points: pts,
-        orderNum: parsed.length + 1,
-        choices: [],
-        identificationAnswer: answer,
-        identificationMatchMode: normalizeMatchMode(cols[8]),
-      });
-    } else if (type === 'true_false') {
-      const correct = parseTrueFalseCorrect(cols[7]);
-      parsed.push({
-        id: uid(),
-        questionText: qText,
-        questionType: 'true_false',
-        points: pts,
-        orderNum: parsed.length + 1,
-        choices: trueFalseChoices(correct),
-      });
-    } else if (type === 'mc') {
-      const choiceTexts = [cols[3], cols[4], cols[5], cols[6]].map((c: any) => String(c || '').trim()).filter(Boolean);
-      const correctIdx = parseCorrectIndex(cols[7]);
-      if (choiceTexts.length < 2) { errs++; continue; }
-      parsed.push({
-        id: uid(),
-        questionText: qText,
-        questionType: 'mc',
-        points: pts,
-        orderNum: parsed.length + 1,
-        choices: choiceTexts.map((t, i) => ({ id: uid(), choiceText: t, isCorrect: i === correctIdx })),
-      });
-    } else { errs++; }
-  }
-  return { parsed, errs };
-}
-
-export function downloadTemplate(format: 'csv' | 'json' | 'excel') {
+export function downloadTemplate(format: 'csv' | 'json') {
   if (format === 'csv') {
     const content = [
       'type,question,points,choiceA,choiceB,choiceC,choiceD,correct,matchMode',
@@ -219,38 +164,5 @@ export function downloadTemplate(format: 'csv' | 'json' | 'excel') {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = 'exam_template.json'; a.click();
     URL.revokeObjectURL(url);
-  } else if (format === 'excel') {
-    const rows = [
-      ['type', 'question', 'points', 'choiceA', 'choiceB', 'choiceC', 'choiceD', 'correct', 'matchMode'],
-      ['mc', 'What is the capital of the Philippines?', 2, 'Cebu', 'Manila', 'Davao', 'Quezon City', 'B', ''],
-      ['true_false', 'The Pacific Ocean is the largest ocean.', 1, 'True', 'False', '', '', 'True', ''],
-      ['identification', 'What planet is known as the Red Planet?', 2, '', '', '', '', 'Mars', 'exact'],
-      ['mc', 'What is 15 x 8?', 2, '110', '120', '132', '140', 'C', ''],
-      ['essay', 'Explain why education is important in society.', 5, '', '', '', '', '', ''],
-    ];
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols'] = [{ wch: 14 }, { wch: 55 }, { wch: 8 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 16 }, { wch: 12 }];
-    const noteRows = [
-      ['INSTRUCTIONS'],
-      ['Column', 'Description'],
-      ['type', 'mc | true_false | identification | essay'],
-      ['question', 'The full question text'],
-      ['points', 'Point value (number)'],
-      ['choiceA–D', 'Answer options (MC; optional for true_false where True/False defaults are used)'],
-      ['correct', 'MC: A-D or 1-4 | true_false: True/False | identification: answer key text'],
-      ['matchMode', 'identification only: exact or partial'],
-      [''],
-      ['NOTES'],
-      ['- You may add or remove rows freely.'],
-      ['- Do NOT change column headers in row 1 of the Questions sheet.'],
-      ['- For essay questions, leave choiceA–D/correct/matchMode blank.'],
-      ['- The "correct" column accepts A/B/C/D or 1/2/3/4 (1-indexed).'],
-    ];
-    const wsNotes = XLSX.utils.aoa_to_sheet(noteRows);
-    wsNotes['!cols'] = [{ wch: 18 }, { wch: 60 }];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Questions');
-    XLSX.utils.book_append_sheet(wb, wsNotes, 'Instructions');
-    XLSX.writeFile(wb, 'exam_template.xlsx');
   }
 }

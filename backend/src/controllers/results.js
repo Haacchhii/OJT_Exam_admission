@@ -560,24 +560,12 @@ export async function getEmployeeSummary(req, res, next) {
 
       const regsMap = new Map();
       const usersById = new Map();
-      const usersByEmail = new Map();
       const schedulesMap = new Map();
       const examsMap = new Map();
 
       const registerUser = (user) => {
         if (!user || usersById.has(user.id)) return;
-        const normalizedEmail = normalizeEmail(user.email);
-        usersById.set(user.id, {
-          id: user.id,
-          firstName: user.firstName,
-          middleName: user.middleName,
-          lastName: user.lastName,
-          email: user.email,
-          applicantProfile: user.applicantProfile,
-        });
-        if (normalizedEmail && !usersByEmail.has(normalizedEmail)) {
-          usersByEmail.set(normalizedEmail, usersById.get(user.id));
-        }
+        usersById.set(user.id, user);
       };
 
       const registerSchedule = (schedule) => {

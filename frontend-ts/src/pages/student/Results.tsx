@@ -147,8 +147,7 @@ export default function StudentResults() {
       showToast('Exam result PDF downloaded successfully', 'success');
     } catch (err) {
       console.error('PDF export error:', err);
-      showToast(
-        showErrorToast(err, 'Failed to download PDF. Please try again.');
+      showErrorToast(err, 'Failed to download PDF. Please try again.');
     } finally {
       setExporting(false);
     }

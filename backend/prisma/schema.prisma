@@ -206,7 +206,9 @@ model Exam {
   @@index([academicYearId])
   @@index([semesterId])
   @@index([deletedAt])
-  @@index([createdAt])
+  @@index([createdAt(sort: Desc)], name: "idx_exam_created_at_desc")
+  @@index([title])
+  @@index([gradeLevel, createdAt(sort: Desc)], name: "idx_exam_grade_created_desc")
   @@map("exams")
 }
 
@@ -371,7 +373,8 @@ model ExamResult {
   registration ExamRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
   reviewedBy   User?            @relation("ResultReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
 
-  @@index([createdAt])
+  @@index([createdAt(sort: Desc)], name: "idx_exam_result_created_at_desc")
+  @@index([registrationId], name: "idx_exam_result_registration_id")
   @@index([passed])
   @@index([passed, createdAt])
   @@map("exam_results")
@@ -412,9 +415,10 @@ model EssayAnswer {
   question     ExamQuestion     @relation(fields: [questionId], references: [id])
   scoredBy     User?            @relation("EssayScorer", fields: [scoredById], references: [id], onDelete: SetNull)
 
-  @@index([scored])
-  @@index([registrationId])
-  @@index([registrationId, scored])
+  @@index([scored], name: "idx_essay_answer_scored")
+  @@index([createdAt(sort: Desc)], name: "idx_essay_answer_created_at_desc")
+  @@index([registrationId], name: "idx_essay_answer_registration_id")
+  @@index([registrationId, scored], name: "idx_essay_answer_registration_scored")
   @@index([scored, createdAt])
   @@unique([registrationId, questionId])
   @@map("essay_answers")

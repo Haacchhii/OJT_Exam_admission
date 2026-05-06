@@ -256,31 +256,12 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
   const parseQuestionFile = (file: File) => new Promise<{ parsed: ParsedQuestion[]; errs: number; fileName: string }>((resolve, reject) => {
     if (!file) return;
     const ext = file.name.split('.').pop()?.toLowerCase() || '';
-    if (!['json', 'csv', 'xlsx', 'xls'].includes(ext)) {
+    if (!['json', 'csv'].includes(ext)) {
       reject(new Error(`Unsupported file type in ${file.name}.`));
       return;
     }
     loadExamParsersModule()
       .then((parsers) => {
-        if (ext === 'xlsx' || ext === 'xls') {
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            try {
-              const { parsed, errs } = parsers.parseExcelQuestions(e.target?.result as ArrayBuffer);
-              if (parsed.length === 0) {
-                reject(new Error(`No valid questions found in ${file.name}.`));
-                return;
-              }
-              resolve({ parsed, errs, fileName: file.name });
-            } catch (err: any) {
-              reject(new Error(`Failed to parse ${file.name}: ${err.message}`));
-            }
-          };
-          reader.onerror = () => reject(new Error(`Failed to read ${file.name}.`));
-          reader.readAsArrayBuffer(file);
-          return;
-        }
-
         const reader = new FileReader();
         reader.onload = (e) => {
           try {
@@ -303,7 +284,7 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
       });
   });
 
-  const handleDownloadTemplate = async (format: 'csv' | 'json' | 'excel') => {
+  const handleDownloadTemplate = async (format: 'csv' | 'json') => {
     const parsers = await loadExamParsersModule();
     parsers.downloadTemplate(format);
   };
@@ -539,7 +520,6 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
           </div>
           <div className="flex gap-2">
             <button onClick={() => void handleDownloadTemplate('csv')} className="text-xs border border-gray-300 text-gray-600 px-2.5 py-1.5 rounded-lg hover:bg-gray-50 flex items-center gap-1 font-medium" title="Download a sample CSV file to use as a template"><Icon name="document" className="w-3.5 h-3.5" /> CSV Sample</button>
-            <button onClick={() => void handleDownloadTemplate('excel')} className="text-xs border border-forest-300 text-forest-700 bg-forest-50 px-2.5 py-1.5 rounded-lg hover:bg-forest-100 flex items-center gap-1 font-medium" title="Download a sample Excel file to use as a template"><Icon name="document" className="w-3.5 h-3.5" /> Excel Sample</button>
             <button onClick={() => void handleDownloadTemplate('json')} className="text-xs border border-gray-300 text-gray-600 px-2.5 py-1.5 rounded-lg hover:bg-gray-50 flex items-center gap-1 font-medium" title="Download a sample JSON file to use as a template"><Icon name="document" className="w-3.5 h-3.5" /> JSON Sample</button>
           </div>
         </div>
@@ -554,9 +534,9 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
           <div className="text-3xl mb-2"><Icon name="upload" className="w-8 h-8 text-gray-400 mx-auto" /></div>
           <p className="text-gray-600 font-medium">Drag & drop your questionnaire file here</p>
           <p className="text-gray-400 text-sm mt-1">or <span className="text-forest-500 font-medium underline">click to browse</span></p>
-          <p className="text-xs text-gray-400 mt-2">Supported: .xlsx (Excel) | .csv | .json | Multiple files allowed (processed individually)</p>
+          <p className="text-xs text-gray-400 mt-2">Supported: .csv | .json | Multiple files allowed (processed individually)</p>
         </div>
-        <input id="questionnaire-upload" type="file" accept=".csv,.json,.xlsx,.xls" multiple className="hidden" onChange={e => { const files = Array.from(e.target.files || []); if (files.length) handleUploadFiles(files); e.target.value = ''; }} />
+        <input id="questionnaire-upload" type="file" accept=".csv,.json" multiple className="hidden" onChange={e => { const files = Array.from(e.target.files || []); if (files.length) handleUploadFiles(files); e.target.value = ''; }} />
 
         <details className="mt-4 group border border-amber-200 rounded-lg p-4 bg-amber-50">
           <summary className="text-sm text-amber-800 font-bold cursor-pointer select-none flex items-center gap-2"><Icon name="info" className="w-4 h-4" /> 📋 Format Guide & Template Samples</summary>
@@ -564,8 +544,8 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
             <p className="text-xs text-amber-700 mb-3 font-medium">Download sample files below to see the expected format, then edit them with your questions:</p>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="bg-gray-50 rounded-lg p-4">
-              <h4 className="font-bold text-forest-500 text-sm mb-1 flex items-center gap-1"><Icon name="document" className="w-4 h-4" /> CSV / Excel Format</h4>
-              <p className="text-xs text-gray-500 mb-2">9 columns - same structure for both .csv and .xlsx</p>
+              <h4 className="font-bold text-forest-500 text-sm mb-1 flex items-center gap-1"><Icon name="document" className="w-4 h-4" /> CSV Format</h4>
+              <p className="text-xs text-gray-500 mb-2">9 columns - use this exact structure for CSV imports</p>
               <div className="text-xs font-mono bg-white rounded p-2 border border-gray-200 overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead><tr className="bg-forest-50">
@@ -630,10 +610,6 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
               <h4 className="font-bold text-gold-700 text-sm mb-1">Download Templates</h4>
               <p className="text-xs text-gray-500 mb-3">Pre-filled sample files ready to edit</p>
               <div className="space-y-2">
-                <button onClick={() => void handleDownloadTemplate('excel')} className="w-full flex items-center gap-2 text-sm text-forest-700 bg-white border border-forest-200 rounded-lg px-3 py-2 hover:bg-forest-50 transition-colors">
-                  <Icon name="document" className="w-4 h-4 text-green-600" />
-                  <span>Excel Template <span className="text-xs text-gray-400 font-normal">(.xlsx)</span></span>
-                </button>
                 <button onClick={() => void handleDownloadTemplate('csv')} className="w-full flex items-center gap-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors">
                   <Icon name="document" className="w-4 h-4 text-blue-500" />
                   <span>CSV Template <span className="text-xs text-gray-400 font-normal">(.csv)</span></span>

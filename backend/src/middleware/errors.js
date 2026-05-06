@@ -1,8 +1,29 @@
+import logger, { errorMetrics } from '../config/logger.js';
+
 /**
  * Global error handler — must be the last middleware.
+ * Logs structured errors and tracks error metrics.
  */
-export function errorHandler(err, _req, res, _next) {
-  console.error('[ERROR]', err.message || err);
+export function errorHandler(err, req, res, _next) {
+  const status = err.status || err.statusCode || 500;
+  
+  // Track error metrics
+  errorMetrics.record(err, status);
+
+  // Log structured error with request context
+  logger.error(
+    {
+      method: req.method,
+      path: req.originalUrl,
+      status,
+      errorCode: err.code,
+      errorMessage: err.message,
+      stack: process.env.NODE_ENV === 'production' ? undefined : err.stack,
+      userAgent: req.get('user-agent'),
+      ip: req.ip,
+    },
+    `[${status}] ${req.method} ${req.originalUrl}: ${err.message || 'Unknown error'}`
+  );
 
   const supportHint = 'If this keeps happening, please contact the developers or support team.';
 
@@ -55,7 +76,6 @@ export function errorHandler(err, _req, res, _next) {
     });
   }
 
-  const status = err.status || err.statusCode || 500;
   const isProduction = process.env.NODE_ENV === 'production';
   const baseMessage = isProduction && status === 500
     ? 'Something went wrong on our side. Please try again in a moment.'
