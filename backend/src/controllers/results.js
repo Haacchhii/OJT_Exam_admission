@@ -422,31 +422,78 @@ export async function getEmployeeSummary(req, res, next) {
             `SELECT * FROM employee_summary_mv ORDER BY created_at DESC LIMIT $1`,
             summaryLimit,
           );
-          // Materialized view returns a pre-shaped summary; return minimal payload consistent with live path
-          return {
-            results: mvRows.map(r => ({
-              id: r.result_id,
-              registrationId: r.registration_id,
-              totalScore: r.total_score,
-              maxPossible: r.max_possible,
-              percentage: r.percentage,
-              passed: r.passed,
-              essayReviewed: r.essay_reviewed,
-              createdAt: r.created_at,
-              registration: {
+          // Materialized view returns a pre-shaped summary; return payload shaped like the live path
+          const results = mvRows.map(r => ({
+            id: r.result_id,
+            registrationId: r.registration_id,
+            totalScore: r.total_score,
+            maxPossible: r.max_possible,
+            percentage: r.percentage,
+            passed: r.passed,
+            essayReviewed: r.essay_reviewed,
+            createdAt: r.created_at,
+            registration: {
+              id: r.registration_id,
+              scheduleId: r.schedule_id,
+              userEmail: r.user_email,
+              userId: r.user_id,
+              status: r.registration_status,
+              user: r.user_id ? { id: r.user_id, firstName: r.first_name, lastName: r.last_name, email: r.user_email } : null,
+              schedule: r.exam_id ? { id: r.schedule_id, examId: r.exam_id, scheduledDate: r.scheduled_date, startTime: r.start_time, endTime: r.end_time, exam: { id: r.exam_id, title: r.exam_title, gradeLevel: r.exam_grade_level, passingScore: r.passing_score } } : null,
+            },
+          }));
+
+          const regsMap = new Map();
+          const usersMap = new Map();
+          const schedulesMap = new Map();
+          const examsMap = new Map();
+
+          for (const r of mvRows) {
+            if (r.registration_id && !regsMap.has(r.registration_id)) {
+              regsMap.set(r.registration_id, {
                 id: r.registration_id,
                 scheduleId: r.schedule_id,
                 userEmail: r.user_email,
                 userId: r.user_id,
                 status: r.registration_status,
-                user: r.user_id ? { id: r.user_id, firstName: r.first_name, lastName: r.last_name, email: r.user_email } : null,
-                schedule: r.exam_id ? { id: r.schedule_id, examId: r.exam_id, scheduledDate: r.scheduled_date, startTime: r.start_time, endTime: r.end_time, exam: { id: r.exam_id, title: r.exam_title, gradeLevel: r.exam_grade_level, passingScore: r.passing_score } } : null,
-              },
-            })),
-            regs: [],
-            users: [],
-            schedules: [],
-            exams: [],
+              });
+            }
+
+            if (r.user_id && !usersMap.has(r.user_id)) {
+              usersMap.set(r.user_id, {
+                id: r.user_id,
+                firstName: r.first_name,
+                lastName: r.last_name,
+                email: r.user_email,
+              });
+            }
+
+            if (r.schedule_id && !schedulesMap.has(r.schedule_id)) {
+              schedulesMap.set(r.schedule_id, {
+                id: r.schedule_id,
+                examId: r.exam_id,
+                scheduledDate: r.scheduled_date,
+                startTime: r.start_time,
+                endTime: r.end_time,
+              });
+            }
+
+            if (r.exam_id && !examsMap.has(r.exam_id)) {
+              examsMap.set(r.exam_id, {
+                id: r.exam_id,
+                title: r.exam_title,
+                gradeLevel: r.exam_grade_level,
+                passingScore: r.passing_score,
+              });
+            }
+          }
+
+          return {
+            results,
+            regs: [...regsMap.values()],
+            users: [...usersMap.values()],
+            schedules: [...schedulesMap.values()],
+            exams: [...examsMap.values()],
             essays: [],
             academicYears: [],
             semesters: [],
