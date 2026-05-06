@@ -415,8 +415,8 @@ export async function getEmployeeSummary(req, res, next) {
     const cacheMs = Number(process.env.SUMMARY_CACHE_MS) || 300_000;
 
     const summary = await cached(cacheKey, async () => {
-      // If materialized summary is enabled, prefer it to reduce DB work
-      if (process.env.USE_MATERIALIZED_SUMMARY === '1') {
+      // Prefer the materialized summary path by default; set USE_MATERIALIZED_SUMMARY=0 to disable it.
+      if (process.env.USE_MATERIALIZED_SUMMARY !== '0') {
         try {
           const mvRows = await prisma.$queryRawUnsafe(
             `SELECT * FROM employee_summary_mv ORDER BY created_at DESC LIMIT $1`,

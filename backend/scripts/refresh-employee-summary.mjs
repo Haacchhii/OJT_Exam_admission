@@ -58,20 +58,20 @@ async function refresh() {
     } catch (err) {
       console.warn('Failed to invalidate cache prefix after refresh:', err?.message || err);
     }
+
+    try {
+      console.log('Ensuring MV indexes exist...');
+      await prisma.$executeRawUnsafe('CREATE UNIQUE INDEX IF NOT EXISTS idx_employee_summary_mv_result_id ON employee_summary_mv(result_id);');
+      await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS idx_employee_summary_mv_created_at_desc ON employee_summary_mv(created_at DESC);');
+    } catch (err) {
+      console.warn('Failed to create MV indexes (may require manual run):', err?.message || err);
+    }
   } catch (err) {
     console.error('Failed to create/refresh materialized view:', err.message);
     process.exit(1);
   } finally {
     await prisma.$disconnect();
   }
-  
-    // Ensure a unique index exists on the materialized view to allow concurrent refreshes in future
-    try {
-      console.log('Ensuring unique index on employee_summary_mv.result_id...');
-      await prisma.$executeRawUnsafe('CREATE UNIQUE INDEX IF NOT EXISTS idx_employee_summary_mv_result_id ON employee_summary_mv(result_id);');
-    } catch (err) {
-      console.warn('Failed to create unique index on materialized view (may require manual run):', err.message);
-    }
 }
 
 refresh();
