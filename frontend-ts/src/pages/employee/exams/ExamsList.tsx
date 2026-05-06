@@ -1,6 +1,6 @@
 ﻿import { useState, useMemo, useEffect, useRef } from 'react';
 import { useAsync } from '../../../hooks/useAsync';
-import { getExams, getExam, updateExam, deleteExam, bulkDeleteExams, cloneExam, getExamSchedules, getExamRegistrations, getExamReadinessPage } from '../../../api/exams';
+import { getExamsPage, getExam, updateExam, deleteExam, bulkDeleteExams, cloneExam, getExamSchedules, getExamRegistrations, getExamReadinessPage } from '../../../api/exams';
 import { getAcademicYears, getSemesters, getActivePeriod } from '../../../api/academicYears';
 import { showToast } from '../../../components/Toast';
 import { useConfirm } from '../../../components/ConfirmDialog';
@@ -45,9 +45,9 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
 
   const { data, loading, error, refetch } = useAsync(async () => {
     const [rawExm, rawSched, rawRegs] = await Promise.all([
-      getExams(), getExamSchedules(), getExamRegistrations(),
+      getExamsPage(), getExamSchedules(), getExamRegistrations(),
     ]);
-    return { exams: asArray<Exam>(rawExm), schedules: asArray<ExamSchedule>(rawSched), regs: asArray<ExamRegistration>(rawRegs) };
+    return { examsPage: rawExm, schedules: asArray<ExamSchedule>(rawSched), regs: asArray<ExamRegistration>(rawRegs) };
   }, [], 0, {
     resourcePrefixes: ['/exams'],
   });
@@ -94,9 +94,10 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
     return list.filter(s => s.academicYearId === Number(yearFilterExam));
   }, [allSemesters, yearFilterExam]);
 
-  const exams: Exam[] = data?.exams || [];
+  const exams: Exam[] = data?.examsPage?.data || [];
   const schedules: ExamSchedule[] = data?.schedules || [];
   const regs: ExamRegistration[] = data?.regs || [];
+  const examCatalogTotal = data?.examsPage?.pagination?.total ?? exams.length;
 
   const schedulesById = useMemo(() => new Map(schedules.map(s => [s.id, s])), [schedules]);
   const examsById = useMemo(() => new Map(exams.map(e => [e.id, e])), [exams]);
@@ -115,7 +116,7 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
 
   const examGrades = useMemo(() => [...new Set(exams.map(e => e.gradeLevel).filter(Boolean))].sort(), [exams]);
 
-  const { paginated: paginatedExams, totalPages: examTotalPages, safePage: examSafePage, totalItems: examTotal } = usePaginationSlice(filteredExams, examPage, EXAMS_PER_PAGE);
+  const { paginated: paginatedExams, totalPages: examTotalPages, safePage: examSafePage, totalItems: filteredExamTotal } = usePaginationSlice(filteredExams, examPage, EXAMS_PER_PAGE);
   const resetExamPage = () => setExamPage(1);
 
   const handleBulkDelete = async () => {
@@ -252,7 +253,7 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
         </div>
       </PageHeader>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard icon="exam" value={exams.length} label="Total Exams" color="blue" />
+        <StatCard icon="exam" value={examCatalogTotal} label="Total Exams" color="blue" />
         <StatCard icon="calendar" value={schedules.length} label="Schedules" color="emerald" />
         <StatCard icon="users" value={regs.length} label="Registrations" color="amber" />
         <StatCard icon="checkCircle" value={regs.filter(r => r.status === 'done').length} label="Completed" color="amber" />
@@ -322,7 +323,7 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
                 </tbody>
               </table>
             </div>
-            <Pagination currentPage={examSafePage} totalPages={examTotalPages} onPageChange={setExamPage} totalItems={examTotal} itemsPerPage={EXAMS_PER_PAGE} />
+            <Pagination currentPage={examSafePage} totalPages={examTotalPages} onPageChange={setExamPage} totalItems={filteredExamTotal} itemsPerPage={EXAMS_PER_PAGE} />
           </>
         ) : (
           <EmptyState icon="documentText" title="No exams found" text={searchExam ? `No exams match "${searchExam}"${gradeFilterExam !== 'all' || statusFilterExam !== 'all' ? ' with the selected filters' : ''}.` : 'No exams match your current filters.'} />

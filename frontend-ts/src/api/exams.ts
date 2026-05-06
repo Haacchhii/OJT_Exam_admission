@@ -71,6 +71,10 @@ export async function getExams(params?: ExamParams) {
   return client.get<Exam[]>(`/exams${qs(withDefaultListParams(params))}`);
 }
 
+export async function getExamsPage(params?: ExamParams) {
+  return client.get<PagedApiResponse<Exam>>(`/exams${qs(withDefaultListParams(params))}`);
+}
+
 export async function getExam(id: number) {
   return client.get<Exam>(`/exams/${id}`);
 }
