@@ -2,7 +2,8 @@ import prisma from '../config/db.js';
 import { paginate, paginatedResponse } from '../utils/pagination.js';
 import { cached } from '../utils/cache.js';
 
-const EMPLOYEE_SUMMARY_DEFAULT_LIMIT = 40;
+// Reduce default to limit payload and DB work for summary endpoint
+const EMPLOYEE_SUMMARY_DEFAULT_LIMIT = 20;
 const EMPLOYEE_SUMMARY_MAX_LIMIT = 200;
 
 function parseBooleanQuery(value, fallback) {
@@ -411,7 +412,50 @@ export async function getEmployeeSummary(req, res, next) {
     const includeEssays = parseBooleanQuery(req.query?.includeEssays, true);
 
     const cacheKey = `resultsEmployeeSummary:v6:${summaryLimit}:r${includeResults ? 1 : 0}:e${includeEssays ? 1 : 0}`;
+    const cacheMs = Number(process.env.SUMMARY_CACHE_MS) || 300_000;
+
     const summary = await cached(cacheKey, async () => {
+      // If materialized summary is enabled, prefer it to reduce DB work
+      if (process.env.USE_MATERIALIZED_SUMMARY === '1') {
+        try {
+          const mvRows = await prisma.$queryRawUnsafe(
+            `SELECT * FROM employee_summary_mv ORDER BY created_at DESC LIMIT $1`,
+            summaryLimit,
+          );
+          // Materialized view returns a pre-shaped summary; return minimal payload consistent with live path
+          return {
+            results: mvRows.map(r => ({
+              id: r.result_id,
+              registrationId: r.registration_id,
+              totalScore: r.total_score,
+              maxPossible: r.max_possible,
+              percentage: r.percentage,
+              passed: r.passed,
+              essayReviewed: r.essay_reviewed,
+              createdAt: r.created_at,
+              registration: {
+                id: r.registration_id,
+                scheduleId: r.schedule_id,
+                userEmail: r.user_email,
+                userId: r.user_id,
+                status: r.registration_status,
+                user: r.user_id ? { id: r.user_id, firstName: r.first_name, lastName: r.last_name, email: r.user_email } : null,
+                schedule: r.exam_id ? { id: r.schedule_id, examId: r.exam_id, scheduledDate: r.scheduled_date, startTime: r.start_time, endTime: r.end_time, exam: { id: r.exam_id, title: r.exam_title, gradeLevel: r.exam_grade_level, passingScore: r.passing_score } } : null,
+              },
+            })),
+            regs: [],
+            users: [],
+            schedules: [],
+            exams: [],
+            essays: [],
+            academicYears: [],
+            semesters: [],
+            meta: { totalResults: mvRows.length, returnedResults: mvRows.length, totalEssays: 0, returnedEssays: 0, totalPendingEssays: 0, totalScoredEssays: 0, summaryLimit, includeResults, includeEssays, capped: false },
+          };
+        } catch (err) {
+          // Fall back to live query if materialized view not present or query fails
+        }
+      }
       const [
         totalResults,
         totalEssays,
@@ -448,10 +492,8 @@ export async function getEmployeeSummary(req, res, next) {
                       select: {
                         id: true,
                         firstName: true,
-                        middleName: true,
                         lastName: true,
                         email: true,
-                        applicantProfile: { select: { gradeLevel: true } },
                       },
                     },
                     schedule: {
@@ -467,8 +509,6 @@ export async function getEmployeeSummary(req, res, next) {
                             title: true,
                             gradeLevel: true,
                             passingScore: true,
-                            academicYear: { select: { id: true } },
-                            semester: { select: { id: true } },
                           },
                         },
                       },
@@ -505,10 +545,8 @@ export async function getEmployeeSummary(req, res, next) {
                       select: {
                         id: true,
                         firstName: true,
-                        middleName: true,
                         lastName: true,
                         email: true,
-                        applicantProfile: { select: { gradeLevel: true } },
                       },
                     },
                     schedule: {
@@ -524,8 +562,6 @@ export async function getEmployeeSummary(req, res, next) {
                             title: true,
                             gradeLevel: true,
                             passingScore: true,
-                            academicYear: { select: { id: true } },
-                            semester: { select: { id: true } },
                           },
                         },
                       },
@@ -627,10 +663,8 @@ export async function getEmployeeSummary(req, res, next) {
           select: {
             id: true,
             firstName: true,
-            middleName: true,
             lastName: true,
             email: true,
-            applicantProfile: { select: { gradeLevel: true } },
           },
         });
 
@@ -650,7 +684,7 @@ export async function getEmployeeSummary(req, res, next) {
         semesters,
         meta,
       };
-    }, 120_000);
+    }, cacheMs);
 
     res.json(summary);
   } catch (err) { next(err); }

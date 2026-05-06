@@ -24,6 +24,7 @@
     "test:watch": "vitest",
     "perf:smoke": "node scripts/perf-smoke.mjs",
     "smoke:postdeploy": "node scripts/post-deploy-smoke.mjs"
+    ,"worker:refresh-summary": "node scripts/worker-refresh-loop.mjs"
   },
   "keywords": [],
   "license": "ISC",
