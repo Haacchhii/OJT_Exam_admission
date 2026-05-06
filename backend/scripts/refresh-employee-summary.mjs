@@ -1,6 +1,8 @@
 import prisma from '../src/config/db.js';
 import { invalidatePrefix } from '../src/utils/cache.js';
 
+const WORKER_LOCK_KEY = 982451653; // stable integer lock key for pg advisory lock
+
 async function refresh() {
   // Create or refresh materialized view with minimal pre-joined fields used by employee-summary
   const createMv = `
@@ -40,8 +42,16 @@ async function refresh() {
 
   const refreshConcurrently = `REFRESH MATERIALIZED VIEW CONCURRENTLY employee_summary_mv;`;
   const refreshFallback = `REFRESH MATERIALIZED VIEW employee_summary_mv;`;
+  let lockAcquired = false;
 
   try {
+    const lockRows = await prisma.$queryRawUnsafe(`SELECT pg_try_advisory_lock(${WORKER_LOCK_KEY}) AS locked;`);
+    lockAcquired = Boolean(lockRows?.[0]?.locked);
+    if (!lockAcquired) {
+      console.log('Skipping refresh: another worker holds employee_summary_mv refresh lock.');
+      return;
+    }
+
     console.log('Creating materialized view (if not exists)...');
     await prisma.$executeRawUnsafe(createMv);
     console.log('Attempting concurrent refresh of materialized view...');
@@ -70,6 +80,13 @@ async function refresh() {
     console.error('Failed to create/refresh materialized view:', err.message);
     process.exit(1);
   } finally {
+    if (lockAcquired) {
+      try {
+        await prisma.$executeRawUnsafe(`SELECT pg_advisory_unlock(${WORKER_LOCK_KEY});`);
+      } catch (err) {
+        console.warn('Failed to release advisory lock:', err?.message || err);
+      }
+    }
     await prisma.$disconnect();
   }
 }

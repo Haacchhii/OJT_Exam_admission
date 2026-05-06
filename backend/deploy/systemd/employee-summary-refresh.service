@@ -1,0 +1,18 @@
+[Unit]
+Description=Golden Backend Employee Summary Refresh Worker
+After=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/golden/backend
+Environment=NODE_ENV=production
+Environment=USE_MATERIALIZED_SUMMARY=1
+EnvironmentFile=/opt/golden/backend/.env
+ExecStart=/usr/bin/node /opt/golden/backend/scripts/refresh-employee-summary.mjs
+User=www-data
+Group=www-data
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=timers.target

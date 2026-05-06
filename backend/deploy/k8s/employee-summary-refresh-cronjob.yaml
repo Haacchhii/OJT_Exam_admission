@@ -1,0 +1,38 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: employee-summary-refresh
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: refresh-summary
+              image: ghcr.io/haacchhii/golden-backend:latest
+              imagePullPolicy: IfNotPresent
+              command: ["node", "scripts/worker-refresh-loop.mjs"]
+              env:
+                - name: RUN_ONCE
+                  value: "1"
+                - name: USE_MATERIALIZED_SUMMARY
+                  value: "1"
+                - name: SUMMARY_REFRESH_INTERVAL_MS
+                  value: "300000"
+                - name: SUMMARY_REFRESH_JITTER_PERCENT
+                  value: "10"
+                - name: DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: golden-backend-secrets
+                      key: DATABASE_URL
+                - name: REDIS_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: golden-backend-secrets
+                      key: REDIS_URL

@@ -1,0 +1,11 @@
+[Unit]
+Description=Run employee summary MV refresh every 5 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Unit=employee-summary-refresh.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target
