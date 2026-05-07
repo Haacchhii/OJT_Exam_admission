@@ -90,6 +90,8 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const submittedRef = useRef(false);
+  const fullscreenWarningCountRef = useRef(0);
+  const questionStartTimesRef = useRef<Record<number, number>>({}); // Track when student views each question
 
   const baseQuestions = Array.isArray(exam.questions) ? exam.questions : [];
   const questions = useMemo(() => {
@@ -152,6 +154,14 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
     });
     if (timerRef.current) clearInterval(timerRef.current);
 
+    // Prepare security metadata
+    const securityMetadata = {
+      tabSwitches: cheatFlags > 0 ? Math.floor(cheatFlags / 2) : 0, // Divide by 2 since both visibility change and blur fire
+      windowBlurs: cheatFlags,
+      fullscreenExits: fullscreenWarningCountRef.current,
+      timePerQuestion: questionStartTimesRef.current,
+    };
+
     // If offline, save to queue instead of submitting
     if (!isOnline) {
       enqueueSubmission(registration.id, answersRef.current);
@@ -163,7 +173,7 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
     }
 
     try {
-      await submitExamAnswers(registration.id, answersRef.current);
+      await submitExamAnswers(registration.id, answersRef.current, securityMetadata);
     } catch (err: unknown) {
       // If submission fails due to network error, try to queue it
       if (!navigator.onLine) {
@@ -236,12 +246,156 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
         });
       }
     };
-    const preventContext = (e: MouseEvent) => e.preventDefault();
-    const beforeUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+
+    // ── Prevent right-click context menu ──────────────
+    const preventContext = (e: MouseEvent) => {
+      e.preventDefault();
+      showToast('Right-click is disabled during the exam.', 'warning');
+    };
+
+    // ── Prevent copy, cut, paste ──────────────────────
+    const preventCopyPaste = (e: ClipboardEvent) => {
+      e.preventDefault();
+      showToast('Copy and paste are disabled during the exam.', 'warning');
+    };
+
+    // ── Prevent navigation away ───────────────────────
+    const beforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+
+    // ── Prevent drag & drop ───────────────────────────
+    const preventDragDrop = (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
+    // ── Prevent F12, Ctrl+Shift+I, Ctrl+Shift+C (Dev Tools) ─
+    const preventDevTools = (e: KeyboardEvent) => {
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const isF12 = e.key === 'F12';
+      const isCtrlShiftI = (isMac ? e.metaKey : e.ctrlKey) && e.shiftKey && e.key === 'I';
+      const isCtrlShiftC = (isMac ? e.metaKey : e.ctrlKey) && e.shiftKey && e.key === 'C';
+      const isCtrlShiftJ = (isMac ? e.metaKey : e.ctrlKey) && e.shiftKey && e.key === 'J';
+
+      if (isF12 || isCtrlShiftI || isCtrlShiftC || isCtrlShiftJ) {
+        e.preventDefault();
+        showToast('Developer tools are disabled during the exam.', 'warning');
+      }
+    };
+
+    // ── Track window blur/focus ───────────────────────
+    const handleBlur = () => {
+      setCheatFlags(prev => {
+        const next = prev + 1;
+        if (next >= 5) {
+          doSubmitRef.current('Warning: Exam Auto-Submitted', 'Your exam was automatically submitted due to multiple window switches.');
+        } else if (next <= 4) {
+          showToast(`Window switch detected (${next}/5). Please return to the exam.`, 'warning');
+        }
+        return next;
+      });
+    };
+
     document.addEventListener('visibilitychange', handler);
     document.addEventListener('contextmenu', preventContext);
+    document.addEventListener('copy', preventCopyPaste);
+    document.addEventListener('cut', preventCopyPaste);
+    document.addEventListener('paste', preventCopyPaste);
+    document.addEventListener('dragstart', preventDragDrop);
+    document.addEventListener('drop', preventDragDrop);
+    document.addEventListener('keydown', preventDevTools);
     window.addEventListener('beforeunload', beforeUnload);
-    return () => { document.removeEventListener('visibilitychange', handler); document.removeEventListener('contextmenu', preventContext); window.removeEventListener('beforeunload', beforeUnload); };
+    window.addEventListener('blur', handleBlur);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handler);
+      document.removeEventListener('contextmenu', preventContext);
+      document.removeEventListener('copy', preventCopyPaste);
+      document.removeEventListener('cut', preventCopyPaste);
+      document.removeEventListener('paste', preventCopyPaste);
+      document.removeEventListener('dragstart', preventDragDrop);
+      document.removeEventListener('drop', preventDragDrop);
+      document.removeEventListener('keydown', preventDevTools);
+      window.removeEventListener('beforeunload', beforeUnload);
+      window.removeEventListener('blur', handleBlur);
+    };
+  }, []);
+
+  // ── Fullscreen enforcement ────────────────────────────────
+  useEffect(() => {
+    let fullscreenWarningCount = 0;
+    let enteringFullscreen = false;
+
+    // Request fullscreen on component mount
+    const requestFullscreen = async () => {
+      try {
+        const elem = document.documentElement;
+        if (!document.fullscreenElement) {
+          enteringFullscreen = true;
+          if (elem.requestFullscreen) {
+            await elem.requestFullscreen();
+          } else if ((elem as any).webkitRequestFullscreen) {
+            await (elem as any).webkitRequestFullscreen();
+          } else if ((elem as any).mozRequestFullScreen) {
+            await (elem as any).mozRequestFullScreen();
+          } else if ((elem as any).msRequestFullscreen) {
+            await (elem as any).msRequestFullscreen();
+          }
+          enteringFullscreen = false;
+        }
+      } catch (err) {
+        console.warn('Fullscreen request failed:', err);
+        showToast('Fullscreen mode could not be enabled. Please try maximizing your browser window instead.', 'warning');
+      }
+    };
+
+    // Handle fullscreen change
+    const handleFullscreenChange = () => {
+      if (enteringFullscreen) return;
+
+      if (!document.fullscreenElement) {
+        // Student exited fullscreen
+        fullscreenWarningCount++;
+        if (fullscreenWarningCount === 1) {
+          showToast('⚠️ You have exited fullscreen. Returning to fullscreen now...', 'error');
+          setTimeout(() => requestFullscreen(), 500);
+        } else if (fullscreenWarningCount === 2) {
+          showToast('⚠️ Final warning: Please stay in fullscreen or your exam will be submitted.', 'error');
+          setTimeout(() => requestFullscreen(), 500);
+        } else if (fullscreenWarningCount >= 3) {
+          showToast('Your exam is being submitted due to repeated fullscreen violations.', 'error');
+          doSubmitRef.current(
+            'Exam Auto-Submitted',
+            'Your exam was automatically submitted due to repeated fullscreen mode violations.'
+          );
+        }
+      }
+    };
+
+    const handleFullscreenError = () => {
+      console.warn('Fullscreen error - retrying');
+      setTimeout(() => requestFullscreen(), 1000);
+    };
+
+    // Request fullscreen on load
+    requestFullscreen();
+
+    // Add listeners for fullscreen changes
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+    document.addEventListener('fullscreenerror', handleFullscreenError);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+      document.removeEventListener('fullscreenerror', handleFullscreenError);
+    };
   }, []);
 
   // Network connection listeners

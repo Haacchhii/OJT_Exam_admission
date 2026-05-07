@@ -58,12 +58,13 @@ function resolveSelectedChoiceId(answer, choices) {
 
 // ═══════════════════════════════════════════════════════
 // POST /api/results/submit
-// SECURITY: grades server-side — only accepts { registrationId, answers }
+// SECURITY: grades server-side — only accepts { registrationId, answers, securityMetadata? }
 // answers: { questionId: choiceId | essayText }
+// securityMetadata: { tabSwitches, windowBlurs, fullscreenExits, suspiciousActivity, ... }
 // ═══════════════════════════════════════════════════════
 export async function submitExam(req, res, next) {
   try {
-    const { registrationId, answers } = req.body;
+    const { registrationId, answers, securityMetadata } = req.body;
     if (!registrationId || !answers) {
       return res.status(400).json({ error: 'registrationId and answers are required', code: 'VALIDATION_ERROR' });
     }
@@ -186,6 +187,23 @@ export async function submitExam(req, res, next) {
     // Provisional pass state from auto-graded items. Final state may change after essay scoring.
     const passed = percentage >= exam.passingScore;
 
+    // ── Log security events ──────────────────────────
+    const securityIssues = [];
+    if (securityMetadata) {
+      if (securityMetadata.tabSwitches && securityMetadata.tabSwitches > 0) {
+        securityIssues.push(`${securityMetadata.tabSwitches} tab switch(es) detected`);
+      }
+      if (securityMetadata.windowBlurs && securityMetadata.windowBlurs > 0) {
+        securityIssues.push(`${securityMetadata.windowBlurs} window blur(s) detected`);
+      }
+      if (securityMetadata.fullscreenExits && securityMetadata.fullscreenExits > 0) {
+        securityIssues.push(`${securityMetadata.fullscreenExits} fullscreen exit(s) detected`);
+      }
+      if (securityMetadata.suspiciousActivity) {
+        securityIssues.push(`Suspicious activity detected: ${securityMetadata.suspiciousActivityDetails || 'Unspecified'}`);
+      }
+    }
+
     // Transaction: save all at once
     await prisma.$transaction([
       // Save submitted answers
@@ -220,7 +238,22 @@ export async function submitExam(req, res, next) {
 
     res.json({ totalScore, maxPossible, percentage, passed, essayReviewed: !hasEssays });
 
-    logAudit({ userId: req.user.id, action: 'exam.submit', entity: 'result', entityId: registrationId, details: { totalScore, maxPossible, percentage, hasEssays }, ipAddress: req.ip });
+    // Log exam submission with security metadata
+    logAudit({
+      userId: req.user.id,
+      action: 'exam.submit',
+      entity: 'result',
+      entityId: registrationId,
+      details: {
+        totalScore,
+        maxPossible,
+        percentage,
+        hasEssays,
+        securityMetadata,
+        securityIssues: securityIssues.length > 0 ? securityIssues : undefined,
+      },
+      ipAddress: req.ip,
+    });
 
     // If no essays, result is final → send result email now
     if (!hasEssays) {

@@ -439,6 +439,15 @@ export const submitExamSchema = z.object({
     (value) => Object.keys(value).length <= 1000,
     'Cannot submit more than 1000 questions'
   ),
+  // Optional security metadata for exam integrity tracking
+  securityMetadata: z.object({
+    tabSwitches: z.number().int().nonnegative().optional(),
+    windowBlurs: z.number().int().nonnegative().optional(),
+    fullscreenExits: z.number().int().nonnegative().optional(),
+    timePerQuestion: z.record(z.string(), z.number()).optional(),
+    suspiciousActivity: z.boolean().optional(),
+    suspiciousActivityDetails: z.string().max(500).optional(),
+  }).optional(),
 });
 
 export const scoreEssaySchema = z.object({

@@ -132,11 +132,20 @@ export async function getQuestionAnalyticsPage(examId: number, params?: { page?:
 
 export async function submitExamAnswers(
   registrationId: number,
-  answersObj: Record<string | number, unknown>
+  answersObj: Record<string | number, unknown>,
+  securityMetadata?: {
+    tabSwitches?: number;
+    windowBlurs?: number;
+    fullscreenExits?: number;
+    timePerQuestion?: Record<string, number>;
+    suspiciousActivity?: boolean;
+    suspiciousActivityDetails?: string;
+  }
 ) {
   return client.post<ExamResult>('/results/submit', {
     registrationId,
     answers: answersObj,
+    securityMetadata,
   });
 }
 
