@@ -2,7 +2,7 @@
 import path from 'path';
 import { existsSync } from 'fs';
 import { paginate, paginatedResponse } from '../utils/pagination.js';
-import { VALID_TRANSITIONS, ROLES, MAX_BULK_OPERATIONS, getLevelGroup } from '../utils/constants.js';
+import { VALID_TRANSITIONS, ROLES, MAX_BULK_OPERATIONS, getLevelGroup, shouldSkipEntranceExam } from '../utils/constants.js';
 import { generateTrackingId, generateStudentNumber } from '../utils/tracking.js';
 import { logAudit } from '../utils/auditLog.js';
 import { getIo } from '../utils/socket.js';
@@ -929,8 +929,10 @@ export async function createAdmission(req, res, next) {
       });
     }
 
-    // Enforce exam-completion gate on the backend as well (frontend already gates this).
-    const completedExam = await prisma.examRegistration.findFirst({
+    const skipEntranceExam = shouldSkipEntranceExam(gradeLevel);
+
+    // Enforce exam-completion gate only for grade levels that require entrance exams.
+    const completedExam = skipEntranceExam ? null : await prisma.examRegistration.findFirst({
       where: {
         status: 'done',
         OR: [
@@ -940,7 +942,7 @@ export async function createAdmission(req, res, next) {
       },
       select: { id: true },
     });
-    if (!completedExam) {
+    if (!skipEntranceExam && !completedExam) {
       return res.status(400).json({
         error: 'Please complete your entrance exam before submitting an admission application.',
         code: 'VALIDATION_ERROR',
