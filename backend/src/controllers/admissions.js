@@ -671,7 +671,7 @@ export async function getDashboardSummary(req, res, next) {
           needsAttention: academicYearStatus !== 'active' || semesterStatus !== 'active',
         },
       };
-    }, 300_000);
+    }, 60_000);
 
     res.json(summary);
   } catch (err) { next(err); }
@@ -1054,6 +1054,8 @@ export async function uploadDocuments(req, res, next) {
         fileSize: Number.isFinite(files[i].size) ? files[i].size : null,
       })),
     });
+
+    await invalidateAdmissionCaches([admission.userId]);
 
     // Return public URLs
     const baseUrl = `${req.protocol}://${req.get('host')}/uploads`;

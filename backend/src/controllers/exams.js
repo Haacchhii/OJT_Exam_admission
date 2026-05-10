@@ -224,7 +224,7 @@ async function invalidateExamCaches() {
 async function getExamDetailCached(examId) {
   return cached(`exams:detail:${examId}`, async () => {
     return prisma.exam.findUnique({ where: { id: examId }, include: examDetailInclude });
-  }, 300_000);
+  }, 60_000);
 }
 
 function shapeExam(exam) {

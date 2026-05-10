@@ -282,7 +282,17 @@ export async function getAvailableSchedules(req, res, next) {
         include: { exam: { select: { title: true, gradeLevel: true } } },
         orderBy: { scheduledDate: 'asc' },
       });
-    }, 90_000);
+    }, 30_000);
+
+    if (req.user?.role === ROLES.APPLICANT) {
+      const completedExam = await prisma.examRegistration.findFirst({
+        where: { userId: req.user.id, status: 'done' },
+        select: { id: true },
+      });
+      if (completedExam) {
+        return res.json([]);
+      }
+    }
 
     const now = new Date();
 
