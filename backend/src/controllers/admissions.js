@@ -890,7 +890,7 @@ export async function getReportsSummary(req, res, next) {
         semesters,
         meta,
       };
-    }, 120_000);
+    }, 60_000);
 
     res.json(summary);
   } catch (err) { next(err); }

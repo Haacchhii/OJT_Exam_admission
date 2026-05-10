@@ -412,7 +412,7 @@ export async function getEmployeeSummary(req, res, next) {
     const includeEssays = parseBooleanQuery(req.query?.includeEssays, true);
 
     const cacheKey = `resultsEmployeeSummary:v6:${summaryLimit}:r${includeResults ? 1 : 0}:e${includeEssays ? 1 : 0}`;
-    const cacheMs = Number(process.env.SUMMARY_CACHE_MS) || 300_000;
+    const cacheMs = Number(process.env.SUMMARY_CACHE_MS) || 60_000;
 
     const summary = await cached(cacheKey, async () => {
       // Prefer the materialized summary path by default; set USE_MATERIALIZED_SUMMARY=0 to disable it.
@@ -498,7 +498,6 @@ export async function getEmployeeSummary(req, res, next) {
                   id: true,
                   registrationId: true,
                   questionId: true,
-                  essayResponse: true,
                   pointsAwarded: true,
                   maxPoints: true,
                   comment: true,
@@ -613,7 +612,6 @@ export async function getEmployeeSummary(req, res, next) {
                 id: true,
                 registrationId: true,
                 questionId: true,
-                essayResponse: true,
                 pointsAwarded: true,
                 maxPoints: true,
                 comment: true,

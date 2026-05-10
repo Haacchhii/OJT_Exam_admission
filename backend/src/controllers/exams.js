@@ -268,7 +268,7 @@ function stripAnswers(exam) {
 export async function getExams(req, res, next) {
   try {
     const { search, grade, levelGroup, status, academicYearId, semesterId, page, limit } = req.query;
-    const pg = paginate(page ?? 1, limit ?? 200);
+    const pg = paginate(page ?? 1, limit ?? 20);
 
     const where = { deletedAt: null };
     if (grade)  where.gradeLevel = grade;
@@ -292,7 +292,24 @@ export async function getExams(req, res, next) {
     })}`;
     const { exams, total } = await cached(cacheKey, async () => {
       const [rows, count] = await Promise.all([
-        prisma.exam.findMany({ where, ...(pg && { skip: pg.skip, take: pg.take }), orderBy: { createdAt: 'desc' }, include: examListInclude }),
+        prisma.exam.findMany({
+          where,
+          ...(pg && { skip: pg.skip, take: pg.take }),
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            title: true,
+            gradeLevel: true,
+            levelGroup: true,
+            passingScore: true,
+            isActive: true,
+            createdAt: true,
+            createdBy: { select: { firstName: true, middleName: true, lastName: true } },
+            academicYear: { select: { id: true, year: true, startDate: true, endDate: true } },
+            semester: { select: { id: true, name: true, startDate: true, endDate: true } },
+            _count: { select: { questions: true, schedules: true } },
+          },
+        }),
         prisma.exam.count({ where }),
       ]);
       return { exams: rows, total: count };
@@ -390,7 +407,7 @@ export async function getReadiness(req, res, next) {
         prisma.examRegistration.count({ where }),
       ]);
       return { rows: listRows, total: count };
-    }, 120_000);
+    }, 30_000);
 
     res.json(paginatedResponse(rows, total, pg));
   } catch (err) { next(err); }
