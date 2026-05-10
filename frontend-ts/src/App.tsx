@@ -135,9 +135,16 @@ export default function App() {
       // Ignore storage access issues
     }
 
-    // Call health endpoint on app mount for server readiness check
-    fetch('/api/health', { method: 'GET' }).catch(() => {
-      console.warn('Health check failed; backend may be unavailable');
+    // Warm up Vercel serverless functions on app load
+    // These ping endpoints are lightweight and return immediately
+    // Fire all at once, ignore responses — errors are normal during cold start
+    Promise.allSettled([
+      fetch('/api/health'),
+      fetch('/api/admissions/ping'),
+      fetch('/api/exams/ping'),
+      fetch('/api/academic-years/ping'),
+    ]).catch(() => {
+      // Ignore all errors; warmup is best-effort
     });
   }, []);
 
