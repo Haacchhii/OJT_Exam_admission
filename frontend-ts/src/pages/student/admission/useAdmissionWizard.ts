@@ -115,6 +115,9 @@ export function useAdmissionWizard() {
           lastName: f.lastName || user.lastName || '',
           email: f.email || user.email || '',
           studentNumber: f.studentNumber || user.applicantProfile?.studentNumber || '',
+          // Prefill grade level and LRN from the registered applicant profile when available
+          gradeLevel: f.gradeLevel || user.applicantProfile?.gradeLevel || '',
+          lrn: f.lrn || user.applicantProfile?.lrn || '',
         };
         if (user.applicantProfile?.studentNumber && !f.applicantType) {
           updated.applicantType = 'Continuing';

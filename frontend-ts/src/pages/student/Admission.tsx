@@ -41,7 +41,11 @@ function formatDisplayDate(v: string | null): string {
 
 export default function StudentAdmission() {
   const w = useAdmissionWizard();
-  const requiresEntranceExam = !shouldSkipEntranceExam(w.user?.applicantProfile?.gradeLevel);
+  // Use the grade level from the current form (if the applicant selected one during the wizard),
+  // otherwise fall back to the user's profile gradeLevel. This ensures preschool/elementary
+  // applicants who select a qualifying grade in the form are not blocked by the exam gate.
+  const gradeToCheck = w.form?.gradeLevel || w.user?.applicantProfile?.gradeLevel || null;
+  const requiresEntranceExam = !shouldSkipEntranceExam(gradeToCheck);
   const { data: activePeriod } = useAsync(() => getActivePeriod());
 
   const activeSemester = activePeriod?.semesters?.find(s => s.isActive) || null;
