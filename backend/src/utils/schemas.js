@@ -177,6 +177,10 @@ export const bulkDeleteSchema = z.object({
   ids: z.array(z.number().int().positive()).min(1).max(MAX_BULK_OPERATIONS),
 });
 
+export const bulkHandoffSchema = z.object({
+  ids: z.array(z.number().int().positive()).min(1).max(MAX_BULK_OPERATIONS),
+});
+
 // ─── Exam Schemas ─────────────────────────────────────
 const choiceSchema = z.object({
   choiceText: z.string().min(1),
