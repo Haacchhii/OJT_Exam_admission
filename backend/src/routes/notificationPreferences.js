@@ -7,6 +7,12 @@ import * as ctrl from '../controllers/notificationPreferences.js';
 import { ROLES } from '../utils/constants.js';
 
 const router = Router();
+
+// Warmup ping endpoint — no auth required, returns instantly
+router.get('/ping', (_req, res) => {
+  res.status(200).json({ ok: true });
+});
+
 router.use(authenticate);
 
 router.get('/', ctrl.getNotificationPreferences);

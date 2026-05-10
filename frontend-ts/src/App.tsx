@@ -146,6 +146,9 @@ export default function App() {
       fetch('/api/results/ping'),
       fetch('/api/users/ping'),
       fetch('/api/question-templates/ping'),
+      fetch('/api/notification-preferences/ping'),
+      fetch('/api/audit-logs/ping'),
+      fetch('/api/perf/ping'),
       fetch('/api/academic-years/ping'),
     ]).catch(() => {
       // Ignore all errors; warmup is best-effort

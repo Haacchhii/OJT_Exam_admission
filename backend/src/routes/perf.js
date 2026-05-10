@@ -6,6 +6,11 @@ import { getPerfSummary, observeVitalMetric } from '../utils/perfStore.js';
 
 const router = Router();
 
+// Warmup ping endpoint — no auth required, returns instantly
+router.get('/ping', (_req, res) => {
+  res.status(200).json({ ok: true });
+});
+
 function hasSummaryAccess(req) {
   if (env.NODE_ENV !== 'production' && !env.PERF_MONITOR_KEY) return true;
   const provided = req.get('x-perf-key') || req.query?.key;
