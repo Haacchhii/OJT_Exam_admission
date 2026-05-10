@@ -1006,14 +1006,19 @@ export async function createAdmission(req, res, next) {
       include: { documents: true, academicYear: true, semester: true },
     });
 
-    logAudit({ userId: req.user.id, action: 'admission.create', entity: 'admission', entityId: admission.id, details: { trackingId, gradeLevel, applicantType: applicantType || 'New' }, ipAddress: req.ip });
-
     await invalidateAdmissionCaches([req.user.id]);
 
-    // Fire-and-forget confirmation email to the applicant
-    sendAdmissionSubmittedEmail({ to: email, firstName, trackingId, gradeLevel });
-
     res.status(201).json(shapeAdmission(admission));
+
+    // Keep non-critical post-submit work off the response path.
+    setImmediate(() => {
+      try {
+        logAudit({ userId: req.user.id, action: 'admission.create', entity: 'admission', entityId: admission.id, details: { trackingId, gradeLevel, applicantType: applicantType || 'New' }, ipAddress: req.ip });
+        void sendAdmissionSubmittedEmail({ to: email, firstName, trackingId, gradeLevel });
+      } catch (err) {
+        console.warn('[admissions] post-submit work failed:', err?.message || err);
+      }
+    });
   } catch (err) { next(err); }
 }
 

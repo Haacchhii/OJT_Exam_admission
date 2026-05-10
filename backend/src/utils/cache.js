@@ -79,7 +79,9 @@ async function deleteRedisByPrefix(prefix) {
       keys.push(key);
     }
     if (keys.length) await client.del(keys); // batch delete, one round-trip
-  } catch { /* best effort */ }
+  } catch (err) {
+    console.warn(`[cache] invalidatePrefix("${prefix}") failed: ${err?.message || err}`);
+  }
 }
 
 export async function cached(key, fn, ttlMs = CACHE_DEFAULT_TTL_MS) {
