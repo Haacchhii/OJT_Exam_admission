@@ -14,15 +14,6 @@ import { ROLES } from '../utils/constants.js';
 
 const router = Router();
 
-// Warmup ping endpoint — no auth required, returns instantly
-router.get('/ping', (_req, res) => {
-  try {
-    res.status(200).json({ ok: true });
-  } catch (err) {
-    res.status(500).json({ ok: false, error: 'ping failed' });
-  }
-});
-
 router.use(authenticate);
 
 // Student scoped
