@@ -266,7 +266,7 @@ export default function ScheduleManager() {
     }
     setForm({ examId: '', date: '', start: '', end: '', visibilityStartDate: '', visibilityEndDate: '', openDate: '', closeDate: '', slots: '' });
     setSelectedExamIds([]);
-    schedRefetch();
+    await schedRefetch();
   };
 
   const editSched = (s: ExamSchedule) => {
@@ -310,7 +310,7 @@ export default function ScheduleManager() {
         tone: 'success',
         title: 'Schedule deleted successfully.',
       });
-      schedRefetch();
+      await schedRefetch();
     } catch {
       setSchedActionBanner({
         tone: 'danger',
@@ -345,7 +345,7 @@ export default function ScheduleManager() {
         message: 'The schedule has been marked closed and the list is now updated.',
       });
       showToast('Schedule closed.', 'success');
-      schedRefetch();
+      await schedRefetch();
     } catch (err: any) {
       setSchedActionBanner({
         tone: 'danger',

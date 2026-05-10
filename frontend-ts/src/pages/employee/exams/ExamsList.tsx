@@ -1,6 +1,6 @@
 ﻿import { useState, useMemo, useEffect, useRef } from 'react';
 import { useAsync } from '../../../hooks/useAsync';
-import { getExamsPage, getExam, updateExam, deleteExam, bulkDeleteExams, cloneExam, getExamSchedules, getExamRegistrations, getExamReadinessPage } from '../../../api/exams';
+import { getExams, getExam, updateExam, deleteExam, bulkDeleteExams, cloneExam, getExamSchedules, getExamRegistrations, getExamReadinessPage } from '../../../api/exams';
 import { getAcademicYears, getSemesters, getActivePeriod } from '../../../api/academicYears';
 import { showToast } from '../../../components/Toast';
 import { useConfirm } from '../../../components/ConfirmDialog';
@@ -11,6 +11,8 @@ import Icon from '../../../components/Icons';
 import { formatTime, badgeClass, asArray, exportToCSV, formatPersonName, formatDate } from '../../../utils/helpers';
 import { DetailField, QuestionCard } from './ExamComponents';
 import ExamPreviewModal from './ExamPreviewModal';
+import { CSVUploader } from '../../../components/CSVUploader';
+import { addExam } from '../../../api/exams';
 import type { Exam, ExamSchedule, ExamRegistration, AcademicYear, Semester } from '../../../types';
 import { GRADE_OPTIONS, ALL_GRADE_LEVELS } from '../../../utils/constants';
 
@@ -30,6 +32,7 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
   const confirm = useConfirm();
   const [detailId, setDetailId] = useState<number | null>(null);
   const [previewExam, setPreviewExam] = useState<Exam | null>(null);
+  const [showBulkImport, setShowBulkImport] = useState(false);
   const [saving, setSaving] = useState(false);
   const [searchExam, setSearchExam] = useState('');    const [levelGroupFilterExam, setLevelGroupFilterExam] = useState('all');  const [gradeFilterExam, setGradeFilterExam] = useState('all');
   const [statusFilterExam, setStatusFilterExam] = useState('all');
@@ -45,9 +48,9 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
 
   const { data, loading, error, refetch } = useAsync(async () => {
     const [rawExm, rawSched, rawRegs] = await Promise.all([
-      getExamsPage(), getExamSchedules(), getExamRegistrations(),
+      getExams(), getExamSchedules(), getExamRegistrations(),
     ]);
-    return { examsPage: rawExm, schedules: asArray<ExamSchedule>(rawSched), regs: asArray<ExamRegistration>(rawRegs) };
+    return { exams: asArray<Exam>(rawExm), schedules: asArray<ExamSchedule>(rawSched), regs: asArray<ExamRegistration>(rawRegs) };
   }, [], 0, {
     resourcePrefixes: ['/exams'],
   });
@@ -94,10 +97,9 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
     return list.filter(s => s.academicYearId === Number(yearFilterExam));
   }, [allSemesters, yearFilterExam]);
 
-  const exams: Exam[] = data?.examsPage?.data || [];
+  const exams: Exam[] = data?.exams || [];
   const schedules: ExamSchedule[] = data?.schedules || [];
   const regs: ExamRegistration[] = data?.regs || [];
-  const examCatalogTotal = data?.examsPage?.pagination?.total ?? exams.length;
 
   const schedulesById = useMemo(() => new Map(schedules.map(s => [s.id, s])), [schedules]);
   const examsById = useMemo(() => new Map(exams.map(e => [e.id, e])), [exams]);
@@ -116,8 +118,101 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
 
   const examGrades = useMemo(() => [...new Set(exams.map(e => e.gradeLevel).filter(Boolean))].sort(), [exams]);
 
-  const { paginated: paginatedExams, totalPages: examTotalPages, safePage: examSafePage, totalItems: filteredExamTotal } = usePaginationSlice(filteredExams, examPage, EXAMS_PER_PAGE);
+  const { paginated: paginatedExams, totalPages: examTotalPages, safePage: examSafePage, totalItems: examTotal } = usePaginationSlice(filteredExams, examPage, EXAMS_PER_PAGE);
   const resetExamPage = () => setExamPage(1);
+
+  const handleBulkImportExams = async (data: any[]) => {
+    if (!data.length) {
+      showToast('No exam rows found to import.', 'error');
+      return;
+    }
+    const ok = await confirm({
+      title: 'Bulk Import Exams',
+      message: `Import ${data.length} exam row(s)? Existing exams will remain unchanged.`,
+      confirmLabel: 'Import Exams',
+      variant: 'info',
+    });
+    if (!ok) return;
+
+    let successCount = 0;
+    let failedCount = 0;
+    setSaving(true);
+    try {
+      for (const row of data) {
+        try {
+          const questions = [];
+          for (let i = 1; i <= 200; i++) {
+            const qtext = row['q' + i + '_text'];
+            if (!qtext) continue;
+            
+            const rawType = String(row['q' + i + '_type'] || 'mc').toLowerCase().trim();
+            const qType = rawType === 'truefalse' || rawType === 'true_false' || rawType === 'true/false' ? 'true_false' : rawType === 'identification' ? 'identification' : rawType === 'essay' ? 'essay' : 'mc';
+            const qPoints = parseInt(row['q' + i + '_points']) || 1;
+
+            const choices = [];
+            const correctAns = String(row['q' + i + '_ans'] || 'a').toLowerCase().trim();
+            const optionMap = ['a', 'b', 'c', 'd'];
+
+            if (qType === 'mc') {
+              for (let j = 0; j < 4; j++) {
+                const choiceText = row['q' + i + '_' + optionMap[j]];
+                if (choiceText) {
+                  choices.push({
+                    choiceText,
+                    isCorrect: correctAns === optionMap[j] || correctAns === String(j + 1),
+                    orderNum: j + 1,
+                  });
+                }
+              }
+            }
+
+            if (qType === 'true_false') {
+              const trueIsCorrect = !['false', 'f', 'b', '2', 'no', '0'].includes(correctAns);
+              choices.push(
+                { choiceText: 'True', isCorrect: trueIsCorrect, orderNum: 1 },
+                { choiceText: 'False', isCorrect: !trueIsCorrect, orderNum: 2 }
+              );
+            }
+
+            const questionPayload: Record<string, unknown> = {
+              questionText: qtext,
+              questionType: qType,
+              points: qPoints,
+              orderNum: questions.length + 1,
+              choices,
+            };
+
+            if (qType === 'identification') {
+              questionPayload.identificationAnswer = String(row['q' + i + '_ans'] || '').trim();
+              questionPayload.identificationMatchMode = String(row['q' + i + '_match'] || '').toLowerCase() === 'partial' ? 'partial' : 'exact';
+            }
+
+            questions.push(questionPayload);
+          }
+
+          await addExam({
+            title: row.title || 'Untitled Exam',
+            gradeLevel: row.gradeLevel || 'Grade 10',
+            durationMinutes: parseInt(row.durationMinutes) || 60,
+            passingScore: parseInt(row.passingScore) || 50,
+            isActive: row.isActive === 'true' || row.isActive === '1' || row.isActive?.toLowerCase() === 'yes',
+            questions
+          });
+          successCount++;
+        } catch (e) {
+          failedCount++;
+        }
+      }
+      if (successCount > 0) {
+        showToast(`Successfully imported ${successCount} exam(s).${failedCount ? ` ${failedCount} failed.` : ''}`, failedCount ? 'info' : 'success');
+      } else {
+        showToast('Import failed. No exams were created.', 'error');
+      }
+      await refetch();
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleBulkDelete = async () => {
     if (selectedCount === 0 || bulkDeleting) return;
@@ -134,7 +229,7 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
       await bulkDeleteExams(ids);
       showToast(`${ids.length} exam(s) deleted.`, 'info');
       clearSelection();
-      refetch();
+      await refetch();
     } catch {
       showToast('Failed to delete exams.', 'error');
     } finally {
@@ -177,7 +272,7 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
               <ActionButton variant="secondary" size="sm" icon={<Icon name="eye" className="w-3.5 h-3.5" />} onClick={() => setPreviewExam(fullExam || exam)}>Preview</ActionButton>
               {canManageExams && <>
                 <ActionButton size="sm" icon={<Icon name="edit" className="w-3.5 h-3.5" />} onClick={() => onEdit!(fullExam || exam)}>Edit</ActionButton>
-                <ActionButton variant="secondary" size="sm" onClick={async () => { const action = exam.isActive ? 'Deactivate' : 'Activate'; const ok = await confirm({ title: `${action} Exam`, message: `Are you sure you want to ${action.toLowerCase()} "${exam.title}"?`, confirmLabel: action, variant: exam.isActive ? 'danger' : 'info' }); if (!ok) return; try { await updateExam(exam.id, { isActive: !exam.isActive }); showToast(`Exam ${action.toLowerCase()}d!`, 'success'); refetch(); } catch { showToast('Failed to update exam.', 'error'); } }}>{exam.isActive ? 'Deactivate' : 'Activate'}</ActionButton>
+                <ActionButton variant="secondary" size="sm" onClick={async () => { const action = exam.isActive ? 'Deactivate' : 'Activate'; const ok = await confirm({ title: `${action} Exam`, message: `Are you sure you want to ${action.toLowerCase()} "${exam.title}"?`, confirmLabel: action, variant: exam.isActive ? 'danger' : 'info' }); if (!ok) return; try { await updateExam(exam.id, { isActive: !exam.isActive }); showToast(`Exam ${action.toLowerCase()}d!`, 'success'); await refetch(); } catch { showToast('Failed to update exam.', 'error'); } }}>{exam.isActive ? 'Deactivate' : 'Activate'}</ActionButton>
               </>}
             </div>
           </div>
@@ -250,10 +345,38 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
           }}>
             Export
           </ActionButton>
+          <CSVUploader
+            title="Bulk Import Exams"
+            isOpen={showBulkImport}
+            onClose={() => setShowBulkImport(false)}
+            onImport={handleBulkImportExams}
+            templateHeaders={['title', 'gradeLevel', 'durationMinutes', 'passingScore', 'isActive', 'q1_text', 'q1_type', 'q1_points', 'q1_a', 'q1_b', 'q1_c', 'q1_d', 'q1_ans']}
+            templateRows={[
+              {
+                title: 'Grade 10 Entrance Exam',
+                gradeLevel: 'Grade 10',
+                durationMinutes: 120,
+                passingScore: 60,
+                isActive: 'true',
+                q1_text: 'What is the capital of the Philippines?',
+                q1_type: 'mc',
+                q1_points: 2,
+                q1_a: 'Cebu',
+                q1_b: 'Manila',
+                q1_c: 'Davao',
+                q1_d: 'Quezon City',
+                q1_ans: 'B',
+              },
+            ]}
+            allowMultiple
+          />
+          <ActionButton variant="secondary" onClick={() => setShowBulkImport(true)} icon={<Icon name="upload" className="w-4 h-4" />}>
+            Import Exams
+          </ActionButton>
         </div>
       </PageHeader>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard icon="exam" value={examCatalogTotal} label="Total Exams" color="blue" />
+        <StatCard icon="exam" value={exams.length} label="Total Exams" color="blue" />
         <StatCard icon="calendar" value={schedules.length} label="Schedules" color="emerald" />
         <StatCard icon="users" value={regs.length} label="Registrations" color="amber" />
         <StatCard icon="checkCircle" value={regs.filter(r => r.status === 'done').length} label="Completed" color="amber" />
@@ -312,9 +435,9 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
                         <div className="flex gap-1">
                           <ActionButton size="sm" variant="ghost" onClick={() => setDetailId(e.id)} className="text-forest-600">View</ActionButton>
                           {canManageExams && <>
-                            <ActionButton size="sm" variant="ghost" onClick={async () => { const ok = await confirm({ title: 'Clone Exam', message: `Create a duplicate copy of "${e.title}"?`, confirmLabel: 'Clone', variant: 'info' }); if (!ok) return; try { await cloneExam(e.id); showToast('Exam cloned successfully!', 'success'); refetch(); } catch { showToast('Failed to clone exam.', 'error'); } }} className="text-gold-700">Clone</ActionButton>
-                            <ActionButton size="sm" variant="ghost" onClick={async () => { const action = e.isActive ? 'Deactivate' : 'Activate'; const ok = await confirm({ title: `${action} Exam`, message: `Are you sure you want to ${action.toLowerCase()} "${e.title}"?`, confirmLabel: action, variant: e.isActive ? 'danger' : 'info' }); if (!ok) return; try { await updateExam(e.id, { isActive: !e.isActive }); showToast(`Exam ${action.toLowerCase()}d!`, 'success'); refetch(); } catch { showToast('Failed to update exam.', 'error'); } }} className="text-gray-600">{e.isActive ? 'Deactivate' : 'Activate'}</ActionButton>
-                            <ActionButton size="sm" variant="ghost" onClick={async () => { if (await confirm({ title: 'Delete Exam', message: 'Are you sure you want to delete this exam? This will also delete associated schedules, registrations, and results. This cannot be undone.', confirmLabel: 'Delete', variant: 'danger' })) { try { await deleteExam(e.id); refetch(); } catch { showToast('Failed to delete exam.', 'error'); } } }} className="text-red-600">Delete</ActionButton>
+                            <ActionButton size="sm" variant="ghost" onClick={async () => { const ok = await confirm({ title: 'Clone Exam', message: `Create a duplicate copy of "${e.title}"?`, confirmLabel: 'Clone', variant: 'info' }); if (!ok) return; try { await cloneExam(e.id); showToast('Exam cloned successfully!', 'success'); await refetch(); } catch { showToast('Failed to clone exam.', 'error'); } }} className="text-gold-700">Clone</ActionButton>
+                            <ActionButton size="sm" variant="ghost" onClick={async () => { const action = e.isActive ? 'Deactivate' : 'Activate'; const ok = await confirm({ title: `${action} Exam`, message: `Are you sure you want to ${action.toLowerCase()} "${e.title}"?`, confirmLabel: action, variant: e.isActive ? 'danger' : 'info' }); if (!ok) return; try { await updateExam(e.id, { isActive: !e.isActive }); showToast(`Exam ${action.toLowerCase()}d!`, 'success'); await refetch(); } catch { showToast('Failed to update exam.', 'error'); } }} className="text-gray-600">{e.isActive ? 'Deactivate' : 'Activate'}</ActionButton>
+                            <ActionButton size="sm" variant="ghost" onClick={async () => { if (await confirm({ title: 'Delete Exam', message: 'Are you sure you want to delete this exam? This will also delete associated schedules, registrations, and results. This cannot be undone.', confirmLabel: 'Delete', variant: 'danger' })) { try { await deleteExam(e.id); await refetch(); } catch { showToast('Failed to delete exam.', 'error'); } } }} className="text-red-600">Delete</ActionButton>
                           </>}
                         </div>
                       </td>
@@ -323,7 +446,7 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
                 </tbody>
               </table>
             </div>
-            <Pagination currentPage={examSafePage} totalPages={examTotalPages} onPageChange={setExamPage} totalItems={filteredExamTotal} itemsPerPage={EXAMS_PER_PAGE} />
+            <Pagination currentPage={examSafePage} totalPages={examTotalPages} onPageChange={setExamPage} totalItems={examTotal} itemsPerPage={EXAMS_PER_PAGE} />
           </>
         ) : (
           <EmptyState icon="documentText" title="No exams found" text={searchExam ? `No exams match "${searchExam}"${gradeFilterExam !== 'all' || statusFilterExam !== 'all' ? ' with the selected filters' : ''}.` : 'No exams match your current filters.'} />

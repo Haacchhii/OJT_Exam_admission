@@ -55,7 +55,7 @@ export async function getActiveAcademicYear(_req, res, next) {
         where: { isActive: true },
         include: { semesters: { orderBy: { id: 'asc' } } },
       })
-    );
+    , 600_000);
     res.json(year || null);
   } catch (err) { next(err); }
 }

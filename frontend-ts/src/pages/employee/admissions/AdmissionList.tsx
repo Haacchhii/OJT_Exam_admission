@@ -195,7 +195,7 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
       await bulkUpdateStatus(validIds, targetStatus);
       showToast(`${validIds.length} application(s) updated to ${targetStatus}.${skippedIds.length ? ` ${skippedIds.length} skipped.` : ''}`, 'success');
       setSelected(new Set());
-      refetch();
+      await refetch();
     } catch (err: any) {
       showToast('Bulk update failed: ' + (err.message || 'Unknown error'), 'error');
     } finally {
@@ -218,7 +218,7 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
       await bulkDeleteAdmissions(ids);
       showToast(`${ids.length} application(s) deleted.`, 'info');
       setSelected(new Set());
-      refetch();
+      await refetch();
     } catch {
       showToast('Failed to delete applications.', 'error');
     } finally {
@@ -246,7 +246,7 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
       await bulkHandoffAdmissions(ids);
       showToast(`${ids.length} application(s) handed off successfully.`, 'success');
       setSelected(new Set());
-      refetch();
+      await refetch();
     } catch (err: any) {
       showToast('Bulk handoff failed: ' + (err.message || 'Unknown error'), 'error');
     } finally {

@@ -48,6 +48,28 @@ export default function StudentExam() {
 
   const [startingExam, setStartingExam] = useState(false);
 
+  const requestFullscreen = async (): Promise<boolean> => {
+    try {
+      const elem = document.documentElement;
+      if (document.fullscreenElement) return true;
+      if (elem.requestFullscreen) {
+        await elem.requestFullscreen();
+        return true;
+      }
+      const fallback = elem as HTMLElement & {
+        webkitRequestFullscreen?: () => Promise<void>;
+        mozRequestFullScreen?: () => Promise<void>;
+        msRequestFullscreen?: () => Promise<void>;
+      };
+      if (fallback.webkitRequestFullscreen) { await fallback.webkitRequestFullscreen(); return true; }
+      if (fallback.mozRequestFullScreen) { await fallback.mozRequestFullScreen(); return true; }
+      if (fallback.msRequestFullscreen) { await fallback.msRequestFullscreen(); return true; }
+    } catch (err) {
+      console.warn('Fullscreen request failed:', err);
+    }
+    return false;
+  };
+
   const showLobby = (exam: Exam) => { setCurrentExam(exam); setView('lobby'); };
   
   const handleStartExam = () => {
@@ -64,13 +86,18 @@ export default function StudentExam() {
       return;
     }
 
+    const fullscreenEnabled = await requestFullscreen();
+    if (!fullscreenEnabled) {
+      showToast('Fullscreen could not be enabled automatically. The exam will still start, but please maximize your browser window.', 'warning');
+    }
+
     setStartingExam(true);
     try {
       await apiStartExam(activeReg.id);
       const loadedExam = await getExamForStudent(examId);
       setCurrentExam(loadedExam);
       setView('exam');
-      refetch();
+      await refetch();
     } catch (err: unknown) {
       showErrorToast(err, 'Failed to start exam. Please try again.');
       setView('lobby');

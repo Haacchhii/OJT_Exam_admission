@@ -133,7 +133,16 @@ export function useAdmissionWizard() {
         normalized.motherName = legacy.motherName;
         normalized.motherOccupation = legacy.motherOccupation;
       }
-      setForm(f => ({ ...f, ...normalized }));
+      setForm(f => {
+        const merged = { ...f, ...normalized };
+        if (!String(normalized.gradeLevel || '').trim()) {
+          merged.gradeLevel = f.gradeLevel || user?.applicantProfile?.gradeLevel || '';
+        }
+        if (!String(normalized.lrn || '').trim()) {
+          merged.lrn = f.lrn || user?.applicantProfile?.lrn || '';
+        }
+        return merged;
+      });
       showToast('Draft restored from your last session.', 'info');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -208,7 +217,7 @@ export function useAdmissionWizard() {
       if (result?.trackingId) setSubmittedTrackingId(result.trackingId);
       clear();
       try { localStorage.removeItem('gk_admission_step'); } catch { /* ignore */ }
-      refetch();
+      await refetch();
       setSuccessOpen(true);
     } catch (err: unknown) {
       showToast(getFriendlySubmitError(err, 'We could not submit your application right now.'), 'error');

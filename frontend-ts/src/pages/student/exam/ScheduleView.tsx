@@ -92,6 +92,20 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, onBo
     );
   }
 
+  if (myReg?.status === 'started') {
+    return (
+      <div>
+        <PageHeader title="Entrance Examination" subtitle="Select an available exam slot and confirm your booking." />
+        <div className="gk-section-card p-8 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-amber-50 flex items-center justify-center mx-auto mb-3"><Icon name="clock" className="w-7 h-7 text-amber-500" /></div>
+          <h3 className="font-bold text-amber-600 mb-1">Exam In Progress</h3>
+          <p className="text-gray-500 text-sm mb-4">Your entrance exam is already in progress or being processed. Scheduling another slot is locked until this attempt is resolved.</p>
+          <Link to="/student/results" className="inline-block bg-forest-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-forest-600">View Results</Link>
+        </div>
+      </div>
+    );
+  }
+
   if (!myReg && myResult) {
     return (
       <div>
@@ -129,7 +143,8 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, onBo
       onCancelledRegistration(registrationId);
       showToast('Your exam schedule has been cancelled.', 'success');
       setShowCancelSuccess(true);
-      onRefresh();
+      await refetchSchedules();
+      await Promise.resolve(onRefresh());
     } catch (err: unknown) {
       showToast((err as Error).message || 'Failed to cancel schedule. Please try again.', 'error');
     } finally {
@@ -180,7 +195,8 @@ export default function ScheduleView({ myReg, myResult, onLobby, onRefresh, onBo
         onBookedRegistration(optimisticReg);
         const trackMsg = reg.trackingId ? ` Your tracking ID: ${reg.trackingId}` : '';
         showToast(`Exam slot booked successfully!${trackMsg}`, 'success');
-        onRefresh();
+        await refetchSchedules();
+        await Promise.resolve(onRefresh());
       }
       else showToast('Slot is full or you are already registered. Please choose another.', 'error');
     } catch {

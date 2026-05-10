@@ -339,7 +339,7 @@ export default function EmployeeResults() {
         message: 'The review data has been refreshed with the latest score.',
       });
       setScoreModal(null);
-      refetch();
+      await refetch();
     } catch (err) {
       setScoreActionState({
         tone: 'danger',

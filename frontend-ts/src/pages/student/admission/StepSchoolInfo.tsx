@@ -20,6 +20,10 @@ interface Props {
 }
 
 export default function StepSchoolInfo({ form, set, setForm, goTo, requiredDocs, slotFiles, user, errors = {}, clearError }: Props) {
+  const registeredGradeLevel = user?.applicantProfile?.gradeLevel || '';
+  const gradeLevelLocked = Boolean(registeredGradeLevel);
+  const gradeLevelValue = registeredGradeLevel || form.gradeLevel;
+
   return (
     <div className="gk-section-card p-6">
       <h3 className="text-lg font-bold text-forest-500 mb-1">Step 2: School Information</h3>
@@ -31,7 +35,7 @@ export default function StepSchoolInfo({ form, set, setForm, goTo, requiredDocs,
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Grade Level to Enroll <span className="text-red-500">*</span></label>
-          <select value={form.gradeLevel} onChange={set('gradeLevel')} required className={`w-full px-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white ${errors.gradeLevel ? 'border-red-400' : 'border-gray-300'}`} aria-invalid={!!errors.gradeLevel}>
+          <select value={gradeLevelValue} onChange={set('gradeLevel')} required disabled={gradeLevelLocked} className={`w-full px-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-forest-500/20 outline-none bg-white disabled:bg-gray-100 disabled:text-gray-500 ${errors.gradeLevel ? 'border-red-400' : 'border-gray-300'}`} aria-invalid={!!errors.gradeLevel}>
             <option value="">Select grade level</option>
             {GRADE_OPTIONS.map(g => (
               <optgroup key={g.group} label={g.group}>
@@ -39,6 +43,7 @@ export default function StepSchoolInfo({ form, set, setForm, goTo, requiredDocs,
               </optgroup>
             ))}
           </select>
+          {gradeLevelLocked && <p className="mt-1 text-xs text-gray-500">Your grade level comes from registration and cannot be changed here.</p>}
           {errors.gradeLevel && <p className="mt-1 text-sm text-red-500" role="alert">{errors.gradeLevel}</p>}
         </div>
         <Input label="Learner Reference Number (LRN)" value={form.lrn} onChange={(e: ChangeEvent<HTMLInputElement>) => { const v = e.target.value.replace(/\D/g, ''); setForm(f => ({ ...f, lrn: v })); clearError?.('lrn'); }} required placeholder="12-digit LRN" maxLength={12} inputMode="numeric" pattern="[0-9]*" error={errors.lrn} />

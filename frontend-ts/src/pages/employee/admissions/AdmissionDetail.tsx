@@ -216,7 +216,7 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
         message: `Current status is now "${updated.status}".`,
       });
       showToast(`Application ${statusVal.toLowerCase()} successfully!`, 'success');
-      refetch();
+      await refetch();
     } catch (err: any) {
       setActionBanner({
         tone: 'danger',
@@ -239,7 +239,7 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
       // `handoffAdmission` returns the updated Admission object directly
       setAdm(updated);
       showToast('Enrollment handoff recorded and noted in application.', 'success');
-      refetch();
+      await refetch();
     } catch (err: any) {
       showErrorToast(err, 'Failed to hand off admission.');
     } finally { setSaving(false); }
