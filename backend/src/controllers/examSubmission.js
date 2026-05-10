@@ -235,6 +235,7 @@ export async function submitExam(req, res, next) {
     await invalidatePrefix('regs:list:');
     await invalidatePrefix('readiness:list:');
     await invalidatePrefix('resultsEmployeeSummary:');
+    await invalidatePrefix(`exam-eligibility:${req.user.id}`);
     await invalidatePrefix('schedules:available:');
 
     res.json({ totalScore, maxPossible, percentage, passed, essayReviewed: !hasEssays });
