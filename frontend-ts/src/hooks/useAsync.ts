@@ -25,6 +25,11 @@ function shouldRefreshForPrefixes(resourcePrefixes: string[] | undefined, change
   return resourcePrefixes.some(prefix => changedPrefixes.includes(prefix));
 }
 
+function areDepsEqual(prevDeps: unknown[] | undefined, nextDeps: unknown[]): boolean {
+  if (!prevDeps || prevDeps.length !== nextDeps.length) return false;
+  return nextDeps.every((dep, index) => Object.is(dep, prevDeps[index]));
+}
+
 export function useAsync<T>(
   asyncFn: () => Promise<T>, 
   deps: unknown[] = [],
@@ -45,6 +50,7 @@ export function useAsync<T>(
 
   const fnRef = useRef(asyncFn);
   fnRef.current = asyncFn;
+  const prevDepsRef = useRef<unknown[] | undefined>(undefined);
 
   const isFirstLoad = useRef(true);
   const lastAutoRefreshAt = useRef(0);
@@ -69,6 +75,12 @@ export function useAsync<T>(
 
   useEffect(() => {
     let cancelled = false;
+    const depsChanged = !areDepsEqual(prevDepsRef.current, deps);
+    prevDepsRef.current = deps;
+
+    if (depsChanged) {
+      setData(null);
+    }
     
     if (setLoadingOnReload || isFirstLoad.current || !data) {
       setLoading(true);
