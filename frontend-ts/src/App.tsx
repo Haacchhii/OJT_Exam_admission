@@ -140,8 +140,12 @@ export default function App() {
     // Fire all at once, ignore responses — errors are normal during cold start
     Promise.allSettled([
       fetch('/api/health'),
+      fetch('/api/auth/ping'),
       fetch('/api/admissions/ping'),
       fetch('/api/exams/ping'),
+      fetch('/api/results/ping'),
+      fetch('/api/users/ping'),
+      fetch('/api/question-templates/ping'),
       fetch('/api/academic-years/ping'),
     ]).catch(() => {
       // Ignore all errors; warmup is best-effort

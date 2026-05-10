@@ -7,6 +7,12 @@ import * as ctrl from '../controllers/questionTemplate.js';
 import { ROLES } from '../utils/constants.js';
 
 const router = Router();
+
+// Warmup ping endpoint — no auth required, returns instantly
+router.get('/ping', (_req, res) => {
+  res.status(200).json({ ok: true });
+});
+
 router.use(authenticate);
 
 // Question Templates - CRUD operations for reusable question bank

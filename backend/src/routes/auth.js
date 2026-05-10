@@ -6,6 +6,11 @@ import { loginSchema, registerSchema, forgotPasswordSchema, resetPasswordSchema,
 
 const router = Router();
 
+// Warmup ping endpoint — no auth required, returns instantly
+router.get('/ping', (_req, res) => {
+  res.status(200).json({ ok: true });
+});
+
 router.post('/login',           validate(loginSchema), ctrl.login);
 router.post('/register',        validate(registerSchema), ctrl.register);
 router.post('/verify-email',    validate(verifyEmailSchema), ctrl.verifyEmail);
