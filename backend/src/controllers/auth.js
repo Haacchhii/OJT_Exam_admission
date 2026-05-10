@@ -9,6 +9,9 @@ import { logAudit } from '../utils/auditLog.js';
 import { ROLES, BCRYPT_ROUNDS, RESET_TOKEN_EXPIRY, EMAIL_VERIFY_EXPIRY_MS, getLevelGroup } from '../utils/constants.js';
 import { isApplicantPeriodOpen, syncApplicantUserStatusById } from '../utils/applicantStatusSync.js';
 
+const JWT_ALGORITHM = 'HS256';
+const JWT_VERIFY_OPTIONS = { algorithms: [JWT_ALGORITHM] };
+
 // ─── Password complexity (single source of truth: passwordSchema in schemas.js) ──
 function validatePassword(password) {
   const result = passwordSchema.safeParse(password);
@@ -17,27 +20,32 @@ function validatePassword(password) {
 }
 
 
-function signToken(user, rememberMe = false) {
+function signToken(user) {
   return jwt.sign({
     sub: user.id,
     email: user.email,
     role: user.role,
     status: user.status,
     emailVerified: user.emailVerified,
-    mustChangePassword: user.mustChangePassword,
+    mustChangePassword: Boolean(user.mustChangePassword),
     tokenVersion: user.tokenVersion,
   }, env.JWT_SECRET, {
-    expiresIn: rememberMe ? '30d' : env.JWT_EXPIRES_IN,
+    expiresIn: env.JWT_EXPIRES_IN,
+    algorithm: JWT_ALGORITHM,
   });
 }
 
 function signResetToken(user) {
-  return jwt.sign({ sub: user.id, email: user.email, purpose: 'password-reset' }, env.JWT_SECRET, { expiresIn: RESET_TOKEN_EXPIRY });
+  return jwt.sign(
+    { sub: user.id, email: user.email, purpose: 'password-reset' },
+    env.JWT_SECRET,
+    { expiresIn: RESET_TOKEN_EXPIRY, algorithm: JWT_ALGORITHM },
+  );
 }
 
 function verifyResetToken(token) {
   try {
-    const payload = jwt.verify(token, env.JWT_SECRET);
+    const payload = jwt.verify(token, env.JWT_SECRET, JWT_VERIFY_OPTIONS);
     if (payload.purpose !== 'password-reset') return null;
     return payload;
   } catch { return null; }
@@ -73,7 +81,7 @@ export async function getMe(req, res, next) {
 // POST /api/auth/login
 export async function login(req, res, next) {
   try {
-    const { email, password, rememberMe } = req.body;
+    const { email, password } = req.body;
     const normalizedEmail = String(email || '').trim().toLowerCase();
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required', code: 'VALIDATION_ERROR' });
@@ -104,7 +112,7 @@ export async function login(req, res, next) {
       return res.status(403).json({ error: 'Account is inactive', code: 'FORBIDDEN' });
     }
 
-    const token = signToken(user, rememberMe === true);
+    const token = signToken(user);
     logAudit({ userId: user.id, action: 'auth.login', entity: 'user', entityId: user.id, ipAddress: req.ip });
     const response = { user: safeUser(user), token };
     if (env.EMAIL_VERIFICATION_REQUIRED && !user.emailVerified) {
@@ -381,7 +389,7 @@ export async function resetPassword(req, res, next) {
       return res.status(404).json({ error: 'User not found', code: 'NOT_FOUND' });
     }
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
-    await prisma.user.update({ where: { id: user.id }, data: { passwordHash, mustChangePassword: false } });
+    await prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
     logAudit({ userId: user.id, action: 'auth.password_reset', entity: 'user', entityId: user.id, ipAddress: req.ip });
     res.json({ ok: true, message: 'Password updated successfully.' });
   } catch (err) { next(err); }
@@ -417,7 +425,6 @@ export async function updateProfile(req, res, next) {
         return res.status(400).json({ error: pwErr, code: 'VALIDATION_ERROR' });
       }
       data.passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
-      data.mustChangePassword = false;
     }
 
     if (Object.keys(data).length === 0) {

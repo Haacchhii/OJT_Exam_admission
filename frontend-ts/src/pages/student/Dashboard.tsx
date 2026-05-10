@@ -48,6 +48,18 @@ export default function StudentDashboard() {
   const statusText = myApp ? myApp.status : 'Not Submitted';
   const statusColor = statusText === 'Accepted' ? 'emerald' : statusText === 'Rejected' ? 'red' : 'amber';
   const admissionUnlocked = hasCompletedExam || !requiresEntranceExam;
+  const dashboardStats = requiresEntranceExam
+    ? [
+        { icon: examStatus.icon, value: examStatus.text, label: 'Exam Status', color: examStatus.color },
+        { icon: admissionUnlocked ? 'lockOpen' : 'lock', value: admissionUnlocked ? 'Unlocked' : 'Locked', label: 'Admission Access', color: admissionUnlocked ? 'emerald' : 'blue' },
+        { icon: statusText === 'Accepted' ? 'checkCircle' : statusText === 'Rejected' ? 'xCircle' : 'clock', value: statusText, label: 'Admission Status', color: statusColor },
+        { icon: 'document', value: myApp?.documents?.length || 0, label: 'Documents Uploaded', color: 'amber' },
+      ]
+    : [
+        { icon: 'lockOpen', value: 'Open', label: 'Admission Access', color: 'emerald' },
+        { icon: statusText === 'Accepted' ? 'checkCircle' : statusText === 'Rejected' ? 'xCircle' : 'clock', value: statusText, label: 'Admission Status', color: statusColor },
+        { icon: 'document', value: myApp?.documents?.length || 0, label: 'Documents Uploaded', color: 'amber' },
+      ];
 
   const journeySteps = requiresEntranceExam ? [
     { step: 1, label: 'Register', desc: 'Create your account', icon: 'check', done: true },
@@ -195,11 +207,10 @@ export default function StudentDashboard() {
         );
       })()}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8 animate-stagger">
-        <StatCard icon={examStatus.icon} value={examStatus.text} label="Exam Status" color={examStatus.color} />
-        <StatCard icon={admissionUnlocked ? 'lockOpen' : 'lock'} value={admissionUnlocked ? 'Unlocked' : 'Locked'} label="Admission Access" color={admissionUnlocked ? 'emerald' : 'blue'} />
-        <StatCard icon={statusText === 'Accepted' ? 'checkCircle' : statusText === 'Rejected' ? 'xCircle' : 'clock'} value={statusText} label="Admission Status" color={statusColor} />
-        <StatCard icon="document" value={myApp?.documents?.length || 0} label="Documents Uploaded" color="amber" />
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${requiresEntranceExam ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-5 mb-8 animate-stagger`}>
+        {dashboardStats.map((stat) => (
+          <StatCard key={stat.label} icon={stat.icon} value={stat.value} label={stat.label} color={stat.color} />
+        ))}
       </div>
 
       <div className="gk-section-card p-6 mb-8">

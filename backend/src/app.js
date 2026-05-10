@@ -13,6 +13,7 @@ import { errorHandler } from './middleware/errors.js';
 import { trackErrors, logRequests } from './middleware/errorTracking.js';
 import { authenticate } from './middleware/auth.js';
 import { RATE_LIMITS, BODY_SIZE_LIMIT } from './utils/constants.js';
+import { sanitizeDeepStrings, sanitizeRequestInput } from './middleware/validate.js';
 import { cachePublic, cachePrivate, noStore } from './middleware/cache.js';
 import { observeApiRequest } from './utils/perfStore.js';
 import { runWithRequestContext } from './utils/requestContext.js';
@@ -83,8 +84,10 @@ const corsConfig = {
 };
 app.use(cors(corsConfig));
 
-app.use(express.json({ limit: BODY_SIZE_LIMIT }));
-app.use(express.urlencoded({ extended: true, limit: BODY_SIZE_LIMIT }));
+const bodySizeLimit = `${env.MAX_PAYLOAD_KB}kb`;
+app.use(express.json({ limit: bodySizeLimit || BODY_SIZE_LIMIT }));
+app.use(express.urlencoded({ extended: true, limit: bodySizeLimit || BODY_SIZE_LIMIT }));
+app.use(sanitizeRequestInput);
 
 // Lightweight API timing log to track endpoint p95 improvements.
 app.use((req, res, next) => {
@@ -92,11 +95,12 @@ app.use((req, res, next) => {
     const startedAt = process.hrtime.bigint();
     const originalJson = res.json.bind(res);
     res.json = (payload) => {
+      const safePayload = sanitizeDeepStrings(payload);
       if (req.originalUrl.startsWith('/api/')) {
         const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
         res.setHeader('X-Response-Time-Ms', elapsedMs.toFixed(1));
       }
-      return originalJson(payload);
+      return originalJson(safePayload);
     };
     res.on('finish', () => {
       if (!req.originalUrl.startsWith('/api/')) return;

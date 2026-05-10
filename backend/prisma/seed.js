@@ -69,10 +69,19 @@ async function main() {
   const sem2 = await prisma.semester.create({ data: { name: 'Second Semester', academicYearId: ayActive.id, isActive: false } });
   await prisma.semester.create({ data: { name: 'Summer', academicYearId: ayActive.id, isActive: false } });
 
-  const adminHash = await bcrypt.hash('admin123', 12);
-  const teacherHash = await bcrypt.hash('teacher123', 12);
-  const registrarHash = await bcrypt.hash('registrar123', 12);
-  const studentHash = await bcrypt.hash('student123', 12);
+  const adminPassword = String(process.env.SEED_ADMIN_PASSWORD || '').trim();
+  const teacherPassword = String(process.env.SEED_TEACHER_PASSWORD || '').trim();
+  const registrarPassword = String(process.env.SEED_REGISTRAR_PASSWORD || '').trim();
+  const applicantPassword = String(process.env.SEED_APPLICANT_PASSWORD || '').trim();
+
+  if (!adminPassword || !teacherPassword || !registrarPassword || !applicantPassword) {
+    throw new Error('Missing one or more required seed credentials: SEED_ADMIN_PASSWORD, SEED_TEACHER_PASSWORD, SEED_REGISTRAR_PASSWORD, SEED_APPLICANT_PASSWORD');
+  }
+
+  const adminHash = await bcrypt.hash(adminPassword, 12);
+  const teacherHash = await bcrypt.hash(teacherPassword, 12);
+  const registrarHash = await bcrypt.hash(registrarPassword, 12);
+  const studentHash = await bcrypt.hash(applicantPassword, 12);
 
   const users = await Promise.all([
     prisma.user.create({ data: { firstName: 'Admin', middleName: 'System', lastName: 'User', email: 'admin@goldenkey.edu', passwordHash: adminHash, role: 'administrator', status: 'Active', emailVerified: true } }),
@@ -326,11 +335,7 @@ async function main() {
   await resetSequences();
 
   console.log('✅ Dataset created successfully.');
-  console.log('Accounts:');
-  console.log('  admin@goldenkey.edu / admin123');
-  console.log('  registrar@goldenkey.edu / registrar123');
-  console.log('  teacher@goldenkey.edu / teacher123');
-  console.log('  maria.santos@email.com / student123');
+  console.log('Accounts seeded. Credentials are sourced from SEED_*_PASSWORD environment variables.');
 }
 
 main()

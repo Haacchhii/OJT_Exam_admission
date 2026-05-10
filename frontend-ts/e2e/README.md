@@ -13,11 +13,11 @@ These tests cover high-risk journeys:
 2. Frontend running (default `http://127.0.0.1:5173`)
 3. Seeded test data in backend (`admin@goldenkey.edu`, `teacher@goldenkey.edu`, `registrar@goldenkey.edu`, `joseirineo0418@gmail.com`)
 
-Default credentials used by tests:
-- admin@goldenkey.edu / admin123
-- teacher@goldenkey.edu / Admin123!
-- registrar@goldenkey.edu / Admin123!
-- joseirineo0418@gmail.com / Changeme123!
+E2E credentials are read from environment variables:
+- E2E_ADMIN_EMAIL, E2E_ADMIN_PASSWORD
+- E2E_TEACHER_EMAIL, E2E_TEACHER_PASSWORD
+- E2E_REGISTRAR_EMAIL, E2E_REGISTRAR_PASSWORD
+- E2E_APPLICANT_EMAIL, E2E_APPLICANT_PASSWORD
 
 ## Install
 - `npm install`

@@ -3,6 +3,7 @@ import env from '../config/env.js';
 import jwt from 'jsonwebtoken';
 
 let io;
+const JWT_VERIFY_OPTIONS = { algorithms: ['HS256'] };
 
 function createMockIo() {
   return { emit: () => {}, to: () => ({ emit: () => {} }) };
@@ -27,7 +28,7 @@ export function initIo(server) {
     const token = socket.handshake.auth?.token;
     if (!token) return next(new Error('Authentication error'));
     
-    jwt.verify(token, env.JWT_SECRET, (err, decoded) => {
+    jwt.verify(token, env.JWT_SECRET, JWT_VERIFY_OPTIONS, (err, decoded) => {
       if (err) return next(new Error('Authentication error'));
       socket.user = decoded;
       next();

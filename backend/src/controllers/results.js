@@ -418,10 +418,7 @@ export async function getEmployeeSummary(req, res, next) {
       // Prefer the materialized summary path by default; set USE_MATERIALIZED_SUMMARY=0 to disable it.
       if (process.env.USE_MATERIALIZED_SUMMARY !== '0') {
         try {
-          const mvRows = await prisma.$queryRawUnsafe(
-            `SELECT * FROM employee_summary_mv ORDER BY created_at DESC LIMIT $1`,
-            summaryLimit,
-          );
+          const mvRows = await prisma.$queryRaw`SELECT * FROM employee_summary_mv ORDER BY created_at DESC LIMIT ${summaryLimit}`;
           // Materialized view returns a pre-shaped summary; return payload shaped like the live path
           const results = mvRows.map(r => ({
             id: r.result_id,

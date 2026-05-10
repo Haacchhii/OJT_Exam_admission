@@ -134,6 +134,11 @@ export default function App() {
     } catch {
       // Ignore storage access issues
     }
+
+    // Call health endpoint on app mount for server readiness check
+    fetch('/api/health', { method: 'GET' }).catch(() => {
+      console.warn('Health check failed; backend may be unavailable');
+    });
   }, []);
 
   return (

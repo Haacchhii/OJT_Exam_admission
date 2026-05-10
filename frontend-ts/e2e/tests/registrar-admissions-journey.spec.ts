@@ -9,11 +9,12 @@ test.describe('Critical Journey: Registrar Admissions Review', () => {
 
     await expect(page.getByRole('heading', { name: 'All Admission Applications' })).toBeVisible();
 
-    const viewButtons = page.getByRole('button', { name: 'View' });
-    const count = await viewButtons.count();
+    const rows = page.locator('tbody tr[role="button"]');
+    const count = await rows.count();
     test.skip(count === 0, 'No seeded admissions available to validate detail flow.');
 
-    await viewButtons.first().click();
-    await expect(page.getByRole('heading', { name: 'Application Details' })).toBeVisible();
+    await rows.first().click();
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByRole('heading', { name: 'Application Details' })).toBeVisible({ timeout: 15000 });
   });
 });

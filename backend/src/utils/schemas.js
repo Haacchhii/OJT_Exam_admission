@@ -173,10 +173,6 @@ export const bulkUpdateStatusSchema = z.object({
   status: z.enum(STATUS_VALUES),
 });
 
-export const bulkHandoffSchema = z.object({
-  ids: z.array(z.number().int().positive()).min(1).max(MAX_BULK_OPERATIONS),
-});
-
 export const bulkDeleteSchema = z.object({
   ids: z.array(z.number().int().positive()).min(1).max(MAX_BULK_OPERATIONS),
 });
@@ -382,7 +378,6 @@ export const auditLogQuerySchema = z.object({
   ...paginationQuery,
   action: optionalString,
   entity: optionalString,
-  entityId: coerceOptionalInt,
   userId: coerceOptionalInt,
   from:   isoDateStr.optional(),
   to:     isoDateStr.optional(),
@@ -439,18 +434,63 @@ export const submitExamSchema = z.object({
     (value) => Object.keys(value).length <= 1000,
     'Cannot submit more than 1000 questions'
   ),
-  // Optional security metadata for exam integrity tracking
-  securityMetadata: z.object({
-    tabSwitches: z.number().int().nonnegative().optional(),
-    windowBlurs: z.number().int().nonnegative().optional(),
-    fullscreenExits: z.number().int().nonnegative().optional(),
-    timePerQuestion: z.record(z.string(), z.number()).optional(),
-    suspiciousActivity: z.boolean().optional(),
-    suspiciousActivityDetails: z.string().max(500).optional(),
-  }).optional(),
 });
 
 export const scoreEssaySchema = z.object({
   points:  z.number().min(0),
   comment: z.string().max(2000).optional().nullable(),
+});
+
+export const admissionIdParamSchema = z.object({
+  admissionId: z.coerce.number().int().positive(),
+});
+
+export const commentIdParamSchema = z.object({
+  commentId: z.coerce.number().int().positive(),
+});
+
+export const templateIdParamSchema = z.object({
+  templateId: z.coerce.number().int().positive(),
+});
+
+export const admissionCommentSchema = z.object({
+  content: z.string().min(1, 'Comment content is required').max(3000),
+});
+
+export const notifyNoScheduleSchema = z.object({
+  message: z.string().max(500).optional().default(''),
+});
+
+export const notificationPreferenceItemSchema = z.object({
+  eventType: z.string().min(1).max(100),
+  enabled: z.boolean(),
+});
+
+export const notificationPreferencesUpdateSchema = z.array(notificationPreferenceItemSchema)
+  .min(1)
+  .max(200);
+
+export const notificationRolePreferenceItemSchema = z.object({
+  role: z.enum(ROLE_VALUES),
+  eventType: z.string().min(1).max(100),
+  enabled: z.boolean(),
+});
+
+export const notificationRoleDefaultsUpdateSchema = z.array(notificationRolePreferenceItemSchema)
+  .min(1)
+  .max(200);
+
+export const notificationRoleDefaultsQuerySchema = z.object({
+  role: z.enum(ROLE_VALUES).optional(),
+});
+
+export const questionTemplateSchema = z.object({
+  title: z.string().min(1).max(200),
+  questionText: z.string().min(1).max(5000),
+  questionType: z.enum(['mc', 'essay', 'identification', 'true_false']),
+  points: z.number().int().positive().max(100).optional(),
+  choices: z.array(choiceSchema).max(20).optional(),
+  identificationAnswer: z.string().max(5000).optional().nullable(),
+  identificationMatchMode: z.enum(['exact', 'partial']).optional().nullable(),
+  description: z.string().max(1000).optional().nullable(),
 });

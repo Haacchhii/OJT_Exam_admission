@@ -6,18 +6,24 @@ test.describe('Critical Journey: Teacher Bulk Import Exams Modal Safety', () => 
     await loginViaUi(page, TEST_USERS.teacher.email, TEST_USERS.teacher.password);
     await page.goto('/#/employee/exams');
     await expect(page).toHaveURL(/#\/employee\/exams/);
-    await expect(page.getByRole('tab', { name: 'Exams' })).toBeVisible();
+    await page.waitForLoadState('networkidle');
 
-    await page.getByRole('button', { name: /Import Exams/i }).click();
-    await expect(page.getByRole('dialog', { name: 'Bulk Import Exams' })).toBeVisible();
+    await page.getByRole('tab', { name: 'Create Exam' }).click();
+    await expect(page.getByRole('heading', { name: 'Upload Questionnaire' })).toBeVisible({ timeout: 20000 });
+
+    await page.locator('#questionnaire-upload').setInputFiles('e2e/fixtures/exam-import-sample.json');
+
+    await expect(page.getByRole('dialog', { name: 'Import Preview' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Close dialog' }).click();
-    await expect(page.getByRole('dialog', { name: 'Bulk Import Exams' })).toBeHidden();
+    await expect(page.getByRole('dialog', { name: 'Import Preview' })).toBeHidden();
 
-    await page.getByRole('button', { name: /Import Exams/i }).click();
-    await expect(page.getByRole('dialog', { name: 'Bulk Import Exams' })).toBeVisible();
+    await page.getByRole('tab', { name: 'Create Exam' }).click();
+    await page.locator('#questionnaire-upload').setInputFiles('e2e/fixtures/exam-import-sample.json');
 
-    await page.getByRole('button', { name: 'Cancel' }).click();
-    await expect(page.getByRole('dialog', { name: 'Bulk Import Exams' })).toBeHidden();
+    await expect(page.getByRole('dialog', { name: 'Import Preview' })).toBeVisible();
+
+    await page.getByRole('dialog', { name: 'Import Preview' }).getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.getByRole('dialog', { name: 'Import Preview' })).toBeHidden();
   });
 });

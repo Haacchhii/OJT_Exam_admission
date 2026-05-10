@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { authenticate } from '../middleware/auth.js';
 import { authorize } from '../middleware/rbac.js';
 import { validate, validateQuery } from '../middleware/validate.js';
-import { createExamSchema, updateExamSchema, createScheduleSchema, updateScheduleSchema, bulkDeleteSchema, saveDraftSchema, examsQuerySchema, schedulesQuerySchema, registrationsQuerySchema, createRegistrationSchema, examReadinessQuerySchema } from '../utils/schemas.js';
+import { createExamSchema, updateExamSchema, createScheduleSchema, updateScheduleSchema, bulkDeleteSchema, saveDraftSchema, examsQuerySchema, schedulesQuerySchema, registrationsQuerySchema, createRegistrationSchema, examReadinessQuerySchema, notifyNoScheduleSchema } from '../utils/schemas.js';
 import * as ctrl from '../controllers/exams.js';
 import { ROLES } from '../utils/constants.js';
 
@@ -12,7 +12,7 @@ router.use(authenticate);
 // ─── Schedules (MUST be before /:id to avoid param capture) ───
 router.get('/schedules',           validateQuery(schedulesQuerySchema), ctrl.getSchedules);
 router.get('/schedules/available', ctrl.getAvailableSchedules);
-router.post('/schedules/notice',   authorize(ROLES.APPLICANT), ctrl.notifyNoSchedule);
+router.post('/schedules/notice',   authorize(ROLES.APPLICANT), validate(notifyNoScheduleSchema), ctrl.notifyNoSchedule);
 router.post('/schedules',          authorize(ROLES.ADMIN, ROLES.TEACHER), validate(createScheduleSchema), ctrl.createSchedule);
 router.post('/schedules/:id/close', authorize(ROLES.ADMIN, ROLES.TEACHER), ctrl.closeSchedule);
 router.put('/schedules/:id',       authorize(ROLES.ADMIN, ROLES.TEACHER), validate(updateScheduleSchema), ctrl.updateSchedule);

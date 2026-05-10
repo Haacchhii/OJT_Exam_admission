@@ -43,6 +43,14 @@ export function errorHandler(err, req, res, _next) {
     });
   }
 
+  // Body parser payload-size error
+  if (err.type === 'entity.too.large' || status === 413) {
+    return res.status(413).json({
+      error: 'Request payload is too large. Please reduce the request size and try again.',
+      code: 'PAYLOAD_TOO_LARGE',
+    });
+  }
+
   // Multer file-type error
   if (err.message?.includes('not allowed')) {
     return res.status(400).json({

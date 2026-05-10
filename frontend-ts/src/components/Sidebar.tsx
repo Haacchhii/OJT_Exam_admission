@@ -43,10 +43,10 @@ export default function Sidebar({ open, onClose, role, collapsed, onToggleCollap
   const { logout, canAccess, roleLabel, user } = useAuth();
   const navigate = useNavigate();
   const confirm = useConfirm();
-  const hideExamLink = role === 'student' && shouldSkipEntranceExam(user?.applicantProfile?.gradeLevel);
+  const hideExamLinks = role === 'student' && shouldSkipEntranceExam(user?.applicantProfile?.gradeLevel);
   let links = role === 'employee'
     ? allEmployeeLinks.filter(l => canAccess(l.page as any))
-    : studentLinks.filter(l => !(hideExamLink && l.to === '/student/exam'));
+    : studentLinks.filter(l => !(hideExamLinks && (l.to === '/student/exam' || l.to === '/student/results')));
   const isEmployee = role === 'employee';
   const location = useLocation();
 

@@ -3,8 +3,8 @@ import { authenticate } from '../middleware/auth.js';
 import { authorize } from '../middleware/rbac.js';
 import { upload } from '../middleware/upload.js';
 import { verifyMime } from '../middleware/verifyMime.js';
-import { validate, validateQuery } from '../middleware/validate.js';
-import { createAdmissionSchema, updateStatusSchema, bulkUpdateStatusSchema, bulkHandoffSchema, bulkDeleteSchema, reviewDocumentSchema, admissionsQuerySchema, admissionsStatsQuerySchema, reportsSummaryQuerySchema } from '../utils/schemas.js';
+import { validate, validateParams, validateQuery } from '../middleware/validate.js';
+import { createAdmissionSchema, updateStatusSchema, bulkUpdateStatusSchema, bulkHandoffSchema, bulkDeleteSchema, reviewDocumentSchema, admissionsQuerySchema, admissionsStatsQuerySchema, reportsSummaryQuerySchema, admissionCommentSchema, admissionIdParamSchema, commentIdParamSchema } from '../utils/schemas.js';
 import { writeLimiter } from '../middleware/rateLimits.js';
 import * as ctrl from '../controllers/admissions.js';
 import * as commentsCtrl from '../controllers/admissionComments.js';
@@ -28,9 +28,9 @@ router.get('/ops-bootstrap', authorize(ROLES.ADMIN, ROLES.REGISTRAR), validateQu
 router.get('/track/:trackingId', ctrl.trackApplication);
 
 // Admission comments thread
-router.get('/:admissionId/comments', authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), commentsCtrl.getAdmissionComments);
-router.post('/:admissionId/comments', authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), commentsCtrl.addAdmissionComment);
-router.delete('/comments/:commentId', authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), commentsCtrl.deleteAdmissionComment);
+router.get('/:admissionId/comments', authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), validateParams(admissionIdParamSchema), commentsCtrl.getAdmissionComments);
+router.post('/:admissionId/comments', authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), validateParams(admissionIdParamSchema), validate(admissionCommentSchema), commentsCtrl.addAdmissionComment);
+router.delete('/comments/:commentId', authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), validateParams(commentIdParamSchema), commentsCtrl.deleteAdmissionComment);
 
 // CRUD
 router.get('/',      authorize(ROLES.ADMIN, ROLES.REGISTRAR), validateQuery(admissionsQuerySchema), ctrl.getAdmissions);

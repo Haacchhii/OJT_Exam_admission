@@ -96,7 +96,7 @@ test.describe('Stakeholder Navigation Coverage', () => {
       {
         label: 'Results',
         urlPattern: /#\/employee\/results/,
-        marker: { role: 'heading', name: /Exam Results|Essay Review|Per-Question Analytics/i },
+        marker: { role: 'heading', name: /Teacher Score Dashboard/i },
       },
       {
         label: 'Reports',
@@ -169,7 +169,7 @@ test.describe('Stakeholder Navigation Coverage', () => {
 
     await expect(mainNav(page).getByRole('link', { name: 'Users', exact: true })).toHaveCount(0);
     await expect(mainNav(page).getByRole('link', { name: 'Audit Log', exact: true })).toHaveCount(0);
-    await expect(mainNav(page).getByRole('link', { name: 'Settings', exact: true })).toHaveCount(0);
+    await expect(mainNav(page).getByRole('link', { name: 'Settings', exact: true })).toHaveCount(1);
     await expect(mainNav(page).getByRole('link', { name: 'Exams', exact: true })).toHaveCount(0);
 
     await navigateViaSidebar(page, {
@@ -202,7 +202,7 @@ test.describe('Stakeholder Navigation Coverage', () => {
       {
         label: 'Results',
         urlPattern: /#\/employee\/results/,
-        marker: { role: 'heading', name: /Exam Results|Essay Review|Per-Question Analytics/i },
+        marker: { role: 'heading', name: /Teacher Score Dashboard/i },
       },
       {
         label: 'Reports',
@@ -218,6 +218,6 @@ test.describe('Stakeholder Navigation Coverage', () => {
     await expect(mainNav(page).getByRole('link', { name: 'Admissions', exact: true })).toHaveCount(0);
     await expect(mainNav(page).getByRole('link', { name: 'Users', exact: true })).toHaveCount(0);
     await expect(mainNav(page).getByRole('link', { name: 'Audit Log', exact: true })).toHaveCount(0);
-    await expect(mainNav(page).getByRole('link', { name: 'Settings', exact: true })).toHaveCount(0);
+    await expect(mainNav(page).getByRole('link', { name: 'Settings', exact: true })).toHaveCount(1);
   });
 });

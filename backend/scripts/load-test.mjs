@@ -6,7 +6,11 @@
 
 const baseUrl = String(process.env.PERF_LOAD_BASE_URL || 'http://localhost:3000').trim().replace(/\/+$/, '');
 const email = String(process.env.PERF_LOAD_EMAIL || 'admin@goldenkey.edu').trim();
-const password = String(process.env.PERF_LOAD_PASSWORD || 'admin123').trim();
+const password = String(process.env.PERF_LOAD_PASSWORD || '').trim();
+
+if (!password) {
+  throw new Error('PERF_LOAD_PASSWORD must be set in the environment before running load tests.');
+}
 
 // Load test configuration
 const CONCURRENT_REQUESTS = 10;

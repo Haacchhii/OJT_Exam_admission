@@ -229,21 +229,26 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
   }, []);
 
   useEffect(() => {
+    const registerViolation = (reason: 'tab' | 'window' | 'pagehide') => {
+      setCheatFlags(prev => {
+        const next = prev + 1;
+        const label = reason === 'tab' ? 'Tab switch' : reason === 'window' ? 'Window switch' : 'Page hidden';
+        if (next >= 5) {
+          doSubmitRef.current('Warning: Exam Auto-Submitted', 'Your exam was automatically submitted due to multiple security violations.');
+        } else if (next === 4) {
+          showToast('Final warning! One more security violation and your exam will be auto-submitted.', 'error');
+        } else if (next === 3) {
+          showToast(`Warning: ${label} detected 3 times. 2 more and your exam will be auto-submitted.`, 'error');
+        } else {
+          showToast(`${label} detected (${next}/5). Please stay on this page.`, 'error');
+        }
+        return next;
+      });
+    };
+
     const handler = () => {
-      if (document.hidden) {
-        setCheatFlags(prev => {
-          const next = prev + 1;
-          if (next >= 5) {
-            doSubmitRef.current('Warning: Exam Auto-Submitted', 'Your exam was automatically submitted due to multiple tab switches.');
-          } else if (next === 4) {
-            showToast('Final warning! One more tab switch and your exam will be auto-submitted.', 'error');
-          } else if (next === 3) {
-            showToast('Warning: You have switched tabs 3 times. 2 more and your exam will be auto-submitted.', 'error');
-          } else {
-            showToast(`Tab switch detected (${next}/5). Please stay on this page.`, 'error');
-          }
-          return next;
-        });
+      if (document.visibilityState !== 'visible' || document.hidden) {
+        registerViolation('tab');
       }
     };
 
@@ -287,15 +292,11 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
 
     // ── Track window blur/focus ───────────────────────
     const handleBlur = () => {
-      setCheatFlags(prev => {
-        const next = prev + 1;
-        if (next >= 5) {
-          doSubmitRef.current('Warning: Exam Auto-Submitted', 'Your exam was automatically submitted due to multiple window switches.');
-        } else if (next <= 4) {
-          showToast(`Window switch detected (${next}/5). Please return to the exam.`, 'warning');
-        }
-        return next;
-      });
+      registerViolation('window');
+    };
+
+    const handlePageHide = () => {
+      registerViolation('pagehide');
     };
 
     document.addEventListener('visibilitychange', handler);
@@ -308,6 +309,7 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
     document.addEventListener('keydown', preventDevTools);
     window.addEventListener('beforeunload', beforeUnload);
     window.addEventListener('blur', handleBlur);
+    window.addEventListener('pagehide', handlePageHide);
 
     return () => {
       document.removeEventListener('visibilitychange', handler);
@@ -320,6 +322,7 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
       document.removeEventListener('keydown', preventDevTools);
       window.removeEventListener('beforeunload', beforeUnload);
       window.removeEventListener('blur', handleBlur);
+      window.removeEventListener('pagehide', handlePageHide);
     };
   }, []);
 

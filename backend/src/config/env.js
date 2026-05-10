@@ -27,8 +27,9 @@ const env = {
   PORT:             parseInt(process.env.PORT, 10) || 3000,
   DATABASE_URL:     process.env.DATABASE_URL,
   DIRECT_URL:       process.env.DIRECT_URL,
-  JWT_SECRET:       process.env.JWT_SECRET || 'dev-secret',
+  JWT_SECRET:       String(process.env.JWT_SECRET || '').trim(),
   JWT_EXPIRES_IN:   process.env.JWT_EXPIRES_IN || '60m',
+  MAX_PAYLOAD_KB:   Math.max(1, parseInt(process.env.MAX_PAYLOAD_KB, 10) || 256),
   CORS_ORIGIN:      process.env.CORS_ORIGIN || 'http://localhost:5173',
   UPLOAD_DIR:       process.env.UPLOAD_DIR || 'uploads',
   MAX_FILE_SIZE_MB: parseInt(process.env.MAX_FILE_SIZE_MB, 10) || 10,
@@ -63,13 +64,13 @@ if (!env.DATABASE_URL) {
   console.error('FATAL: DATABASE_URL is not set');
   process.exit(1);
 }
+if (!env.JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET is not set');
+  process.exit(1);
+}
 if (env.NODE_ENV === 'production') {
   if (!env.DIRECT_URL) {
     console.warn('WARNING: DIRECT_URL is not set in production. Prisma migrations will fail until it is configured, but the API can still start.');
-  }
-  if (env.JWT_SECRET === 'dev-secret') {
-    console.error('FATAL: JWT_SECRET must be set in production');
-    process.exit(1);
   }
   if (env.JWT_SECRET.length < 32) {
     console.error('FATAL: JWT_SECRET must be at least 32 characters in production');
@@ -85,8 +86,8 @@ if (env.NODE_ENV === 'production') {
     console.warn('WARNING: ENABLE_REDIS_CACHE is true but REDIS_URL is empty. Falling back to in-memory cache.');
   }
 } else {
-  if (env.JWT_SECRET === 'dev-secret') {
-    console.warn('WARNING: Using default JWT_SECRET — set a strong secret via JWT_SECRET env var');
+  if (env.JWT_SECRET.length < 16) {
+    console.warn('WARNING: JWT_SECRET is short in non-production. Use at least 16 characters.');
   }
 }
 

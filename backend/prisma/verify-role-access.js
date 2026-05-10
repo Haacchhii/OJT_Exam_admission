@@ -4,22 +4,22 @@ const TEST_ACCOUNTS = [
   {
     name: 'admin',
     email: process.env.TEST_ADMIN_EMAIL || 'admin@goldenkey.edu',
-    password: process.env.TEST_ADMIN_PASSWORD || 'admin123',
+    password: process.env.TEST_ADMIN_PASSWORD || '',
   },
   {
     name: 'registrar',
     email: process.env.TEST_REGISTRAR_EMAIL || 'registrar@goldenkey.edu',
-    password: process.env.TEST_REGISTRAR_PASSWORD || 'Admin123!',
+    password: process.env.TEST_REGISTRAR_PASSWORD || '',
   },
   {
     name: 'teacher',
     email: process.env.TEST_TEACHER_EMAIL || 'teacher@goldenkey.edu',
-    password: process.env.TEST_TEACHER_PASSWORD || 'Admin123!',
+    password: process.env.TEST_TEACHER_PASSWORD || '',
   },
   {
     name: 'applicant',
     email: process.env.TEST_APPLICANT_EMAIL || 'joseirineo0418@gmail.com',
-    password: process.env.TEST_APPLICANT_PASSWORD || 'Changeme123!',
+    password: process.env.TEST_APPLICANT_PASSWORD || '',
   },
 ];
 

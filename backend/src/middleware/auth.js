@@ -5,6 +5,8 @@ import { ROLES } from '../utils/constants.js';
 import { syncApplicantUserStatusById } from '../utils/applicantStatusSync.js';
 import { cached } from '../utils/cache.js';
 
+const JWT_VERIFY_OPTIONS = { algorithms: ['HS256'] };
+
 /**
  * Verify JWT and attach req.user
  */
@@ -16,7 +18,7 @@ export async function authenticate(req, res, next) {
 
   try {
     const token = header.split(' ')[1];
-    const payload = jwt.verify(token, env.JWT_SECRET);
+    const payload = jwt.verify(token, env.JWT_SECRET, JWT_VERIFY_OPTIONS);
     const includeProfiles = req.originalUrl.startsWith('/api/auth/me');
     const needsFreshUser = includeProfiles || payload.mustChangePassword !== false;
     const cacheKey = `user:${payload.sub}:${needsFreshUser ? 'full' : 'base'}`;

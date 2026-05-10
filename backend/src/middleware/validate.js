@@ -1,5 +1,24 @@
 import { ZodError } from 'zod';
 
+function sanitizeString(value) {
+  if (typeof value !== 'string') return value;
+  return value
+    .normalize('NFKC')
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+    .trim();
+}
+
+export function sanitizeDeepStrings(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeDeepStrings(item));
+  }
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value).map(([key, item]) => [key, sanitizeDeepStrings(item)]);
+    return Object.fromEntries(entries);
+  }
+  return sanitizeString(value);
+}
+
 function humanizeField(path) {
   const raw = Array.isArray(path) ? path.filter(Boolean).join(' ') : String(path || 'field');
   return raw
@@ -63,7 +82,7 @@ function formatZodIssues(issues) {
 export function validate(schema) {
   return (req, _res, next) => {
     try {
-      req.body = schema.parse(req.body);
+      req.body = sanitizeDeepStrings(schema.parse(req.body));
       next();
     } catch (err) {
       if (err instanceof ZodError) {
@@ -88,7 +107,7 @@ export function validate(schema) {
 export function validateQuery(schema) {
   return (req, _res, next) => {
     try {
-      const parsed = schema.parse(req.query);
+      const parsed = sanitizeDeepStrings(schema.parse(req.query));
       Object.defineProperty(req, 'query', { value: parsed, writable: true, configurable: true });
       next();
     } catch (err) {
@@ -102,4 +121,46 @@ export function validateQuery(schema) {
       next(err);
     }
   };
+}
+
+/**
+ * Express middleware factory: validates req.params against a Zod schema.
+ */
+export function validateParams(schema) {
+  return (req, _res, next) => {
+    try {
+      req.params = sanitizeDeepStrings(schema.parse(req.params));
+      next();
+    } catch (err) {
+      if (err instanceof ZodError) {
+        const message = formatZodIssues(err.issues);
+        const error = new Error(message);
+        error.status = 400;
+        error.code = 'VALIDATION_ERROR';
+        return next(error);
+      }
+      next(err);
+    }
+  };
+}
+
+export function sanitizeRequestInput(req, _res, next) {
+  try {
+    if (req.body && typeof req.body === 'object') {
+      req.body = sanitizeDeepStrings(req.body);
+    }
+    if (req.params && typeof req.params === 'object') {
+      req.params = sanitizeDeepStrings(req.params);
+    }
+    if (req.query && typeof req.query === 'object') {
+      Object.defineProperty(req, 'query', {
+        value: sanitizeDeepStrings(req.query),
+        writable: true,
+        configurable: true,
+      });
+    }
+    next();
+  } catch (err) {
+    next(err);
+  }
 }

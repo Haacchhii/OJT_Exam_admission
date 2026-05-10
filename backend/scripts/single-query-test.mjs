@@ -2,7 +2,11 @@ import fetch from 'node-fetch';
 
 const baseUrl = process.env.PERF_LOAD_BASE_URL || 'http://localhost:3000';
 const email = process.env.PERF_LOAD_EMAIL || 'admin@goldenkey.edu';
-const password = process.env.PERF_LOAD_PASSWORD || 'admin123';
+const password = process.env.PERF_LOAD_PASSWORD || '';
+
+if (!password) {
+  throw new Error('PERF_LOAD_PASSWORD must be set in the environment before running this script.');
+}
 
 async function login() {
   const res = await fetch(`${baseUrl}/api/auth/login`, {

@@ -276,6 +276,20 @@ export async function createRegistration(req, res, next) {
       }
     }
 
+    const completedExam = await prisma.examRegistration.findFirst({
+      where: {
+        userId: targetUserId,
+        status: 'done',
+      },
+      select: { id: true },
+    });
+    if (completedExam) {
+      return res.status(409).json({
+        error: 'This applicant has already completed the entrance exam and cannot book another slot.',
+        code: 'CONFLICT',
+      });
+    }
+
     // Check for existing active registration for this specific schedule's exam
     const schedule = await prisma.examSchedule.findUnique({
       where: { id: scheduleId },
