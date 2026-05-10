@@ -135,17 +135,8 @@ export default function App() {
       // Ignore storage access issues
     }
 
-    // Warm up Vercel serverless functions on app load
-    // These ping endpoints are lightweight and return immediately
-    // Fire all at once, ignore responses — errors are normal during cold start
-    Promise.allSettled([
-      fetch('/api/health'),
-      fetch('/api/admissions/ping'),
-      fetch('/api/exams/ping'),
-      fetch('/api/academic-years/ping'),
-    ]).catch(() => {
-      // Ignore all errors; warmup is best-effort
-    });
+    // Note: Vercel warmup system disabled temporarily due to FUNCTION_INVOCATION_FAILED errors
+    // Will re-enable after root cause analysis
   }, []);
 
   return (
