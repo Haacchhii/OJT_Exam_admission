@@ -57,11 +57,10 @@ export default function ExamSecurityNotice({
 
   return (
     <Modal
-      isOpen
+      open
       onClose={() => {}}
       title=""
-      subtitle=""
-      className="max-w-2xl"
+      maxWidth="max-w-2xl"
     >
       <div className="p-8">
         {/* Header */}
