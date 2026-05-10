@@ -222,20 +222,6 @@ app.get('/api/health', async (_req, res) => {
   }
 });
 
-// Warmup pings (lightweight endpoints to trigger Vercel function initialization)
-// These are called on app load to warm up serverless functions — they bypass auth
-app.get('/api/admissions/ping', (_req, res) => {
-  res.status(200).json({ ok: true });
-});
-
-app.get('/api/exams/ping', (_req, res) => {
-  res.status(200).json({ ok: true });
-});
-
-app.get('/api/academic-years/ping', (_req, res) => {
-  res.status(200).json({ ok: true });
-});
-
 // Error metrics endpoint (internal observability)
 app.get('/api/metrics/errors', (_req, res) => {
   res.json({
