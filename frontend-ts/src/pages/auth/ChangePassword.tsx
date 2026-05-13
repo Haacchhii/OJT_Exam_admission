@@ -8,7 +8,7 @@ import { ActionButton } from '../../components/UI';
 import Icon from '../../components/Icons';
 
 export default function ChangePassword() {
-  const { user: authUser, refreshUser } = useAuth();
+  const { user: authUser, logout } = useAuth();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -29,7 +29,6 @@ export default function ChangePassword() {
 
   const strength = getPasswordStrength(newPassword);
   const requirementChecks = getPasswordRequirementChecks(newPassword);
-  const landingPath = authUser.role === 'applicant' ? '/student' : '/employee';
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -56,9 +55,9 @@ export default function ChangePassword() {
         currentPassword,
         newPassword,
       });
-      await refreshUser();
-      showToast('Password changed successfully. Please sign in with your new password next time.', 'success');
-      navigate(landingPath, { replace: true });
+      logout();
+      showToast('Password changed successfully. Please sign in with your new password.', 'success');
+      navigate('/login', { replace: true });
     } catch (err) {
       showToast((err as Error).message || 'Failed to change password.', 'error');
     } finally {

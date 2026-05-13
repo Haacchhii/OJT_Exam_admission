@@ -6,6 +6,7 @@ import env from '../config/env.js';
 import { sendWelcomeEmail, sendVerificationEmail, sendPasswordResetEmail } from '../utils/email.js';
 import { passwordSchema } from '../utils/schemas.js';
 import { logAudit } from '../utils/auditLog.js';
+import { invalidatePrefix } from '../utils/cache.js';
 import { ROLES, BCRYPT_ROUNDS, RESET_TOKEN_EXPIRY, EMAIL_VERIFY_EXPIRY_MS, getLevelGroup } from '../utils/constants.js';
 import { isApplicantPeriodOpen, syncApplicantUserStatusById } from '../utils/applicantStatusSync.js';
 
@@ -425,6 +426,8 @@ export async function updateProfile(req, res, next) {
         return res.status(400).json({ error: pwErr, code: 'VALIDATION_ERROR' });
       }
       data.passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+      data.mustChangePassword = false;
+      data.tokenVersion = { increment: 1 };
     }
 
     if (Object.keys(data).length === 0) {
@@ -440,6 +443,8 @@ export async function updateProfile(req, res, next) {
     const changedFields = Object.keys(data).filter(k => k !== 'passwordHash');
     if (data.passwordHash) changedFields.push('password');
     logAudit({ userId, action: 'auth.profile_update', entity: 'user', entityId: userId, details: { fields: changedFields }, ipAddress: req.ip });
+
+    await invalidatePrefix(`user:${userId}:`);
 
     res.json(safeUser(updated));
   } catch (err) { next(err); }
