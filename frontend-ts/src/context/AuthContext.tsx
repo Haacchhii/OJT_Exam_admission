@@ -115,6 +115,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       localStorage.removeItem('gk_admission_step');
       localStorage.removeItem('gk_admission_draft');
+      const _userHash = (() => { try { return sessionStorage.getItem(USER_HASH_KEY); } catch { return null; } })();
+      if (_userHash) {
+        try { localStorage.removeItem(`gk_admission_step:${_userHash}`); } catch {}
+        try { localStorage.removeItem(`gk_admission_draft:${_userHash}`); } catch {}
+      }
     } catch {
       // Ignore storage cleanup issues and continue logout.
     }

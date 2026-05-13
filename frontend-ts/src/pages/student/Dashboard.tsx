@@ -76,11 +76,15 @@ export default function StudentDashboard() {
 
   const syncDraftState = useCallback(() => {
     try {
-      const rawStep = localStorage.getItem('gk_admission_step');
+      const _userHash = (() => { try { return sessionStorage.getItem('gk_user_hash'); } catch { return null; } })();
+      const admissionStepKey = _userHash ? `gk_admission_step:${_userHash}` : 'gk_admission_step:anon';
+      const admissionDraftKey = _userHash ? `gk_admission_draft:${_userHash}` : 'gk_admission_draft:anon';
+
+      const rawStep = localStorage.getItem(admissionStepKey) ?? localStorage.getItem('gk_admission_step');
       const parsedStep = rawStep ? Number.parseInt(rawStep, 10) : 1;
       const safeStep = Number.isFinite(parsedStep) ? Math.min(Math.max(parsedStep, 1), 5) : 1;
       setDraftStep(safeStep);
-      setHasAdmissionDraft(!!localStorage.getItem('gk_admission_draft'));
+      setHasAdmissionDraft(!!(localStorage.getItem(admissionDraftKey) ?? localStorage.getItem('gk_admission_draft')));
     } catch {
       setDraftStep(1);
       setHasAdmissionDraft(false);
@@ -89,13 +93,19 @@ export default function StudentDashboard() {
 
   useEffect(() => {
     const onStorage = (event: StorageEvent) => {
-      if (!event.key || event.key === 'gk_admission_step' || event.key === 'gk_admission_draft') {
+      const _userHash = (() => { try { return sessionStorage.getItem('gk_user_hash'); } catch { return null; } })();
+      const admissionStepKey = _userHash ? `gk_admission_step:${_userHash}` : 'gk_admission_step:anon';
+      const admissionDraftKey = _userHash ? `gk_admission_draft:${_userHash}` : 'gk_admission_draft:anon';
+      if (!event.key || event.key === 'gk_admission_step' || event.key === 'gk_admission_draft' || event.key === admissionStepKey || event.key === admissionDraftKey) {
         syncDraftState();
       }
     };
     const onStorageChanged = (event: Event) => {
       const detail = (event as CustomEvent<{ key?: string }>).detail;
-      if (!detail?.key || detail.key === 'gk_admission_step' || detail.key === 'gk_admission_draft') {
+      const _userHash = (() => { try { return sessionStorage.getItem('gk_user_hash'); } catch { return null; } })();
+      const admissionStepKey = _userHash ? `gk_admission_step:${_userHash}` : 'gk_admission_step:anon';
+      const admissionDraftKey = _userHash ? `gk_admission_draft:${_userHash}` : 'gk_admission_draft:anon';
+      if (!detail?.key || detail.key === 'gk_admission_step' || detail.key === 'gk_admission_draft' || detail.key === admissionStepKey || detail.key === admissionDraftKey) {
         syncDraftState();
       }
     };

@@ -62,8 +62,15 @@ export function getOptionalDocs(gradeLevel: string): string[] {
 }
 
 export function useAdmissionWizard() {
+  const _userHash = (() => { try { return sessionStorage.getItem('gk_user_hash'); } catch { return null; } })();
+  const admissionStepKey = _userHash ? `gk_admission_step:${_userHash}` : 'gk_admission_step:anon';
+  const admissionDraftKey = _userHash ? `gk_admission_draft:${_userHash}` : 'gk_admission_draft:anon';
+
   const [step, setStep] = useState(() => {
-    try { const s = localStorage.getItem('gk_admission_step'); return s ? Math.min(Math.max(parseInt(s), 1), 5) : 1; } catch { return 1; }
+    try {
+      const s = localStorage.getItem(admissionStepKey) ?? localStorage.getItem('gk_admission_step');
+      return s ? Math.min(Math.max(parseInt(s), 1), 5) : 1;
+    } catch { return 1; }
   });
   const [showWizard, setShowWizard] = useState(true);
   const [successOpen, setSuccessOpen] = useState(false);
@@ -97,7 +104,7 @@ export function useAdmissionWizard() {
   const examCompleted = gateData?.examCompleted || false;
 
   const isDirty = !!(form.firstName || form.middleName || form.lastName || form.email);
-  const { restore, clear } = useUnsavedChanges(isDirty, 'gk_admission_draft', form);
+  const { restore, clear } = useUnsavedChanges(isDirty, admissionDraftKey, form);
 
   const getFriendlySubmitError = (err: unknown, fallback: string) => {
     const message = err instanceof Error ? err.message?.trim() : '';
@@ -179,7 +186,7 @@ export function useAdmissionWizard() {
       setErrors({});
     }
     setStep(n);
-    try { localStorage.setItem('gk_admission_step', String(n)); } catch { /* ignore */ }
+    try { localStorage.setItem(admissionStepKey, String(n)); } catch { /* ignore */ }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -216,7 +223,7 @@ export function useAdmissionWizard() {
       }
       if (result?.trackingId) setSubmittedTrackingId(result.trackingId);
       clear();
-      try { localStorage.removeItem('gk_admission_step'); } catch { /* ignore */ }
+      try { localStorage.removeItem(admissionStepKey); } catch { /* ignore */ }
       await refetch();
       setSuccessOpen(true);
     } catch (err: unknown) {
