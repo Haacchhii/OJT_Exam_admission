@@ -410,11 +410,75 @@ export const client = {
     inflightGetRequests.set(key, req as Promise<unknown>);
     return req;
   },
-  post:   <T = unknown>(path: string, body?: unknown, options?: RequestOptions) => request<T>('POST', path, body, { signal: options?.signal }).then((data) => { invalidateGetCache(inferInvalidatePrefixes(path)); return data; }),
-  put:    <T = unknown>(path: string, body?: unknown, options?: RequestOptions) => request<T>('PUT', path, body, { signal: options?.signal }).then((data) => { invalidateGetCache(inferInvalidatePrefixes(path)); return data; }),
-  patch:  <T = unknown>(path: string, body?: unknown, options?: RequestOptions) => request<T>('PATCH', path, body, { signal: options?.signal }).then((data) => { invalidateGetCache(inferInvalidatePrefixes(path)); return data; }),
-  delete: <T = unknown>(path: string, options?: RequestOptions) => request<T>('DELETE', path, undefined, { signal: options?.signal }).then((data) => { invalidateGetCache(inferInvalidatePrefixes(path)); return data; }),
-  upload: <T = unknown>(path: string, formData: FormData, options?: RequestOptions) => request<T>('POST', path, formData, { isFormData: true, signal: options?.signal }).then((data) => { invalidateGetCache(inferInvalidatePrefixes(path)); return data; }),
+  post:   <T = unknown>(path: string, body?: unknown, options?: RequestOptions) =>
+    request<T>('POST', path, body, { signal: options?.signal }).then((data) => {
+      const prefixes = inferInvalidatePrefixes(path);
+      invalidateGetCache(prefixes);
+      if (typeof window !== 'undefined') {
+        setTimeout(() => {
+          try {
+            window.dispatchEvent(new CustomEvent('gk:data-changed-scoped', { detail: { prefixes } }));
+          } catch {}
+        }, 0);
+      }
+      return data;
+    }),
+
+  put:    <T = unknown>(path: string, body?: unknown, options?: RequestOptions) =>
+    request<T>('PUT', path, body, { signal: options?.signal }).then((data) => {
+      const prefixes = inferInvalidatePrefixes(path);
+      invalidateGetCache(prefixes);
+      if (typeof window !== 'undefined') {
+        setTimeout(() => {
+          try {
+            window.dispatchEvent(new CustomEvent('gk:data-changed-scoped', { detail: { prefixes } }));
+          } catch {}
+        }, 0);
+      }
+      return data;
+    }),
+
+  patch:  <T = unknown>(path: string, body?: unknown, options?: RequestOptions) =>
+    request<T>('PATCH', path, body, { signal: options?.signal }).then((data) => {
+      const prefixes = inferInvalidatePrefixes(path);
+      invalidateGetCache(prefixes);
+      if (typeof window !== 'undefined') {
+        setTimeout(() => {
+          try {
+            window.dispatchEvent(new CustomEvent('gk:data-changed-scoped', { detail: { prefixes } }));
+          } catch {}
+        }, 0);
+      }
+      return data;
+    }),
+
+  delete: <T = unknown>(path: string, options?: RequestOptions) =>
+    request<T>('DELETE', path, undefined, { signal: options?.signal }).then((data) => {
+      const prefixes = inferInvalidatePrefixes(path);
+      invalidateGetCache(prefixes);
+      if (typeof window !== 'undefined') {
+        setTimeout(() => {
+          try {
+            window.dispatchEvent(new CustomEvent('gk:data-changed-scoped', { detail: { prefixes } }));
+          } catch {}
+        }, 0);
+      }
+      return data;
+    }),
+
+  upload: <T = unknown>(path: string, formData: FormData, options?: RequestOptions) =>
+    request<T>('POST', path, formData, { isFormData: true, signal: options?.signal }).then((data) => {
+      const prefixes = inferInvalidatePrefixes(path);
+      invalidateGetCache(prefixes);
+      if (typeof window !== 'undefined') {
+        setTimeout(() => {
+          try {
+            window.dispatchEvent(new CustomEvent('gk:data-changed-scoped', { detail: { prefixes } }));
+          } catch {}
+        }, 0);
+      }
+      return data;
+    }),
 };
 
 // Utility for filter/search UIs: cancel prior request before issuing the next one.
