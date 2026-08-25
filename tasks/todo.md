@@ -3,10 +3,11 @@
 ## Task 1: Capture the existing application baseline
 
 **Acceptance criteria:**
-- [ ] Backend tests, frontend lint/build, and available performance checks are run.
-- [ ] Failures and environment-dependent skips are recorded without changing behavior.
+- [x] Backend tests, frontend lint/build, and available performance checks are run.
+- [x] Failures and environment-dependent skips are recorded without changing behavior.
 
-**Verification:** Run the repository's existing documented commands.
+**Verification:** Completed and recorded in
+`docs/architecture/data-platform-baseline.md`.
 
 **Dependencies:** None
 
