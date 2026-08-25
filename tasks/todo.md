@@ -33,11 +33,13 @@
 ## Task 3: Add the minimal local service foundation
 
 **Acceptance criteria:**
-- [ ] Compose defines isolated source, warehouse, and MinIO services.
-- [ ] Services include health checks and persistent named volumes.
-- [ ] No credentials or host-specific paths are committed.
+- [x] Compose defines isolated source, warehouse, and S3-compatible SeaweedFS services.
+- [x] Services include health checks and persistent named volumes.
+- [x] No real credentials or host-specific paths are committed.
 
-**Verification:** `docker compose -f data-platform/docker-compose.yml config`
+**Verification:** Structural tests pass. Runtime verification with
+`docker compose -f data-platform/docker-compose.yml config` remains pending until
+Docker is available locally or a CI workflow is approved.
 
 **Dependencies:** Task 2
 

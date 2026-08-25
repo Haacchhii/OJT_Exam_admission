@@ -20,7 +20,7 @@ Exam data follows after the admissions pipeline is verified.
 
 - Operational source: Supabase PostgreSQL in production; PostgreSQL in local/CI
 - Ingestion: Python 3.12, psycopg, Pydantic, PyArrow
-- Raw storage: Parquet in MinIO-compatible object storage
+- Raw storage: Parquet in S3-compatible SeaweedFS object storage
 - Analytical warehouse: PostgreSQL
 - Transformations and tests: dbt Core with `dbt-postgres`
 - Orchestration: Apache Airflow
@@ -63,7 +63,7 @@ cd ../frontend-ts; npm run lint; npm run build:ci
 
 ```text
 data-platform/
-  docker-compose.yml       Local warehouse, MinIO, Airflow, and Metabase
+  docker-compose.yml       Local warehouse, SeaweedFS, Airflow, and Metabase
   .env.example             Placeholder-only local configuration
   requirements.txt         Pinned Python data-platform dependencies
   src/data_platform/

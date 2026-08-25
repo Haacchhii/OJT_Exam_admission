@@ -1,0 +1,14 @@
+{
+  "identities": [
+    {
+      "name": "goldenkey-pipeline-local",
+      "credentials": [
+        {
+          "accessKey": "local-seaweedfs-user",
+          "secretKey": "local-seaweedfs-password"
+        }
+      ],
+      "actions": ["Admin", "Read", "List", "Tagging", "Write"]
+    }
+  ]
+}

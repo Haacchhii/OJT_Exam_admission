@@ -14,7 +14,8 @@ orchestration and visualization only after the pipeline is independently testabl
 - Use a separate local PostgreSQL source for development and CI safety.
 - Use standard PostgreSQL and S3-compatible interfaces to avoid vendor lock-in.
 - Use batch ELT first; defer event streaming until a measured use case exists.
-- Keep immutable raw Parquet separate from the analytical PostgreSQL warehouse.
+- Keep immutable raw Parquet in S3-compatible SeaweedFS, separate from the
+  analytical PostgreSQL warehouse.
 - Keep Airflow DAGs thin; tested Python modules contain pipeline behavior.
 - Model current-state admissions first; do not infer unavailable status history.
 
@@ -101,6 +102,7 @@ Configuration and local services
 | Production credentials leak | High | Local-first development, placeholder examples, secret scans, read-only production role |
 | PII reaches raw demos | High | Synthetic fixtures, explicit allowlists, sensitive-column tests |
 | Airflow overwhelms local hardware | Medium | Minimal services/profile, resource limits, pipeline runnable without Airflow |
+| Object-storage implementation becomes unavailable | Medium | Program to the S3 interface and pin an actively maintained SeaweedFS release |
 | Timestamp updates are missed | High | UTC watermarks, overlap window, stable key ordering, idempotent merge tests |
 | Current status is mistaken for history | High | Current-state mart naming and explicit documentation |
 | Platform work destabilizes app | Medium | Separate modules and commits; existing test/build gates |

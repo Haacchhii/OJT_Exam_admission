@@ -1,0 +1,74 @@
+name: goldenkey-data-platform
+
+services:
+  source-db:
+    image: postgres:17.11-alpine3.24
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${SOURCE_DB_OWNER_USER}
+      POSTGRES_PASSWORD: ${SOURCE_DB_OWNER_PASSWORD}
+      POSTGRES_DB: ${SOURCE_DB_NAME}
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - source-db-data:/var/lib/postgresql/data
+    networks:
+      - data-platform
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SOURCE_DB_OWNER_USER} -d ${SOURCE_DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  warehouse-db:
+    image: postgres:17.11-alpine3.24
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${WAREHOUSE_DB_USER}
+      POSTGRES_PASSWORD: ${WAREHOUSE_DB_PASSWORD}
+      POSTGRES_DB: ${WAREHOUSE_DB_NAME}
+    ports:
+      - "127.0.0.1:55433:5432"
+    volumes:
+      - warehouse-db-data:/var/lib/postgresql/data
+    networks:
+      - data-platform
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${WAREHOUSE_DB_USER} -d ${WAREHOUSE_DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.41
+    restart: unless-stopped
+    command:
+      - server
+      - -s3
+      - -dir=/data
+      - -ip.bind=0.0.0.0
+      - -s3.config=/etc/seaweedfs/s3.json
+    ports:
+      - "127.0.0.1:8333:8333"
+    volumes:
+      - seaweedfs-data:/data
+      - ./seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
+    networks:
+      - data-platform
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8333"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+      start_period: 15s
+
+volumes:
+  source-db-data:
+  warehouse-db-data:
+  seaweedfs-data:
+
+networks:
+  data-platform:
+    driver: bridge

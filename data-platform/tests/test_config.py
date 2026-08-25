@@ -18,9 +18,9 @@ def valid_environment() -> dict[str, str]:
             "postgresql://goldenkey_warehouse:warehouse-password@warehouse-db:5432/"
             "goldenkey_warehouse"
         ),
-        "OBJECT_STORAGE_ENDPOINT": "http://minio:9000",
-        "OBJECT_STORAGE_ACCESS_KEY": "local-minio-user",
-        "OBJECT_STORAGE_SECRET_KEY": "local-minio-password",
+        "OBJECT_STORAGE_ENDPOINT": "http://seaweedfs:8333",
+        "OBJECT_STORAGE_ACCESS_KEY": "local-seaweedfs-user",
+        "OBJECT_STORAGE_SECRET_KEY": "local-seaweedfs-password",
         "OBJECT_STORAGE_BUCKET": "goldenkey-raw",
         "PIPELINE_BATCH_SIZE": "1000",
         "PIPELINE_LOOKBACK_MINUTES": "5",
