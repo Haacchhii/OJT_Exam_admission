@@ -18,9 +18,9 @@
 ## Task 2: Add validated local platform configuration
 
 **Acceptance criteria:**
-- [ ] `data-platform/.env.example` contains placeholders only.
-- [ ] Configuration fails clearly when required values are absent or unsafe.
-- [ ] Unit tests cover valid, missing, and malformed configuration.
+- [x] `data-platform/.env.example` contains placeholders only.
+- [x] Configuration fails clearly when required values are absent or unsafe.
+- [x] Unit tests cover valid, missing, and malformed configuration.
 
 **Verification:** `python -m pytest data-platform/tests/test_config.py`
 

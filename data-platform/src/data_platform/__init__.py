@@ -1,0 +1,1 @@
+"""GoldenKey data-platform package."""
