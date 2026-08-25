@@ -50,11 +50,12 @@ Docker is available locally or a CI workflow is approved.
 ## Task 4: Define admissions source contracts and synthetic fixtures
 
 **Acceptance criteria:**
-- [ ] Contracts cover admissions, academic years, and semesters.
-- [ ] Sensitive fields are explicitly excluded from analytical extraction.
-- [ ] Synthetic fixtures are deterministic and preserve required relationships.
+- [x] Contracts cover admissions, academic years, and semesters.
+- [x] Sensitive fields are explicitly excluded from analytical extraction.
+- [x] Synthetic fixtures are deterministic and preserve required relationships.
 
-**Verification:** Focused contract and fixture tests pass.
+**Verification:** Focused contract and fixture tests pass with deterministic,
+privacy, validation, and relationship coverage.
 
 **Dependencies:** Task 2
 
