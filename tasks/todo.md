@@ -66,11 +66,13 @@ privacy, validation, and relationship coverage.
 ## Task 5: Implement incremental raw admissions extraction
 
 **Acceptance criteria:**
-- [ ] Extraction uses UTC watermarks, overlap, stable ordering, and bounded batches.
-- [ ] Raw output is partitioned Parquet with run metadata and a manifest.
-- [ ] Re-running the same interval produces identical logical records.
+- [x] Extraction uses UTC watermarks, overlap, stable ordering, and bounded batches.
+- [x] Raw output is partitioned Parquet with run metadata and a manifest.
+- [x] Re-running the same interval produces identical logical records.
 
-**Verification:** Unit and integration tests for first run, rerun, and late arrival pass.
+**Verification:** Unit and composed pipeline tests for first run, rerun, late
+arrival, Parquet round trips, manifests, and storage boundaries pass. Live
+PostgreSQL and SeaweedFS verification remains pending until Docker is available.
 
 **Dependencies:** Tasks 3 and 4
 
