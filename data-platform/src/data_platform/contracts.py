@@ -131,9 +131,21 @@ class SemesterRecord(ContractModel):
 
 def extract_admission_record(source_row: Mapping[str, Any]) -> AdmissionRecord:
     """Project an untrusted source row through the analytical allowlist."""
-    allowed = {field: source_row[field] for field in ADMISSION_SOURCE_FIELDS if field in source_row}
-    allowed["source_admission_id"] = allowed.pop("id", None)
-    return AdmissionRecord.model_validate(allowed)
+    return AdmissionRecord.model_validate(project_admission_candidate(source_row))
+
+
+def project_admission_candidate(source_row: Mapping[str, Any]) -> dict[str, Any]:
+    """Remove fields outside the analytical allowlist without business validation."""
+    allowed = {
+        field: source_row[field]
+        for field in ADMISSION_SOURCE_FIELDS - {"id"}
+        if field in source_row
+    }
+    allowed["source_admission_id"] = source_row.get(
+        "source_admission_id",
+        source_row.get("id"),
+    )
+    return allowed
 
 
 def extract_academic_year_record(source_row: Mapping[str, Any]) -> AcademicYearRecord:

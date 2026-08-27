@@ -1,17 +1,18 @@
 """Incremental, privacy-safe admissions extraction from PostgreSQL."""
 
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Protocol, TypeAlias
+from typing import Any, Protocol, TypeAlias
 
 from psycopg import Connection
 from psycopg.rows import dict_row
 
-from data_platform.contracts import AdmissionRecord, extract_admission_record
+from data_platform.contracts import project_admission_candidate
 
 
 PageCursor: TypeAlias = tuple[datetime, int]
+AdmissionCandidate: TypeAlias = Mapping[str, Any]
 
 
 def _is_utc(value: datetime) -> bool:
@@ -52,7 +53,7 @@ class AdmissionsSource(Protocol):
         window: ExtractionWindow,
         after: PageCursor | None,
         limit: int,
-    ) -> Sequence[AdmissionRecord]: ...
+    ) -> Sequence[AdmissionCandidate]: ...
 
 
 class PostgresAdmissionsSource:
@@ -75,7 +76,7 @@ class PostgresAdmissionsSource:
         window: ExtractionWindow,
         after: PageCursor | None,
         limit: int,
-    ) -> tuple[AdmissionRecord, ...]:
+    ) -> tuple[AdmissionCandidate, ...]:
         if limit < 1:
             raise ValueError("limit must be positive")
 
@@ -104,7 +105,17 @@ class PostgresAdmissionsSource:
         """
         with self._connection.cursor(row_factory=dict_row) as cursor:
             cursor.execute(query, params)
-            return tuple(extract_admission_record(row) for row in cursor.fetchall())
+            return tuple(project_admission_candidate(row) for row in cursor.fetchall())
+
+
+def _candidate_cursor(candidate: AdmissionCandidate) -> PageCursor:
+    updated_at = candidate.get("updated_at")
+    source_id = candidate.get("source_admission_id")
+    if not isinstance(updated_at, datetime) or not _is_utc(updated_at):
+        raise ValueError("candidate updated_at must be timezone-aware UTC")
+    if not isinstance(source_id, int) or isinstance(source_id, bool) or source_id < 1:
+        raise ValueError("candidate source_admission_id must be a positive integer")
+    return updated_at, source_id
 
 
 def extract_incrementally(
@@ -112,7 +123,7 @@ def extract_incrementally(
     source: AdmissionsSource,
     window: ExtractionWindow,
     batch_size: int,
-) -> Iterator[AdmissionRecord]:
+) -> Iterator[AdmissionCandidate]:
     """Stream one stable, bounded keyset page at a time."""
     if batch_size < 1:
         raise ValueError("batch_size must be positive")
@@ -125,7 +136,7 @@ def extract_incrementally(
         if not batch:
             return
 
-        cursors = tuple((row.updated_at, row.source_admission_id) for row in batch)
+        cursors = tuple(_candidate_cursor(row) for row in batch)
         if cursors != tuple(sorted(cursors)) or (after is not None and cursors[0] <= after):
             raise ValueError("source batch is not in strictly advancing keyset order")
         if len(set(cursors)) != len(cursors):

@@ -83,11 +83,13 @@ PostgreSQL and SeaweedFS verification remains pending until Docker is available.
 ## Task 6: Add validation, quarantine, and reconciliation
 
 **Acceptance criteria:**
-- [ ] Invalid records retain a reason and pipeline run ID in quarantine.
-- [ ] Extracted equals accepted plus rejected for every run.
-- [ ] Invalid records cannot silently enter curated models.
+- [x] Invalid records retain a reason and pipeline run ID in quarantine.
+- [x] Extracted equals accepted plus rejected for every run.
+- [x] Invalid records cannot silently enter curated models.
 
-**Verification:** Quality tests with deliberately invalid fixtures pass.
+**Verification:** Quality and composed pipeline tests with deliberately invalid
+fixtures prove run-correlated quarantine, exact reconciliation, privacy-safe
+payloads, and exclusion from accepted Parquet.
 
 **Dependencies:** Task 5
 
@@ -158,6 +160,6 @@ PostgreSQL and SeaweedFS verification remains pending until Docker is available.
 ## Checkpoints
 
 - [ ] After Tasks 1-3: application baseline and local foundation reviewed.
-- [ ] After Tasks 4-6: raw admissions pipeline reviewed.
+- [x] After Tasks 4-6: raw admissions pipeline reviewed.
 - [ ] After Tasks 7-8: trusted admissions mart reviewed.
 - [ ] After Tasks 9-10: MVP reviewed before merge or deployment.
