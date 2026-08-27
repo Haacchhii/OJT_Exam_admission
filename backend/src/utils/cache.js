@@ -7,6 +7,8 @@ const CACHE_KEY_PREFIX = 'gk:cache:';
 
 let redisClient = null;
 let redisInitPromise = null;
+let redisUnavailableUntil = 0;
+const REDIS_RETRY_BACKOFF_MS = 30_000;
 
 function cacheKey(key) {
   return `${CACHE_KEY_PREFIX}${key}`;
@@ -14,6 +16,7 @@ function cacheKey(key) {
 
 async function initRedisClient() {
   if (!env.ENABLE_REDIS_CACHE || !env.REDIS_URL) return null;
+  if (Date.now() < redisUnavailableUntil) return null;
   if (redisClient?.isOpen) return redisClient;
   if (redisInitPromise) return redisInitPromise;
 
@@ -26,7 +29,7 @@ async function initRedisClient() {
       });
       client.on('error', (err) => {
         console.warn(`[cache] Redis error: ${err?.message || err}`);
-        // Reset so next call can retry — don't permanently disable
+        redisUnavailableUntil = Date.now() + REDIS_RETRY_BACKOFF_MS;
         redisClient = null;
       });
       await client.connect();
@@ -45,11 +48,37 @@ async function initRedisClient() {
   return redisInitPromise;
 }
 
+async function runRedisCommand(client, operation) {
+  let timeoutId;
+  try {
+    return await Promise.race([
+      operation(),
+      new Promise((_, reject) => {
+        timeoutId = setTimeout(
+          () => reject(new Error(`Redis command timed out after ${env.REDIS_COMMAND_TIMEOUT_MS}ms`)),
+          env.REDIS_COMMAND_TIMEOUT_MS,
+        );
+      }),
+    ]);
+  } catch (err) {
+    redisUnavailableUntil = Date.now() + REDIS_RETRY_BACKOFF_MS;
+    if (redisClient === client) redisClient = null;
+    try {
+      await client.disconnect();
+    } catch {
+      // Best effort: the cache must still fall back to the source.
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 async function readRedis(key) {
   const client = await initRedisClient();
   if (!client) return null;
   try {
-    const raw = await client.get(cacheKey(key));
+    const raw = await runRedisCommand(client, () => client.get(cacheKey(key)));
     if (raw) console.log(`[cache] Redis HIT: ${key}`);
     return raw ? JSON.parse(raw) : null;
   } catch { return null; }
@@ -59,26 +88,28 @@ async function writeRedis(key, value, ttlMs) {
   const client = await initRedisClient();
   if (!client) return;
   try {
-    await client.set(cacheKey(key), JSON.stringify(value), { PX: ttlMs });
+    await runRedisCommand(client, () => client.set(cacheKey(key), JSON.stringify(value), { PX: ttlMs }));
   } catch { /* ignore write errors */ }
 }
 
 async function deleteRedisKey(key) {
   const client = await initRedisClient();
   if (!client) return;
-  try { await client.del(cacheKey(key)); } catch { /* best effort */ }
+  try { await runRedisCommand(client, () => client.del(cacheKey(key))); } catch { /* best effort */ }
 }
 
 async function deleteRedisByPrefix(prefix) {
   const client = await initRedisClient();
   if (!client) return;
   try {
-    const pattern = cacheKey(`${prefix}*`);
-    const keys = [];
-    for await (const key of client.scanIterator({ MATCH: pattern, COUNT: 100 })) {
-      keys.push(key);
-    }
-    if (keys.length) await client.del(keys); // batch delete, one round-trip
+    await runRedisCommand(client, async () => {
+      const pattern = cacheKey(`${prefix}*`);
+      const keys = [];
+      for await (const key of client.scanIterator({ MATCH: pattern, COUNT: 100 })) {
+        keys.push(key);
+      }
+      if (keys.length) await client.del(keys); // batch delete, one round-trip
+    });
   } catch (err) {
     console.warn(`[cache] invalidatePrefix("${prefix}") failed: ${err?.message || err}`);
   }
