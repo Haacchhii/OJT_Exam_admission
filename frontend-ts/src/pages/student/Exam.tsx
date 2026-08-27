@@ -5,7 +5,6 @@ import { useAsync } from '../../hooks/useAsync';
 import { startExam as apiStartExam, getExamForStudent } from '../../api/exams';
 import { getStudentHomeSummary } from '../../api/admissions';
 import { showToast, showErrorToast } from '../../components/Toast';
-import { useConfirm } from '../../components/ConfirmDialog';
 import { SkeletonPage, ErrorAlert, ActionButton, ProcessStatePanel } from '../../components/UI';
 import Icon from '../../components/Icons';
 import ExamSecurityNotice from '../../components/ExamSecurityNotice';
@@ -20,7 +19,6 @@ interface ExamData {
 }
 
 export default function StudentExam() {
-  const confirm = useConfirm();
   const [view, setView] = useState<'schedule' | 'lobby' | 'security-notice' | 'exam'>('schedule');
   const [currentExam, setCurrentExam] = useState<Exam | null>(null);
   const [optimisticReg, setOptimisticReg] = useState<ExamRegistration | null>(null);
@@ -29,16 +27,17 @@ export default function StudentExam() {
   const [recoveringExam, setRecoveringExam] = useState(false);
 
   const { user } = useAuth();
-  if (shouldSkipEntranceExam(user?.applicantProfile?.gradeLevel)) {
-    return <Navigate to="/student" replace />;
-  }
+  const skipEntranceExam = shouldSkipEntranceExam(user?.applicantProfile?.gradeLevel);
   const { data: rawData, loading, error, refetch } = useAsync<ExamData>(async () => {
+    if (skipEntranceExam) {
+      return { myReg: null, myResult: null };
+    }
     const summary = await getStudentHomeSummary();
     const regSummary = summary?.registrationSummary;
     const myResult = summary?.myResult || null;
     const myReg = regSummary?.latest || null;
     return { myReg, myResult };
-  }, [user], 0, { setLoadingOnReload: true });
+  }, [user, skipEntranceExam], 0, { setLoadingOnReload: true });
 
   const myReg = rawData?.myReg || null;
   const activeServerReg = myReg && myReg.id !== cancelledRegId ? myReg : null;
@@ -154,6 +153,10 @@ export default function StudentExam() {
     const timer = window.setTimeout(() => setRecentlyBooked(false), 7000);
     return () => window.clearTimeout(timer);
   }, [recentlyBooked]);
+
+  if (skipEntranceExam) {
+    return <Navigate to="/student" replace />;
+  }
 
   if (loading && !rawData) return <SkeletonPage />;
   if (recoveringExam && view !== 'exam') return <SkeletonPage />;
