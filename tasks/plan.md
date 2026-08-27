@@ -4,7 +4,7 @@
 
 Make every workflow promised by the presentation documents executable end to end for applicants, registrars, teachers, and administrators, while establishing measurable performance and release gates.
 
-## Current Evidence
+## Initial Evidence
 
 - The deployed frontend responds with HTTP 200, but `/api/health` returns HTTP 503 with `{"status":"degraded","db":"disconnected"}`.
 - Three health samples took 4.17 s, 3.76 s, and 3.78 s; the server reported 3.35 s of response processing on the inspected response.
@@ -14,6 +14,14 @@ Make every workflow promised by the presentation documents executable end to end
 - Backend unit/security checks reach 67 passing tests after Prisma generation. Four production-flow tests require a real seeded database and cannot run against an isolated audit database.
 - Clean dependency installation reports 14 frontend vulnerabilities (11 high) and 20 backend vulnerabilities (14 high, 1 critical); each advisory must be triaged before remediation.
 - The repository's corrected May 7 production report previously left teacher and registrar journeys blocked and administrator coverage partial. These are historical leads that require re-verification after deployment recovery.
+
+## Audit Progress (August 27, 2026)
+
+- Supabase connectivity has been restored and `/api/health` now reports the database connected.
+- Frontend lint, production build, and bundle-budget checks pass. Conditional hook execution in the student exam page was repaired.
+- The deployed backend was running in Virginia while Supabase is in Tokyo. The Vercel function region is now configured as Tokyo (`hnd1`) on the audit branch.
+- Authenticated academic-period requests were observed hanging beyond 45 seconds. The shared Redis cache had connection timeouts but no command timeouts; bounded command execution and database fallback now have a regression test.
+- The isolated backend suite passes 68 tests across nine files. The two production-flow suites remain dependent on a real seeded database.
 
 ## Workflow Contract
 
