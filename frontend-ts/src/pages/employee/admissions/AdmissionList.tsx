@@ -136,7 +136,15 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
 
   const resetPage = () => setPage(1);
 
-  const toggleSelect = (id: number) => setSelected(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggleSelect = (id: number) => setSelected(s => {
+    const n = new Set(s);
+    if (n.has(id)) {
+      n.delete(id);
+    } else {
+      n.add(id);
+    }
+    return n;
+  });
   const toggleAll = () => {
     if (admissions.every((a: Admission) => selected.has(a.id))) {
       setSelected(s => { const n = new Set(s); admissions.forEach((a: Admission) => n.delete(a.id)); return n; });

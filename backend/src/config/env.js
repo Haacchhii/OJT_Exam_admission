@@ -55,6 +55,7 @@ const env = {
   ENABLE_REDIS_CACHE: (process.env.ENABLE_REDIS_CACHE || 'false').toLowerCase() === 'true',
   REDIS_URL: String(process.env.REDIS_URL || '').trim(),
   REDIS_CONNECT_TIMEOUT_MS: parseInt(process.env.REDIS_CONNECT_TIMEOUT_MS, 10) || 1500,
+  REDIS_COMMAND_TIMEOUT_MS: parseInt(process.env.REDIS_COMMAND_TIMEOUT_MS, 10) || 1500,
   DASHBOARD_ROLE_AWARE_QUERIES: (process.env.DASHBOARD_ROLE_AWARE_QUERIES || 'true').toLowerCase() === 'true',
   EXAM_GRACE_MINUTES: Math.max(0, parseInt(process.env.EXAM_GRACE_MINUTES, 10) || 1),
 };

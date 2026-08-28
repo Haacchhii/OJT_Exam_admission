@@ -1,8 +1,8 @@
 Deployment notes — Redis & employee-summary worker
 
 - To enable Redis caching (shared across instances):
-  - Set `ENABLE_REDIS_CACHE=1` and `REDIS_URL` (Upstash or self-hosted)
-  - Optionally tune `REDIS_CONNECT_TIMEOUT_MS` (ms)
+  - Set `ENABLE_REDIS_CACHE=true` and `REDIS_URL` (Upstash or self-hosted)
+  - Optionally tune `REDIS_CONNECT_TIMEOUT_MS` and `REDIS_COMMAND_TIMEOUT_MS` (ms)
 
 - Materialized summary (fast reads):
   - `USE_MATERIALIZED_SUMMARY=1` will cause `/api/results/employee-summary` to use `employee_summary_mv` when present.
