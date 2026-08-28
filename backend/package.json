@@ -4,6 +4,9 @@
   "description": "Golden Key Integrated School — Admission & Examination System API",
   "main": "src/index.js",
   "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
