@@ -6,7 +6,7 @@ import { useAsync } from '../../hooks/useAsync';
 import { invalidateResourceCache } from '../../api/client';
 import { getAdmissionsPage, getDashboardSummary, type EmployeeDashboardSummary } from '../../api/admissions';
 import { StatCard, PageHeader, Badge, Pagination, usePaginationSlice, SkeletonPage, ErrorAlert, SearchInput } from '../../components/UI';
-import { formatDate, badgeClass, formatPersonName } from '../../utils/helpers';
+import { formatDate, badgeClass, formatPersonName, daysSince } from '../../utils/helpers';
 import { ADMISSION_IN_PROGRESS, GRADE_OPTIONS, ALL_GRADE_LEVELS } from '../../utils/constants';
 import Icon from '../../components/Icons';
 import type { Admission } from '../../types';
@@ -14,10 +14,6 @@ import type { Admission } from '../../types';
 const PER_PAGE = 5;
 const EXAMS_PER_PAGE = 8;
 const SLA_DAYS = 7;
-
-function daysPending(submittedAt: string) {
-  return Math.floor((Date.now() - new Date(submittedAt).getTime()) / 86400000);
-}
 
 export default function EmployeeDashboard() {
   const { user, canAccess, roleLabel } = useAuth();
@@ -267,19 +263,21 @@ export default function EmployeeDashboard() {
                 <tr><td colSpan={7} className="py-8" /></tr>
               ) : admissions.length === 0 ? (
                 <tr><td colSpan={7} className="text-center text-gray-400 py-8">No admissions match your filters.</td></tr>
-              ) : admissions.map((a: Admission, i: number) => (
+              ) : admissions.map((a: Admission, i: number) => {
+                const pendingDays = daysSince(a.submittedAt);
+                return (
                 <tr key={a.id}>
                   <td className="text-gray-400">{(admissionsPagination.page - 1) * PER_PAGE + i + 1}</td>
                   <td className="font-medium text-gray-800">{formatPersonName(a)}</td>
                   <td>{a.gradeLevel}</td>
                   <td><Badge className={badgeClass(a.status)}>{a.status}</Badge></td>
                   <td className="text-gray-500">{formatDate(a.submittedAt)}</td>
-                  <td>{(ADMISSION_IN_PROGRESS as readonly string[]).includes(a.status) ? (
-                    <span className={`text-sm font-semibold ${daysPending(a.submittedAt) > SLA_DAYS ? 'text-red-600' : daysPending(a.submittedAt) > 5 ? 'text-amber-600' : 'text-gray-500'}`}>{daysPending(a.submittedAt)}d</span>
+                  <td>{(ADMISSION_IN_PROGRESS as readonly string[]).includes(a.status) && pendingDays !== null ? (
+                    <span className={`text-sm font-semibold ${pendingDays > SLA_DAYS ? 'text-red-600' : pendingDays > 5 ? 'text-amber-600' : 'text-gray-500'}`}>{pendingDays}d</span>
                   ) : <span className="text-gray-400">—</span>}</td>
                   <td><Link to={`/employee/admissions?id=${a.id}`} className="text-forest-500 hover:text-forest-600 text-xs font-semibold transition-colors">View</Link></td>
                 </tr>
-              ))}
+              );})}
             </tbody>
           </table>
           {admissionsLoading && (

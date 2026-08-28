@@ -14,6 +14,7 @@ import { SEMESTER_NAMES } from '../../utils/constants';
 import { formatDate } from '../../utils/helpers';
 import type { AcademicYear, Semester } from '../../types';
 import NotificationPreferences from '../settings/NotificationPreferences';
+import { useAuth } from '../../context/AuthContext';
 
 interface YearForm { year: string; isActive: boolean }
 interface SemForm {
@@ -34,10 +35,12 @@ const emptySemForm: SemForm = {
 };
 
 export default function EmployeeSettings() {
-  const { data: academicYears, loading: ayLoading, error: ayError, refetch: refetchAY } = useAsync<AcademicYear[]>(() => getAcademicYears(), [], 0, {
+  const { user } = useAuth();
+  const canManageAcademicPeriods = user?.role === 'administrator';
+  const { data: academicYears, loading: ayLoading, error: ayError, refetch: refetchAY } = useAsync<AcademicYear[]>(() => canManageAcademicPeriods ? getAcademicYears() : Promise.resolve([]), [canManageAcademicPeriods], 0, {
     resourcePrefixes: ['/academic-years'],
   });
-  const { data: allSemesters, loading: semLoading, error: semError, refetch: refetchSem } = useAsync<Semester[]>(() => getSemesters(), [], 0, {
+  const { data: allSemesters, loading: semLoading, error: semError, refetch: refetchSem } = useAsync<Semester[]>(() => canManageAcademicPeriods ? getSemesters() : Promise.resolve([]), [canManageAcademicPeriods], 0, {
     resourcePrefixes: ['/academic-years'],
   });
 
@@ -194,7 +197,7 @@ export default function EmployeeSettings() {
 
   if (ayLoading || semLoading) return (
     <div className="space-y-8">
-      <PageHeader title="Settings" subtitle="Manage academic years and semesters" />
+      <PageHeader title="Settings" subtitle={canManageAcademicPeriods ? 'Manage academic years and semesters' : 'Manage notification preferences'} />
       <div className="animate-pulse space-y-4">
         {[1, 2, 3].map(i => <div key={i} className="h-16 bg-gray-100 rounded-lg" />)}
       </div>
@@ -203,14 +206,14 @@ export default function EmployeeSettings() {
 
   if (ayError || semError) return (
     <div className="space-y-8">
-      <PageHeader title="Settings" subtitle="Manage academic years and semesters" />
+      <PageHeader title="Settings" subtitle={canManageAcademicPeriods ? 'Manage academic years and semesters' : 'Manage notification preferences'} />
       <ErrorAlert error={ayError || semError} onRetry={() => { refetchAY(); refetchSem(); }} />
     </div>
   );
 
   return (
     <div className="space-y-8">
-      <PageHeader title="Settings" subtitle="Manage academic years and semesters" />
+      <PageHeader title="Settings" subtitle={canManageAcademicPeriods ? 'Manage academic years and semesters' : 'Manage notification preferences'} />
 
       <section className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
@@ -225,6 +228,7 @@ export default function EmployeeSettings() {
         </div>
       </section>
 
+      {canManageAcademicPeriods && <>
       {/* School Years Panel */}
       <section className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
@@ -351,8 +355,10 @@ export default function EmployeeSettings() {
         )}
       </section>
 
+      </>}
+
       {/* School Year Modal */}
-      <Modal
+      {canManageAcademicPeriods && <Modal
         open={showYearModal}
         onClose={() => setShowYearModal(false)}
         title={editYearId ? 'Edit School Year' : 'Add School Year'}
@@ -386,10 +392,10 @@ export default function EmployeeSettings() {
             <span className="text-sm text-gray-700">Set as active school year</span>
           </label>
         </div>
-      </Modal>
+      </Modal>}
 
       {/* Semester Modal */}
-      <Modal
+      {canManageAcademicPeriods && <Modal
         open={showSemModal}
         onClose={() => setShowSemModal(false)}
         title={editSemId ? 'Edit Semester' : 'Add Semester'}
@@ -458,7 +464,7 @@ export default function EmployeeSettings() {
             <span className="text-sm text-gray-700">Set as active semester</span>
           </label>
         </div>
-      </Modal>
+      </Modal>}
     </div>
   );
 }

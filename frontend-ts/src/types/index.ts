@@ -236,7 +236,9 @@ export interface AuditLog {
   entityId: number | null;
   details: string | null;
   ipAddress: string | null;
-  createdAt: string;
+  createdAt?: string;
+  created_at?: string;
+  timestamp?: string;
   user?: { firstName: string; middleName?: string | null; lastName: string; email: string; role?: string } | null;
 }
 
