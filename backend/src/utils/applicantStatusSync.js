@@ -13,14 +13,20 @@ function isWithinPeriod(day, start, end) {
 }
 
 export async function isApplicantPeriodOpen(referenceDate = new Date()) {
-  const activeSemester = await prisma.semester.findFirst({
-    where: {
-      isActive: true,
-      academicYear: { isActive: true },
-    },
-    orderBy: { id: 'asc' },
-    select: { startDate: true, endDate: true },
-  });
+  // Cast restored PostgreSQL timestamps to text at the database boundary.
+  // Some restored deployments expose Prisma DateTime values as opaque objects,
+  // which serialize as `{}` and cannot be compared as calendar days.
+  const [activeSemester] = await prisma.$queryRaw`
+    SELECT
+      s.start_date::date::text AS "startDate",
+      s.end_date::date::text AS "endDate"
+    FROM semesters s
+    INNER JOIN academic_years ay ON ay.id = s.academic_year_id
+    WHERE s.is_active = true
+      AND ay.is_active = true
+    ORDER BY s.id ASC
+    LIMIT 1
+  `;
   if (!activeSemester) return false;
 
   const today = toIsoDay(referenceDate);
