@@ -7,7 +7,7 @@ import { showToast } from '../../../components/Toast';
 import { useConfirm } from '../../../components/ConfirmDialog';
 import { PageHeader, Badge, EmptyState, Pagination, SkeletonPage, ErrorAlert, ActionButton, SearchInput } from '../../../components/UI';
 import Icon from '../../../components/Icons';
-import { formatDate, badgeClass, exportToCSV, formatPersonName } from '../../../utils/helpers';
+import { formatDate, badgeClass, exportToCSV, formatPersonName, daysSince } from '../../../utils/helpers';
 import { ADMISSION_STATUSES, ADMISSION_IN_PROGRESS, GRADE_OPTIONS, ALL_GRADE_LEVELS } from '../../../utils/constants';
 import { useAuth } from '../../../context/AuthContext';
 import { useSocket } from '../../../context/SocketContext';
@@ -22,10 +22,6 @@ function semesterLabel(s: Semester) {
   const end = s.endDate ? formatDate(String(s.endDate)) : null;
   if (start || end) return `${s.name} (${start || 'open'} - ${end || 'open'})`;
   return s.name;
-}
-
-function daysPending(submittedAt: string) {
-  return Math.floor((Date.now() - new Date(submittedAt).getTime()) / 86400000);
 }
 
 type RawData = AdmissionsOpsBootstrap;
@@ -273,7 +269,8 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
         '',
         ...stalePreview.data.slice(0, 20).map(a => {
           const name = formatPersonName(a);
-          return `#${a.id} | ${name} | ${a.status} | ${daysPending(a.submittedAt)}d pending`;
+          const pendingDays = daysSince(a.submittedAt);
+          return `#${a.id} | ${name} | ${a.status} | ${pendingDays === null ? 'date unavailable' : `${pendingDays}d pending`}`;
         }),
       ];
       await navigator.clipboard.writeText(lines.join('\n'));
@@ -520,7 +517,9 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
                     <tr>
                       <td colSpan={canManage ? 11 : 10} className="py-8 px-4" />
                     </tr>
-                  ) : admissions.map((a: Admission, index: number) => (
+                  ) : admissions.map((a: Admission, index: number) => {
+                    const pendingDays = daysSince(a.submittedAt);
+                    return (
                     <tr
                       key={a.id}
                       onClick={() => onShowDetail(a.id)}
@@ -539,8 +538,8 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
                       <td className="py-3 px-2">{a.documentCount ?? a.documents.length} file(s)</td>
                       <td className="py-3 px-2"><Badge className={badgeClass(a.status)}>{a.status}</Badge></td>
                       <td className="py-3 px-2 text-gray-500">{formatDate(a.submittedAt)}</td>
-                      <td className="py-3 px-2">{(ADMISSION_IN_PROGRESS as readonly string[]).includes(a.status) ? (
-                        <span className={`text-xs font-semibold ${daysPending(a.submittedAt) > SLA_DAYS ? 'text-red-600' : daysPending(a.submittedAt) > 5 ? 'text-amber-600' : 'text-gray-500'}`}>{daysPending(a.submittedAt)}d</span>
+                      <td className="py-3 px-2">{(ADMISSION_IN_PROGRESS as readonly string[]).includes(a.status) && pendingDays !== null ? (
+                        <span className={`text-xs font-semibold ${pendingDays > SLA_DAYS ? 'text-red-600' : pendingDays > 5 ? 'text-amber-600' : 'text-gray-500'}`}>{pendingDays}d</span>
                       ) : <span className="text-gray-400">-</span>}</td>
                       <td className="py-3 px-2">
                         <ActionButton
@@ -553,7 +552,7 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
                         </ActionButton>
                       </td>
                     </tr>
-                  ))}
+                  );})}
                 </tbody>
               </table>
               {loading && (

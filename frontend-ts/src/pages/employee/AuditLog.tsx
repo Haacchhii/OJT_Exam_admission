@@ -31,10 +31,16 @@ function getActionBadge(action: string): string {
 }
 
 function formatDateLocal(date: string): string {
-  return new Date(date).toLocaleString('en-PH', {
+  const parsed = new Date(date);
+  if (!date || !Number.isFinite(parsed.getTime())) return '—';
+  return parsed.toLocaleString('en-PH', {
     year: 'numeric', month: 'short', day: 'numeric',
     hour: '2-digit', minute: '2-digit', second: '2-digit',
   });
+}
+
+function auditTimestamp(log: AuditLogType): string {
+  return log.createdAt || log.created_at || log.timestamp || '';
 }
 
 function formatDetails(details: unknown): string {
@@ -48,7 +54,7 @@ function formatDetails(details: unknown): string {
 function downloadCSV(logs: any[], filters: { search?: string; entity?: string; dateFrom?: string; dateTo?: string }) {
   const headers = ['Timestamp', 'User', 'Email', 'Action', 'Entity', 'Entity ID', 'Details', 'IP Address'];
   const rows = logs.map(log => [
-    new Date(log.createdAt).toLocaleString('en-PH'),
+    formatDateLocal(auditTimestamp(log)),
     log.user ? formatPersonName(log.user) : 'System',
     log.user?.email || '-',
     log.action,
@@ -105,7 +111,7 @@ function TimelineView({ logs }: { logs: any[] }) {
                   <div className="gk-section-card bg-gray-50 p-4">
                     <div className="flex items-start justify-between mb-2">
                       <div>
-                        <p className="text-xs font-mono text-gray-500">{formatDateLocal(log.createdAt)}</p>
+                        <p className="text-xs font-mono text-gray-500">{formatDateLocal(auditTimestamp(log))}</p>
                         <p className="text-sm font-medium text-gray-800 mt-1">
                           {log.user ? formatPersonName(log.user) : 'System'}
                           {log.user?.email && <span className="text-xs text-gray-500 ml-2">({log.user.email})</span>}
@@ -296,7 +302,7 @@ export default function AuditLog() {
                 ) : filteredLogs.map((log: any) => (
                   <tr key={log.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3 text-gray-600 whitespace-nowrap text-xs">
-                      {formatDateLocal(log.createdAt)}
+                      {formatDateLocal(auditTimestamp(log))}
                     </td>
                     <td className="px-4 py-3">
                       {log.user ? (
@@ -337,7 +343,7 @@ export default function AuditLog() {
           {totalPages > 1 && (
             <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
               <p className="text-xs text-gray-500">
-                Page {page} of {totalPages} ({(data as any)?.total || 0} total)
+                Page {page} of {totalPages} ({data?.pagination?.total ?? data?.total ?? 0} total)
               </p>
               <div className="flex gap-1">
                 <ActionButton

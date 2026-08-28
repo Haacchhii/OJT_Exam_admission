@@ -25,6 +25,13 @@ export function formatDate(isoString: string | null | undefined): string {
   return formatManilaDate(d, { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
+export function daysSince(isoString: string | null | undefined, now = Date.now()): number | null {
+  if (!isoString) return null;
+  const timestamp = new Date(isoString).getTime();
+  if (!Number.isFinite(timestamp)) return null;
+  return Math.max(0, Math.floor((now - timestamp) / 86400000));
+}
+
 interface FormatDateRangeOptions {
   openStartLabel?: string;
   openEndLabel?: string;
