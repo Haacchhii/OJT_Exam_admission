@@ -13,6 +13,10 @@ export function sanitizeDeepStrings(value) {
     return value.map((item) => sanitizeDeepStrings(item));
   }
   if (value && typeof value === 'object') {
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) {
+      return value;
+    }
     const entries = Object.entries(value).map(([key, item]) => [key, sanitizeDeepStrings(item)]);
     return Object.fromEntries(entries);
   }
