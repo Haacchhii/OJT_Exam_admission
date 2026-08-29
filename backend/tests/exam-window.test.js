@@ -7,6 +7,20 @@ import {
 } from '../src/utils/examWindow.js';
 
 describe('exam window status', () => {
+  it('returns closed when staff manually closed the schedule', () => {
+    const schedule = {
+      status: 'closed',
+      closedAt: '2026-04-20T13:15:00.000Z',
+      examWindowStartAt: '2026-04-20T13:00:00.000Z',
+      examWindowEndAt: '2026-04-20T14:00:00.000Z',
+    };
+
+    const result = computeExamWindowStatus(schedule, new Date('2026-04-20T13:30:00.000Z'));
+
+    expect(result.status).toBe('closed');
+    expect(result.label).toBe('Closed by staff');
+  });
+
   it('returns open when now is inside explicit datetime window', () => {
     const schedule = {
       scheduledDate: '2026-04-20',
@@ -48,6 +62,20 @@ describe('exam window status', () => {
 });
 
 describe('evaluateExamStartAvailability', () => {
+  it('blocks exam starts after staff manually closes the schedule', () => {
+    const schedule = {
+      status: 'closed',
+      closedAt: '2026-04-20T13:15:00.000Z',
+      examWindowStartAt: '2026-04-20T13:00:00.000Z',
+      examWindowEndAt: '2026-04-20T14:00:00.000Z',
+    };
+
+    const result = evaluateExamStartAvailability(schedule, new Date('2026-04-20T13:30:00.000Z'));
+
+    expect(result.allowed).toBe(false);
+    expect(result.message).toMatch(/closed by staff/i);
+  });
+
   it('allows rolling window exam starts anytime while window is open', () => {
     const schedule = {
       scheduledDate: '2026-04-20',

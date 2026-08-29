@@ -4,6 +4,13 @@ import app from '../src/app.js';
 import { RATE_LIMITS } from '../src/utils/constants.js';
 
 describe('security guards', () => {
+  it('does not consume the strict auth-attempt quota for health and session reads', async () => {
+    for (let i = 0; i < RATE_LIMITS.AUTH.max + 3; i++) {
+      const res = await request(app).get('/api/auth/ping');
+      expect(res.status).toBe(200);
+    }
+  });
+
   it('rejects invalid verify-email payload with validation error', async () => {
     const res = await request(app)
       .post('/api/auth/verify-email')

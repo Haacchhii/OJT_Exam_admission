@@ -110,6 +110,15 @@ export function computeExamWindowStatus(schedule, now = new Date()) {
   const { startAt, endAt } = getEffectiveExamWindow(schedule);
   const nowDate = asValidDate(now) || new Date();
 
+  if (String(schedule?.status || '').toLowerCase() === 'closed' || schedule?.closedAt) {
+    return {
+      status: 'closed',
+      label: 'Closed by staff',
+      startAt,
+      endAt,
+    };
+  }
+
   if (startAt && nowDate.getTime() < startAt.getTime()) {
     return {
       status: 'upcoming',
@@ -175,7 +184,9 @@ export function evaluateExamStartAvailability(schedule, now = new Date()) {
     return {
       allowed: false,
       code: 'VALIDATION_ERROR',
-      message: 'This exam window has already closed.',
+      message: status.label === 'Closed by staff'
+        ? 'This exam schedule was closed by staff.'
+        : 'This exam window has already closed.',
     };
   }
 
