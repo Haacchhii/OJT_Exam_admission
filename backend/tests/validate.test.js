@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { validate } from '../src/middleware/validate.js';
+import { sanitizeDeepStrings, validate } from '../src/middleware/validate.js';
 import { z } from 'zod';
 
 function mockReqResNext(body) {
@@ -43,5 +43,20 @@ describe('validate middleware', () => {
     validate(schema)(req, res, next);
     expect(next).toHaveBeenCalledWith();
     expect(req.body).not.toHaveProperty('extra');
+  });
+});
+
+describe('sanitizeDeepStrings', () => {
+  it('preserves nested Date values while sanitizing plain-object strings', () => {
+    const createdAt = new Date('2026-08-29T01:23:45.000Z');
+
+    const result = sanitizeDeepStrings({
+      name: '  Registrar  ',
+      profile: { createdAt },
+    });
+
+    expect(result.name).toBe('Registrar');
+    expect(result.profile.createdAt).toBe(createdAt);
+    expect(result.profile.createdAt.toISOString()).toBe('2026-08-29T01:23:45.000Z');
   });
 });
