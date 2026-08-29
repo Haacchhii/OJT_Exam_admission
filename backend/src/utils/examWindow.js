@@ -206,3 +206,36 @@ export function isSubmissionWithinScheduleWindow(schedule, now = new Date(), gra
   const nowDate = asValidDate(now) || new Date();
   return nowDate.getTime() <= deadline.getTime();
 }
+
+export function isExamAttemptExpired({ schedule, startedAt, durationMinutes, now = new Date(), graceMinutes = 0 }) {
+  const nowDate = asValidDate(now) || new Date();
+  if (!isSubmissionWithinScheduleWindow(schedule, nowDate, graceMinutes)) return true;
+
+  const startDate = asValidDate(startedAt);
+  const duration = Number(durationMinutes);
+  if (!startDate || !Number.isFinite(duration) || duration <= 0) return false;
+
+  const deadline = addMinutes(startDate, duration + Math.max(0, Number(graceMinutes) || 0));
+  return deadline ? nowDate.getTime() > deadline.getTime() : false;
+}
+
+function parseSavedAnswers(value) {
+  if (!value) return null;
+  try {
+    const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export function resolveSubmissionAnswers({ submittedAnswers, draftAnswers, timedOut }) {
+  if (!timedOut) {
+    return { answers: parseSavedAnswers(submittedAnswers) || {}, source: 'submitted' };
+  }
+
+  const savedDraft = parseSavedAnswers(draftAnswers);
+  if (savedDraft) return { answers: savedDraft, source: 'saved-draft' };
+  return { answers: {}, source: 'empty' };
+}
