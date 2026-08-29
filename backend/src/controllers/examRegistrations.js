@@ -2,9 +2,9 @@ import prisma from '../config/db.js';
 import { paginate, paginatedResponse } from '../utils/pagination.js';
 import { generateTrackingId } from '../utils/tracking.js';
 import { sendExamBookingEmail } from '../utils/email.js';
-import { ROLES, shouldSkipEntranceExam } from '../utils/constants.js';
+import { EXAM_GRACE_MINUTES, ROLES, shouldSkipEntranceExam } from '../utils/constants.js';
 import { cached, invalidatePrefix } from '../utils/cache.js';
-import { attachExamWindowStatus, evaluateExamStartAvailability, isNowWithinExamWindow, computeExamWindowStatus } from '../utils/examWindow.js';
+import { attachExamWindowStatus, evaluateExamStartAvailability, isExamAttemptExpired, isNowWithinExamWindow, computeExamWindowStatus } from '../utils/examWindow.js';
 import { formatManilaDate, toManilaIsoDay } from '../utils/timezone.js';
 
 function normalizeEmail(value) {
@@ -486,7 +486,10 @@ export async function startExam(req, res, next) {
 export async function saveDraftAnswers(req, res, next) {
   try {
     const id = Number(req.params.id);
-    const reg = await prisma.examRegistration.findUnique({ where: { id } });
+    const reg = await prisma.examRegistration.findUnique({
+      where: { id },
+      include: { schedule: { include: { exam: { select: { durationMinutes: true } } } } },
+    });
     if (!reg) return res.status(404).json({ error: 'We could not find this exam registration.', code: 'NOT_FOUND' });
 
     if (!registrationBelongsToUser(reg, req.user)) {
@@ -495,6 +498,19 @@ export async function saveDraftAnswers(req, res, next) {
 
     if (reg.status !== 'started') {
       return res.status(400).json({ error: 'You can save answers only while the exam is in progress.', code: 'VALIDATION_ERROR' });
+    }
+
+    if (isExamAttemptExpired({
+      schedule: reg.schedule,
+      startedAt: reg.startedAt,
+      durationMinutes: reg.schedule?.exam?.durationMinutes,
+      now: new Date(),
+      graceMinutes: EXAM_GRACE_MINUTES,
+    })) {
+      return res.status(400).json({
+        error: 'The exam time has expired. Submit now to finalize your last saved answers.',
+        code: 'TIMER_EXPIRED',
+      });
     }
 
     const { answers } = req.body;

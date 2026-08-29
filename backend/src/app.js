@@ -134,6 +134,15 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+const STRICT_AUTH_PATHS = [
+  '/api/auth/login',
+  '/api/auth/register',
+  '/api/auth/verify-email',
+  '/api/auth/resend-verification',
+  '/api/auth/forgot-password',
+  '/api/auth/reset-password',
+];
+
 // ─── Rate limiters for sensitive operations ───────────
 const uploadLimiter = rateLimit({
   windowMs: RATE_LIMITS.UPLOAD.windowMs,
@@ -185,6 +194,7 @@ const uploadStaticDir = getUploadBaseDir();
 app.use('/uploads', authenticate, express.static(uploadStaticDir));
 
 // Apply specific rate limiters to sensitive operations (must be mounted before routes)
+app.use(STRICT_AUTH_PATHS, authLimiter);
 app.use('/api/admissions/bulk-status', bulkOpLimiter);
 app.use('/api/admissions/:id/documents', uploadLimiter);
 app.use('/api/exams/registrations', examSubmitLimiter);
@@ -201,7 +211,7 @@ app.get('/', (_req, res) => {
 });
 
 // ─── API routes ───────────────────────────────────────
-app.use('/api/auth', authLimiter, noStore, authRoutes);
+app.use('/api/auth', noStore, authRoutes);
 app.use('/api/perf', noStore, perfRoutes);
 app.use('/api/admissions',    cachePrivate, admissionsRoutes);
 app.use('/api/exams',         cachePrivate, examsRoutes);

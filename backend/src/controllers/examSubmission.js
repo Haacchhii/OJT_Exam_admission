@@ -3,7 +3,7 @@ import { logAudit } from '../utils/auditLog.js';
 import { sendExamResultEmail } from '../utils/email.js';
 import { EXAM_GRACE_MINUTES } from '../utils/constants.js';
 import { invalidatePrefix } from '../utils/cache.js';
-import { isSubmissionWithinScheduleWindow } from '../utils/examWindow.js';
+import { isExamAttemptExpired, resolveSubmissionAnswers } from '../utils/examWindow.js';
 
 function normalizeEmail(value) {
   return String(value || '').trim().toLowerCase();
@@ -86,13 +86,6 @@ export async function submitExam(req, res, next) {
       return res.status(400).json({ error: 'Exam must be started before submission', code: 'VALIDATION_ERROR' });
     }
 
-    if (!isSubmissionWithinScheduleWindow(reg.schedule, new Date(), EXAM_GRACE_MINUTES)) {
-      return res.status(400).json({
-        error: 'Exam submission is no longer allowed because the exam window has closed.',
-        code: 'TIMER_EXPIRED',
-      });
-    }
-
     // Get exam questions with correct answers from DB (NEVER from client)
     const exam = await prisma.exam.findUnique({
       where: { id: reg.schedule.examId },
@@ -111,19 +104,21 @@ export async function submitExam(req, res, next) {
       });
     }
 
-    // ── Server-side timer enforcement ────────────────────
-    // Reject submissions that arrive well after the allowed duration.
-    // A 1-minute grace period accounts for network latency.
-    if (reg.startedAt && exam.durationMinutes) {
-      const elapsedMs = Date.now() - new Date(reg.startedAt).getTime();
-      const allowedMs = (exam.durationMinutes + EXAM_GRACE_MINUTES) * 60 * 1000;
-      if (elapsedMs > allowedMs) {
-        return res.status(400).json({
-          error: 'Exam time has expired. Your submission was not accepted.',
-          code: 'TIMER_EXPIRED',
-        });
-      }
-    }
+    // Expired attempts are finalized from the last server-saved draft. Answers
+    // arriving after the deadline are ignored so recovery cannot bypass timing.
+    const timedOut = isExamAttemptExpired({
+      schedule: reg.schedule,
+      startedAt: reg.startedAt,
+      durationMinutes: exam.durationMinutes,
+      now: new Date(),
+      graceMinutes: EXAM_GRACE_MINUTES,
+    });
+    const resolvedAnswers = resolveSubmissionAnswers({
+      submittedAnswers: answers,
+      draftAnswers: reg.draftAnswers,
+      timedOut,
+    });
+    const effectiveAnswers = resolvedAnswers.answers;
 
     let totalScore = 0;
     let maxPossible = 0;
@@ -132,7 +127,7 @@ export async function submitExam(req, res, next) {
 
     for (const question of exam.questions) {
       maxPossible += question.points;
-      const answer = answers[String(question.id)];
+      const answer = effectiveAnswers[String(question.id)];
 
       if (question.questionType === 'mc' || question.questionType === 'true_false') {
         const selectedId = resolveSelectedChoiceId(answer, question.choices || []);
@@ -238,7 +233,15 @@ export async function submitExam(req, res, next) {
     await invalidatePrefix(`exam-eligibility:${req.user.id}`);
     await invalidatePrefix('schedules:available:');
 
-    res.json({ totalScore, maxPossible, percentage, passed, essayReviewed: !hasEssays });
+    res.json({
+      totalScore,
+      maxPossible,
+      percentage,
+      passed,
+      essayReviewed: !hasEssays,
+      timedOut,
+      answerSource: resolvedAnswers.source,
+    });
 
     // Log exam submission with security metadata
     logAudit({
@@ -251,6 +254,8 @@ export async function submitExam(req, res, next) {
         maxPossible,
         percentage,
         hasEssays,
+        timedOut,
+        answerSource: resolvedAnswers.source,
         securityMetadata,
         securityIssues: securityIssues.length > 0 ? securityIssues : undefined,
       },

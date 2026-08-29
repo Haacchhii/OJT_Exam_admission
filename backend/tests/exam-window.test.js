@@ -4,9 +4,25 @@ import {
   evaluateExamStartAvailability,
   computeScheduleSubmissionDeadline,
   isSubmissionWithinScheduleWindow,
+  isExamAttemptExpired,
+  resolveSubmissionAnswers,
 } from '../src/utils/examWindow.js';
 
 describe('exam window status', () => {
+  it('returns closed when staff manually closed the schedule', () => {
+    const schedule = {
+      status: 'closed',
+      closedAt: '2026-04-20T13:15:00.000Z',
+      examWindowStartAt: '2026-04-20T13:00:00.000Z',
+      examWindowEndAt: '2026-04-20T14:00:00.000Z',
+    };
+
+    const result = computeExamWindowStatus(schedule, new Date('2026-04-20T13:30:00.000Z'));
+
+    expect(result.status).toBe('closed');
+    expect(result.label).toBe('Closed by staff');
+  });
+
   it('returns open when now is inside explicit datetime window', () => {
     const schedule = {
       scheduledDate: '2026-04-20',
@@ -48,6 +64,20 @@ describe('exam window status', () => {
 });
 
 describe('evaluateExamStartAvailability', () => {
+  it('blocks exam starts after staff manually closes the schedule', () => {
+    const schedule = {
+      status: 'closed',
+      closedAt: '2026-04-20T13:15:00.000Z',
+      examWindowStartAt: '2026-04-20T13:00:00.000Z',
+      examWindowEndAt: '2026-04-20T14:00:00.000Z',
+    };
+
+    const result = evaluateExamStartAvailability(schedule, new Date('2026-04-20T13:30:00.000Z'));
+
+    expect(result.allowed).toBe(false);
+    expect(result.message).toMatch(/closed by staff/i);
+  });
+
   it('allows rolling window exam starts anytime while window is open', () => {
     const schedule = {
       scheduledDate: '2026-04-20',
@@ -186,5 +216,55 @@ describe('submission schedule deadline policy', () => {
 
     expect(startedAt.getTime()).toBeLessThan(new Date('2026-04-20T14:00:00.000Z').getTime());
     expect(isSubmissionWithinScheduleWindow(schedule, submitAfterClose, 0)).toBe(false);
+  });
+});
+
+describe('expired attempt recovery', () => {
+  it('marks an attempt expired when its duration plus grace has elapsed', () => {
+    const expired = isExamAttemptExpired({
+      schedule: {
+        examWindowStartAt: '2026-04-20T13:00:00.000Z',
+        examWindowEndAt: '2026-04-20T16:00:00.000Z',
+      },
+      startedAt: '2026-04-20T13:00:00.000Z',
+      durationMinutes: 60,
+      graceMinutes: 1,
+      now: new Date('2026-04-20T14:01:01.000Z'),
+    });
+
+    expect(expired).toBe(true);
+  });
+
+  it('uses only the server-saved draft after an attempt expires', () => {
+    const result = resolveSubmissionAnswers({
+      submittedAnswers: { 1: 99 },
+      draftAnswers: JSON.stringify({ 1: 42 }),
+      timedOut: true,
+    });
+
+    expect(result.answers).toEqual({ 1: 42 });
+    expect(result.source).toBe('saved-draft');
+  });
+
+  it('uses an empty answer set when an expired attempt has no valid draft', () => {
+    const result = resolveSubmissionAnswers({
+      submittedAnswers: { 1: 99 },
+      draftAnswers: '{not-json',
+      timedOut: true,
+    });
+
+    expect(result.answers).toEqual({});
+    expect(result.source).toBe('empty');
+  });
+
+  it('uses the current submission while the attempt is still active', () => {
+    const result = resolveSubmissionAnswers({
+      submittedAnswers: { 1: 99 },
+      draftAnswers: JSON.stringify({ 1: 42 }),
+      timedOut: false,
+    });
+
+    expect(result.answers).toEqual({ 1: 99 });
+    expect(result.source).toBe('submitted');
   });
 });
