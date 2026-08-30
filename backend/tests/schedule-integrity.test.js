@@ -2,6 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   prisma: {
+    $transaction: vi.fn(),
+    academicYear: { findFirst: vi.fn() },
+    semester: { findFirst: vi.fn() },
+    applicantProfile: { findUnique: vi.fn() },
     examSchedule: {
       findUnique: vi.fn(),
       update: vi.fn(),
@@ -10,6 +14,7 @@ const mocks = vi.hoisted(() => ({
     examRegistration: {
       count: vi.fn(),
       deleteMany: vi.fn(),
+      findFirst: vi.fn(),
     },
   },
 }));
@@ -24,8 +29,11 @@ vi.mock('../src/utils/socket.js', () => ({
   getIo: vi.fn(() => ({ to: vi.fn().mockReturnThis(), emit: vi.fn() })),
 }));
 vi.mock('../src/services/emailService.js', () => ({ sendScheduleClosedEmail: vi.fn() }));
+vi.mock('../src/utils/email.js', () => ({ sendExamBookingEmail: vi.fn() }));
+vi.mock('../src/utils/tracking.js', () => ({ generateTrackingId: vi.fn().mockResolvedValue('GK-EXM-TEST') }));
 
 import { deleteSchedule, updateSchedule } from '../src/controllers/examSchedules.js';
+import { createRegistration } from '../src/controllers/examRegistrations.js';
 
 function responseRecorder() {
   return {
@@ -99,5 +107,52 @@ describe('schedule data integrity', () => {
     expect(res.statusCode).toBe(409);
     expect(res.body?.code).toBe('CAPACITY_BELOW_BOOKINGS');
     expect(mocks.prisma.examSchedule.update).not.toHaveBeenCalled();
+  });
+
+  it('rechecks for an active registration after locking the schedule', async () => {
+    const now = Date.now();
+    mocks.prisma.applicantProfile.findUnique.mockResolvedValue({ gradeLevel: 'Grade 10' });
+    mocks.prisma.examRegistration.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+    mocks.prisma.examSchedule.findUnique.mockResolvedValue({
+      id: 44,
+      examId: 9,
+      examWindowStartAt: new Date(now - 60_000),
+      examWindowEndAt: new Date(now + 3_600_000),
+      maxSlots: 10,
+      slotsTaken: 1,
+      exam: { id: 9, academicYear: { id: 3, isActive: true } },
+    });
+    mocks.prisma.academicYear.findFirst.mockResolvedValue({ id: 3, isActive: true });
+    mocks.prisma.semester.findFirst.mockResolvedValue({
+      id: 2,
+      isActive: true,
+      startDate: new Date(now - 86_400_000),
+      endDate: new Date(now + 86_400_000),
+    });
+
+    const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([{ id: 44, max_slots: 10, slots_taken: 1 }]),
+      examRegistration: {
+        findFirst: vi.fn().mockResolvedValue({ id: 100, status: 'scheduled' }),
+        create: vi.fn(),
+      },
+      examSchedule: { update: vi.fn() },
+    };
+    mocks.prisma.$transaction.mockImplementation(callback => callback(tx));
+
+    const req = {
+      body: { scheduleId: 44 },
+      user: { id: 7, email: 'student@example.test', role: 'applicant', status: 'Active' },
+    };
+    const res = responseRecorder();
+    const next = vi.fn();
+
+    await createRegistration(req, res, next);
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ code: 'CONFLICT' }));
+    expect(tx.examRegistration.create).not.toHaveBeenCalled();
+    expect(tx.examSchedule.update).not.toHaveBeenCalled();
   });
 });

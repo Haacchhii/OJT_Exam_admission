@@ -364,6 +364,25 @@ export async function createRegistration(req, res, next) {
       if (!freshSchedule || freshSchedule.slotsTaken >= freshSchedule.maxSlots) {
         throw Object.assign(new Error('This schedule is already full. Please choose another schedule.'), { statusCode: 400, code: 'VALIDATION_ERROR' });
       }
+
+      // The optimistic check above gives fast feedback. Recheck after the
+      // schedule row lock so concurrent requests from the same applicant
+      // cannot both create an active registration.
+      const concurrentRegistration = await tx.examRegistration.findFirst({
+        where: {
+          userId: targetUserId,
+          status: { not: 'done' },
+          schedule: { examId: schedule.examId },
+        },
+        select: { id: true },
+      });
+      if (concurrentRegistration) {
+        throw Object.assign(new Error('You already have an active registration for this exam.'), {
+          statusCode: 409,
+          code: 'CONFLICT',
+        });
+      }
+
       const reg = await tx.examRegistration.create({
         data: { trackingId, userEmail: email, userId: targetUserId, scheduleId, status: 'scheduled' },
       });
