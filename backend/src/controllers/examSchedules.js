@@ -411,6 +411,13 @@ export async function updateSchedule(req, res, next) {
     const nextExamWindowStartAt = examWindowStartAt !== undefined ? examWindowStartAt : existing.examWindowStartAt;
     const nextExamWindowEndAt = examWindowEndAt !== undefined ? examWindowEndAt : existing.examWindowEndAt;
 
+    if (maxSlots !== undefined && maxSlots < existing.slotsTaken) {
+      return res.status(409).json({
+        error: `Capacity cannot be lower than the ${existing.slotsTaken} applicants already booked.`,
+        code: 'CAPACITY_BELOW_BOOKINGS',
+      });
+    }
+
     const validationError = validateScheduleFields(
       { scheduledDate: nextScheduledDate, startTime: nextStartTime, endTime: nextEndTime },
       { checkPastDate: scheduledDate !== undefined }
@@ -483,8 +490,19 @@ export async function updateSchedule(req, res, next) {
 export async function deleteSchedule(req, res, next) {
   try {
     const id = Number(req.params.id);
-    // Cascade: delete registrations first (which cascade to results/answers)
-    await prisma.examRegistration.deleteMany({ where: { scheduleId: id } });
+    const existing = await prisma.examSchedule.findUnique({ where: { id }, select: { id: true } });
+    if (!existing) {
+      return res.status(404).json({ error: 'Schedule not found', code: 'NOT_FOUND' });
+    }
+
+    const registrationCount = await prisma.examRegistration.count({ where: { scheduleId: id } });
+    if (registrationCount > 0) {
+      return res.status(409).json({
+        error: 'This schedule has applicant records and cannot be deleted. Close it instead to preserve exam history.',
+        code: 'SCHEDULE_HAS_REGISTRATIONS',
+      });
+    }
+
     await prisma.examSchedule.delete({ where: { id } });
     await invalidatePrefix('schedules:available:');
     await invalidatePrefix('schedules:list:');
