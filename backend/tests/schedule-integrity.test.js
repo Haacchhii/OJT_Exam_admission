@@ -64,8 +64,12 @@ describe('schedule data integrity', () => {
   });
 
   it('refuses to delete a schedule that has applicant registrations', async () => {
-    mocks.prisma.examSchedule.findUnique.mockResolvedValue({ id: 41 });
-    mocks.prisma.examRegistration.count.mockResolvedValue(2);
+    const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([{ id: 41 }]),
+      examRegistration: { count: vi.fn().mockResolvedValue(2) },
+      examSchedule: { delete: vi.fn() },
+    };
+    mocks.prisma.$transaction.mockImplementation(callback => callback(tx));
     const req = { params: { id: '41' } };
     const res = responseRecorder();
 
@@ -73,21 +77,41 @@ describe('schedule data integrity', () => {
 
     expect(res.statusCode).toBe(409);
     expect(res.body?.code).toBe('SCHEDULE_HAS_REGISTRATIONS');
-    expect(mocks.prisma.examRegistration.deleteMany).not.toHaveBeenCalled();
-    expect(mocks.prisma.examSchedule.delete).not.toHaveBeenCalled();
+    expect(tx.examSchedule.delete).not.toHaveBeenCalled();
   });
 
   it('allows deletion when a schedule has never been booked', async () => {
-    mocks.prisma.examSchedule.findUnique.mockResolvedValue({ id: 42 });
-    mocks.prisma.examRegistration.count.mockResolvedValue(0);
+    const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([{ id: 42 }]),
+      examRegistration: { count: vi.fn().mockResolvedValue(0) },
+      examSchedule: { delete: vi.fn().mockResolvedValue({ id: 42 }) },
+    };
+    mocks.prisma.$transaction.mockImplementation(callback => callback(tx));
     const req = { params: { id: '42' } };
     const res = responseRecorder();
 
     await deleteSchedule(req, res, vi.fn());
 
     expect(res.statusCode).toBe(204);
-    expect(mocks.prisma.examSchedule.delete).toHaveBeenCalledWith({ where: { id: 42 } });
-    expect(mocks.prisma.examRegistration.deleteMany).not.toHaveBeenCalled();
+    expect(tx.examSchedule.delete).toHaveBeenCalledWith({ where: { id: 42 } });
+  });
+
+  it('locks the schedule while checking and deleting it', async () => {
+    const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([{ id: 42 }]),
+      examRegistration: { count: vi.fn().mockResolvedValue(0) },
+      examSchedule: { delete: vi.fn().mockResolvedValue({ id: 42 }) },
+    };
+    mocks.prisma.$transaction.mockImplementation(callback => callback(tx));
+    const req = { params: { id: '42' } };
+    const res = responseRecorder();
+
+    await deleteSchedule(req, res, vi.fn());
+
+    expect(mocks.prisma.$transaction).toHaveBeenCalledOnce();
+    expect(tx.$queryRaw).toHaveBeenCalledOnce();
+    expect(tx.examRegistration.count).toHaveBeenCalledWith({ where: { scheduleId: 42 } });
+    expect(tx.examSchedule.delete).toHaveBeenCalledWith({ where: { id: 42 } });
   });
 
   it('refuses to reduce capacity below the number already booked', async () => {

@@ -490,20 +490,26 @@ export async function updateSchedule(req, res, next) {
 export async function deleteSchedule(req, res, next) {
   try {
     const id = Number(req.params.id);
-    const existing = await prisma.examSchedule.findUnique({ where: { id }, select: { id: true } });
-    if (!existing) {
+    const outcome = await prisma.$transaction(async (tx) => {
+      const rows = await tx.$queryRaw`SELECT id FROM exam_schedules WHERE id = ${id} FOR UPDATE`;
+      if (rows.length === 0) return { status: 'not_found' };
+
+      const registrationCount = await tx.examRegistration.count({ where: { scheduleId: id } });
+      if (registrationCount > 0) return { status: 'has_registrations', registrationCount };
+
+      await tx.examSchedule.delete({ where: { id } });
+      return { status: 'deleted' };
+    });
+
+    if (outcome.status === 'not_found') {
       return res.status(404).json({ error: 'Schedule not found', code: 'NOT_FOUND' });
     }
-
-    const registrationCount = await prisma.examRegistration.count({ where: { scheduleId: id } });
-    if (registrationCount > 0) {
+    if (outcome.status === 'has_registrations') {
       return res.status(409).json({
         error: 'This schedule has applicant records and cannot be deleted. Close it instead to preserve exam history.',
         code: 'SCHEDULE_HAS_REGISTRATIONS',
       });
     }
-
-    await prisma.examSchedule.delete({ where: { id } });
     await invalidatePrefix('schedules:available:');
     await invalidatePrefix('schedules:list:');
     res.status(204).end();
