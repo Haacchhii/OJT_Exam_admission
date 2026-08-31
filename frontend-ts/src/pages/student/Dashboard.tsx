@@ -67,11 +67,13 @@ export default function StudentDashboard() {
     { step: 3, label: 'Complete Exam', desc: 'Finish the entrance exam', icon: 'trophy', done: admissionUnlocked },
     { step: 4, label: 'Apply', desc: 'Submit admission form', icon: 'admissions', done: !!myApp },
     { step: 5, label: 'Accepted', desc: 'Admission confirmed', icon: 'graduationCap', done: myApp?.status === 'Accepted' },
+    { step: 6, label: 'Enrollment', desc: 'Registrar handoff completed', icon: 'clipboard', done: !!myApp?.enrollmentHandoffAt },
   ] : [
     { step: 1, label: 'Register', desc: 'Create your account', icon: 'check', done: true },
     { step: 2, label: 'Open Application', desc: 'Fill out the online form', icon: 'admissions', done: !!myApp || hasAdmissionDraft },
     { step: 3, label: 'Submit Application', desc: 'Upload documents and send it in', icon: 'clipboard', done: !!myApp },
     { step: 4, label: 'Accepted', desc: 'Admission confirmed', icon: 'graduationCap', done: myApp?.status === 'Accepted' },
+    { step: 5, label: 'Enrollment', desc: 'Registrar handoff completed', icon: 'clipboard', done: !!myApp?.enrollmentHandoffAt },
   ];
 
   const syncDraftState = useCallback(() => {

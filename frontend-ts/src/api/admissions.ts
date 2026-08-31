@@ -193,7 +193,7 @@ export async function bulkUpdateStatus(ids: number[], status: string) {
 }
 
 export async function bulkHandoffAdmissions(ids: number[]) {
-  return client.post<{ updated: number }>('/admissions/bulk-handoff', { ids });
+  return client.post<{ updated: number; alreadyCompleted: number }>('/admissions/bulk-handoff', { ids });
 }
 
 export async function bulkDeleteAdmissions(ids: number[]) {

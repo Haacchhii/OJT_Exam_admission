@@ -150,7 +150,7 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
   };
 
   const selectedAdmissions = useMemo(() => admissions.filter((a: Admission) => selected.has(a.id)), [admissions, selected]);
-  const canBulkHandoff = selectedAdmissions.length > 0 && selectedAdmissions.every((adm: Admission) => adm.status === 'Accepted');
+  const canBulkHandoff = selectedAdmissions.length > 0 && selectedAdmissions.every((adm: Admission) => adm.status === 'Accepted' && !adm.enrollmentHandoffAt);
   const bulkActionLabel = selectedAdmissions.length > 0
     ? `${selectedAdmissions.length} selected (${selectedAdmissions.filter((adm: Admission) => adm.status === 'Accepted').length} accepted)`
     : 'No applications selected';
@@ -247,8 +247,8 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
     if (!ok) return;
     setHandoffing(true);
     try {
-      await bulkHandoffAdmissions(ids);
-      showToast(`${ids.length} application(s) handed off successfully.`, 'success');
+      const result = await bulkHandoffAdmissions(ids);
+      showToast(`${result.updated} application(s) handed off successfully.`, 'success');
       setSelected(new Set());
       await refetch();
     } catch (err: any) {
@@ -484,7 +484,7 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
               icon={<Icon name="clipboard" className="w-3.5 h-3.5" />}
               className="min-w-[140px]"
               disabled={!canBulkHandoff}
-              title={canBulkHandoff ? 'Hand off accepted applications' : 'Only accepted applications can be handed off'}
+              title={canBulkHandoff ? 'Complete enrollment handoff' : 'Select only accepted applications with a pending handoff'}
             >
               {handoffing ? 'Handing Off...' : 'Bulk Handoff'}
             </ActionButton>
@@ -536,7 +536,16 @@ export default function AdmissionList({ onShowDetail, directStatus }: Props) {
                       <td className="py-3 px-2">{a.gradeLevel}</td>
                       <td className="py-3 px-2"><Badge variant="info">{a.applicantType || 'New'}</Badge></td>
                       <td className="py-3 px-2">{a.documentCount ?? a.documents.length} file(s)</td>
-                      <td className="py-3 px-2"><Badge className={badgeClass(a.status)}>{a.status}</Badge></td>
+                      <td className="py-3 px-2">
+                        <div className="flex flex-col items-start gap-1">
+                          <Badge className={badgeClass(a.status)}>{a.status}</Badge>
+                          {a.status === 'Accepted' && (
+                            <span className={`text-[11px] font-medium ${a.enrollmentHandoffAt ? 'text-emerald-600' : 'text-amber-600'}`}>
+                              {a.enrollmentHandoffAt ? 'Handoff complete' : 'Handoff pending'}
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td className="py-3 px-2 text-gray-500">{formatDate(a.submittedAt)}</td>
                       <td className="py-3 px-2">{(ADMISSION_IN_PROGRESS as readonly string[]).includes(a.status) && pendingDays !== null ? (
                         <span className={`text-xs font-semibold ${pendingDays > SLA_DAYS ? 'text-red-600' : pendingDays > 5 ? 'text-amber-600' : 'text-gray-500'}`}>{pendingDays}d</span>

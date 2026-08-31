@@ -41,6 +41,9 @@ export default function ExistingApplication({ existingApp, onNewApplication }: P
       ? [{ label: 'Rejected', date: existingApp.updatedAt, done: true, icon: 'xCircle' }]
       : [{ label: 'Accepted', date: currentIdx >= 3 ? existingApp.updatedAt : undefined, done: currentIdx >= 3, icon: 'checkCircle' }]
     ),
+    ...(existingApp.status === 'Accepted'
+      ? [{ label: 'Enrollment Handoff', date: existingApp.enrollmentHandoffAt || undefined, done: !!existingApp.enrollmentHandoffAt, icon: 'clipboard' }]
+      : []),
   ];
 
   return (
@@ -133,6 +136,11 @@ export default function ExistingApplication({ existingApp, onNewApplication }: P
         ) : existingApp.status === 'Accepted' ? (
           <div className="mt-6 bg-forest-50 border border-forest-200 rounded-xl p-5">
             <h4 className="font-bold text-forest-700 mb-3 flex items-center gap-2"><Icon name="trophy" className="w-5 h-5 text-gold-500" /> Congratulations! Your application has been accepted.</h4>
+            <div className={`mb-4 rounded-lg border px-4 py-3 text-sm ${existingApp.enrollmentHandoffAt ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
+              {existingApp.enrollmentHandoffAt
+                ? `Enrollment handoff completed on ${formatDate(existingApp.enrollmentHandoffAt)}. The registrar can now continue enrollment processing.`
+                : 'Enrollment handoff is pending. The registrar will update this page after your accepted application enters enrollment processing.'}
+            </div>
             <p className="text-sm text-forest-600 mb-3">Here are the next steps to complete your enrollment:</p>
             <ol className="list-decimal list-inside space-y-2 text-sm text-forest-600">
               <li><strong>Visit the Registrar's Office</strong> - Bring original documents for verification (Birth Certificate, Report Card, Good Moral Certificate).</li>

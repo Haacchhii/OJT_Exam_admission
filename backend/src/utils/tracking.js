@@ -59,12 +59,12 @@ export async function generateTrackingId(type = 'ADM') {
  * this function can be updated at that time. The logic
  * already handles: lookup highest existing number → increment → retry.
  */
-export async function generateStudentNumber() {
+export async function generateStudentNumber(db = prisma) {
   const year = getManilaYear(new Date());
   const prefix = `GKISSJ-${year}-`;
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    const latest = await prisma.applicantProfile.findFirst({
+    const latest = await db.applicantProfile.findFirst({
       where: { studentNumber: { startsWith: prefix } },
       orderBy: { studentNumber: 'desc' },
       select: { studentNumber: true },
@@ -80,7 +80,7 @@ export async function generateStudentNumber() {
     if (attempt > 0) seq += attempt;
 
     const candidate = `${prefix}${String(seq).padStart(5, '0')}`;
-    const exists = await prisma.applicantProfile.findFirst({
+    const exists = await db.applicantProfile.findFirst({
       where: { studentNumber: candidate },
       select: { studentNumber: true },
     });

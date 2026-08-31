@@ -11,40 +11,41 @@ datasource db {
 
 // ─── Users ────────────────────────────────────────────
 model User {
-  id            Int      @id @default(autoincrement())
-  firstName     String   @map("first_name")
-  middleName    String?  @map("middle_name")
-  lastName      String   @map("last_name")
-  email         String   @unique
-  passwordHash  String   @map("password_hash")
-  role          String   @default("applicant") // administrator | registrar | teacher | applicant
-  status        String   @default("Active")    // Active | Inactive
-  mustChangePassword Boolean @default(false) @map("must_change_password")
-  phone         String?
-  address       String?
-  emailVerified Boolean  @default(false) @map("email_verified")
-  emailVerifyToken  String?  @map("email_verify_token")
+  id                 Int       @id @default(autoincrement())
+  firstName          String    @map("first_name")
+  middleName         String?   @map("middle_name")
+  lastName           String    @map("last_name")
+  email              String    @unique
+  passwordHash       String    @map("password_hash")
+  role               String    @default("applicant") // administrator | registrar | teacher | applicant
+  status             String    @default("Active") // Active | Inactive
+  mustChangePassword Boolean   @default(false) @map("must_change_password")
+  phone              String?
+  address            String?
+  emailVerified      Boolean   @default(false) @map("email_verified")
+  emailVerifyToken   String?   @map("email_verify_token")
   emailVerifyExpires DateTime? @map("email_verify_expires")
-  tokenVersion  Int      @default(1) @map("token_version") // Incremented to revoke all existing tokens
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-  deletedAt     DateTime? @map("deleted_at")
+  tokenVersion       Int       @default(1) @map("token_version") // Incremented to revoke all existing tokens
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  deletedAt          DateTime? @map("deleted_at")
 
-  admissions      Admission[]
-  examsCreated    Exam[]             @relation("ExamCreator")
-  reviewedResults ExamResult[]       @relation("ResultReviewer")
-  scoredEssays    EssayAnswer[]      @relation("EssayScorer")
-  reviewedDocs    AdmissionDocument[] @relation("DocumentReviewer")
-  reviewedDocSubmissions AdmissionDocumentSubmission[] @relation("DocumentSubmissionReviewer")
-  closedSchedules ExamSchedule[]     @relation("ScheduleClosedBy")
-  notificationPreferences NotificationPreference[]
-  admissionComments     AdmissionComment[]
-  auditLogs       AuditLog[]
-  examRegistrations ExamRegistration[] @relation("ExamRegistrationUser")
-  questionTemplates QuestionTemplate[] @relation("TemplateCreator")
+  admissions                  Admission[]
+  examsCreated                Exam[]                        @relation("ExamCreator")
+  reviewedResults             ExamResult[]                  @relation("ResultReviewer")
+  scoredEssays                EssayAnswer[]                 @relation("EssayScorer")
+  reviewedDocs                AdmissionDocument[]           @relation("DocumentReviewer")
+  reviewedDocSubmissions      AdmissionDocumentSubmission[] @relation("DocumentSubmissionReviewer")
+  completedEnrollmentHandoffs Admission[]                   @relation("EnrollmentHandoffBy")
+  closedSchedules             ExamSchedule[]                @relation("ScheduleClosedBy")
+  notificationPreferences     NotificationPreference[]
+  admissionComments           AdmissionComment[]
+  auditLogs                   AuditLog[]
+  examRegistrations           ExamRegistration[]            @relation("ExamRegistrationUser")
+  questionTemplates           QuestionTemplate[]            @relation("TemplateCreator")
 
-  applicantProfile  ApplicantProfile?
-  staffProfile      StaffProfile?
+  applicantProfile ApplicantProfile?
+  staffProfile     StaffProfile?
 
   @@index([deletedAt, createdAt])
   @@index([deletedAt, role, createdAt])
@@ -55,21 +56,21 @@ model User {
 
 // ─── Question Templates (Reusable Questions) ──────────
 model QuestionTemplate {
-  id           Int    @id @default(autoincrement())
-  createdById  Int    @map("created_by")
-  title        String // Template name
-  questionText String @map("question_text")
-  questionType String @map("question_type") // mc | essay | identification | true_false
-  identificationAnswer String? @map("identification_answer")
-  identificationMatchMode String? @map("identification_match_mode") // exact | partial
-  points       Int    @default(1)
-  choices      String // Stored as JSON array
-  description  String?
-  isPublic     Boolean @default(false) @map("is_public")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id                      Int      @id @default(autoincrement())
+  createdById             Int      @map("created_by")
+  title                   String // Template name
+  questionText            String   @map("question_text")
+  questionType            String   @map("question_type") // mc | essay | identification | true_false
+  identificationAnswer    String?  @map("identification_answer")
+  identificationMatchMode String?  @map("identification_match_mode") // exact | partial
+  points                  Int      @default(1)
+  choices                 String // Stored as JSON array
+  description             String?
+  isPublic                Boolean  @default(false) @map("is_public")
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
 
-  createdBy    User @relation("TemplateCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  createdBy User @relation("TemplateCreator", fields: [createdById], references: [id], onDelete: Cascade)
 
   @@index([createdById])
   @@index([questionType])
@@ -80,47 +81,53 @@ model QuestionTemplate {
 
 // ─── Admissions ───────────────────────────────────────
 model Admission {
-  id              Int      @id @default(autoincrement())
-  trackingId      String   @unique @map("tracking_id") // e.g. GK-ADM-2026-00001
-  userId          Int      @map("user_id")
-  firstName       String   @map("first_name")
-  middleName      String?  @map("middle_name")
-  lastName        String   @map("last_name")
-  email           String
-  phone           String?
-  dob             String   // stored as ISO date string
-  gender          String   // Male | Female
-  address         String
-  gradeLevel      String   @map("grade_level")
-  levelGroup      String?  @map("level_group")
-  prevSchool      String?  @map("prev_school")
-  schoolYear      String   @map("school_year")
-  lrn             String?
-  applicantType   String   @default("New") @map("applicant_type") // New | Transferee | Returning | Continuing
-  studentNumber   String?  @map("student_number") // pre-filled for continuing students, assigned for new on acceptance
-  guardian        String
-  guardianRelation String  @map("guardian_relation")
-  guardianPhone   String?  @map("guardian_phone")
-  guardianEmail   String?  @map("guardian_email")
-  status          String   @default("Submitted") // Submitted | Under Screening | Under Evaluation | Accepted | Rejected
-  notes           String?
-  academicYearId  Int?     @map("academic_year_id")
-  semesterId      Int?     @map("semester_id")
-  submittedAt     DateTime @default(now()) @map("submitted_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-  deletedAt       DateTime? @map("deleted_at")
+  id                    Int       @id @default(autoincrement())
+  trackingId            String    @unique @map("tracking_id") // e.g. GK-ADM-2026-00001
+  userId                Int       @map("user_id")
+  firstName             String    @map("first_name")
+  middleName            String?   @map("middle_name")
+  lastName              String    @map("last_name")
+  email                 String
+  phone                 String?
+  dob                   String // stored as ISO date string
+  gender                String // Male | Female
+  address               String
+  gradeLevel            String    @map("grade_level")
+  levelGroup            String?   @map("level_group")
+  prevSchool            String?   @map("prev_school")
+  schoolYear            String    @map("school_year")
+  lrn                   String?
+  applicantType         String    @default("New") @map("applicant_type") // New | Transferee | Returning | Continuing
+  studentNumber         String?   @map("student_number") // pre-filled for continuing students, assigned for new on acceptance
+  guardian              String
+  guardianRelation      String    @map("guardian_relation")
+  guardianPhone         String?   @map("guardian_phone")
+  guardianEmail         String?   @map("guardian_email")
+  status                String    @default("Submitted") // Submitted | Under Screening | Under Evaluation | Accepted | Rejected
+  notes                 String?
+  enrollmentHandoffAt   DateTime? @map("enrollment_handoff_at")
+  enrollmentHandoffById Int?      @map("enrollment_handoff_by_id")
+  academicYearId        Int?      @map("academic_year_id")
+  semesterId            Int?      @map("semester_id")
+  submittedAt           DateTime  @default(now()) @map("submitted_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+  deletedAt             DateTime? @map("deleted_at")
 
-  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  documents     AdmissionDocument[]
+  user                User                          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documents           AdmissionDocument[]
   documentSubmissions AdmissionDocumentSubmission[]
-  comments      AdmissionComment[]
-  academicYear  AcademicYear?       @relation(fields: [academicYearId], references: [id])
-  semester      Semester?           @relation(fields: [semesterId], references: [id])
+  comments            AdmissionComment[]
+  academicYear        AcademicYear?                 @relation(fields: [academicYearId], references: [id])
+  semester            Semester?                     @relation(fields: [semesterId], references: [id])
+  enrollmentHandoffBy User?                         @relation("EnrollmentHandoffBy", fields: [enrollmentHandoffById], references: [id], onDelete: SetNull)
+
   @@index([userId])
   @@index([status])
   @@index([gradeLevel])
   @@index([academicYearId])
   @@index([semesterId])
+  @@index([enrollmentHandoffAt])
+  @@index([enrollmentHandoffById])
   @@index([submittedAt])
   @@index([deletedAt])
   @@index([deletedAt, status, submittedAt])
@@ -144,8 +151,8 @@ model AdmissionDocument {
   reviewedById  Int?      @map("reviewed_by_id")
   reviewNote    String?   @map("review_note")
 
-  admission  Admission @relation(fields: [admissionId], references: [id], onDelete: Cascade)
-  reviewedBy User?     @relation("DocumentReviewer", fields: [reviewedById], references: [id])
+  admission   Admission                     @relation(fields: [admissionId], references: [id], onDelete: Cascade)
+  reviewedBy  User?                         @relation("DocumentReviewer", fields: [reviewedById], references: [id])
   submissions AdmissionDocumentSubmission[]
 
   @@index([admissionId])
@@ -153,25 +160,25 @@ model AdmissionDocument {
 }
 
 model AdmissionDocumentSubmission {
-  id                 Int      @id @default(autoincrement())
-  admissionId        Int      @map("admission_id")
-  admissionDocumentId Int?    @map("admission_document_id")
-  originalFileName   String   @map("original_file_name")
-  storedFilePath     String   @map("stored_file_path")
-  mimeType           String?  @map("mime_type")
-  fileSize           Int?     @map("file_size")
-  uploadedAt         DateTime @default(now()) @map("uploaded_at")
-  extractedText      String?  @map("extracted_text")
-  extractedData      String?  @map("extracted_data")
-  extractedAt        DateTime? @map("extracted_at")
-  reviewStatus       String   @default("pending") @map("review_status")
-  reviewedAt         DateTime? @map("reviewed_at")
-  reviewedById       Int?     @map("reviewed_by_id")
-  reviewNote         String?  @map("review_note")
+  id                  Int       @id @default(autoincrement())
+  admissionId         Int       @map("admission_id")
+  admissionDocumentId Int?      @map("admission_document_id")
+  originalFileName    String    @map("original_file_name")
+  storedFilePath      String    @map("stored_file_path")
+  mimeType            String?   @map("mime_type")
+  fileSize            Int?      @map("file_size")
+  uploadedAt          DateTime  @default(now()) @map("uploaded_at")
+  extractedText       String?   @map("extracted_text")
+  extractedData       String?   @map("extracted_data")
+  extractedAt         DateTime? @map("extracted_at")
+  reviewStatus        String    @default("pending") @map("review_status")
+  reviewedAt          DateTime? @map("reviewed_at")
+  reviewedById        Int?      @map("reviewed_by_id")
+  reviewNote          String?   @map("review_note")
 
-  admission         Admission         @relation(fields: [admissionId], references: [id], onDelete: Cascade)
+  admission         Admission          @relation(fields: [admissionId], references: [id], onDelete: Cascade)
   admissionDocument AdmissionDocument? @relation(fields: [admissionDocumentId], references: [id], onDelete: SetNull)
-  reviewedBy        User?             @relation("DocumentSubmissionReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedBy        User?              @relation("DocumentSubmissionReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
 
   @@index([admissionId])
   @@index([admissionDocumentId])
@@ -181,18 +188,18 @@ model AdmissionDocumentSubmission {
 
 // ─── Exams ────────────────────────────────────────────
 model Exam {
-  id              Int      @id @default(autoincrement())
+  id              Int       @id @default(autoincrement())
   title           String
-  gradeLevel      String   @map("grade_level")
-  levelGroup      String?  @map("level_group")
-  durationMinutes Int      @map("duration_minutes")
-  passingScore    Float    @map("passing_score") // percentage 0-100
-  isActive        Boolean  @default(true) @map("is_active")
-  academicYearId  Int?     @map("academic_year_id")
-  semesterId      Int?     @map("semester_id")
-  createdById     Int?     @map("created_by")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  gradeLevel      String    @map("grade_level")
+  levelGroup      String?   @map("level_group")
+  durationMinutes Int       @map("duration_minutes")
+  passingScore    Float     @map("passing_score") // percentage 0-100
+  isActive        Boolean   @default(true) @map("is_active")
+  academicYearId  Int?      @map("academic_year_id")
+  semesterId      Int?      @map("semester_id")
+  createdById     Int?      @map("created_by")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
   deletedAt       DateTime? @map("deleted_at")
 
   createdBy    User?          @relation("ExamCreator", fields: [createdById], references: [id], onDelete: SetNull)
@@ -213,14 +220,14 @@ model Exam {
 }
 
 model ExamQuestion {
-  id           Int    @id @default(autoincrement())
-  examId       Int    @map("exam_id")
-  questionText String @map("question_text")
-  questionType String @map("question_type") // mc | essay | identification | true_false
-  identificationAnswer String? @map("identification_answer")
+  id                      Int     @id @default(autoincrement())
+  examId                  Int     @map("exam_id")
+  questionText            String  @map("question_text")
+  questionType            String  @map("question_type") // mc | essay | identification | true_false
+  identificationAnswer    String? @map("identification_answer")
   identificationMatchMode String? @map("identification_match_mode") // exact | partial
-  points       Int
-  orderNum     Int    @map("order_num")
+  points                  Int
+  orderNum                Int     @map("order_num")
 
   exam             Exam              @relation(fields: [examId], references: [id], onDelete: Cascade)
   choices          QuestionChoice[]
@@ -247,26 +254,26 @@ model QuestionChoice {
 
 // ─── Schedules & Registrations ────────────────────────
 model ExamSchedule {
-  id            Int      @id @default(autoincrement())
-  examId        Int      @map("exam_id")
-  scheduledDate String   @map("scheduled_date") // YYYY-MM-DD
-  startTime     String   @map("start_time")     // HH:mm
-  endTime       String   @map("end_time")       // HH:mm
-  visibilityStartDate String?  @map("visibility_start_date")  // YYYY-MM-DD (when exam becomes visible to students)
-  visibilityEndDate   String?  @map("visibility_end_date")    // YYYY-MM-DD (when exam stops being visible, typically 10 days from start)
-  registrationOpenDate  String?  @map("registration_open_date")  // YYYY-MM-DD
-  registrationCloseDate String?  @map("registration_close_date") // YYYY-MM-DD
-  examWindowStartAt DateTime? @map("exam_window_start_at")
-  examWindowEndAt   DateTime? @map("exam_window_end_at")
-  maxSlots      Int      @map("max_slots")
-  slotsTaken    Int      @default(0) @map("slots_taken")
-  venue         String?
-  status        String   @default("open")
-  closedAt      DateTime? @map("closed_at")
-  closedBy      Int?     @map("closed_by")
-  closureReason String?  @map("closure_reason")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  id                    Int       @id @default(autoincrement())
+  examId                Int       @map("exam_id")
+  scheduledDate         String    @map("scheduled_date") // YYYY-MM-DD
+  startTime             String    @map("start_time") // HH:mm
+  endTime               String    @map("end_time") // HH:mm
+  visibilityStartDate   String?   @map("visibility_start_date") // YYYY-MM-DD (when exam becomes visible to students)
+  visibilityEndDate     String?   @map("visibility_end_date") // YYYY-MM-DD (when exam stops being visible, typically 10 days from start)
+  registrationOpenDate  String?   @map("registration_open_date") // YYYY-MM-DD
+  registrationCloseDate String?   @map("registration_close_date") // YYYY-MM-DD
+  examWindowStartAt     DateTime? @map("exam_window_start_at")
+  examWindowEndAt       DateTime? @map("exam_window_end_at")
+  maxSlots              Int       @map("max_slots")
+  slotsTaken            Int       @default(0) @map("slots_taken")
+  venue                 String?
+  status                String    @default("open")
+  closedAt              DateTime? @map("closed_at")
+  closedBy              Int?      @map("closed_by")
+  closureReason         String?   @map("closure_reason")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
 
   exam          Exam               @relation(fields: [examId], references: [id], onDelete: Cascade)
   registrations ExamRegistration[]
@@ -281,12 +288,12 @@ model ExamSchedule {
 }
 
 model NotificationPreference {
-  id         Int      @id @default(autoincrement())
-  userId     Int      @map("user_id")
-  eventType  String   @map("event_type")
-  enabled    Boolean  @default(true)
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime? @map("updated_at")
+  id        Int       @id @default(autoincrement())
+  userId    Int       @map("user_id")
+  eventType String    @map("event_type")
+  enabled   Boolean   @default(true)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime? @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -296,12 +303,12 @@ model NotificationPreference {
 }
 
 model NotificationRolePreference {
-  id         Int      @id @default(autoincrement())
-  role       String
-  eventType  String   @map("event_type")
-  enabled    Boolean  @default(true)
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime? @map("updated_at")
+  id        Int       @id @default(autoincrement())
+  role      String
+  eventType String    @map("event_type")
+  enabled   Boolean   @default(true)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime? @map("updated_at")
 
   @@unique([role, eventType])
   @@index([role])
@@ -309,11 +316,11 @@ model NotificationRolePreference {
 }
 
 model AdmissionComment {
-  id          Int      @id @default(autoincrement())
-  admissionId Int      @map("admission_id")
-  userId      Int      @map("user_id")
+  id          Int       @id @default(autoincrement())
+  admissionId Int       @map("admission_id")
+  userId      Int       @map("user_id")
   content     String
-  createdAt   DateTime @default(now()) @map("created_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime? @map("updated_at")
 
   admission Admission @relation(fields: [admissionId], references: [id], onDelete: Cascade)
@@ -325,16 +332,16 @@ model AdmissionComment {
 }
 
 model ExamRegistration {
-  id          Int       @id @default(autoincrement())
-  trackingId  String    @unique @map("tracking_id") // e.g. GK-EXM-2026-00001
-  userEmail   String    @map("user_email")
-  userId      Int?      @map("user_id")
-  scheduleId  Int       @map("schedule_id")
-  status      String    @default("scheduled") // scheduled | started | done
-  startedAt   DateTime? @map("started_at")
-  submittedAt DateTime? @map("submitted_at")
-  draftAnswers String?  @map("draft_answers") // JSON draft for auto-save during exam
-  createdAt   DateTime  @default(now()) @map("created_at")
+  id           Int       @id @default(autoincrement())
+  trackingId   String    @unique @map("tracking_id") // e.g. GK-EXM-2026-00001
+  userEmail    String    @map("user_email")
+  userId       Int?      @map("user_id")
+  scheduleId   Int       @map("schedule_id")
+  status       String    @default("scheduled") // scheduled | started | done
+  startedAt    DateTime? @map("started_at")
+  submittedAt  DateTime? @map("submitted_at")
+  draftAnswers String?   @map("draft_answers") // JSON draft for auto-save during exam
+  createdAt    DateTime  @default(now()) @map("created_at")
 
   schedule         ExamSchedule      @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
   user             User?             @relation("ExamRegistrationUser", fields: [userId], references: [id], onDelete: Cascade)
@@ -405,7 +412,7 @@ model EssayAnswer {
   essayResponse  String    @map("essay_response")
   pointsAwarded  Int?      @map("points_awarded")
   maxPoints      Int       @map("max_points")
-  comment        String?   // teacher feedback on essay
+  comment        String? // teacher feedback on essay
   scored         Boolean   @default(false)
   scoredById     Int?      @map("scored_by")
   scoredAt       DateTime? @map("scored_at")
@@ -415,12 +422,12 @@ model EssayAnswer {
   question     ExamQuestion     @relation(fields: [questionId], references: [id])
   scoredBy     User?            @relation("EssayScorer", fields: [scoredById], references: [id], onDelete: SetNull)
 
+  @@unique([registrationId, questionId])
   @@index([scored], name: "idx_essay_answer_scored")
   @@index([createdAt(sort: Desc)], name: "idx_essay_answer_created_at_desc")
   @@index([registrationId], name: "idx_essay_answer_registration_id")
   @@index([registrationId, scored], name: "idx_essay_answer_registration_scored")
   @@index([scored, createdAt])
-  @@unique([registrationId, questionId])
   @@map("essay_answers")
 }
 
@@ -428,10 +435,10 @@ model EssayAnswer {
 model AuditLog {
   id        Int      @id @default(autoincrement())
   userId    Int?     @map("user_id")
-  action    String   // e.g. "admission.status_update", "user.create", "exam.delete"
-  entity    String   // e.g. "admission", "user", "exam", "result"
+  action    String // e.g. "admission.status_update", "user.create", "exam.delete"
+  entity    String // e.g. "admission", "user", "exam", "result"
   entityId  Int?     @map("entity_id")
-  details   String?  // JSON string with extra context
+  details   String? // JSON string with extra context
   ipAddress String?  @map("ip_address")
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -450,16 +457,16 @@ model AuditLog {
 
 // ─── Academic Year ──────────────────────────────────
 model AcademicYear {
-  id        Int        @id @default(autoincrement())
-  year      String     @unique                    // e.g. "2026-2027"
-  isActive  Boolean    @default(false) @map("is_active")
-  startDate DateTime?  @map("start_date")
-  endDate   DateTime?  @map("end_date")
-  createdAt DateTime   @default(now()) @map("created_at")
+  id        Int       @id @default(autoincrement())
+  year      String    @unique // e.g. "2026-2027"
+  isActive  Boolean   @default(false) @map("is_active")
+  startDate DateTime? @map("start_date")
+  endDate   DateTime? @map("end_date")
+  createdAt DateTime  @default(now()) @map("created_at")
 
-  semesters   Semester[]
-  admissions  Admission[]
-  exams       Exam[]
+  semesters  Semester[]
+  admissions Admission[]
+  exams      Exam[]
 
   @@index([isActive])
   @@map("academic_years")
@@ -467,13 +474,13 @@ model AcademicYear {
 
 // ─── Semester / Period ──────────────────────────────
 model Semester {
-  id             Int          @id @default(autoincrement())
-  name           String       // "First Semester" | "Second Semester" | "Summer"
-  academicYearId Int          @map("academic_year_id")
-  isActive       Boolean      @default(false) @map("is_active")
-  startDate      DateTime?    @map("start_date")
-  endDate        DateTime?    @map("end_date")
-  createdAt      DateTime     @default(now()) @map("created_at")
+  id             Int       @id @default(autoincrement())
+  name           String // "First Semester" | "Second Semester" | "Summer"
+  academicYearId Int       @map("academic_year_id")
+  isActive       Boolean   @default(false) @map("is_active")
+  startDate      DateTime? @map("start_date")
+  endDate        DateTime? @map("end_date")
+  createdAt      DateTime  @default(now()) @map("created_at")
 
   academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
   admissions   Admission[]
@@ -506,18 +513,16 @@ model ApplicantProfile {
 }
 
 model StaffProfile {
-  id         Int      @id @default(autoincrement())
-  userId     Int      @unique @map("user_id")
-  employeeId String?  @unique @map("employee_id")
+  id         Int       @id @default(autoincrement())
+  userId     Int       @unique @map("user_id")
+  employeeId String?   @unique @map("employee_id")
   department String?
   position   String?
   hireDate   DateTime? @map("hire_date")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("staff_profiles")
 }
-
-

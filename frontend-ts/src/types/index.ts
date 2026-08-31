@@ -86,6 +86,8 @@ export interface Admission {
   guardianEmail: string | null;
   status: AdmissionStatus;
   notes: string | null;
+  enrollmentHandoffAt: string | null;
+  enrollmentHandoffById: number | null;
   academicYearId: number | null;
   semesterId: number | null;
   submittedAt: string;
