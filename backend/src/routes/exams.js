@@ -18,6 +18,7 @@ router.use(authenticate);
 // ─── Schedules (MUST be before /:id to avoid param capture) ───
 router.get('/schedules',           validateQuery(schedulesQuerySchema), ctrl.getSchedules);
 router.get('/schedules/available', ctrl.getAvailableSchedules);
+router.get('/schedules/notices',   authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), ctrl.getScheduleNotices);
 router.post('/schedules/notice',   authorize(ROLES.APPLICANT), validate(notifyNoScheduleSchema), ctrl.notifyNoSchedule);
 router.post('/schedules',          authorize(ROLES.ADMIN, ROLES.TEACHER), validate(createScheduleSchema), ctrl.createSchedule);
 router.post('/schedules/:id/close', authorize(ROLES.ADMIN, ROLES.TEACHER), ctrl.closeSchedule);

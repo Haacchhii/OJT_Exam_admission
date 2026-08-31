@@ -1,6 +1,6 @@
 ﻿import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useAsync } from '../../../hooks/useAsync';
-import { getExams, getExamSchedulesPage, addExamSchedule, updateExamSchedule, deleteExamSchedule, closeExamSchedule } from '../../../api/exams';
+import { getExams, getExamSchedulesPage, getExamScheduleNotices, addExamSchedule, updateExamSchedule, deleteExamSchedule, closeExamSchedule } from '../../../api/exams';
 import { showToast } from '../../../components/Toast';
 import { useConfirm } from '../../../components/ConfirmDialog';
 import { PageHeader, Badge, EmptyState, Pagination, SkeletonPage, ActionButton, SearchInput, StatusBanner } from '../../../components/UI';
@@ -104,7 +104,7 @@ export default function ScheduleManager() {
   };
 
   const { data: schedData, loading: schedLoading, error: schedError, refetch: schedRefetch } = useAsync(async () => {
-    const [rawExm, schedulesPage] = await Promise.all([
+    const [rawExm, schedulesPage, noticesPage] = await Promise.all([
       getExams(),
       getExamSchedulesPage({
         examId: schedExamFilter !== 'all' ? Number(schedExamFilter) : undefined,
@@ -112,10 +112,12 @@ export default function ScheduleManager() {
         page: schedPage,
         limit: SCHED_PER_PAGE,
       }),
+      getExamScheduleNotices({ page: 1, limit: 5 }),
     ]);
     return {
       exams: asArray<Exam>(rawExm),
       schedulesPage,
+      noticesPage,
     };
   }, [schedExamFilter, schedSearch, schedPage], 0, {
     setLoadingOnReload: true,
@@ -124,6 +126,7 @@ export default function ScheduleManager() {
 
   const exams: Exam[] = schedData?.exams || [];
   const schedulesPage = schedData?.schedulesPage || { data: [] as ExamSchedule[], pagination: { page: 1, limit: SCHED_PER_PAGE, total: 0, totalPages: 1 } };
+  const scheduleNotices = schedData?.noticesPage?.data || [];
 
   const toggleBulkExam = (examId: number) => {
     setSelectedExamIds(prev => prev.includes(examId) ? prev.filter(id => id !== examId) : [...prev, examId]);
@@ -289,7 +292,7 @@ export default function ScheduleManager() {
   const handleDeleteSchedule = async (scheduleId: number) => {
     const ok = await confirm({
       title: 'Delete Schedule',
-      message: 'Are you sure you want to delete this schedule?',
+      message: 'Delete this unused schedule? Only schedules with no applicant bookings can be deleted.',
       confirmLabel: 'Delete',
       variant: 'danger',
     });
@@ -311,13 +314,13 @@ export default function ScheduleManager() {
         title: 'Schedule deleted successfully.',
       });
       await schedRefetch();
-    } catch {
+    } catch (err: any) {
       setSchedActionBanner({
         tone: 'danger',
         title: 'Failed to delete schedule.',
-        message: 'Please try again.',
+        message: err?.message || 'Close booked schedules instead so applicant exam history is preserved.',
       });
-      showToast('Failed to delete schedule.', 'error');
+      showToast(err?.message || 'Failed to delete schedule.', 'error');
     }
   };
 
@@ -369,6 +372,29 @@ export default function ScheduleManager() {
           message={schedActionBanner.message}
           className="mb-4"
         />
+      )}
+      {scheduleNotices.length > 0 && (
+        <section className="gk-section-card p-5 mb-6" aria-labelledby="schedule-requests-title">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <div>
+              <h3 id="schedule-requests-title" className="text-lg font-bold text-forest-500">Applicant Schedule Requests</h3>
+              <p className="text-xs text-gray-500">Saved requests from applicants who could not find an available exam schedule.</p>
+            </div>
+            <Badge className="gk-badge gk-badge-warning">{schedData?.noticesPage?.pagination.total || scheduleNotices.length} request(s)</Badge>
+          </div>
+          <div className="divide-y divide-gray-100 rounded-lg border border-gray-200">
+            {scheduleNotices.map(notice => (
+              <div key={notice.id} className="p-3 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">{notice.studentName}</p>
+                  <p className="text-xs text-gray-500">{notice.gradeLevel || 'Grade not provided'} · {notice.email || 'No email available'}</p>
+                  {notice.message && <p className="text-sm text-gray-700 mt-1">{notice.message}</p>}
+                </div>
+                <time className="text-xs text-gray-500 whitespace-nowrap" dateTime={notice.createdAt}>{formatDateTime(notice.createdAt)}</time>
+              </div>
+            ))}
+          </div>
+        </section>
       )}
       <div className="gk-section-card p-6 mb-6">
         <h3 className="text-lg font-bold text-forest-500 mb-4">{editId ? 'Edit Schedule' : 'Add New Schedule'}</h3>
@@ -497,7 +523,9 @@ export default function ScheduleManager() {
                         Close
                       </ActionButton>
                     )}
-                    <ActionButton size="sm" variant="ghost" onClick={() => handleDeleteSchedule(s.id)} icon={<Icon name="trash" className="w-3 h-3" />} className="text-red-600">Delete</ActionButton>
+                    {s.slotsTaken === 0 && (
+                      <ActionButton size="sm" variant="ghost" onClick={() => handleDeleteSchedule(s.id)} icon={<Icon name="trash" className="w-3 h-3" />} className="text-red-600">Delete</ActionButton>
+                    )}
                   </div>
                 </div>
               );

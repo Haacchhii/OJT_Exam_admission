@@ -65,6 +65,16 @@ export interface ExamSchedulePayload {
   venue?: string | null;
 }
 
+export interface ExamScheduleNotice {
+  id: number;
+  userId: number | null;
+  studentName: string;
+  email: string | null;
+  gradeLevel: string | null;
+  message: string;
+  createdAt: string;
+}
+
 export type UpdateExamSchedulePayload = Partial<Omit<ExamSchedulePayload, 'examId'>>;
 
 export async function getExams(params?: ExamParams) {
@@ -127,9 +137,15 @@ export async function getAvailableSchedules() {
 }
 
 export async function notifyNoExamSchedule(message?: string) {
-  return client.post<{ ok: boolean; message: string }>('/exams/schedules/notice', {
+  return client.post<{ ok: boolean; noticeId: number; message: string }>('/exams/schedules/notice', {
     message: message || '',
   });
+}
+
+export async function getExamScheduleNotices(params?: { page?: number; limit?: number }) {
+  return client.get<PagedApiResponse<ExamScheduleNotice>>(
+    `/exams/schedules/notices${qs(withDefaultListParams(params))}`
+  );
 }
 
 export async function addExamSchedule(schedule: ExamSchedulePayload) {
