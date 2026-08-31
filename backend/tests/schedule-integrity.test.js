@@ -6,6 +6,11 @@ const mocks = vi.hoisted(() => ({
     academicYear: { findFirst: vi.fn() },
     semester: { findFirst: vi.fn() },
     applicantProfile: { findUnique: vi.fn() },
+    auditLog: {
+      create: vi.fn(),
+      findMany: vi.fn(),
+      count: vi.fn(),
+    },
     examSchedule: {
       findUnique: vi.fn(),
       update: vi.fn(),
@@ -32,7 +37,7 @@ vi.mock('../src/services/emailService.js', () => ({ sendScheduleClosedEmail: vi.
 vi.mock('../src/utils/email.js', () => ({ sendExamBookingEmail: vi.fn() }));
 vi.mock('../src/utils/tracking.js', () => ({ generateTrackingId: vi.fn().mockResolvedValue('GK-EXM-TEST') }));
 
-import { deleteSchedule, updateSchedule } from '../src/controllers/examSchedules.js';
+import { deleteSchedule, getScheduleNotices, notifyNoSchedule, updateSchedule } from '../src/controllers/examSchedules.js';
 import { createRegistration } from '../src/controllers/examRegistrations.js';
 
 function responseRecorder() {
@@ -154,5 +159,59 @@ describe('schedule data integrity', () => {
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ code: 'CONFLICT' }));
     expect(tx.examRegistration.create).not.toHaveBeenCalled();
     expect(tx.examSchedule.update).not.toHaveBeenCalled();
+  });
+
+  it('persists an applicant schedule request before reporting success', async () => {
+    mocks.prisma.applicantProfile.findUnique.mockResolvedValue({ gradeLevel: 'Grade 10' });
+    mocks.prisma.auditLog.create.mockResolvedValue({ id: 501 });
+    const req = {
+      body: { message: 'Please add a weekend schedule.' },
+      user: {
+        id: 7,
+        email: 'student@example.test',
+        role: 'applicant',
+        firstName: 'Test',
+        lastName: 'Student',
+      },
+      ip: '127.0.0.1',
+    };
+    const res = responseRecorder();
+
+    await notifyNoSchedule(req, res, vi.fn());
+
+    expect(mocks.prisma.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        userId: 7,
+        action: 'exam.schedule_notice',
+        entity: 'exam_schedule',
+      }),
+    });
+    expect(res.body).toEqual(expect.objectContaining({ ok: true, noticeId: 501 }));
+  });
+
+  it('returns persisted schedule requests to staff', async () => {
+    mocks.prisma.auditLog.findMany.mockResolvedValue([{
+      id: 501,
+      userId: 7,
+      details: JSON.stringify({ gradeLevel: 'Grade 10', message: 'Weekend please' }),
+      createdAt: new Date('2026-08-30T01:00:00.000Z'),
+      user: { firstName: 'Test', middleName: null, lastName: 'Student', email: 'student@example.test' },
+    }]);
+    mocks.prisma.auditLog.count.mockResolvedValue(1);
+    const req = { query: { page: '1', limit: '20' } };
+    const res = responseRecorder();
+
+    await getScheduleNotices(req, res, vi.fn());
+
+    expect(res.body.data).toEqual([
+      expect.objectContaining({
+        id: 501,
+        studentName: 'Test Student',
+        email: 'student@example.test',
+        gradeLevel: 'Grade 10',
+        message: 'Weekend please',
+      }),
+    ]);
+    expect(res.body.pagination).toEqual(expect.objectContaining({ total: 1, page: 1 }));
   });
 });

@@ -607,20 +607,68 @@ export async function notifyNoSchedule(req, res, next) {
       createdAt: new Date().toISOString(),
     };
 
+    // Persist before acknowledging the request so staff can retrieve it even
+    // when nobody is connected to the real-time channel.
+    const notice = await prisma.auditLog.create({
+      data: {
+        userId: req.user.id,
+        action: 'exam.schedule_notice',
+        entity: 'exam_schedule',
+        details: JSON.stringify({
+          studentName: payload.studentName,
+          email: payload.email,
+          gradeLevel,
+          message: message || null,
+        }),
+        ipAddress: req.ip || null,
+      },
+    });
+
     try {
       getIo().to('role_teacher').to('role_registrar').to('role_administrator').emit('exam_schedule_notice', payload);
     } catch (_) {
       // Non-fatal: request should still succeed even if socket emit fails.
     }
 
-    logAudit({
-      userId: req.user.id,
-      action: 'exam.schedule_notice',
-      entity: 'exam_schedule',
-      details: { gradeLevel, message: message || null },
-      ipAddress: req.ip,
+    res.json({ ok: true, noticeId: notice.id, message: 'Your notice has been saved and sent to the staff.' });
+  } catch (err) { next(err); }
+}
+
+// GET /api/exams/schedules/notices
+export async function getScheduleNotices(req, res, next) {
+  try {
+    const pg = paginate(req.query.page ?? 1, req.query.limit ?? 20);
+    const where = { action: 'exam.schedule_notice', entity: 'exam_schedule' };
+    const [rows, total] = await Promise.all([
+      prisma.auditLog.findMany({
+        where,
+        skip: pg.skip,
+        take: pg.take,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          user: { select: { firstName: true, middleName: true, lastName: true, email: true } },
+        },
+      }),
+      prisma.auditLog.count({ where }),
+    ]);
+
+    const data = rows.map((row) => {
+      let details = {};
+      try { details = row.details ? JSON.parse(row.details) : {}; } catch { details = {}; }
+      const userName = row.user
+        ? `${row.user.firstName || ''} ${row.user.middleName || ''} ${row.user.lastName || ''}`.replace(/\s+/g, ' ').trim()
+        : '';
+      return {
+        id: row.id,
+        userId: row.userId,
+        studentName: details.studentName || userName || row.user?.email || 'Applicant',
+        email: details.email || row.user?.email || null,
+        gradeLevel: details.gradeLevel || null,
+        message: details.message || '',
+        createdAt: row.createdAt,
+      };
     });
 
-    res.json({ ok: true, message: 'Your notice has been sent to the staff.' });
+    res.json(paginatedResponse(data, total, pg));
   } catch (err) { next(err); }
 }
