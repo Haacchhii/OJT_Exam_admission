@@ -388,6 +388,7 @@ export async function createSchedule(req, res, next) {
     await invalidatePrefix('schedules:list:');
 
     res.status(201).json(attachExamWindowStatus(schedule));
+    logAudit({ userId: req.user?.id, action: 'schedule.create', entity: 'exam_schedule', entityId: schedule.id, details: { examId: schedule.examId, scheduledDate: schedule.scheduledDate }, ipAddress: req.ip });
   } catch (err) { next(err); }
 }
 
@@ -483,6 +484,7 @@ export async function updateSchedule(req, res, next) {
     await invalidatePrefix('schedules:list:');
 
     res.json(attachExamWindowStatus(schedule));
+    logAudit({ userId: req.user?.id, action: 'schedule.update', entity: 'exam_schedule', entityId: id, details: { fields: Object.keys(req.body) }, ipAddress: req.ip });
   } catch (err) { next(err); }
 }
 
@@ -497,8 +499,8 @@ export async function deleteSchedule(req, res, next) {
       const registrationCount = await tx.examRegistration.count({ where: { scheduleId: id } });
       if (registrationCount > 0) return { status: 'has_registrations', registrationCount };
 
-      await tx.examSchedule.delete({ where: { id } });
-      return { status: 'deleted' };
+      const deleted = await tx.examSchedule.delete({ where: { id } });
+      return { status: 'deleted', examId: deleted.examId };
     });
 
     if (outcome.status === 'not_found') {
@@ -512,6 +514,7 @@ export async function deleteSchedule(req, res, next) {
     }
     await invalidatePrefix('schedules:available:');
     await invalidatePrefix('schedules:list:');
+    logAudit({ userId: req.user?.id, action: 'schedule.delete', entity: 'exam_schedule', entityId: id, details: { examId: outcome.examId }, ipAddress: req.ip });
     res.status(204).end();
   } catch (err) { next(err); }
 }

@@ -60,132 +60,141 @@ export async function scoreEssay(req, res, next) {
       return res.status(400).json({ error: 'points is required', code: 'VALIDATION_ERROR' });
     }
 
-    const essay = await prisma.essayAnswer.findUnique({ where: { id } });
-    if (!essay) return res.status(404).json({ error: 'Essay answer not found', code: 'NOT_FOUND' });
+    const outcome = await prisma.$transaction(async (tx) => {
+      const essay = await tx.essayAnswer.findUnique({ where: { id } });
+      if (!essay) return { status: 'not_found' };
 
-    // Clamp points to [0, maxPoints]
-    const clampedPoints = Math.max(0, Math.min(essay.maxPoints, Number(points)));
+      // Serialize every scoring operation for this registration so two teachers
+      // cannot finalize totals from different snapshots.
+      await tx.$queryRaw`SELECT id FROM exam_registrations WHERE id = ${essay.registrationId} FOR UPDATE`;
 
-    const updated = await prisma.essayAnswer.update({
-      where: { id },
-      data: {
-        pointsAwarded: clampedPoints,
-        comment: comment ?? null,
-        scored: true,
-        scoredById: req.user.id,
-        scoredAt: new Date(),
-      },
-    });
+      const clampedPoints = Math.max(0, Math.min(essay.maxPoints, Number(points)));
+      const updated = await tx.essayAnswer.update({
+        where: { id },
+        data: {
+          pointsAwarded: clampedPoints,
+          comment: comment ?? null,
+          scored: true,
+          scoredById: req.user.id,
+          scoredAt: new Date(),
+        },
+      });
 
-    // Check if ALL essays for this registration are scored → recalculate result
-    const [allEssays, result, reg] = await Promise.all([
-      prisma.essayAnswer.findMany({
-        where: { registrationId: essay.registrationId },
-        select: { id: true, scored: true, pointsAwarded: true },
-      }),
-      prisma.examResult.findUnique({
-        where: { registrationId: essay.registrationId },
-        select: { id: true, maxPossible: true },
-      }),
-      prisma.examRegistration.findUnique({
-        where: { id: essay.registrationId },
-        select: { userEmail: true, schedule: { select: { examId: true } } },
-      }),
-    ]);
-
-    const allScored = allEssays.every(e => e.scored);
-
-    if (allScored && result && reg?.schedule?.examId) {
-      const [exam, submitted, student] = await Promise.all([
-        prisma.exam.findUnique({
-          where: { id: reg.schedule.examId },
-          select: {
-            title: true,
-            passingScore: true,
-            questions: {
-              where: { questionType: { in: ['mc', 'true_false', 'identification'] } },
-              select: {
-                id: true,
-                questionType: true,
-                points: true,
-                identificationAnswer: true,
-                identificationMatchMode: true,
-                choices: { where: { isCorrect: true }, select: { id: true } },
-              },
-            },
-          },
-        }),
-        prisma.submittedAnswer.findMany({
+      const [allEssays, result, reg] = await Promise.all([
+        tx.essayAnswer.findMany({
           where: { registrationId: essay.registrationId },
-          select: { questionId: true, selectedChoiceId: true, essayText: true },
+          select: { id: true, scored: true, pointsAwarded: true },
         }),
-        prisma.user.findFirst({
-          where: { email: reg.userEmail },
-          select: { id: true, email: true, firstName: true },
+        tx.examResult.findUnique({
+          where: { registrationId: essay.registrationId },
+          select: { id: true, maxPossible: true, essayReviewed: true },
+        }),
+        tx.examRegistration.findUnique({
+          where: { id: essay.registrationId },
+          select: { userEmail: true, schedule: { select: { examId: true } } },
         }),
       ]);
+      const allScored = allEssays.every(e => e.scored);
+      let notification = null;
 
-      if (exam) {
-        const answerByQuestionId = new Map(submitted.map(s => [s.questionId, s]));
-        const essayPoints = allEssays.reduce((sum, e) => sum + (e.pointsAwarded || 0), 0);
+      if (allScored && result && reg?.schedule?.examId) {
+        const [exam, submitted, student] = await Promise.all([
+          tx.exam.findUnique({
+            where: { id: reg.schedule.examId },
+            select: {
+              title: true,
+              passingScore: true,
+              questions: {
+                where: { questionType: { in: ['mc', 'true_false', 'identification'] } },
+                select: {
+                  id: true,
+                  questionType: true,
+                  points: true,
+                  identificationAnswer: true,
+                  identificationMatchMode: true,
+                  choices: { where: { isCorrect: true }, select: { id: true } },
+                },
+              },
+            },
+          }),
+          tx.submittedAnswer.findMany({
+            where: { registrationId: essay.registrationId },
+            select: { questionId: true, selectedChoiceId: true, essayText: true },
+          }),
+          tx.user.findFirst({
+            where: { email: reg.userEmail },
+            select: { id: true, email: true, firstName: true },
+          }),
+        ]);
 
-        let mcScore = 0;
-        for (const q of exam.questions) {
-          const ans = answerByQuestionId.get(q.id);
-          if (!ans) continue;
+        if (exam) {
+          const answerByQuestionId = new Map(submitted.map(s => [s.questionId, s]));
+          const essayPoints = allEssays.reduce((sum, e) => sum + (e.pointsAwarded || 0), 0);
+          let objectiveScore = 0;
 
-          if (q.questionType === 'identification') {
-            if (isIdentificationMatch(ans.essayText, q.identificationAnswer, q.identificationMatchMode)) {
-              mcScore += q.points;
+          for (const question of exam.questions) {
+            const answer = answerByQuestionId.get(question.id);
+            if (!answer) continue;
+            if (question.questionType === 'identification') {
+              if (isIdentificationMatch(answer.essayText, question.identificationAnswer, question.identificationMatchMode)) {
+                objectiveScore += question.points;
+              }
+              continue;
             }
-            continue;
+            const correctChoiceId = question.choices[0]?.id;
+            if (answer.selectedChoiceId && correctChoiceId && answer.selectedChoiceId === correctChoiceId) {
+              objectiveScore += question.points;
+            }
           }
 
-          const correctChoiceId = q.choices[0]?.id;
-          if (ans.selectedChoiceId && correctChoiceId && ans.selectedChoiceId === correctChoiceId) {
-            mcScore += q.points;
-          }
-        }
-
-        const newTotal = mcScore + essayPoints;
-        const maxPossible = result.maxPossible;
-        const newPct = maxPossible > 0 ? Math.round((newTotal / maxPossible) * 1000) / 10 : 0;
-        const passed = newPct >= exam.passingScore;
-
-        await prisma.examResult.update({
-          where: { id: result.id },
-          data: {
-            totalScore: newTotal,
-            percentage: newPct,
-            passed,
-            essayReviewed: true,
-            reviewedById: req.user.id,
-          },
-        });
-
-        if (student?.id) {
-          await invalidatePrefix(`results:mine:${student.id}:`);
-        }
-        await invalidatePrefix(`results:answers:${essay.registrationId}`);
-        await invalidatePrefix('readiness:list:');
-        await invalidatePrefix('resultsEmployeeSummary:');
-
-        if (student) {
-          sendExamResultEmail({
-            to: student.email,
-            firstName: student.firstName,
-            examTitle: exam.title,
-            score: newTotal,
-            maxPossible,
-            percentage: newPct,
-            passed,
+          const totalScore = objectiveScore + essayPoints;
+          const percentage = result.maxPossible > 0 ? Math.round((totalScore / result.maxPossible) * 1000) / 10 : 0;
+          const passed = percentage >= exam.passingScore;
+          await tx.examResult.update({
+            where: { id: result.id },
+            data: { totalScore, percentage, passed, essayReviewed: true, reviewedById: req.user.id },
           });
+
+          if (!result.essayReviewed && student) {
+            notification = {
+              student,
+              examTitle: exam.title,
+              score: totalScore,
+              maxPossible: result.maxPossible,
+              percentage,
+              passed,
+            };
+          }
         }
       }
+
+      return { status: 'ok', updated, essay, clampedPoints, allScored, notification };
+    });
+
+    if (outcome.status === 'not_found') {
+      return res.status(404).json({ error: 'Essay answer not found', code: 'NOT_FOUND' });
     }
 
-    res.json(updated);
+    if (outcome.notification?.student) {
+      sendExamResultEmail({
+        to: outcome.notification.student.email,
+        firstName: outcome.notification.student.firstName,
+        examTitle: outcome.notification.examTitle,
+        score: outcome.notification.score,
+        maxPossible: outcome.notification.maxPossible,
+        percentage: outcome.notification.percentage,
+        passed: outcome.notification.passed,
+      });
+    }
 
-    logAudit({ userId: req.user.id, action: 'essay.score', entity: 'result', entityId: id, details: { points: clampedPoints, maxPoints: essay.maxPoints, comment: comment || null, allScored }, ipAddress: req.ip });
+    if (outcome.notification?.student?.id) {
+      await invalidatePrefix(`results:mine:${outcome.notification.student.id}:`);
+    }
+    await invalidatePrefix(`results:answers:${outcome.essay.registrationId}`);
+    await invalidatePrefix('readiness:list:');
+    await invalidatePrefix('resultsEmployeeSummary:');
+
+    res.json(outcome.updated);
+    logAudit({ userId: req.user.id, action: 'essay.score', entity: 'result', entityId: id, details: { points: outcome.clampedPoints, maxPoints: outcome.essay.maxPoints, comment: comment || null, allScored: outcome.allScored }, ipAddress: req.ip });
   } catch (err) { next(err); }
 }

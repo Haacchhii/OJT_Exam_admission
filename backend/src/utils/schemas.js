@@ -251,7 +251,7 @@ export const createExamSchema = z.object({
   gradeLevel: z.enum(EXAM_GRADE_LEVEL_VALUES),
   durationMinutes: z.number().int().positive(),
   passingScore: z.number().min(0).max(100),
-  isActive: z.boolean().default(true),
+  isActive: z.boolean().default(false),
   academicYearId: z.number().int().positive().optional().nullable(),
   semesterId: z.number().int().positive().optional().nullable(),
   questions: z.array(questionSchema).optional(),

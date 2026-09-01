@@ -271,7 +271,11 @@ export default function ExamsList({ onEdit }: { onEdit?: (exam: Exam) => void })
             <div className="flex gap-2">
               <ActionButton variant="secondary" size="sm" icon={<Icon name="eye" className="w-3.5 h-3.5" />} onClick={() => setPreviewExam(fullExam || exam)}>Preview</ActionButton>
               {canManageExams && <>
-                <ActionButton size="sm" icon={<Icon name="edit" className="w-3.5 h-3.5" />} onClick={() => onEdit!(fullExam || exam)}>Edit</ActionButton>
+                {!exam.isActive && eSched.length === 0 ? (
+                  <ActionButton size="sm" icon={<Icon name="edit" className="w-3.5 h-3.5" />} onClick={() => onEdit!(fullExam || exam)}>Edit</ActionButton>
+                ) : (
+                  <span className="self-center text-xs text-gray-500">Clone to revise questions</span>
+                )}
                 <ActionButton variant="secondary" size="sm" onClick={async () => { const action = exam.isActive ? 'Deactivate' : 'Activate'; const ok = await confirm({ title: `${action} Exam`, message: `Are you sure you want to ${action.toLowerCase()} "${exam.title}"?`, confirmLabel: action, variant: exam.isActive ? 'danger' : 'info' }); if (!ok) return; try { await updateExam(exam.id, { isActive: !exam.isActive }); showToast(`Exam ${action.toLowerCase()}d!`, 'success'); await refetch(); } catch { showToast('Failed to update exam.', 'error'); } }}>{exam.isActive ? 'Deactivate' : 'Activate'}</ActionButton>
               </>}
             </div>
