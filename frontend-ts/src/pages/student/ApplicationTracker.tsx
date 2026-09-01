@@ -276,7 +276,23 @@ function AdmissionStatusResult({ data, trackingId }: { data: Record<string, any>
             </div>
           </div>
         )}
+        {data.status === 'Accepted' && (
+          <div className="flex items-center gap-2">
+            <div className={`w-8 h-0.5 ${data.enrollmentHandoffAt ? 'bg-forest-500' : 'bg-gray-200'}`} />
+            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${data.enrollmentHandoffAt ? 'bg-forest-100 text-forest-700' : 'bg-amber-50 text-amber-700'}`}>
+              {data.enrollmentHandoffAt ? <Icon name="checkCircle" className="w-3.5 h-3.5 inline" /> : 'o'} Enrollment Handoff
+            </div>
+          </div>
+        )}
       </div>
+
+      {data.status === 'Accepted' && (
+        <div className={`mt-4 rounded-lg border px-4 py-3 text-sm ${data.enrollmentHandoffAt ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
+          {data.enrollmentHandoffAt
+            ? `Enrollment handoff completed ${formatDate(data.enrollmentHandoffAt)}.`
+            : 'Your application is accepted and waiting for registrar enrollment handoff.'}
+        </div>
+      )}
 
       <div className="mt-4 rounded-lg border border-gold-200 bg-gold-50 px-4 py-3 text-sm text-gold-800">
         <p className="font-semibold">Process note</p>

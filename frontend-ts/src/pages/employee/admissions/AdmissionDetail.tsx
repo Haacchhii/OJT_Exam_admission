@@ -357,9 +357,15 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
               <ActionButton onClick={saveStatus} loading={saving} icon={!saving ? <Icon name="check" className="w-4 h-4" /> : undefined}>{saving ? 'Saving...' : 'Save Changes'}</ActionButton>
               <ActionButton onClick={onBack} variant="secondary">Cancel</ActionButton>
               {adm.status === 'Accepted' && (user?.role === 'registrar' || user?.role === 'administrator') && (
-                <ActionButton onClick={handleHandoff} variant="ghost" size="sm" className="border border-forest-200 bg-white" loading={saving}>
-                  Mark Enrollment Handoff
-                </ActionButton>
+                adm.enrollmentHandoffAt ? (
+                  <span className="inline-flex items-center rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">
+                    Enrollment handed off {formatDate(adm.enrollmentHandoffAt)}
+                  </span>
+                ) : (
+                  <ActionButton onClick={handleHandoff} variant="ghost" size="sm" className="border border-forest-200 bg-white" loading={saving}>
+                    Mark Enrollment Handoff
+                  </ActionButton>
+                )
               )}
             </div>
           </>

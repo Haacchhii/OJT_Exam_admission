@@ -3,7 +3,7 @@ import path from 'path';
 import { existsSync } from 'fs';
 import { paginate, paginatedResponse } from '../utils/pagination.js';
 import { VALID_TRANSITIONS, ROLES, MAX_BULK_OPERATIONS, getLevelGroup, shouldSkipEntranceExam } from '../utils/constants.js';
-import { generateTrackingId, generateStudentNumber } from '../utils/tracking.js';
+import { generateTrackingId } from '../utils/tracking.js';
 import { logAudit } from '../utils/auditLog.js';
 import { getIo } from '../utils/socket.js';
 import { sendAdmissionSubmittedEmail, sendAdmissionStatusEmail } from '../utils/email.js';
@@ -11,6 +11,7 @@ import { cached, invalidatePrefix } from '../utils/cache.js';
 import env from '../config/env.js';
 import { resolveUploadedFilePath } from '../utils/uploadPaths.js';
 import { toManilaIsoDay } from '../utils/timezone.js';
+import { completeEnrollmentHandoff, transitionAdmissions } from '../services/admissionWorkflow.js';
 
 const ADMISSION_IN_PROGRESS = ['Submitted', 'Under Screening', 'Under Evaluation'];
 const REPORTS_DEFAULT_ADMISSIONS = 40;
@@ -187,6 +188,8 @@ async function loadAdmissionsPageSnapshot(query = {}) {
       levelGroup: true,
       applicantType: true,
       status: true,
+      enrollmentHandoffAt: true,
+      enrollmentHandoffById: true,
       submittedAt: true,
       updatedAt: true,
       academicYearId: true,
@@ -1078,35 +1081,7 @@ export async function updateStatus(req, res, next) {
     const admission = await prisma.admission.findUnique({ where: { id }, include: { documents: true, academicYear: true, semester: true } });
     if (!admission || admission.deletedAt) return res.status(404).json({ error: 'We could not find this admission record.', code: 'NOT_FOUND' });
 
-    // Validate transition
-    const allowed = VALID_TRANSITIONS[admission.status] || [];
-    if (!allowed.includes(status)) {
-      return res.status(400).json({
-        error: `This status change is not allowed: "${admission.status}" to "${status}".`,
-        code: 'VALIDATION_ERROR',
-      });
-    }
-
-    const updated = await prisma.admission.update({
-      where: { id },
-      data: { status, notes: notes !== undefined ? notes : admission.notes },
-      include: { documents: true, academicYear: true, semester: true },
-    });
-
-    // When accepted, auto-assign a student number if the student doesn't have one yet
-    if (status === 'Accepted') {
-      try {
-        const profile = await prisma.applicantProfile.findUnique({ where: { userId: admission.userId }, select: { studentNumber: true } });
-        if (!profile?.studentNumber) {
-          const studentNumber = await generateStudentNumber();
-          await prisma.applicantProfile.upsert({
-            where: { userId: admission.userId },
-            update: { studentNumber },
-            create: { userId: admission.userId, studentNumber },
-          });
-        }
-      } catch (_) { /* student number failure should not block the response */ }
-    }
+    const [updated] = await transitionAdmissions({ db: prisma, ids: [id], targetStatus: status, notes });
 
     logAudit({ userId: req.user.id, action: 'admission.status_update', entity: 'admission', entityId: id, details: { from: admission.status, to: status, notes: notes || null }, ipAddress: req.ip });
 
@@ -1137,21 +1112,22 @@ export async function handoffAdmission(req, res, next) {
     const id = Number(req.params.id);
     const admission = await prisma.admission.findUnique({ where: { id } });
     if (!admission || admission.deletedAt) return res.status(404).json({ error: 'We could not find this admission record.', code: 'NOT_FOUND' });
-    if (admission.status !== 'Accepted') return res.status(400).json({ error: 'Only accepted applications can be handed off to the registrar.', code: 'VALIDATION_ERROR' });
+    const result = await completeEnrollmentHandoff({ db: prisma, ids: [id], actorId: req.user.id });
+    const updated = result.updated[0] || await prisma.admission.findUnique({
+      where: { id },
+      include: { documents: true, academicYear: true, semester: true },
+    });
 
-    const timestamp = new Date().toISOString();
-    const handoffNote = `Enrollment handoff completed by ${req.user.firstName || req.user.email} (${req.user.role}) on ${timestamp}`;
-
-    const updated = await prisma.admission.update({ where: { id }, data: { notes: (admission.notes ? admission.notes + '\n\n' : '') + handoffNote }, include: { documents: true, academicYear: true, semester: true } });
-
-    logAudit({ userId: req.user.id, action: 'admission.handoff', entity: 'admission', entityId: id, details: { handoffNote }, ipAddress: req.ip });
+    if (result.updatedIds.length > 0) {
+      logAudit({ userId: req.user.id, action: 'admission.handoff', entity: 'admission', entityId: id, details: { completedAt: updated.enrollmentHandoffAt }, ipAddress: req.ip });
+    }
 
     await invalidateAdmissionCaches([admission.userId]);
 
     try {
       const io = getIo();
-      io.to('role_registrar').emit('admission_handoff', { id, handoffNote });
-      io.to(`user_${admission.userId}`).emit('admission_handoff', { id, handoffNote });
+      io.to('role_registrar').emit('admission_handoff', { id, completedAt: updated.enrollmentHandoffAt });
+      io.to(`user_${admission.userId}`).emit('admission_handoff', { id, completedAt: updated.enrollmentHandoffAt });
     } catch (_) {}
 
     res.json(shapeAdmission(updated));
@@ -1169,32 +1145,15 @@ export async function bulkHandoffAdmissions(req, res, next) {
       return res.status(400).json({ error: `Please select ${MAX_BULK_OPERATIONS} admissions or fewer per bulk handoff.`, code: 'VALIDATION_ERROR' });
     }
 
-    const admissions = await prisma.admission.findMany({ where: { id: { in: ids } } });
-    for (const adm of admissions) {
-      if (adm.deletedAt) {
-        return res.status(404).json({ error: `Admission #${adm.id} could not be found.`, code: 'NOT_FOUND' });
-      }
-      if (adm.status !== 'Accepted') {
-        return res.status(400).json({ error: `Admission #${adm.id} must be Accepted before handoff.`, code: 'VALIDATION_ERROR' });
-      }
-    }
-
-    const timestamp = new Date().toISOString();
-    const updates = await prisma.$transaction(admissions.map((adm) => {
-      const handoffNote = `Enrollment handoff completed by ${req.user.firstName || req.user.email} (${req.user.role}) on ${timestamp}`;
-      return prisma.admission.update({
-        where: { id: adm.id },
-        data: { notes: (adm.notes ? adm.notes + '\n\n' : '') + handoffNote },
-        include: { documents: true, academicYear: true, semester: true },
-      });
-    }));
+    const admissions = await prisma.admission.findMany({ where: { id: { in: ids }, deletedAt: null } });
+    const result = await completeEnrollmentHandoff({ db: prisma, ids, actorId: req.user.id });
 
     logAudit({
       userId: req.user.id,
       action: 'admission.bulk_handoff',
       entity: 'admission',
       entityId: null,
-      details: { ids, count: updates.length, handoffBy: req.user.role },
+      details: { ids, count: result.updatedIds.length, alreadyCompletedIds: result.alreadyCompletedIds, handoffBy: req.user.role },
       ipAddress: req.ip,
     });
 
@@ -1202,13 +1161,13 @@ export async function bulkHandoffAdmissions(req, res, next) {
 
     try {
       const io = getIo();
-      io.to('role_registrar').emit('admission_bulk_handoff', { ids, count: updates.length });
+      io.to('role_registrar').emit('admission_bulk_handoff', { ids: result.updatedIds, count: result.updatedIds.length });
       for (const adm of admissions) {
         io.to(`user_${adm.userId}`).emit('admission_handoff', { id: adm.id, bulk: true });
       }
     } catch (_) {}
 
-    res.json({ updated: updates.length });
+    res.json({ updated: result.updatedIds.length, alreadyCompleted: result.alreadyCompletedIds.length });
   } catch (err) { next(err); }
 }
 
@@ -1223,36 +1182,32 @@ export async function bulkUpdateStatus(req, res, next) {
       return res.status(400).json({ error: `Please select ${MAX_BULK_OPERATIONS} admissions or fewer per bulk update.`, code: 'VALIDATION_ERROR' });
     }
 
-    // Validate each admission's transition
-    const admissions = await prisma.admission.findMany({ where: { id: { in: ids } } });
-    for (const adm of admissions) {
-      const allowed = VALID_TRANSITIONS[adm.status] || [];
-      if (!allowed.includes(status)) {
-        return res.status(400).json({
-          error: `Admission #${adm.id} cannot be moved from "${adm.status}" to "${status}".`,
-          code: 'VALIDATION_ERROR',
-        });
-      }
-    }
+    const admissions = await prisma.admission.findMany({ where: { id: { in: ids }, deletedAt: null } });
+    const updated = await transitionAdmissions({ db: prisma, ids, targetStatus: status });
 
-    const result = await prisma.admission.updateMany({
-      where: { id: { in: ids } },
-      data: { status },
-    });
-
-    logAudit({ userId: req.user.id, action: 'admission.bulk_status_update', entity: 'admission', entityId: null, details: { ids, to: status, count: result.count }, ipAddress: req.ip });
+    logAudit({ userId: req.user.id, action: 'admission.bulk_status_update', entity: 'admission', entityId: null, details: { ids, to: status, count: updated.length }, ipAddress: req.ip });
 
     await invalidateAdmissionCaches(admissions.map((adm) => adm.userId));
 
     try {
       const io = getIo();
-      io.to('role_administrator').to('role_registrar').emit('admission_bulk_status_updated', { ids, status, count: result.count });
+      io.to('role_administrator').to('role_registrar').emit('admission_bulk_status_updated', { ids, status, count: updated.length });
       for (const adm of admissions) {
         io.to(`user_${adm.userId}`).emit('admission_status_updated', { id: adm.id, status, prevStatus: adm.status, trackingId: adm.trackingId, bulk: true });
       }
     } catch (_) {}
 
-    res.json({ updated: result.count });
+    for (const adm of admissions) {
+      sendAdmissionStatusEmail({
+        to: adm.email,
+        firstName: adm.firstName,
+        trackingId: adm.trackingId,
+        status,
+        notes: null,
+      });
+    }
+
+    res.json({ updated: updated.length });
   } catch (err) { next(err); }
 }
 
