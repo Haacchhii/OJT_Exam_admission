@@ -382,7 +382,10 @@ export const auditLogQuerySchema = z.object({
   ...paginationQuery,
   action: optionalString,
   entity: optionalString,
+  entityId: coerceOptionalInt,
   userId: coerceOptionalInt,
+  role: z.enum(ROLE_VALUES).optional(),
+  search: optionalString,
   from:   isoDateStr.optional(),
   to:     isoDateStr.optional(),
 });

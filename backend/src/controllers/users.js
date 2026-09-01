@@ -295,6 +295,7 @@ export async function createUser(req, res, next) {
             emailVerifyToken: null,
             emailVerifyExpires: null,
             mustChangePassword: !explicitPassword,
+            tokenVersion: { increment: 1 },
           },
         })
       : await prisma.user.create({
@@ -343,6 +344,22 @@ export async function updateUser(req, res, next) {
   try {
     const { firstName, middleName, lastName, email, role, status, password } = req.body;
     const id = Number(req.params.id);
+    const existingUser = await prisma.user.findUnique({
+      where: { id },
+      select: { id: true, email: true, role: true, status: true, deletedAt: true },
+    });
+    if (!existingUser || existingUser.deletedAt) {
+      return res.status(404).json({ error: 'We could not find this user.', code: 'NOT_FOUND' });
+    }
+    if (id === req.user.id && ((role !== undefined && role !== ROLES.ADMIN) || status === 'Inactive')) {
+      return res.status(409).json({ error: 'You cannot remove your own administrator access.', code: 'ADMIN_SELF_ROLE_CHANGE' });
+    }
+    if (existingUser.role === ROLES.ADMIN && (role !== undefined && role !== ROLES.ADMIN || status === 'Inactive')) {
+      const adminCount = await prisma.user.count({ where: { role: ROLES.ADMIN, status: 'Active', deletedAt: null } });
+      if (adminCount <= 1) {
+        return res.status(409).json({ error: 'At least one active administrator account is required.', code: 'LAST_ADMIN_REQUIRED' });
+      }
+    }
 
     // Only administrators can assign the administrator role
     if (role === ROLES.ADMIN && req.user.role !== ROLES.ADMIN) {
@@ -357,6 +374,9 @@ export async function updateUser(req, res, next) {
     if (role      !== undefined) data.role      = role;
     if (status    !== undefined) data.status    = status;
     if (password) data.passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+    if (role !== undefined || status !== undefined || password || email !== undefined) {
+      data.tokenVersion = { increment: 1 };
+    }
 
     if (role !== undefined && role !== ROLES.APPLICANT) {
       await prisma.applicantProfile.deleteMany({ where: { userId: id } });
@@ -380,7 +400,7 @@ export async function updateUser(req, res, next) {
 
     // If email is changing, also update ExamRegistration.userEmail to keep the link intact
     if (email !== undefined) {
-      const existing = await prisma.user.findUnique({ where: { id }, select: { email: true } });
+      const existing = existingUser;
       if (existing && existing.email !== email) {
         const verifyToken = env.EMAIL_VERIFICATION_REQUIRED ? crypto.randomBytes(32).toString('hex') : null;
         if (env.EMAIL_VERIFICATION_REQUIRED) {
@@ -404,6 +424,14 @@ export async function updateUser(req, res, next) {
         }
 
         await invalidateUserCaches();
+        logAudit({
+          userId: req.user.id,
+          action: 'user.update',
+          entity: 'user',
+          entityId: id,
+          details: { before: existingUser, after: { email: user.email, role: user.role, status: user.status }, fields: Object.keys(data) },
+          ipAddress: req.ip,
+        });
         return res.json({
           ...safifyUser(user),
           ...verification,
@@ -423,7 +451,7 @@ export async function updateUser(req, res, next) {
 
     await invalidateUserCaches();
 
-    logAudit({ userId: req.user.id, action: 'user.update', entity: 'user', entityId: id, details: { fields: Object.keys(data) }, ipAddress: req.ip });
+    logAudit({ userId: req.user.id, action: 'user.update', entity: 'user', entityId: id, details: { before: existingUser, after: { email: user.email, role: user.role, status: user.status }, fields: Object.keys(data) }, ipAddress: req.ip });
 
     res.json(safifyUser(user));
   } catch (err) { next(err); }
@@ -435,6 +463,11 @@ export async function deleteUser(req, res, next) {
     const id = Number(req.params.id);
     if (id === req.user.id) {
       return res.status(400).json({ error: 'You cannot delete your own account.', code: 'VALIDATION_ERROR' });
+    }
+    const target = await prisma.user.findUnique({ where: { id }, select: { role: true, status: true, deletedAt: true } });
+    if (target?.role === ROLES.ADMIN && target.status === 'Active' && !target.deletedAt) {
+      const adminCount = await prisma.user.count({ where: { role: ROLES.ADMIN, status: 'Active', deletedAt: null } });
+      if (adminCount <= 1) return res.status(409).json({ error: 'At least one active administrator account is required.', code: 'LAST_ADMIN_REQUIRED' });
     }
     // Perform an atomic update and detect whether any row was changed.
     const updateResult = await prisma.user.updateMany({ where: { id, deletedAt: null }, data: { deletedAt: new Date() } });
@@ -470,6 +503,11 @@ export async function bulkDeleteUsers(req, res, next) {
     }
 
     const users = await prisma.user.findMany({ where: { id: { in: safeIds } } });
+    const activeAdminsToDelete = users.filter(u => u.role === ROLES.ADMIN && u.status === 'Active' && !u.deletedAt).length;
+    if (activeAdminsToDelete > 0) {
+      const adminCount = await prisma.user.count({ where: { role: ROLES.ADMIN, status: 'Active', deletedAt: null } });
+      if (adminCount - activeAdminsToDelete < 1) return res.status(409).json({ error: 'At least one active administrator account is required.', code: 'LAST_ADMIN_REQUIRED' });
+    }
     const foundIds = users.map(u => u.id);
     const alreadyDeleted = users.filter(u => u.deletedAt).map(u => u.id);
 
@@ -497,7 +535,7 @@ export async function forcePasswordReset(req, res, next) {
 
     const user = await prisma.user.update({
       where: { id },
-      data: { mustChangePassword: true },
+      data: { mustChangePassword: true, tokenVersion: { increment: 1 } },
     });
 
     await invalidateUserCaches();
@@ -515,7 +553,11 @@ export async function setUserRole(req, res, next) {
     const { role } = req.body;
     const id = Number(req.params.id);
 
-    if (!role || !ROLES.find(r => r.value === role)) {
+    if (id === req.user.id && role !== ROLES.ADMIN) {
+      return res.status(409).json({ error: 'You cannot remove your own administrator access.', code: 'ADMIN_SELF_ROLE_CHANGE' });
+    }
+
+    if (!role || !Object.values(ROLES).includes(role)) {
       return res.status(400).json({ error: 'Invalid role.', code: 'VALIDATION_ERROR' });
     }
 
@@ -524,7 +566,14 @@ export async function setUserRole(req, res, next) {
       return res.status(403).json({ error: 'Only administrators can assign the administrator role.', code: 'FORBIDDEN' });
     }
 
-    const data = { role };
+    const existing = await prisma.user.findUnique({ where: { id }, select: { role: true, status: true, deletedAt: true } });
+    if (!existing || existing.deletedAt) return res.status(404).json({ error: 'We could not find this user.', code: 'NOT_FOUND' });
+    if (existing.role === ROLES.ADMIN && role !== ROLES.ADMIN && existing.status === 'Active') {
+      const adminCount = await prisma.user.count({ where: { role: ROLES.ADMIN, status: 'Active', deletedAt: null } });
+      if (adminCount <= 1) return res.status(409).json({ error: 'At least one active administrator account is required.', code: 'LAST_ADMIN_REQUIRED' });
+    }
+
+    const data = { role, tokenVersion: { increment: 1 } };
 
     // If changing to non-applicant role, remove applicant profile
     if (role !== ROLES.APPLICANT) {
@@ -538,7 +587,7 @@ export async function setUserRole(req, res, next) {
 
     await invalidateUserCaches();
 
-    logAudit({ userId: req.user.id, action: 'user.setRole', entity: 'user', entityId: id, details: { newRole: role }, ipAddress: req.ip });
+    logAudit({ userId: req.user.id, action: 'user.role-change', entity: 'user', entityId: id, details: { before: { role: existing.role }, after: { role } }, ipAddress: req.ip });
 
     res.json(safifyUser(user));
   } catch (err) { next(err); }

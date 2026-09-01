@@ -6,6 +6,7 @@ interface AuditLogParams {
   entity?: string;
   entityId?: number | string;
   userId?: string;
+  role?: string;
   from?: string;
   to?: string;
   search?: string;
