@@ -419,6 +419,7 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
         passingScore: pass,
         ...(yearId && { academicYearId: Number(yearId) }),
         ...(semId  && { semesterId:     Number(semId) }),
+        isActive: editExam?.isActive ?? false,
         questions,
       };
       if (editExam) {
@@ -447,7 +448,7 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
       const saved = await saveExam();
       if (!saved) return;
       // publish
-      const pubRes = await import('../../../api/exams').then(m => m.publishExam(saved.id));
+      await import('../../../api/exams').then(m => m.publishExam(saved.id));
       showToast(`Exam "${saved.title}" published and activated.`, 'success');
       clear();
       onDone();
@@ -779,7 +780,7 @@ export default function ExamBuilder({ editExam, onDone }: { editExam: Exam | nul
           {isSaving ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Saving...</> : <><Icon name="check" className="w-4 h-4" /> Save Exam</>}
         </button>
         <button onClick={handleAssignAndPublish} disabled={isSaving} className="border border-gold-400 text-gold-700 bg-gold-50 px-5 py-2.5 rounded-lg hover:bg-gold-100 disabled:opacity-60 inline-flex items-center gap-2">
-          <Icon name="rocket" className="w-4 h-4" /> Assign & Publish
+          <Icon name="rocket" className="w-4 h-4" /> Save & Publish
         </button>
         <button onClick={onDone} disabled={isSaving} className="border border-gray-300 text-gray-700 px-5 py-2.5 rounded-lg hover:bg-gray-50 disabled:opacity-50">Cancel</button>
       </div>

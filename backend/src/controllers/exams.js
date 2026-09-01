@@ -509,7 +509,7 @@ export async function createExam(req, res, next) {
         levelGroup: getLevelGroup(gradeLevel),
         durationMinutes,
         passingScore,
-        isActive: isActive ?? true,
+        isActive: isActive ?? false,
         ...(academicYearId && { academicYearId: Number(academicYearId) }),
         ...(semesterId && { semesterId: Number(semesterId) }),
         createdById: req.user.id,
@@ -535,6 +535,26 @@ export async function updateExam(req, res, next) {
       return res.status(400).json({ error: 'Entrance exams are only available for Grade 7 and above.', code: 'VALIDATION_ERROR' });
     }
 
+    const existing = await prisma.exam.findUnique({
+      where: { id },
+      select: { id: true, deletedAt: true, isActive: true, _count: { select: { questions: true, schedules: true } } },
+    });
+    if (!existing || existing.deletedAt) {
+      return res.status(404).json({ error: 'We could not find this exam.', code: 'NOT_FOUND' });
+    }
+    if (questions !== undefined && (existing.isActive || existing._count.schedules > 0)) {
+      return res.status(409).json({
+        error: 'Question content is locked after an exam is published or scheduled. Clone the exam to create a revised version.',
+        code: 'EXAM_CONTENT_LOCKED',
+      });
+    }
+    if (isActive === true && existing._count.questions === 0 && (!questions || questions.length === 0)) {
+      return res.status(409).json({
+        error: 'Add at least one question before activating this exam.',
+        code: 'EXAM_HAS_NO_QUESTIONS',
+      });
+    }
+
     // Update exam fields
     const data = {};
     if (title !== undefined)           data.title = title;
@@ -558,6 +578,7 @@ export async function updateExam(req, res, next) {
         return tx.exam.findUnique({ where: { id }, include: examDetailInclude });
       }, { timeout: 20000 });  // Increased from 10s → 20s for Vercel cold starts
       await invalidateExamCaches();
+      logAudit({ userId: req.user.id, action: 'exam.update', entity: 'exam', entityId: id, details: { fields: Object.keys(req.body) }, ipAddress: req.ip });
       return res.json(shapeExam(result));
     }
 
@@ -570,6 +591,7 @@ export async function updateExam(req, res, next) {
     await invalidateExamCaches();
 
     res.json(shapeExam(exam));
+    logAudit({ userId: req.user.id, action: 'exam.update', entity: 'exam', entityId: id, details: { fields: Object.keys(req.body) }, ipAddress: req.ip });
   } catch (err) { next(err); }
 }
 
@@ -637,8 +659,17 @@ export async function cloneExam(req, res, next) {
 export async function publishExam(req, res, next) {
   try {
     const id = Number(req.params.id);
-    const existing = await prisma.exam.findUnique({ where: { id } });
+    const existing = await prisma.exam.findUnique({
+      where: { id },
+      include: { _count: { select: { questions: true } } },
+    });
     if (!existing || existing.deletedAt) return res.status(404).json({ error: 'We could not find this exam.', code: 'NOT_FOUND' });
+    if (existing._count.questions === 0) {
+      return res.status(409).json({
+        error: 'Add at least one question before publishing this exam.',
+        code: 'EXAM_HAS_NO_QUESTIONS',
+      });
+    }
 
     const exam = await prisma.exam.update({ where: { id }, data: { isActive: true } });
 
