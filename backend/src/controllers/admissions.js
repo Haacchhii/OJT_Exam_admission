@@ -12,6 +12,7 @@ import env from '../config/env.js';
 import { resolveUploadedFilePath } from '../utils/uploadPaths.js';
 import { toManilaIsoDay } from '../utils/timezone.js';
 import { completeEnrollmentHandoff, transitionAdmissions } from '../services/admissionWorkflow.js';
+import { applicantOwnsRegistration, canAccessAdmissionDocuments } from '../utils/ownership.js';
 
 const ADMISSION_IN_PROGRESS = ['Submitted', 'Under Screening', 'Under Evaluation'];
 const REPORTS_DEFAULT_ADMISSIONS = 40;
@@ -1078,9 +1079,9 @@ export async function uploadDocuments(req, res, next) {
 
     await invalidateAdmissionCaches([admission.userId]);
 
-    // Return public URLs
-    const baseUrl = `${req.protocol}://${req.get('host')}/uploads`;
-    const urls = docs.map(d => `${baseUrl}/${d.filePath}`);
+    // Return ownership-aware preview URLs; stored filenames are never public routes.
+    const baseUrl = `${req.protocol}://${req.get('host')}/api/admissions/${admissionId}/documents`;
+    const urls = docs.map(d => `${baseUrl}/${d.id}/preview`);
     res.json({ urls });
   } catch (err) { next(err); }
 }
@@ -1281,7 +1282,7 @@ export async function trackApplication(req, res, next) {
       });
       if (registration) {
         // Ownership: applicants can only view their own tracking data
-        if (req.user.role === ROLES.APPLICANT && registration.userEmail !== req.user.email) {
+        if (req.user.role === ROLES.APPLICANT && !applicantOwnsRegistration(registration, req.user)) {
           return res.status(403).json({ error: 'You do not have permission to view this tracking record.', code: 'FORBIDDEN' });
         }
         results.type = 'exam';
@@ -1312,7 +1313,7 @@ export async function trackApplication(req, res, next) {
           },
         }).catch(() => null);
         if (registration) {
-          if (req.user.role === ROLES.APPLICANT && registration.userEmail !== req.user.email) {
+          if (req.user.role === ROLES.APPLICANT && !applicantOwnsRegistration(registration, req.user)) {
             return res.status(403).json({ error: 'You do not have permission to view this tracking record.', code: 'FORBIDDEN' });
           }
           results.type = 'exam';
@@ -1350,6 +1351,10 @@ export async function downloadDocument(req, res, next) {
   try {
     const admissionId = Number(req.params.id);
     const docId = Number(req.params.docId);
+
+    if (!canAccessAdmissionDocuments(req.user)) {
+      return res.status(403).json({ error: 'You do not have permission to download this document.', code: 'FORBIDDEN' });
+    }
 
     const doc = await prisma.admissionDocument.findUnique({ where: { id: docId } });
     if (!doc || doc.admissionId !== admissionId) {

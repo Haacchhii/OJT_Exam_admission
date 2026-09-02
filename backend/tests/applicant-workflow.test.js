@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   prisma: {
     admission: { findUnique: vi.fn(), findFirst: vi.fn() },
+    admissionDocument: { findUnique: vi.fn() },
+    admissionDocumentSubmission: { findFirst: vi.fn() },
     applicantProfile: { findUnique: vi.fn() },
     academicYear: { findFirst: vi.fn() },
     semester: { findFirst: vi.fn() },
@@ -39,7 +41,8 @@ vi.mock('../src/services/pdfService.js', () => ({
   savePdfToBuffer: vi.fn(),
 }));
 
-import { authorizeAdmissionDocumentUpload } from '../src/controllers/admissions.js';
+import { authorizeAdmissionDocumentUpload, downloadDocument, trackApplication } from '../src/controllers/admissions.js';
+import { previewDocument } from '../src/controllers/documentPreview.js';
 import { cancelRegistration, saveDraftAnswers, startExam } from '../src/controllers/examRegistrations.js';
 import { submitExam } from '../src/controllers/examSubmission.js';
 import { getResult } from '../src/controllers/results.js';
@@ -362,6 +365,64 @@ describe('applicant result privacy', () => {
     await exportExamResultPdf({
       params: { registrationId: '77' },
       user: { id: 901, email: 'applicant@example.com', role: 'applicant' },
+    }, res, vi.fn());
+
+    expect(res.statusCode).toBe(403);
+    expect(res.body.code).toBe('FORBIDDEN');
+  });
+});
+
+describe('applicant tracking privacy', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('does not let a matching email override a different exam registration owner', async () => {
+    mocks.prisma.examRegistration.findUnique.mockResolvedValue({
+      id: 77,
+      trackingId: 'EXM-PRIVATE',
+      userId: 902,
+      userEmail: 'applicant@example.com',
+      schedule: { exam: { title: 'Entrance Exam' } },
+      result: { id: 88 },
+    });
+    const res = responseRecorder();
+
+    await trackApplication({
+      params: { trackingId: 'EXM-PRIVATE' },
+      user: { id: 901, email: 'applicant@example.com', role: 'applicant' },
+    }, res, vi.fn());
+
+    expect(res.statusCode).toBe(403);
+    expect(res.body.code).toBe('FORBIDDEN');
+  });
+});
+
+describe('admission document role privacy', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('blocks teachers from downloading admission documents', async () => {
+    mocks.prisma.admissionDocument.findUnique.mockResolvedValue({
+      id: 51,
+      admissionId: 41,
+      documentName: 'birth-certificate.pdf',
+      filePath: 'stored.pdf',
+    });
+    const res = responseRecorder();
+
+    await downloadDocument({
+      params: { id: '41', docId: '51' },
+      user: { id: 700, role: 'teacher' },
+    }, res, vi.fn());
+
+    expect(res.statusCode).toBe(403);
+    expect(res.body.code).toBe('FORBIDDEN');
+  });
+
+  it('blocks teachers from previewing admission documents', async () => {
+    const res = responseRecorder();
+
+    await previewDocument({
+      params: { id: '41', docId: '51' },
+      user: { id: 700, role: 'teacher' },
     }, res, vi.fn());
 
     expect(res.statusCode).toBe(403);

@@ -5,6 +5,7 @@ import { existsSync } from 'fs';
 import env from '../config/env.js';
 import { ROLES, DOC_CACHE_MAX_AGE, MAX_KV_PAIRS } from '../utils/constants.js';
 import { resolveUploadedFilePath } from '../utils/uploadPaths.js';
+import { canAccessAdmissionDocuments } from '../utils/ownership.js';
 
 // Lazy-loaded heavy modules
 let Tesseract = null;
@@ -183,6 +184,9 @@ async function processExtractionQueue() {
 
 // ── Ownership helper ──────────────────────────────────
 async function verifyAccess(user, admissionId) {
+  if (!canAccessAdmissionDocuments(user)) {
+    return { error: 'Access denied', code: 'FORBIDDEN', status: 403 };
+  }
   const admission = await prisma.admission.findUnique({ where: { id: admissionId } });
   if (!admission) return { error: 'Admission not found', status: 404 };
   if (user.role === ROLES.APPLICANT && admission.userId !== user.id) {
@@ -203,7 +207,7 @@ export async function previewDocument(req, res, next) {
     const docId = Number(req.params.docId);
 
     const access = await verifyAccess(user, admissionId);
-    if (access.error) return res.status(access.status).json({ error: access.error });
+    if (access.error) return res.status(access.status).json({ error: access.error, code: access.code });
 
     const doc = await prisma.admissionDocument.findUnique({ where: { id: docId } });
     if (!doc || doc.admissionId !== admissionId) {
