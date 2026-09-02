@@ -31,6 +31,7 @@ router.get('/ops-bootstrap', authorize(ROLES.ADMIN, ROLES.REGISTRAR), validateQu
 
 // Tracking (search by tracking ID — any authenticated user)
 router.get('/track/:trackingId', ctrl.trackApplication);
+router.get('/:id/history', authorize(ROLES.ADMIN, ROLES.REGISTRAR), ctrl.getAdmissionHistory);
 
 // Admission comments thread
 router.get('/:admissionId/comments', authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER), validateParams(admissionIdParamSchema), commentsCtrl.getAdmissionComments);

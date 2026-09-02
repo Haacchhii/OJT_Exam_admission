@@ -1106,6 +1106,24 @@ export async function updateStatus(req, res, next) {
   } catch (err) { next(err); }
 }
 
+export async function getAdmissionHistory(req, res, next) {
+  try {
+    const id = Number(req.params.id);
+    const admission = await prisma.admission.findFirst({ where: { id, deletedAt: null }, select: { id: true } });
+    if (!admission) return res.status(404).json({ error: 'We could not find this admission record.', code: 'NOT_FOUND' });
+    const logs = await prisma.auditLog.findMany({
+      where: { entity: 'admission', entityId: id },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      include: { user: { select: { id: true, firstName: true, middleName: true, lastName: true, role: true } } },
+    });
+    res.json(logs.map(log => ({
+      ...log,
+      details: log.details ? (() => { try { return JSON.parse(log.details); } catch { return log.details; } })() : null,
+    })));
+  } catch (err) { next(err); }
+}
+
 // POST /api/admissions/:id/handoff  — registrar marks enrollment handoff completed
 export async function handoffAdmission(req, res, next) {
   try {
@@ -1266,6 +1284,9 @@ export async function trackApplication(req, res, next) {
         include: { documents: true, academicYear: true, semester: true },
       }).catch(() => null);
       if (admission) {
+        if (req.user.role === ROLES.APPLICANT && admission.userId !== req.user.id) {
+          return res.status(403).json({ error: 'You do not have permission to view this tracking record.', code: 'FORBIDDEN' });
+        }
         results.type = 'admission';
         results.trackingId = admission.trackingId;
         results.data = shapeAdmission(admission);
@@ -1278,6 +1299,9 @@ export async function trackApplication(req, res, next) {
           },
         }).catch(() => null);
         if (registration) {
+          if (req.user.role === ROLES.APPLICANT && registration.userEmail !== req.user.email) {
+            return res.status(403).json({ error: 'You do not have permission to view this tracking record.', code: 'FORBIDDEN' });
+          }
           results.type = 'exam';
           results.trackingId = registration.trackingId;
           results.data = registration;

@@ -1,6 +1,6 @@
 ﻿import { showToast, showErrorToast } from '../../../components/Toast';
 import { useConfirm } from '../../../components/ConfirmDialog';
-import { getAdmission, updateAdmissionStatus, VALID_TRANSITIONS } from '../../../api/admissions';
+import { getAdmission, getAdmissionHistory, updateAdmissionStatus, VALID_TRANSITIONS } from '../../../api/admissions';
 import { useAsync } from '../../../hooks/useAsync';
 import { formatDate, formatDateRange, formatPersonName, badgeClass } from '../../../utils/helpers';
 import DocumentReview from '../../../components/DocumentReview';
@@ -10,7 +10,6 @@ import Icon from '../../../components/Icons';
 import { SCHOOL_NAME, SCHOOL_BRAND, SCHOOL_SUBTITLE, SCHOOL_LOGO_PATH, SCHOOL_ADDRESS, SCHOOL_PHONE } from '../../../utils/constants';
 import { useAuth } from '../../../context/AuthContext';
 import type { Admission } from '../../../types';
-import { auditApi } from '../../../api/auditLog';
 import { useEffect, useMemo, useState } from 'react';
 
 interface DProps {
@@ -60,8 +59,8 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
 
   const { data: historyData, loading: historyLoading, refetch: refetchHistory } = useAsync(async () => {
     if (!adm?.id) return null;
-    return auditApi.list({ entity: 'admission', entityId: adm.id, limit: 20, page: 1 });
-  }, [adm?.id], 0, { resourcePrefixes: ['/audit-logs'] });
+    return getAdmissionHistory(adm.id);
+  }, [adm?.id], 0, { resourcePrefixes: ['/admissions'] });
 
   const [statusVal, setStatusVal] = useState('');
   const [notes, setNotes] = useState('');
@@ -82,7 +81,7 @@ export default function AdmissionDetail({ admissionId, onBack }: Props) {
   }, [fetchedAdm?.id, fetchedAdm?.status, fetchedAdm?.notes]);
 
   const statusHistory = useMemo(() => {
-    const logs = historyData?.data || [];
+    const logs = historyData || [];
     return logs.filter((log: any) =>
       log.action === 'admission.status_update' ||
       log.action === 'admission.handoff' ||
