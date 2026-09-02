@@ -131,6 +131,43 @@ Add workflow smoke tests, performance budgets, health monitoring, and deployment
 - LCP is at most 2.5 s, INP at most 200 ms, and CLS at most 0.1 on representative mobile conditions.
 - Tests, lint, builds, security triage, deployment smoke tests, and rollback notes are complete.
 
+## Phase 4: Data Integrity and Recovery
+
+### Task 12: Audit production data without mutation
+
+Run read-only checks for orphaned records, invalid role/status combinations, duplicate active
+registrations, schedule-window contradictions, incomplete admission handoffs, and notification
+ownership. Record counts and stable identifiers without exposing personal data.
+
+### Task 13: Verify migrations and repair tooling
+
+Compare Prisma schema expectations with deployed migration history. Any required repair must be
+idempotent, narrowly scoped, dry-run capable, and covered by a regression test before it can be
+considered for production.
+
+### Task 14: Prove backup and recovery
+
+Create a backup using the supported project tooling, validate its manifest and record counts, and
+restore only into an isolated non-production database. Never overwrite or reset production.
+
+**Acceptance criteria for Tasks 12-14:**
+
+- Every integrity query is read-only and repeatable.
+- Every anomaly is classified as defect, expected legacy state, or accepted limitation.
+- Backup output excludes secrets and is restorable into an isolated target.
+- Restored critical-table counts and representative relationships match the backup manifest.
+
+## Execution Order for the Remaining Audit (September 2026)
+
+1. Applicant/student end-to-end workflow and authorization
+2. Cross-role integration, notifications, and cache/realtime consistency
+3. Production data integrity and migration/schema consistency
+4. Performance, security, backup/recovery, and release readiness
+
+Each implementation slice will begin with a failing regression test, touch no more than five files
+where practical, and receive its own verification evidence. Production writes, destructive database
+operations, pull-request creation, and merging remain explicit confirmation points.
+
 ## Risks
 
 | Risk | Impact | Mitigation |

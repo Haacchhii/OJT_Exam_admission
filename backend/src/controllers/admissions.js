@@ -1026,14 +1026,27 @@ export async function createAdmission(req, res, next) {
 }
 
 // POST /api/admissions/:id/documents  (multipart/form-data)
+export async function authorizeAdmissionDocumentUpload(req, res, next) {
+  try {
+    const admissionId = Number(req.params.id);
+    const admission = await prisma.admission.findUnique({ where: { id: admissionId } });
+    if (!admission || admission.deletedAt) {
+      return res.status(404).json({ error: 'We could not find this admission record.', code: 'NOT_FOUND' });
+    }
+    if (req.user.role === ROLES.APPLICANT && admission.userId !== req.user.id) {
+      return res.status(403).json({ error: 'You do not have permission to upload documents for this admission.', code: 'FORBIDDEN' });
+    }
+    req.admissionForDocumentUpload = admission;
+    next();
+  } catch (err) { next(err); }
+}
+
 export async function uploadDocuments(req, res, next) {
   try {
     const admissionId = Number(req.params.id);
-    // Ownership check
-    const admission = await prisma.admission.findUnique({ where: { id: admissionId } });
-    if (!admission) return res.status(404).json({ error: 'We could not find this admission record.', code: 'NOT_FOUND' });
-    if (req.user.role === ROLES.APPLICANT && admission.userId !== req.user.id) {
-      return res.status(403).json({ error: 'You do not have permission to upload documents for this admission.', code: 'FORBIDDEN' });
+    const admission = req.admissionForDocumentUpload;
+    if (!admission || admission.id !== admissionId) {
+      return res.status(500).json({ error: 'Document upload authorization was not completed.', code: 'INTERNAL_ERROR' });
     }
     const files = req.files;
     if (!files?.length) {
