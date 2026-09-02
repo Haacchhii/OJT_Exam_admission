@@ -11,7 +11,8 @@ const mocks = vi.hoisted(() => ({
     exam: { findUnique: vi.fn() },
     submittedAnswer: { createMany: vi.fn() },
     essayAnswer: { createMany: vi.fn() },
-    examResult: { create: vi.fn() },
+    examResult: { create: vi.fn(), findUnique: vi.fn() },
+    user: { findUnique: vi.fn() },
     examSchedule: { update: vi.fn(), updateMany: vi.fn() },
     $transaction: vi.fn(),
   },
@@ -32,10 +33,17 @@ vi.mock('../src/utils/email.js', () => ({
 vi.mock('../src/utils/socket.js', () => ({
   getIo: vi.fn(() => ({ to: vi.fn().mockReturnThis(), emit: vi.fn() })),
 }));
+vi.mock('../src/services/pdfService.js', () => ({
+  generateExamResultPdf: vi.fn(),
+  generateAdmissionReceiptPdf: vi.fn(),
+  savePdfToBuffer: vi.fn(),
+}));
 
 import { authorizeAdmissionDocumentUpload } from '../src/controllers/admissions.js';
 import { cancelRegistration, saveDraftAnswers, startExam } from '../src/controllers/examRegistrations.js';
 import { submitExam } from '../src/controllers/examSubmission.js';
+import { getResult } from '../src/controllers/results.js';
+import { exportExamResultPdf } from '../src/controllers/pdfExport.js';
 
 function responseRecorder() {
   return {
@@ -43,6 +51,8 @@ function responseRecorder() {
     body: undefined,
     status(code) { this.statusCode = code; return this; },
     json(body) { this.body = body; return this; },
+    setHeader: vi.fn(),
+    send(body) { this.body = body; return this; },
     end() { return this; },
   };
 }
@@ -283,5 +293,78 @@ describe('applicant registration cancellation integrity', () => {
 
     expect(res.statusCode).toBe(204);
     expect(slotsTaken).toBe(0);
+  });
+});
+
+describe('applicant result privacy', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('does not let a matching email override a different registration owner', async () => {
+    mocks.prisma.examResult.findUnique.mockResolvedValue({
+      id: 88,
+      registrationId: 77,
+      percentage: 90,
+      registration: {
+        id: 77,
+        userId: 902,
+        userEmail: 'applicant@example.com',
+        schedule: { exam: { title: 'Entrance Exam' } },
+      },
+    });
+    const res = responseRecorder();
+
+    await getResult({
+      params: { registrationId: '77' },
+      user: { id: 901, email: 'applicant@example.com', role: 'applicant' },
+    }, res, vi.fn());
+
+    expect(res.statusCode).toBe(403);
+    expect(res.body.code).toBe('FORBIDDEN');
+  });
+
+  it('keeps normalized email access for legacy registrations without a user id', async () => {
+    mocks.prisma.examResult.findUnique.mockResolvedValue({
+      id: 88,
+      registrationId: 77,
+      percentage: 90,
+      registration: {
+        id: 77,
+        userId: null,
+        userEmail: ' Applicant@Example.com ',
+        schedule: { exam: { title: 'Entrance Exam' } },
+      },
+    });
+    const res = responseRecorder();
+
+    await getResult({
+      params: { registrationId: '77' },
+      user: { id: 901, email: 'applicant@example.com', role: 'applicant' },
+    }, res, vi.fn());
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.id).toBe(88);
+  });
+
+  it('blocks result PDF export when email matches but the registration belongs to another user', async () => {
+    mocks.prisma.examResult.findFirst = vi.fn().mockResolvedValue({
+      id: 88,
+      registrationId: 77,
+      registration: {
+        id: 77,
+        userId: 902,
+        userEmail: 'applicant@example.com',
+        user: { id: 902 },
+        schedule: { exam: { title: 'Entrance Exam' } },
+      },
+    });
+    const res = responseRecorder();
+
+    await exportExamResultPdf({
+      params: { registrationId: '77' },
+      user: { id: 901, email: 'applicant@example.com', role: 'applicant' },
+    }, res, vi.fn());
+
+    expect(res.statusCode).toBe(403);
+    expect(res.body.code).toBe('FORBIDDEN');
   });
 });

@@ -4,6 +4,7 @@
 
 import prisma from '../config/db.js';
 import { ROLES } from '../utils/constants.js';
+import { applicantOwnsRegistration } from '../utils/ownership.js';
 import { generateExamResultPdf, generateAdmissionReceiptPdf, savePdfToBuffer } from '../services/pdfService.js';
 
 export async function exportExamResultPdf(req, res, next) {
@@ -34,9 +35,7 @@ export async function exportExamResultPdf(req, res, next) {
 
     // Ownership check: must be the result owner or staff
     const isOwner =
-      (user.role === ROLES.APPLICANT &&
-        (result.registration.userId === user.id ||
-          result.registration.userEmail.toLowerCase() === user.email.toLowerCase())) ||
+      (user.role === ROLES.APPLICANT && applicantOwnsRegistration(result.registration, user)) ||
       [ROLES.ADMIN, ROLES.REGISTRAR, ROLES.TEACHER].includes(user.role);
 
     if (!isOwner) {
