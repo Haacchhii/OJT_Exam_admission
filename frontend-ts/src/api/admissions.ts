@@ -1,5 +1,5 @@
 import { client, qs, getToken, type RequestOptions } from './client';
-import type { Admission, AdmissionStats, AdmissionStatus, AcademicYear, Semester, ExamRegistration, ExamResult } from '../types';
+import type { Admission, AdmissionStats, AdmissionStatus, AcademicYear, Semester, ExamRegistration, ExamResult, AuditLog } from '../types';
 
 export const VALID_TRANSITIONS: Record<string, AdmissionStatus[]> = {
   'Submitted': ['Under Screening', 'Rejected'],
@@ -152,6 +152,10 @@ export async function getAdmissions(params?: AdmissionParams, options?: RequestO
 
 export async function getAdmission(id: number) {
   return client.get<Admission>(`/admissions/${id}`);
+}
+
+export async function getAdmissionHistory(id: number) {
+  return client.get<AuditLog[]>(`/admissions/${id}/history`);
 }
 
 export async function getAdmissionsPage(params?: AdmissionParams) {
