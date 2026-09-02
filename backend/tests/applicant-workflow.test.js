@@ -8,6 +8,11 @@ const mocks = vi.hoisted(() => ({
     semester: { findFirst: vi.fn() },
     examQuestion: { count: vi.fn() },
     examRegistration: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
+    exam: { findUnique: vi.fn() },
+    submittedAnswer: { createMany: vi.fn() },
+    essayAnswer: { createMany: vi.fn() },
+    examResult: { create: vi.fn() },
+    $transaction: vi.fn(),
   },
 }));
 
@@ -29,6 +34,7 @@ vi.mock('../src/utils/socket.js', () => ({
 
 import { authorizeAdmissionDocumentUpload } from '../src/controllers/admissions.js';
 import { startExam } from '../src/controllers/examRegistrations.js';
+import { submitExam } from '../src/controllers/examSubmission.js';
 
 function responseRecorder() {
   return {
@@ -132,5 +138,69 @@ describe('applicant exam start integrity', () => {
     expect(firstNext).not.toHaveBeenCalled();
     expect(secondNext).not.toHaveBeenCalled();
     expect([first.statusCode, second.statusCode].sort()).toEqual([200, 409]);
+  });
+});
+
+describe('applicant exam submission integrity', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('allows only one concurrent final submission to create result records', async () => {
+    const registration = {
+      id: 77,
+      userId: 901,
+      userEmail: 'applicant@example.com',
+      status: 'started',
+      startedAt: new Date(),
+      draftAnswers: null,
+      schedule: {
+        examId: 12,
+        examWindowEndAt: new Date(Date.now() + 3_600_000),
+      },
+    };
+    const exam = {
+      id: 12,
+      title: 'Entrance Exam',
+      durationMinutes: 60,
+      passingScore: 75,
+      questions: [{
+        id: 5,
+        questionType: 'mc',
+        points: 1,
+        choices: [{ id: 21, isCorrect: true }],
+      }],
+    };
+    mocks.prisma.examRegistration.findUnique.mockResolvedValue(registration);
+    mocks.prisma.exam.findUnique.mockResolvedValue(exam);
+    mocks.prisma.examRegistration.update.mockResolvedValue({ ...registration, status: 'done' });
+    mocks.prisma.submittedAnswer.createMany.mockResolvedValue({ count: 1 });
+    mocks.prisma.examResult.create.mockResolvedValue({ id: 88 });
+
+    let claimed = false;
+    mocks.prisma.examRegistration.updateMany.mockImplementation(async () => {
+      if (claimed) return { count: 0 };
+      claimed = true;
+      return { count: 1 };
+    });
+    mocks.prisma.$transaction.mockImplementation(async (work) => {
+      if (typeof work === 'function') return work(mocks.prisma);
+      return Promise.all(work);
+    });
+
+    const first = responseRecorder();
+    const second = responseRecorder();
+    const req = {
+      body: { registrationId: 77, answers: { 5: 21 } },
+      user: { id: 901, email: 'applicant@example.com', firstName: 'Applicant', role: 'applicant' },
+      ip: '127.0.0.1',
+    };
+
+    await Promise.all([
+      submitExam(req, first, vi.fn()),
+      submitExam(req, second, vi.fn()),
+    ]);
+
+    expect([first.statusCode, second.statusCode].sort()).toEqual([200, 409]);
+    expect(mocks.prisma.submittedAnswer.createMany).toHaveBeenCalledOnce();
+    expect(mocks.prisma.examResult.create).toHaveBeenCalledOnce();
   });
 });
