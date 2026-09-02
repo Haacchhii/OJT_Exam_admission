@@ -33,7 +33,7 @@ vi.mock('../src/utils/socket.js', () => ({
 }));
 
 import { authorizeAdmissionDocumentUpload } from '../src/controllers/admissions.js';
-import { startExam } from '../src/controllers/examRegistrations.js';
+import { saveDraftAnswers, startExam } from '../src/controllers/examRegistrations.js';
 import { submitExam } from '../src/controllers/examSubmission.js';
 
 function responseRecorder() {
@@ -202,5 +202,49 @@ describe('applicant exam submission integrity', () => {
     expect([first.statusCode, second.statusCode].sort()).toEqual([200, 409]);
     expect(mocks.prisma.submittedAnswer.createMany).toHaveBeenCalledOnce();
     expect(mocks.prisma.examResult.create).toHaveBeenCalledOnce();
+  });
+});
+
+describe('applicant autosave ordering', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('does not let a delayed older draft overwrite a newer draft', async () => {
+    let stored = { revision: 0, answers: null };
+    mocks.prisma.examRegistration.findUnique.mockImplementation(async () => ({
+      id: 77,
+      userId: 901,
+      userEmail: 'applicant@example.com',
+      status: 'started',
+      startedAt: new Date(),
+      draftRevision: stored.revision,
+      draftAnswers: stored.answers,
+      schedule: {
+        examWindowEndAt: new Date(Date.now() + 3_600_000),
+        exam: { durationMinutes: 60 },
+      },
+    }));
+    mocks.prisma.examRegistration.update.mockImplementation(async ({ data }) => {
+      stored = {
+        revision: data.draftRevision ?? stored.revision,
+        answers: data.draftAnswers,
+      };
+      return { id: 77 };
+    });
+    mocks.prisma.examRegistration.updateMany.mockImplementation(async ({ where, data }) => {
+      if (stored.revision >= where.draftRevision.lt) return { count: 0 };
+      stored = { revision: data.draftRevision, answers: data.draftAnswers };
+      return { count: 1 };
+    });
+
+    const user = { id: 901, email: 'applicant@example.com', role: 'applicant' };
+    await saveDraftAnswers({
+      params: { id: '77' }, user, body: { answers: { 5: 21 }, revision: 2 },
+    }, responseRecorder(), vi.fn());
+    await saveDraftAnswers({
+      params: { id: '77' }, user, body: { answers: { 5: 20 }, revision: 1 },
+    }, responseRecorder(), vi.fn());
+
+    expect(stored.revision).toBe(2);
+    expect(JSON.parse(stored.answers)).toEqual({ 5: 21 });
   });
 });

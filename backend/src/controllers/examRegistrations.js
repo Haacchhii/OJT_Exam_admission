@@ -540,13 +540,19 @@ export async function saveDraftAnswers(req, res, next) {
       });
     }
 
-    const { answers } = req.body;
-    await prisma.examRegistration.update({
-      where: { id },
-      data: { draftAnswers: JSON.stringify(answers) },
-    });
+    const { answers, revision } = req.body;
+    const draftAnswers = JSON.stringify(answers);
+    const save = revision == null
+      ? await prisma.examRegistration.updateMany({
+        where: { id, status: 'started', draftRevision: 0 },
+        data: { draftAnswers },
+      })
+      : await prisma.examRegistration.updateMany({
+        where: { id, status: 'started', draftRevision: { lt: revision } },
+        data: { draftAnswers, draftRevision: revision },
+      });
 
-    res.json({ ok: true });
+    res.json({ ok: true, saved: save.count === 1 });
   } catch (err) { next(err); }
 }
 

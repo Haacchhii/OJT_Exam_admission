@@ -185,6 +185,8 @@ export interface ExamRegistration {
   status: RegistrationStatus;
   startedAt: string | null;
   submittedAt: string | null;
+  draftAnswers?: string | null;
+  draftRevision?: number;
   createdAt: string;
   schedule?: ExamSchedule;
   result?: ExamResult | null;

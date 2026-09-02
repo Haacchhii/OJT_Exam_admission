@@ -415,6 +415,7 @@ export const updateScheduleSchema = z.object({
 });
 
 export const saveDraftSchema = z.object({
+  revision: z.number().int().positive().max(2147483647).optional(),
   answers: z.record(
     z.string(),
     z.union([
