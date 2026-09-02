@@ -490,10 +490,18 @@ export async function startExam(req, res, next) {
       });
     }
 
-    const updated = await prisma.examRegistration.update({
-      where: { id },
-      data: { status: 'started', startedAt: new Date() },
+    const startedAt = new Date();
+    const claim = await prisma.examRegistration.updateMany({
+      where: { id, status: 'scheduled' },
+      data: { status: 'started', startedAt },
     });
+    if (claim.count !== 1) {
+      return res.status(409).json({
+        error: 'This exam was already started by another request. Refresh to continue the active attempt.',
+        code: 'EXAM_ALREADY_STARTED',
+      });
+    }
+    const updated = { ...reg, status: 'started', startedAt };
 
     await invalidateMyRegistrationCaches(req.user.id);
     await invalidateEmployeeRegistrationCaches();
