@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
     submittedAnswer: { createMany: vi.fn() },
     essayAnswer: { createMany: vi.fn() },
     examResult: { create: vi.fn() },
+    examSchedule: { update: vi.fn(), updateMany: vi.fn() },
     $transaction: vi.fn(),
   },
 }));
@@ -33,7 +34,7 @@ vi.mock('../src/utils/socket.js', () => ({
 }));
 
 import { authorizeAdmissionDocumentUpload } from '../src/controllers/admissions.js';
-import { saveDraftAnswers, startExam } from '../src/controllers/examRegistrations.js';
+import { cancelRegistration, saveDraftAnswers, startExam } from '../src/controllers/examRegistrations.js';
 import { submitExam } from '../src/controllers/examSubmission.js';
 
 function responseRecorder() {
@@ -42,6 +43,7 @@ function responseRecorder() {
     body: undefined,
     status(code) { this.statusCode = code; return this; },
     json(body) { this.body = body; return this; },
+    end() { return this; },
   };
 }
 
@@ -246,5 +248,40 @@ describe('applicant autosave ordering', () => {
 
     expect(stored.revision).toBe(2);
     expect(JSON.parse(stored.answers)).toEqual({ 5: 21 });
+  });
+});
+
+describe('applicant registration cancellation integrity', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('never decrements schedule capacity below zero when counters have drifted', async () => {
+    let slotsTaken = 0;
+    mocks.prisma.examRegistration.findUnique.mockResolvedValue({
+      id: 77,
+      userId: 901,
+      userEmail: 'applicant@example.com',
+      scheduleId: 12,
+      status: 'scheduled',
+    });
+    mocks.prisma.examRegistration.delete = vi.fn().mockResolvedValue({ id: 77 });
+    mocks.prisma.examSchedule.update.mockImplementation(async ({ data }) => {
+      slotsTaken -= data.slotsTaken.decrement;
+      return { id: 12, slotsTaken };
+    });
+    mocks.prisma.examSchedule.updateMany.mockImplementation(async () => {
+      if (slotsTaken <= 0) return { count: 0 };
+      slotsTaken -= 1;
+      return { count: 1 };
+    });
+    mocks.prisma.$transaction.mockImplementation(async (work) => work(mocks.prisma));
+
+    const res = responseRecorder();
+    await cancelRegistration({
+      params: { id: '77' },
+      user: { id: 901, email: 'applicant@example.com', role: 'applicant' },
+    }, res, vi.fn());
+
+    expect(res.statusCode).toBe(204);
+    expect(slotsTaken).toBe(0);
   });
 });

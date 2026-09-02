@@ -573,8 +573,8 @@ export async function cancelRegistration(req, res, next) {
 
     await prisma.$transaction(async (tx) => {
       await tx.examRegistration.delete({ where: { id } });
-      await tx.examSchedule.update({
-        where: { id: reg.scheduleId },
+      await tx.examSchedule.updateMany({
+        where: { id: reg.scheduleId, slotsTaken: { gt: 0 } },
         data: { slotsTaken: { decrement: 1 } },
       });
     });
