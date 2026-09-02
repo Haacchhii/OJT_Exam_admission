@@ -10,6 +10,20 @@ function validateDateWindow(startDate, endDate, label) {
   return null;
 }
 
+function audit(req, action, entity, entityId, details) {
+  return logAudit({ userId: req.user.id, action, entity, entityId, details, ipAddress: req.ip });
+}
+
+function validateWithinParent(startDate, endDate, parent, label) {
+  if (parent?.startDate && startDate && new Date(startDate) < new Date(parent.startDate)) {
+    return `${label} startDate must be within its academic year`;
+  }
+  if (parent?.endDate && endDate && new Date(endDate) > new Date(parent.endDate)) {
+    return `${label} endDate must be within its academic year`;
+  }
+  return null;
+}
+
 // ──────────────────────────────────────────────────────
 // ACADEMIC YEARS
 // ──────────────────────────────────────────────────────
@@ -77,22 +91,18 @@ export async function createAcademicYear(req, res, next) {
     }
 
     // If setting as active, deactivate others
-    if (isActive) await prisma.academicYear.updateMany({ data: { isActive: false } });
+    const created = await prisma.$transaction(async tx => {
+      if (isActive) await tx.academicYear.updateMany({ data: { isActive: false } });
+      return tx.academicYear.create({
+        data: { year, isActive: isActive ?? false, startDate: startDate ? new Date(startDate) : null, endDate: endDate ? new Date(endDate) : null },
+        include: { semesters: true },
+      });
+    }, { isolationLevel: 'Serializable' });
 
-    const created = await prisma.academicYear.create({
-      data: {
-        year,
-        isActive: isActive ?? false,
-        startDate: startDate ? new Date(startDate) : null,
-        endDate:   endDate   ? new Date(endDate)   : null,
-      },
-      include: { semesters: true },
-    });
-
-    await logAudit(req, 'academic_year.create', 'academic_year', created.id, { year });
+    await audit(req, 'academic_year.create', 'academic_year', created.id, { year, isActive: created.isActive, startDate, endDate });
     const createSync = await syncAllApplicantStatuses();
     if (createSync.changedCount > 0) {
-      await logAudit(req, 'user.status.period_sync', 'user', null, {
+      await audit(req, 'user.status.period_sync', 'user', null, {
         reason: 'academic_year.create',
         status: createSync.status,
         changedCount: createSync.changedCount,
@@ -114,20 +124,24 @@ export async function updateAcademicYear(req, res, next) {
   try {
     const id = Number(req.params.id);
     const { year, isActive, startDate, endDate } = req.body;
+    const existing = await prisma.academicYear.findUnique({ where: { id } });
+    if (!existing) return res.status(404).json({ error: 'Academic year not found', code: 'NOT_FOUND' });
 
     if (year && !/^\d{4}-\d{4}$/.test(year)) {
       return res.status(400).json({ error: 'Year must be in format YYYY-YYYY', code: 'VALIDATION_ERROR' });
     }
 
-    const dateError = validateDateWindow(startDate, endDate, 'Academic year');
+    const nextStart = startDate !== undefined ? startDate : existing.startDate;
+    const nextEnd = endDate !== undefined ? endDate : existing.endDate;
+    const dateError = validateDateWindow(nextStart, nextEnd, 'Academic year');
     if (dateError) {
       return res.status(400).json({ error: dateError, code: 'VALIDATION_ERROR' });
     }
 
     // If activating, deactivate others first
-    if (isActive) await prisma.academicYear.updateMany({ where: { id: { not: id } }, data: { isActive: false } });
-
-    const updated = await prisma.academicYear.update({
+    const updated = await prisma.$transaction(async tx => {
+      if (isActive) await tx.academicYear.updateMany({ where: { id: { not: id } }, data: { isActive: false } });
+      return tx.academicYear.update({
       where: { id },
       data: {
         ...(year      !== undefined && { year }),
@@ -136,12 +150,13 @@ export async function updateAcademicYear(req, res, next) {
         ...(endDate   !== undefined && { endDate:   endDate   ? new Date(endDate)   : null }),
       },
       include: { semesters: true },
-    });
+      });
+    }, { isolationLevel: 'Serializable' });
 
-    await logAudit(req, 'academic_year.update', 'academic_year', id, { year });
+    await audit(req, 'academic_year.update', 'academic_year', id, { before: existing, after: updated });
     const updateSync = await syncAllApplicantStatuses();
     if (updateSync.changedCount > 0) {
-      await logAudit(req, 'user.status.period_sync', 'user', null, {
+      await audit(req, 'user.status.period_sync', 'user', null, {
         reason: 'academic_year.update',
         status: updateSync.status,
         changedCount: updateSync.changedCount,
@@ -163,10 +178,10 @@ export async function deleteAcademicYear(req, res, next) {
   try {
     const id = Number(req.params.id);
     await prisma.academicYear.delete({ where: { id } });
-    await logAudit(req, 'academic_year.delete', 'academic_year', id);
+    await audit(req, 'academic_year.delete', 'academic_year', id);
     const deleteSync = await syncAllApplicantStatuses();
     if (deleteSync.changedCount > 0) {
-      await logAudit(req, 'user.status.period_sync', 'user', null, {
+      await audit(req, 'user.status.period_sync', 'user', null, {
         reason: 'academic_year.delete',
         status: deleteSync.status,
         changedCount: deleteSync.changedCount,
@@ -215,13 +230,15 @@ export async function createSemester(req, res, next) {
     if (dateError) {
       return res.status(400).json({ error: dateError, code: 'VALIDATION_ERROR' });
     }
+    const parent = await prisma.academicYear.findUnique({ where: { id: Number(academicYearId) } });
+    if (!parent) return res.status(404).json({ error: 'Academic year not found', code: 'NOT_FOUND' });
+    const parentDateError = validateWithinParent(startDate, endDate, parent, 'Semester');
+    if (parentDateError) return res.status(400).json({ error: parentDateError, code: 'VALIDATION_ERROR' });
 
     // If setting as active, deactivate other semesters in the same year
-    if (isActive) {
-      await prisma.semester.updateMany({ where: { academicYearId: Number(academicYearId) }, data: { isActive: false } });
-    }
-
-    const created = await prisma.semester.create({
+    const created = await prisma.$transaction(async tx => {
+      if (isActive) await tx.semester.updateMany({ where: { academicYearId: Number(academicYearId) }, data: { isActive: false } });
+      return tx.semester.create({
       data: {
         name,
         academicYearId: Number(academicYearId),
@@ -230,12 +247,13 @@ export async function createSemester(req, res, next) {
         endDate:   endDate   ? new Date(endDate)   : null,
       },
       include: { academicYear: { select: { year: true } } },
-    });
+      });
+    }, { isolationLevel: 'Serializable' });
 
-    await logAudit(req, 'semester.create', 'semester', created.id, { name, academicYearId });
+    await audit(req, 'semester.create', 'semester', created.id, { name, academicYearId, isActive: created.isActive, startDate, endDate });
     const createSemesterSync = await syncAllApplicantStatuses();
     if (createSemesterSync.changedCount > 0) {
-      await logAudit(req, 'user.status.period_sync', 'user', null, {
+      await audit(req, 'user.status.period_sync', 'user', null, {
         reason: 'semester.create',
         status: createSemesterSync.status,
         changedCount: createSemesterSync.changedCount,
@@ -257,19 +275,21 @@ export async function updateSemester(req, res, next) {
   try {
     const id = Number(req.params.id);
     const { name, isActive, startDate, endDate } = req.body;
+    const existing = await prisma.semester.findUnique({ where: { id }, include: { academicYear: true } });
+    if (!existing) return res.status(404).json({ error: 'Semester not found', code: 'NOT_FOUND' });
+    const nextStart = startDate !== undefined ? startDate : existing.startDate;
+    const nextEnd = endDate !== undefined ? endDate : existing.endDate;
 
-    const dateError = validateDateWindow(startDate, endDate, 'Semester');
+    const dateError = validateDateWindow(nextStart, nextEnd, 'Semester')
+      || validateWithinParent(nextStart, nextEnd, existing.academicYear, 'Semester');
     if (dateError) {
       return res.status(400).json({ error: dateError, code: 'VALIDATION_ERROR' });
     }
 
     // If activating, deactivate siblings first
-    if (isActive) {
-      const sem = await prisma.semester.findUnique({ where: { id } });
-      if (sem) await prisma.semester.updateMany({ where: { academicYearId: sem.academicYearId, id: { not: id } }, data: { isActive: false } });
-    }
-
-    const updated = await prisma.semester.update({
+    const updated = await prisma.$transaction(async tx => {
+      if (isActive) await tx.semester.updateMany({ where: { academicYearId: existing.academicYearId, id: { not: id } }, data: { isActive: false } });
+      return tx.semester.update({
       where: { id },
       data: {
         ...(name      !== undefined && { name }),
@@ -278,12 +298,13 @@ export async function updateSemester(req, res, next) {
         ...(endDate   !== undefined && { endDate:   endDate   ? new Date(endDate)   : null }),
       },
       include: { academicYear: { select: { year: true } } },
-    });
+      });
+    }, { isolationLevel: 'Serializable' });
 
-    await logAudit(req, 'semester.update', 'semester', id, { name });
+    await audit(req, 'semester.update', 'semester', id, { before: existing, after: updated });
     const updateSemesterSync = await syncAllApplicantStatuses();
     if (updateSemesterSync.changedCount > 0) {
-      await logAudit(req, 'user.status.period_sync', 'user', null, {
+      await audit(req, 'user.status.period_sync', 'user', null, {
         reason: 'semester.update',
         status: updateSemesterSync.status,
         changedCount: updateSemesterSync.changedCount,
@@ -305,10 +326,10 @@ export async function deleteSemester(req, res, next) {
   try {
     const id = Number(req.params.id);
     await prisma.semester.delete({ where: { id } });
-    await logAudit(req, 'semester.delete', 'semester', id);
+    await audit(req, 'semester.delete', 'semester', id);
     const deleteSemesterSync = await syncAllApplicantStatuses();
     if (deleteSemesterSync.changedCount > 0) {
-      await logAudit(req, 'user.status.period_sync', 'user', null, {
+      await audit(req, 'user.status.period_sync', 'user', null, {
         reason: 'semester.delete',
         status: deleteSemesterSync.status,
         changedCount: deleteSemesterSync.changedCount,

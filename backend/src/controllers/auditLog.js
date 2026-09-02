@@ -5,7 +5,7 @@ import { cached } from '../utils/cache.js';
 // GET /api/audit-logs?action=&entity=&userId=&from=&to=&page=&limit=
 export async function getAuditLogs(req, res, next) {
   try {
-    const { action, entity, entityId, userId, from, to, search, page, limit } = req.query;
+    const { action, entity, entityId, userId, role, from, to, search, page, limit } = req.query;
     const pg = paginate(page ?? 1, limit ?? 100);
 
     const where = {};
@@ -13,6 +13,7 @@ export async function getAuditLogs(req, res, next) {
     if (entity) where.entity = entity;
     if (entityId) where.entityId = Number(entityId);
     if (userId) where.userId = Number(userId);
+    if (role) where.user = { is: { role } };
 
     if (from || to) {
       where.createdAt = {};
@@ -33,6 +34,7 @@ export async function getAuditLogs(req, res, next) {
       entity: entity || null,
       entityId: entityId ? Number(entityId) : null,
       userId: userId ? Number(userId) : null,
+      role: role || null,
       from: from || null,
       to: to || null,
       search: search || null,

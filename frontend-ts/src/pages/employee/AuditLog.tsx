@@ -147,6 +147,7 @@ export default function AuditLog() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('table');
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -159,10 +160,11 @@ export default function AuditLog() {
     const params: Record<string, string | number> = { page, limit: DEFAULT_PAGE_SIZE };
     if (search)   params.search = search;
     if (entity)   params.entity = entity;
+    if (userRole) params.role = userRole;
     if (dateFrom) params.from = dateFrom;
     if (dateTo)   params.to = dateTo + 'T23:59:59';
     return auditApi.list(params as any);
-  }, [page, search, entity, dateFrom, dateTo]);
+  }, [page, search, entity, userRole, dateFrom, dateTo]);
 
   const { data, loading, error, refetch } = useAsync<PaginatedAuditResponse>(
     fetchLogs,
@@ -172,10 +174,29 @@ export default function AuditLog() {
   );
 
   const logs = data?.data || [];
-  const filteredLogs = userRole
-    ? logs.filter(log => log.user?.role?.toLowerCase() === userRole.toLowerCase())
-    : logs;
   const totalPages = data?.pagination?.totalPages || data?.totalPages || 1;
+
+  const handleExport = useCallback(async () => {
+    setExporting(true);
+    try {
+      const params: Record<string, string | number> = { page: 1, limit: 100 };
+      if (search) params.search = search;
+      if (entity) params.entity = entity;
+      if (userRole) params.role = userRole;
+      if (dateFrom) params.from = dateFrom;
+      if (dateTo) params.to = dateTo + 'T23:59:59';
+      const first = await auditApi.list(params);
+      const allLogs = [...(first.data || [])];
+      const pages = first.pagination?.totalPages || first.totalPages || 1;
+      for (let exportPage = 2; exportPage <= pages; exportPage += 1) {
+        const response = await auditApi.list({ ...params, page: exportPage });
+        allLogs.push(...(response.data || []));
+      }
+      downloadCSV(allLogs, { search, entity, dateFrom, dateTo });
+    } finally {
+      setExporting(false);
+    }
+  }, [search, entity, userRole, dateFrom, dateTo]);
 
   if (loading && !data) return <div className="p-6"><SkeletonPage /></div>;
   if (error) return <div className="p-6"><ErrorAlert error={error} onRetry={refetch} /></div>;
@@ -205,12 +226,12 @@ export default function AuditLog() {
           <ActionButton
             variant="secondary"
             icon={<Icon name="download" className="w-4 h-4" />}
-            onClick={() => downloadCSV(filteredLogs, { search, entity, dateFrom, dateTo })}
-            disabled={filteredLogs.length === 0}
+            onClick={handleExport}
+            disabled={logs.length === 0 || exporting}
             title="Download as CSV"
             aria-label="Export audit logs to CSV"
           >
-            Export
+            {exporting ? 'Exporting...' : 'Export'}
           </ActionButton>
           <ActionButton
             variant="secondary"
@@ -291,7 +312,7 @@ export default function AuditLog() {
                   <tr>
                     <td colSpan={7} className="px-4 py-10" />
                   </tr>
-                ) : filteredLogs.length === 0 ? (
+                ) : logs.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
                       <Icon name="shieldCheck" className="w-10 h-10 mx-auto mb-3 text-gray-600" />
@@ -299,7 +320,7 @@ export default function AuditLog() {
                       <p className="text-xs mt-1">Actions will appear here as users interact with the system</p>
                     </td>
                   </tr>
-                ) : filteredLogs.map((log: any) => (
+                ) : logs.map((log: any) => (
                   <tr key={log.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3 text-gray-600 whitespace-nowrap text-xs">
                       {formatDateLocal(auditTimestamp(log))}
@@ -367,7 +388,7 @@ export default function AuditLog() {
           )}
         </div>
       ) : (
-        <TimelineView logs={filteredLogs} />
+        <TimelineView logs={logs} />
       )}
     </div>
   );

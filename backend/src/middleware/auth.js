@@ -3,7 +3,6 @@ import env from '../config/env.js';
 import prisma from '../config/db.js';
 import { ROLES } from '../utils/constants.js';
 import { syncApplicantUserStatusById } from '../utils/applicantStatusSync.js';
-import { cached } from '../utils/cache.js';
 
 const JWT_VERIFY_OPTIONS = { algorithms: ['HS256'] };
 
@@ -20,32 +19,15 @@ export async function authenticate(req, res, next) {
     const token = header.split(' ')[1];
     const payload = jwt.verify(token, env.JWT_SECRET, JWT_VERIFY_OPTIONS);
     const includeProfiles = req.originalUrl.startsWith('/api/auth/me');
-    const needsFreshUser = includeProfiles || payload.mustChangePassword !== false;
-    const cacheKey = `user:${payload.sub}:${needsFreshUser ? 'full' : 'base'}`;
-
-    let user = null;
-    if (!needsFreshUser && payload.role && payload.status && payload.tokenVersion !== undefined) {
-      // For non-/auth/me routes, trust JWT claims to avoid DB round-trips on every request.
-      // However, we still need to verify tokenVersion from DB on some requests.
-      user = {
-        id: payload.sub,
-        email: payload.email,
-        role: payload.role,
-        status: payload.status,
-        emailVerified: payload.emailVerified ?? true,
-        mustChangePassword: payload.mustChangePassword ?? false,
-        tokenVersion: payload.tokenVersion,
-      };
-    } else {
-      user = await cached(cacheKey, async () => {
-        return prisma.user.findUnique({
-          where: { id: payload.sub },
-          ...(includeProfiles
-            ? { include: { applicantProfile: true, staffProfile: true } }
-            : { select: { id: true, email: true, role: true, status: true, emailVerified: true, mustChangePassword: true, tokenVersion: true, deletedAt: true } }),
-        });
-      }, 300_000);
-    }
+    // Security-sensitive account state must come from the database on every
+    // request. JWT role/status claims are snapshots and must never preserve
+    // access after an administrator changes or removes an account.
+    const user = await prisma.user.findUnique({
+      where: { id: payload.sub },
+      ...(includeProfiles
+        ? { include: { applicantProfile: true, staffProfile: true } }
+        : { select: { id: true, email: true, role: true, status: true, emailVerified: true, mustChangePassword: true, tokenVersion: true, deletedAt: true } }),
+    });
 
     // Verify tokenVersion matches (ensures tokens are revoked when role/status changes)
     if (!user || user.tokenVersion !== payload.tokenVersion) {
