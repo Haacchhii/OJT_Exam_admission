@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   logAudit: vi.fn(),
   invalidatePrefix: vi.fn(),
   sendVerificationEmail: vi.fn().mockResolvedValue({ ok: true }),
+  syncApplicantUserStatusById: vi.fn().mockResolvedValue({ status: 'Active' }),
 }));
 
 vi.mock('../src/config/db.js', () => ({ default: mocks.prisma }));
@@ -21,7 +22,10 @@ vi.mock('../src/utils/cache.js', () => ({
   cached: vi.fn((_key, loader) => loader()),
   invalidatePrefix: mocks.invalidatePrefix,
 }));
-vi.mock('../src/utils/applicantStatusSync.js', () => ({ syncAllApplicantStatuses: vi.fn().mockResolvedValue({ changedCount: 0 }) }));
+vi.mock('../src/utils/applicantStatusSync.js', () => ({
+  syncAllApplicantStatuses: vi.fn().mockResolvedValue({ changedCount: 0 }),
+  syncApplicantUserStatusById: mocks.syncApplicantUserStatusById,
+}));
 vi.mock('../src/utils/email.js', () => ({
   sendTemporaryPasswordEmail: vi.fn(),
   sendVerificationEmail: mocks.sendVerificationEmail,
@@ -131,6 +135,34 @@ describe('administrator session revocation', () => {
     expect(mocks.prisma.user.findUnique).toHaveBeenCalled();
     expect(res.statusCode).toBe(401);
     expect(res.body.code).toBe('TOKEN_REVOKED');
+  });
+});
+
+describe('applicant session authentication', () => {
+  it('accepts a current active applicant token while scheduling status synchronization', async () => {
+    const token = jwt.sign(
+      { sub: 9, role: 'applicant', status: 'Active', tokenVersion: 2, mustChangePassword: false },
+      process.env.JWT_SECRET,
+      { algorithm: 'HS256' },
+    );
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      id: 9,
+      email: 'applicant@example.test',
+      role: 'applicant',
+      status: 'Active',
+      emailVerified: true,
+      mustChangePassword: false,
+      tokenVersion: 2,
+      deletedAt: null,
+    });
+    const res = responseRecorder();
+    const next = vi.fn();
+
+    await authenticate({ headers: { authorization: `Bearer ${token}` }, originalUrl: '/api/admissions/mine' }, res, next);
+
+    expect(next).toHaveBeenCalledOnce();
+    expect(res.statusCode).toBe(200);
+    expect(mocks.syncApplicantUserStatusById).toHaveBeenCalledWith(9);
   });
 });
 
