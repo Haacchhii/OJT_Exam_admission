@@ -11,7 +11,7 @@ import { cached, invalidatePrefix } from '../utils/cache.js';
 import env from '../config/env.js';
 import { resolveUploadedFilePath } from '../utils/uploadPaths.js';
 import { toManilaIsoDay } from '../utils/timezone.js';
-import { completeEnrollmentHandoff, createAdmissionOnce, transitionAdmissions } from '../services/admissionWorkflow.js';
+import { buildCompletedEntranceExamWhere, completeEnrollmentHandoff, createAdmissionOnce, transitionAdmissions } from '../services/admissionWorkflow.js';
 import { applicantOwnsRegistration, applicantRegistrationOwnershipWhere, canAccessAdmissionDocuments } from '../utils/ownership.js';
 
 const ADMISSION_IN_PROGRESS = ['Submitted', 'Under Screening', 'Under Evaluation'];
@@ -933,25 +933,6 @@ export async function createAdmission(req, res, next) {
       });
     }
 
-    const skipEntranceExam = shouldSkipEntranceExam(gradeLevel);
-
-    // Enforce exam-completion gate only for grade levels that require entrance exams.
-    const completedExam = skipEntranceExam ? null : await prisma.examRegistration.findFirst({
-      where: {
-        status: 'done',
-        ...applicantRegistrationOwnershipWhere(req.user),
-      },
-      select: { id: true },
-    });
-    if (!skipEntranceExam && !completedExam) {
-      return res.status(400).json({
-        error: 'Please complete your entrance exam before submitting an admission application.',
-        code: 'VALIDATION_ERROR',
-      });
-    }
-
-    const trackingId = await generateTrackingId('ADM');
-
     // Auto-link to active academic year/semester when not provided by client.
     // Also enforce that admissions can only be submitted during the active period window.
     const activeYear = await prisma.academicYear.findFirst({ where: { isActive: true } });
@@ -980,6 +961,28 @@ export async function createAdmission(req, res, next) {
 
     const resolvedYearId = activeYear.id;
     const resolvedSemesterId = activeSemester.id;
+
+    const skipEntranceExam = shouldSkipEntranceExam(gradeLevel);
+
+    // A completed exam only satisfies the gate when it belongs to the same
+    // academic term and targets the applicant's grade (or a compatible legacy/all-level bucket).
+    const completedExam = skipEntranceExam ? null : await prisma.examRegistration.findFirst({
+      where: buildCompletedEntranceExamWhere({
+        user: req.user,
+        gradeLevel,
+        academicYearId: resolvedYearId,
+        semesterId: resolvedSemesterId,
+      }),
+      select: { id: true },
+    });
+    if (!skipEntranceExam && !completedExam) {
+      return res.status(400).json({
+        error: 'Please complete the entrance exam for your grade and active application period before submitting an admission application.',
+        code: 'VALIDATION_ERROR',
+      });
+    }
+
+    const trackingId = await generateTrackingId('ADM');
 
     const admission = await createAdmissionOnce({
       db: prisma,

@@ -1,5 +1,21 @@
-import { VALID_TRANSITIONS } from '../utils/constants.js';
+import { getCompatibleExamGradeLevels, VALID_TRANSITIONS } from '../utils/constants.js';
 import { generateStudentNumber as defaultGenerateStudentNumber } from '../utils/tracking.js';
+import { applicantRegistrationOwnershipWhere } from '../utils/ownership.js';
+
+export function buildCompletedEntranceExamWhere({ user, gradeLevel, academicYearId, semesterId }) {
+  return {
+    status: 'done',
+    ...applicantRegistrationOwnershipWhere(user),
+    schedule: {
+      exam: {
+        gradeLevel: { in: getCompatibleExamGradeLevels(gradeLevel) },
+        academicYearId,
+        semesterId,
+        deletedAt: null,
+      },
+    },
+  };
+}
 
 export class AdmissionWorkflowError extends Error {
   constructor(message, code, status = 409) {

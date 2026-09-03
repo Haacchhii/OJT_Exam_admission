@@ -101,6 +101,15 @@ export const GRADE_TO_LEGACY_EXAM_LEVEL = {
   'Grade 12 — HUMSS': 'Grade 11-12',
 };
 
+export function getCompatibleExamGradeLevels(gradeLevel) {
+  return [...new Set([
+    GRADE_TO_EXAM_LEVEL[gradeLevel],
+    GRADE_TO_LEGACY_EXAM_LEVEL[gradeLevel],
+    gradeLevel,
+    'All Levels',
+  ].filter(Boolean))];
+}
+
 export const GRADE_OPTIONS = [
   { group: 'Preschool', items: ['Nursery', 'Kinder'] },
   { group: 'Grade School', items: ['Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6'] },
