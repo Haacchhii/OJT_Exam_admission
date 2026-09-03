@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { VALID_TRANSITIONS, ROLES, EMPLOYEE_ROLES, ALLOWED_MIME_TYPES } from '../src/utils/constants.js';
+import {
+  VALID_TRANSITIONS,
+  ROLES,
+  EMPLOYEE_ROLES,
+  ALLOWED_MIME_TYPES,
+  getCompatibleExamGradeLevels,
+} from '../src/utils/constants.js';
 
 describe('VALID_TRANSITIONS', () => {
   it('Submitted can go to Under Screening or Rejected', () => {
@@ -60,5 +66,23 @@ describe('ALLOWED_MIME_TYPES', () => {
   it('does not include executable types', () => {
     expect(ALLOWED_MIME_TYPES).not.toContain('application/x-executable');
     expect(ALLOWED_MIME_TYPES).not.toContain('application/javascript');
+  });
+});
+
+describe('getCompatibleExamGradeLevels', () => {
+  it('accepts only the exact, legacy-grouped, and all-level exams for a junior-high applicant', () => {
+    expect(getCompatibleExamGradeLevels('Grade 8')).toEqual([
+      'Grade 8',
+      'Grade 7-10',
+      'All Levels',
+    ]);
+  });
+
+  it('keeps a senior-high strand exact while allowing the legacy senior-high bucket', () => {
+    expect(getCompatibleExamGradeLevels('Grade 11 — STEM')).toEqual([
+      'Grade 11 — STEM',
+      'Grade 11-12',
+      'All Levels',
+    ]);
   });
 });

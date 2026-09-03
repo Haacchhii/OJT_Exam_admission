@@ -41,7 +41,12 @@ vi.mock('../src/services/pdfService.js', () => ({
   savePdfToBuffer: vi.fn(),
 }));
 
-import { authorizeAdmissionDocumentUpload, downloadDocument, trackApplication } from '../src/controllers/admissions.js';
+import {
+  authorizeAdmissionDocumentUpload,
+  downloadDocument,
+  trackApplication,
+} from '../src/controllers/admissions.js';
+import { buildCompletedEntranceExamWhere } from '../src/services/admissionWorkflow.js';
 import { previewDocument } from '../src/controllers/documentPreview.js';
 import { cancelRegistration, saveDraftAnswers, startExam } from '../src/controllers/examRegistrations.js';
 import { submitExam } from '../src/controllers/examSubmission.js';
@@ -59,6 +64,31 @@ function responseRecorder() {
     end() { return this; },
   };
 }
+
+describe('applicant admission exam gate', () => {
+  it('requires a completed compatible exam from the active academic term', () => {
+    expect(buildCompletedEntranceExamWhere({
+      user: { id: 901, email: 'applicant@example.com', role: 'applicant' },
+      gradeLevel: 'Grade 8',
+      academicYearId: 4,
+      semesterId: 9,
+    })).toEqual({
+      status: 'done',
+      OR: [
+        { userId: 901 },
+        { userId: null, userEmail: { equals: 'applicant@example.com', mode: 'insensitive' } },
+      ],
+      schedule: {
+        exam: {
+          gradeLevel: { in: ['Grade 8', 'Grade 7-10', 'All Levels'] },
+          academicYearId: 4,
+          semesterId: 9,
+          deletedAt: null,
+        },
+      },
+    });
+  });
+});
 
 describe('applicant document upload authorization', () => {
   beforeEach(() => vi.clearAllMocks());

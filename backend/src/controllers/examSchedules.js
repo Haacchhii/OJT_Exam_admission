@@ -1,6 +1,6 @@
 import prisma from '../config/db.js';
 import { paginate, paginatedResponse } from '../utils/pagination.js';
-import { GRADE_TO_EXAM_LEVEL, GRADE_TO_LEGACY_EXAM_LEVEL, ROLES, shouldSkipEntranceExam } from '../utils/constants.js';
+import { getCompatibleExamGradeLevels, ROLES, shouldSkipEntranceExam } from '../utils/constants.js';
 import { getIo } from '../utils/socket.js';
 import { logAudit } from '../utils/auditLog.js';
 import { attachExamWindowStatus, computeExamWindowStatus, getEffectiveExamWindow } from '../utils/examWindow.js';
@@ -173,10 +173,11 @@ async function getApplicantGradeFilterCached(userId) {
     if (shouldSkipEntranceExam(profile.gradeLevel)) return null;
 
     const resolvedKey = resolveGradeKey(profile.gradeLevel);
-    const examLevel = resolvedKey ? GRADE_TO_EXAM_LEVEL[resolvedKey] : null;
-    const legacyLevel = resolvedKey ? GRADE_TO_LEGACY_EXAM_LEVEL[resolvedKey] : null;
     const inferredLegacy = inferLegacyGradeBucket(profile.gradeLevel);
-    const allowedLevels = [...new Set([examLevel, legacyLevel, inferredLegacy, profile.gradeLevel, 'All Levels'].filter(Boolean))];
+    const allowedLevels = [...new Set([
+      ...getCompatibleExamGradeLevels(resolvedKey || profile.gradeLevel),
+      inferredLegacy,
+    ].filter(Boolean))];
 
     if (allowedLevels.length === 0) return {};
     return { gradeLevel: { in: allowedLevels } };
