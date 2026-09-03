@@ -3,6 +3,7 @@ import env from '../config/env.js';
 import prisma from '../config/db.js';
 import { ROLES } from '../utils/constants.js';
 import { syncApplicantUserStatusById } from '../utils/applicantStatusSync.js';
+import { cached } from '../utils/cache.js';
 
 const JWT_VERIFY_OPTIONS = { algorithms: ['HS256'] };
 
