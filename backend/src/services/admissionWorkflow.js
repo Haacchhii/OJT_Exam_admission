@@ -52,6 +52,30 @@ async function lockAdmissions(tx, ids) {
   }
 }
 
+export async function createAdmissionOnce({ db, userId, academicYearId, semesterId, data }) {
+  return db.$transaction(async tx => {
+    // Serialize submissions per applicant so simultaneous requests cannot both
+    // pass the duplicate check before either admission is inserted.
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(743921, ${userId})`;
+
+    const existing = await tx.admission.findFirst({
+      where: { userId, academicYearId, semesterId, deletedAt: null },
+      select: { id: true, trackingId: true, status: true },
+    });
+    if (existing) {
+      throw new AdmissionWorkflowError(
+        'You already have an application for the active admission period.',
+        'DUPLICATE_ADMISSION',
+      );
+    }
+
+    return tx.admission.create({
+      data,
+      include: { documents: true, academicYear: true, semester: true },
+    });
+  });
+}
+
 export async function transitionAdmissions({
   db,
   ids,

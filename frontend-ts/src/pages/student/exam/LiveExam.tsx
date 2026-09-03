@@ -57,8 +57,8 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
       const saved = sessionStorage.getItem(draftStorageKey);
       if (saved) return JSON.parse(saved);
       // Fall back to server-saved draft
-      if ((registration as any).draftAnswers) {
-        try { return JSON.parse((registration as any).draftAnswers); } catch { /* ignore */ }
+      if (registration.draftAnswers) {
+        try { return JSON.parse(registration.draftAnswers); } catch { /* ignore */ }
       }
       return {};
     } catch { return {}; }
@@ -119,14 +119,16 @@ export default function LiveExam({ exam, registration }: LiveExamProps) {
 
   const answersRef = useRef(answers);
   answersRef.current = answers;
+  const draftRevisionRef = useRef(Math.max(0, registration.draftRevision || 0));
 
   const saveDraftToServer = useCallback(async () => {
     if (submittedRef.current || !isOnline) return;
     setDraftStatus('saving');
+    const revision = ++draftRevisionRef.current;
     try {
-      await saveDraftAnswers(registration.id, answersRef.current);
+      const result = await saveDraftAnswers(registration.id, answersRef.current, revision);
       setDraftStatus('saved');
-      setLastDraftSavedAt(Date.now());
+      if (result.saved) setLastDraftSavedAt(Date.now());
     } catch {
       setDraftStatus('error');
     }

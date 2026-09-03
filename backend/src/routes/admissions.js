@@ -46,14 +46,14 @@ router.post('/',     authorize(ROLES.APPLICANT), writeLimiter, validate(createAd
 // Export admission receipt as PDF
 router.get('/:id/export-pdf', authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.APPLICANT), exportAdmissionReceiptPdf);
 
-// Documents upload — ownership checked in controller
-router.post('/:id/documents', authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.APPLICANT), upload.array('documents', 10), verifyMime, ctrl.uploadDocuments);
+// Authorize before multipart processing so forbidden uploads never reach disk.
+router.post('/:id/documents', authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.APPLICANT), ctrl.authorizeAdmissionDocumentUpload, upload.array('documents', 10), verifyMime, ctrl.uploadDocuments);
 
 // Document preview — ownership checked in controller
-router.get('/:id/documents/:docId/preview', previewDocument);
+router.get('/:id/documents/:docId/preview', authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.APPLICANT), previewDocument);
 
 // Document download — ownership checked in controller
-router.get('/:id/documents/:docId/download', ctrl.downloadDocument);
+router.get('/:id/documents/:docId/download', authorize(ROLES.ADMIN, ROLES.REGISTRAR, ROLES.APPLICANT), ctrl.downloadDocument);
 
 // Document OCR / text extraction — ownership checked in controller
 router.post('/:id/documents/:docId/extract', authorize(ROLES.ADMIN, ROLES.REGISTRAR), extractDocument);

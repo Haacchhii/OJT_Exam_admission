@@ -4,6 +4,12 @@ import app from '../src/app.js';
 import { RATE_LIMITS } from '../src/utils/constants.js';
 
 describe('security guards', () => {
+  it('does not expose uploaded documents through a global static route', async () => {
+    const res = await request(app).get('/uploads/another-applicants-document.pdf');
+
+    expect(res.status).toBe(404);
+  });
+
   it('does not consume the strict auth-attempt quota for health and session reads', async () => {
     for (let i = 0; i < RATE_LIMITS.AUTH.max + 3; i++) {
       const pingRes = await request(app).get('/api/auth/ping');

@@ -1,0 +1,431 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const mocks = vi.hoisted(() => ({
+  prisma: {
+    admission: { findUnique: vi.fn(), findFirst: vi.fn() },
+    admissionDocument: { findUnique: vi.fn() },
+    admissionDocumentSubmission: { findFirst: vi.fn() },
+    applicantProfile: { findUnique: vi.fn() },
+    academicYear: { findFirst: vi.fn() },
+    semester: { findFirst: vi.fn() },
+    examQuestion: { count: vi.fn() },
+    examRegistration: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
+    exam: { findUnique: vi.fn() },
+    submittedAnswer: { createMany: vi.fn() },
+    essayAnswer: { createMany: vi.fn() },
+    examResult: { create: vi.fn(), findUnique: vi.fn() },
+    user: { findUnique: vi.fn() },
+    examSchedule: { update: vi.fn(), updateMany: vi.fn() },
+    $transaction: vi.fn(),
+  },
+}));
+
+vi.mock('../src/config/db.js', () => ({ default: mocks.prisma }));
+vi.mock('../src/utils/cache.js', () => ({
+  cached: vi.fn((_key, loader) => loader()),
+  invalidate: vi.fn(),
+  invalidatePrefix: vi.fn(),
+}));
+vi.mock('../src/utils/auditLog.js', () => ({ logAudit: vi.fn() }));
+vi.mock('../src/utils/email.js', () => ({
+  sendAdmissionSubmittedEmail: vi.fn(),
+  sendExamBookingEmail: vi.fn(),
+  sendStatusUpdateEmail: vi.fn(),
+}));
+vi.mock('../src/utils/socket.js', () => ({
+  getIo: vi.fn(() => ({ to: vi.fn().mockReturnThis(), emit: vi.fn() })),
+}));
+vi.mock('../src/services/pdfService.js', () => ({
+  generateExamResultPdf: vi.fn(),
+  generateAdmissionReceiptPdf: vi.fn(),
+  savePdfToBuffer: vi.fn(),
+}));
+
+import { authorizeAdmissionDocumentUpload, downloadDocument, trackApplication } from '../src/controllers/admissions.js';
+import { previewDocument } from '../src/controllers/documentPreview.js';
+import { cancelRegistration, saveDraftAnswers, startExam } from '../src/controllers/examRegistrations.js';
+import { submitExam } from '../src/controllers/examSubmission.js';
+import { getResult } from '../src/controllers/results.js';
+import { exportExamResultPdf } from '../src/controllers/pdfExport.js';
+
+function responseRecorder() {
+  return {
+    statusCode: 200,
+    body: undefined,
+    status(code) { this.statusCode = code; return this; },
+    json(body) { this.body = body; return this; },
+    setHeader: vi.fn(),
+    send(body) { this.body = body; return this; },
+    end() { return this; },
+  };
+}
+
+describe('applicant document upload authorization', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('rejects another applicant before multipart files are processed', async () => {
+    mocks.prisma.admission.findUnique.mockResolvedValue({ id: 41, userId: 900, deletedAt: null });
+    const req = { params: { id: '41' }, user: { id: 901, role: 'applicant' } };
+    const res = responseRecorder();
+    const next = vi.fn();
+
+    await authorizeAdmissionDocumentUpload(req, res, next);
+
+    expect(res.statusCode).toBe(403);
+    expect(res.body.code).toBe('FORBIDDEN');
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('treats soft-deleted admissions as unavailable', async () => {
+    mocks.prisma.admission.findUnique.mockResolvedValue({ id: 41, userId: 901, deletedAt: new Date() });
+    const req = { params: { id: '41' }, user: { id: 901, role: 'applicant' } };
+    const res = responseRecorder();
+    const next = vi.fn();
+
+    await authorizeAdmissionDocumentUpload(req, res, next);
+
+    expect(res.statusCode).toBe(404);
+    expect(res.body.code).toBe('NOT_FOUND');
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('passes an owned active admission to the upload handler', async () => {
+    const admission = { id: 41, userId: 901, deletedAt: null };
+    mocks.prisma.admission.findUnique.mockResolvedValue(admission);
+    const req = { params: { id: '41' }, user: { id: 901, role: 'applicant' } };
+    const res = responseRecorder();
+    const next = vi.fn();
+
+    await authorizeAdmissionDocumentUpload(req, res, next);
+
+    expect(req.admissionForDocumentUpload).toBe(admission);
+    expect(next).toHaveBeenCalledOnce();
+  });
+});
+
+describe('applicant exam start integrity', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('allows only one concurrent request to establish the attempt start time', async () => {
+    const registration = {
+      id: 77,
+      userId: 901,
+      userEmail: 'applicant@example.com',
+      status: 'scheduled',
+      schedule: {
+        examId: 12,
+        startDateTime: new Date(Date.now() - 60_000),
+        endDateTime: new Date(Date.now() + 3_600_000),
+        exam: { academicYearId: 1 },
+      },
+    };
+    mocks.prisma.examRegistration.findUnique.mockResolvedValue(registration);
+    mocks.prisma.applicantProfile.findUnique.mockResolvedValue({ gradeLevel: 'Grade 7' });
+    mocks.prisma.academicYear.findFirst.mockResolvedValue({ id: 1, isActive: true });
+    mocks.prisma.semester.findFirst.mockResolvedValue({
+      id: 3,
+      academicYearId: 1,
+      isActive: true,
+      startDate: new Date('2026-01-01T00:00:00Z'),
+      endDate: new Date('2026-12-31T00:00:00Z'),
+    });
+    mocks.prisma.examQuestion.count.mockResolvedValue(10);
+
+    let claimed = false;
+    mocks.prisma.examRegistration.updateMany.mockImplementation(async () => {
+      if (claimed) return { count: 0 };
+      claimed = true;
+      return { count: 1 };
+    });
+
+    const makeResponse = () => responseRecorder();
+    const first = makeResponse();
+    const second = makeResponse();
+    const req = { params: { id: '77' }, user: { id: 901, email: 'applicant@example.com', role: 'applicant' } };
+    const firstNext = vi.fn();
+    const secondNext = vi.fn();
+
+    await Promise.all([
+      startExam(req, first, firstNext),
+      startExam(req, second, secondNext),
+    ]);
+
+    expect(firstNext).not.toHaveBeenCalled();
+    expect(secondNext).not.toHaveBeenCalled();
+    expect([first.statusCode, second.statusCode].sort()).toEqual([200, 409]);
+  });
+});
+
+describe('applicant exam submission integrity', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('allows only one concurrent final submission to create result records', async () => {
+    const registration = {
+      id: 77,
+      userId: 901,
+      userEmail: 'applicant@example.com',
+      status: 'started',
+      startedAt: new Date(),
+      draftAnswers: null,
+      schedule: {
+        examId: 12,
+        examWindowEndAt: new Date(Date.now() + 3_600_000),
+      },
+    };
+    const exam = {
+      id: 12,
+      title: 'Entrance Exam',
+      durationMinutes: 60,
+      passingScore: 75,
+      questions: [{
+        id: 5,
+        questionType: 'mc',
+        points: 1,
+        choices: [{ id: 21, isCorrect: true }],
+      }],
+    };
+    mocks.prisma.examRegistration.findUnique.mockResolvedValue(registration);
+    mocks.prisma.exam.findUnique.mockResolvedValue(exam);
+    mocks.prisma.examRegistration.update.mockResolvedValue({ ...registration, status: 'done' });
+    mocks.prisma.submittedAnswer.createMany.mockResolvedValue({ count: 1 });
+    mocks.prisma.examResult.create.mockResolvedValue({ id: 88 });
+
+    let claimed = false;
+    mocks.prisma.examRegistration.updateMany.mockImplementation(async () => {
+      if (claimed) return { count: 0 };
+      claimed = true;
+      return { count: 1 };
+    });
+    mocks.prisma.$transaction.mockImplementation(async (work) => {
+      if (typeof work === 'function') return work(mocks.prisma);
+      return Promise.all(work);
+    });
+
+    const first = responseRecorder();
+    const second = responseRecorder();
+    const req = {
+      body: { registrationId: 77, answers: { 5: 21 } },
+      user: { id: 901, email: 'applicant@example.com', firstName: 'Applicant', role: 'applicant' },
+      ip: '127.0.0.1',
+    };
+
+    await Promise.all([
+      submitExam(req, first, vi.fn()),
+      submitExam(req, second, vi.fn()),
+    ]);
+
+    expect([first.statusCode, second.statusCode].sort()).toEqual([200, 409]);
+    expect(mocks.prisma.submittedAnswer.createMany).toHaveBeenCalledOnce();
+    expect(mocks.prisma.examResult.create).toHaveBeenCalledOnce();
+  });
+});
+
+describe('applicant autosave ordering', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('does not let a delayed older draft overwrite a newer draft', async () => {
+    let stored = { revision: 0, answers: null };
+    mocks.prisma.examRegistration.findUnique.mockImplementation(async () => ({
+      id: 77,
+      userId: 901,
+      userEmail: 'applicant@example.com',
+      status: 'started',
+      startedAt: new Date(),
+      draftRevision: stored.revision,
+      draftAnswers: stored.answers,
+      schedule: {
+        examWindowEndAt: new Date(Date.now() + 3_600_000),
+        exam: { durationMinutes: 60 },
+      },
+    }));
+    mocks.prisma.examRegistration.update.mockImplementation(async ({ data }) => {
+      stored = {
+        revision: data.draftRevision ?? stored.revision,
+        answers: data.draftAnswers,
+      };
+      return { id: 77 };
+    });
+    mocks.prisma.examRegistration.updateMany.mockImplementation(async ({ where, data }) => {
+      if (stored.revision >= where.draftRevision.lt) return { count: 0 };
+      stored = { revision: data.draftRevision, answers: data.draftAnswers };
+      return { count: 1 };
+    });
+
+    const user = { id: 901, email: 'applicant@example.com', role: 'applicant' };
+    await saveDraftAnswers({
+      params: { id: '77' }, user, body: { answers: { 5: 21 }, revision: 2 },
+    }, responseRecorder(), vi.fn());
+    await saveDraftAnswers({
+      params: { id: '77' }, user, body: { answers: { 5: 20 }, revision: 1 },
+    }, responseRecorder(), vi.fn());
+
+    expect(stored.revision).toBe(2);
+    expect(JSON.parse(stored.answers)).toEqual({ 5: 21 });
+  });
+});
+
+describe('applicant registration cancellation integrity', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('never decrements schedule capacity below zero when counters have drifted', async () => {
+    let slotsTaken = 0;
+    mocks.prisma.examRegistration.findUnique.mockResolvedValue({
+      id: 77,
+      userId: 901,
+      userEmail: 'applicant@example.com',
+      scheduleId: 12,
+      status: 'scheduled',
+    });
+    mocks.prisma.examRegistration.delete = vi.fn().mockResolvedValue({ id: 77 });
+    mocks.prisma.examSchedule.update.mockImplementation(async ({ data }) => {
+      slotsTaken -= data.slotsTaken.decrement;
+      return { id: 12, slotsTaken };
+    });
+    mocks.prisma.examSchedule.updateMany.mockImplementation(async () => {
+      if (slotsTaken <= 0) return { count: 0 };
+      slotsTaken -= 1;
+      return { count: 1 };
+    });
+    mocks.prisma.$transaction.mockImplementation(async (work) => work(mocks.prisma));
+
+    const res = responseRecorder();
+    await cancelRegistration({
+      params: { id: '77' },
+      user: { id: 901, email: 'applicant@example.com', role: 'applicant' },
+    }, res, vi.fn());
+
+    expect(res.statusCode).toBe(204);
+    expect(slotsTaken).toBe(0);
+  });
+});
+
+describe('applicant result privacy', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('does not let a matching email override a different registration owner', async () => {
+    mocks.prisma.examResult.findUnique.mockResolvedValue({
+      id: 88,
+      registrationId: 77,
+      percentage: 90,
+      registration: {
+        id: 77,
+        userId: 902,
+        userEmail: 'applicant@example.com',
+        schedule: { exam: { title: 'Entrance Exam' } },
+      },
+    });
+    const res = responseRecorder();
+
+    await getResult({
+      params: { registrationId: '77' },
+      user: { id: 901, email: 'applicant@example.com', role: 'applicant' },
+    }, res, vi.fn());
+
+    expect(res.statusCode).toBe(403);
+    expect(res.body.code).toBe('FORBIDDEN');
+  });
+
+  it('keeps normalized email access for legacy registrations without a user id', async () => {
+    mocks.prisma.examResult.findUnique.mockResolvedValue({
+      id: 88,
+      registrationId: 77,
+      percentage: 90,
+      registration: {
+        id: 77,
+        userId: null,
+        userEmail: ' Applicant@Example.com ',
+        schedule: { exam: { title: 'Entrance Exam' } },
+      },
+    });
+    const res = responseRecorder();
+
+    await getResult({
+      params: { registrationId: '77' },
+      user: { id: 901, email: 'applicant@example.com', role: 'applicant' },
+    }, res, vi.fn());
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.id).toBe(88);
+  });
+
+  it('blocks result PDF export when email matches but the registration belongs to another user', async () => {
+    mocks.prisma.examResult.findFirst = vi.fn().mockResolvedValue({
+      id: 88,
+      registrationId: 77,
+      registration: {
+        id: 77,
+        userId: 902,
+        userEmail: 'applicant@example.com',
+        user: { id: 902 },
+        schedule: { exam: { title: 'Entrance Exam' } },
+      },
+    });
+    const res = responseRecorder();
+
+    await exportExamResultPdf({
+      params: { registrationId: '77' },
+      user: { id: 901, email: 'applicant@example.com', role: 'applicant' },
+    }, res, vi.fn());
+
+    expect(res.statusCode).toBe(403);
+    expect(res.body.code).toBe('FORBIDDEN');
+  });
+});
+
+describe('applicant tracking privacy', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('does not let a matching email override a different exam registration owner', async () => {
+    mocks.prisma.examRegistration.findUnique.mockResolvedValue({
+      id: 77,
+      trackingId: 'EXM-PRIVATE',
+      userId: 902,
+      userEmail: 'applicant@example.com',
+      schedule: { exam: { title: 'Entrance Exam' } },
+      result: { id: 88 },
+    });
+    const res = responseRecorder();
+
+    await trackApplication({
+      params: { trackingId: 'EXM-PRIVATE' },
+      user: { id: 901, email: 'applicant@example.com', role: 'applicant' },
+    }, res, vi.fn());
+
+    expect(res.statusCode).toBe(403);
+    expect(res.body.code).toBe('FORBIDDEN');
+  });
+});
+
+describe('admission document role privacy', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('blocks teachers from downloading admission documents', async () => {
+    mocks.prisma.admissionDocument.findUnique.mockResolvedValue({
+      id: 51,
+      admissionId: 41,
+      documentName: 'birth-certificate.pdf',
+      filePath: 'stored.pdf',
+    });
+    const res = responseRecorder();
+
+    await downloadDocument({
+      params: { id: '41', docId: '51' },
+      user: { id: 700, role: 'teacher' },
+    }, res, vi.fn());
+
+    expect(res.statusCode).toBe(403);
+    expect(res.body.code).toBe('FORBIDDEN');
+  });
+
+  it('blocks teachers from previewing admission documents', async () => {
+    const res = responseRecorder();
+
+    await previewDocument({
+      params: { id: '41', docId: '51' },
+      user: { id: 700, role: 'teacher' },
+    }, res, vi.fn());
+
+    expect(res.statusCode).toBe(403);
+    expect(res.body.code).toBe('FORBIDDEN');
+  });
+});

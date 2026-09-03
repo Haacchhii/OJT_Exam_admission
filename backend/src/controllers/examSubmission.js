@@ -199,14 +199,21 @@ export async function submitExam(req, res, next) {
       }
     }
 
-    // Transaction: save all at once
-    await prisma.$transaction([
-      // Save submitted answers
-      prisma.submittedAnswer.createMany({ data: submittedAnswerData }),
-      // Save essay answers (for review)
-      ...(essayAnswerData.length ? [prisma.essayAnswer.createMany({ data: essayAnswerData })] : []),
-      // Create result
-      prisma.examResult.create({
+    // Atomically claim the started attempt before writing answers or results.
+    // A concurrent submit waits for this update, then observes status=done and
+    // exits without duplicating any submission records.
+    const committed = await prisma.$transaction(async (tx) => {
+      const claim = await tx.examRegistration.updateMany({
+        where: { id: registrationId, status: 'started' },
+        data: { status: 'done', submittedAt: new Date(), draftAnswers: null },
+      });
+      if (claim.count !== 1) return false;
+
+      await tx.submittedAnswer.createMany({ data: submittedAnswerData });
+      if (essayAnswerData.length) {
+        await tx.essayAnswer.createMany({ data: essayAnswerData });
+      }
+      await tx.examResult.create({
         data: {
           registrationId,
           totalScore,
@@ -215,13 +222,15 @@ export async function submitExam(req, res, next) {
           passed,
           essayReviewed: !hasEssays,
         },
-      }),
-      // Mark registration as done
-      prisma.examRegistration.update({
-        where: { id: registrationId },
-        data: { status: 'done', submittedAt: new Date(), draftAnswers: null },
-      }),
-    ]);
+      });
+      return true;
+    });
+    if (!committed) {
+      return res.status(409).json({
+        error: 'This exam was already submitted by another request.',
+        code: 'EXAM_ALREADY_SUBMITTED',
+      });
+    }
 
     await invalidatePrefix(`regs:mine-summary:${req.user.id}:`);
     await invalidatePrefix(`regs:mine:${req.user.id}:`);

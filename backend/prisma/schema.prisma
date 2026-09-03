@@ -341,6 +341,7 @@ model ExamRegistration {
   startedAt    DateTime? @map("started_at")
   submittedAt  DateTime? @map("submitted_at")
   draftAnswers String?   @map("draft_answers") // JSON draft for auto-save during exam
+  draftRevision Int      @default(0) @map("draft_revision")
   createdAt    DateTime  @default(now()) @map("created_at")
 
   schedule         ExamSchedule      @relation(fields: [scheduleId], references: [id], onDelete: Cascade)

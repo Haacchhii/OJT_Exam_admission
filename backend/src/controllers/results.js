@@ -1,6 +1,7 @@
 import prisma from '../config/db.js';
 import { paginate, paginatedResponse } from '../utils/pagination.js';
 import { cached } from '../utils/cache.js';
+import { applicantOwnsRegistration } from '../utils/ownership.js';
 
 // Reduce default to limit payload and DB work for summary endpoint
 const EMPLOYEE_SUMMARY_DEFAULT_LIMIT = 20;
@@ -77,6 +78,9 @@ async function findLatestOwnedResult(user, academicYearId) {
 
 function registrationBelongsToUser(registration, user) {
   if (!registration || !user) return false;
+  if (String(user.role || '').toLowerCase() === 'applicant') {
+    return applicantOwnsRegistration(registration, user);
+  }
   if (registration.userId != null && registration.userId === user.id) return true;
   return normalizeEmail(registration.userEmail) === normalizeEmail(user.email);
 }

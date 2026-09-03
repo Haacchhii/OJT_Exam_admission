@@ -211,10 +211,10 @@ export async function startExam(registrationId: number) {
   );
 }
 
-export async function saveDraftAnswers(registrationId: number, answers: Record<string | number, unknown>) {
-  return client.patch<{ ok: boolean }>(
+export async function saveDraftAnswers(registrationId: number, answers: Record<string | number, unknown>, revision: number) {
+  return client.patch<{ ok: boolean; saved: boolean }>(
     `/exams/registrations/${registrationId}/save-draft`,
-    { answers }
+    { answers, revision }
   );
 }
 

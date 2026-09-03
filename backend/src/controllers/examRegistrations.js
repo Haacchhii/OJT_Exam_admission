@@ -490,10 +490,18 @@ export async function startExam(req, res, next) {
       });
     }
 
-    const updated = await prisma.examRegistration.update({
-      where: { id },
-      data: { status: 'started', startedAt: new Date() },
+    const startedAt = new Date();
+    const claim = await prisma.examRegistration.updateMany({
+      where: { id, status: 'scheduled' },
+      data: { status: 'started', startedAt },
     });
+    if (claim.count !== 1) {
+      return res.status(409).json({
+        error: 'This exam was already started by another request. Refresh to continue the active attempt.',
+        code: 'EXAM_ALREADY_STARTED',
+      });
+    }
+    const updated = { ...reg, status: 'started', startedAt };
 
     await invalidateMyRegistrationCaches(req.user.id);
     await invalidateEmployeeRegistrationCaches();
@@ -532,13 +540,19 @@ export async function saveDraftAnswers(req, res, next) {
       });
     }
 
-    const { answers } = req.body;
-    await prisma.examRegistration.update({
-      where: { id },
-      data: { draftAnswers: JSON.stringify(answers) },
-    });
+    const { answers, revision } = req.body;
+    const draftAnswers = JSON.stringify(answers);
+    const save = revision == null
+      ? await prisma.examRegistration.updateMany({
+        where: { id, status: 'started', draftRevision: 0 },
+        data: { draftAnswers },
+      })
+      : await prisma.examRegistration.updateMany({
+        where: { id, status: 'started', draftRevision: { lt: revision } },
+        data: { draftAnswers, draftRevision: revision },
+      });
 
-    res.json({ ok: true });
+    res.json({ ok: true, saved: save.count === 1 });
   } catch (err) { next(err); }
 }
 
@@ -559,8 +573,8 @@ export async function cancelRegistration(req, res, next) {
 
     await prisma.$transaction(async (tx) => {
       await tx.examRegistration.delete({ where: { id } });
-      await tx.examSchedule.update({
-        where: { id: reg.scheduleId },
+      await tx.examSchedule.updateMany({
+        where: { id: reg.scheduleId, slotsTaken: { gt: 0 } },
         data: { slotsTaken: { decrement: 1 } },
       });
     });

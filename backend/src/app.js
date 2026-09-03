@@ -11,13 +11,11 @@ import prisma from './config/db.js';
 import logger, { errorMetrics } from './config/logger.js';
 import { errorHandler } from './middleware/errors.js';
 import { trackErrors, logRequests } from './middleware/errorTracking.js';
-import { authenticate } from './middleware/auth.js';
 import { RATE_LIMITS, BODY_SIZE_LIMIT } from './utils/constants.js';
 import { sanitizeDeepStrings, sanitizeRequestInput } from './middleware/validate.js';
 import { cachePublic, cachePrivate, noStore } from './middleware/cache.js';
 import { observeApiRequest } from './utils/perfStore.js';
 import { runWithRequestContext } from './utils/requestContext.js';
-import { getUploadBaseDir } from './utils/uploadPaths.js';
 
 // Route imports
 import authRoutes          from './routes/auth.js';
@@ -189,9 +187,11 @@ const bulkOpLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// Serve uploaded files — require authentication
-const uploadStaticDir = getUploadBaseDir();
-app.use('/uploads', authenticate, express.static(uploadStaticDir));
+// Uploaded admissions documents are only served by ownership-aware API routes.
+// Keep this explicit denial ahead of the frontend fallback route.
+app.use('/uploads', (_req, res) => {
+  res.status(404).json({ error: 'Not found', code: 'NOT_FOUND' });
+});
 
 // Apply specific rate limiters to sensitive operations (must be mounted before routes)
 app.use(STRICT_AUTH_PATHS, authLimiter);
