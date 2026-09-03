@@ -14,3 +14,15 @@ export function applicantOwnsRegistration(registration, user) {
   const userEmail = normalizeEmail(user.email);
   return Boolean(registrationEmail && userEmail && registrationEmail === userEmail);
 }
+
+export function applicantRegistrationOwnershipWhere(user) {
+  return {
+    OR: [
+      { userId: user.id },
+      {
+        userId: null,
+        userEmail: { equals: normalizeEmail(user.email), mode: 'insensitive' },
+      },
+    ],
+  };
+}

@@ -11,8 +11,8 @@ import { cached, invalidatePrefix } from '../utils/cache.js';
 import env from '../config/env.js';
 import { resolveUploadedFilePath } from '../utils/uploadPaths.js';
 import { toManilaIsoDay } from '../utils/timezone.js';
-import { completeEnrollmentHandoff, transitionAdmissions } from '../services/admissionWorkflow.js';
-import { applicantOwnsRegistration, canAccessAdmissionDocuments } from '../utils/ownership.js';
+import { completeEnrollmentHandoff, createAdmissionOnce, transitionAdmissions } from '../services/admissionWorkflow.js';
+import { applicantOwnsRegistration, applicantRegistrationOwnershipWhere, canAccessAdmissionDocuments } from '../utils/ownership.js';
 
 const ADMISSION_IN_PROGRESS = ['Submitted', 'Under Screening', 'Under Evaluation'];
 const REPORTS_DEFAULT_ADMISSIONS = 40;
@@ -939,10 +939,7 @@ export async function createAdmission(req, res, next) {
     const completedExam = skipEntranceExam ? null : await prisma.examRegistration.findFirst({
       where: {
         status: 'done',
-        OR: [
-          { userId: req.user.id },
-          { userEmail: req.user.email },
-        ],
+        ...applicantRegistrationOwnershipWhere(req.user),
       },
       select: { id: true },
     });
@@ -984,7 +981,11 @@ export async function createAdmission(req, res, next) {
     const resolvedYearId = activeYear.id;
     const resolvedSemesterId = activeSemester.id;
 
-    const admission = await prisma.admission.create({
+    const admission = await createAdmissionOnce({
+      db: prisma,
+      userId: req.user.id,
+      academicYearId: resolvedYearId,
+      semesterId: resolvedSemesterId,
       data: {
         trackingId,
         userId: req.user.id,
@@ -1007,7 +1008,6 @@ export async function createAdmission(req, res, next) {
             }
           : {}),
       },
-      include: { documents: true, academicYear: true, semester: true },
     });
 
     await invalidateAdmissionCaches([req.user.id]);

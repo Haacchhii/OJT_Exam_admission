@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../src/utils/tracking.js', () => ({ generateStudentNumber: vi.fn() }));
 
-import { completeEnrollmentHandoff, transitionAdmissions } from '../src/services/admissionWorkflow.js';
+import { completeEnrollmentHandoff, createAdmissionOnce, transitionAdmissions } from '../src/services/admissionWorkflow.js';
 
 function fakeDb(admissions) {
   const rows = new Map(admissions.map(admission => [admission.id, structuredClone(admission)]));
@@ -12,6 +12,17 @@ function fakeDb(admissions) {
     admission: {
       findMany: vi.fn(async ({ where }) => (where.id.in || []).map(id => rows.get(id)).filter(Boolean)),
       findUnique: vi.fn(async ({ where }) => rows.get(where.id) || null),
+      findFirst: vi.fn(async ({ where }) => [...rows.values()].find(admission =>
+        admission.userId === where.userId &&
+        admission.academicYearId === where.academicYearId &&
+        admission.semesterId === where.semesterId &&
+        admission.deletedAt === null
+      ) || null),
+      create: vi.fn(async ({ data }) => {
+        const created = { id: rows.size + 1, deletedAt: null, ...data };
+        rows.set(created.id, created);
+        return created;
+      }),
       update: vi.fn(async ({ where, data }) => {
         const updated = { ...rows.get(where.id), ...data };
         rows.set(where.id, updated);
@@ -48,6 +59,25 @@ const readyAdmission = {
 };
 
 describe('admission workflow integrity', () => {
+  it('rejects a second active application for the same applicant and term', async () => {
+    const fixture = fakeDb([{
+      ...readyAdmission,
+      academicYearId: 3,
+      semesterId: 7,
+      status: 'Submitted',
+    }]);
+
+    await expect(createAdmissionOnce({
+      db: fixture.db,
+      userId: 21,
+      academicYearId: 3,
+      semesterId: 7,
+      data: { userId: 21, academicYearId: 3, semesterId: 7, trackingId: 'ADM-NEW' },
+    })).rejects.toMatchObject({ code: 'DUPLICATE_ADMISSION', status: 409 });
+
+    expect(fixture.tx.admission.create).not.toHaveBeenCalled();
+  });
+
   it('rejects acceptance while any document is not accepted', async () => {
     const fixture = fakeDb([{ ...readyAdmission, documents: [{ id: 1, reviewStatus: 'pending' }] }]);
 
