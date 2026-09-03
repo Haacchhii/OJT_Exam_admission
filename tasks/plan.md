@@ -168,6 +168,15 @@ Each implementation slice will begin with a failing regression test, touch no mo
 where practical, and receive its own verification evidence. Production writes, destructive database
 operations, pull-request creation, and merging remain explicit confirmation points.
 
+## Audit Progress (September 3, 2026)
+
+- Post-merge production health is HTTP 200 with the database connected.
+- The applicant-focused isolated backend slice passes 48 tests.
+- Admission eligibility now requires a completed compatible-grade exam from the active academic
+  year and semester; wrong-grade and old-term completions no longer satisfy the gate.
+- Authenticated deployed applicant verification is still partial because the documented Sofia
+  test account no longer authenticates. See `docs/APPLICANT_WORKFLOW_AUDIT_SEP_3_2026.md`.
+
 ## Risks
 
 | Risk | Impact | Mitigation |
