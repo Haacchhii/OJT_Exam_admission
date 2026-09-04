@@ -12,6 +12,33 @@ export const BACKUP_MODELS = [
   ['notificationRolePreferences', 'notificationRolePreference'], ['auditLogs', 'auditLog'],
 ].map(([table, model]) => ({ table, model }));
 
+const ISOLATED_RESTORE_CONFIRMATION = 'RESTORE_ISOLATED_NON_PRODUCTION';
+
+export function assertIsolatedRestoreTarget({ databaseUrl, confirmation }) {
+  if (confirmation !== ISOLATED_RESTORE_CONFIRMATION) {
+    throw new Error(`Restore confirmation must equal ${ISOLATED_RESTORE_CONFIRMATION}`);
+  }
+
+  let target;
+  try {
+    target = new URL(databaseUrl);
+  } catch {
+    throw new Error('DATABASE_URL must be a valid PostgreSQL connection URL');
+  }
+
+  const targetIdentity = `${target.hostname}/${target.pathname}`.toLowerCase();
+  if (/\b(prod|production|live)\b/.test(targetIdentity.replace(/[_-]/g, ' '))) {
+    throw new Error('Restore target appears to be a production database');
+  }
+
+  const isLocal = ['localhost', '127.0.0.1', '::1'].includes(target.hostname);
+  const hasIsolationMarker = /\b(test|testing|stage|staging|preview|drill|sandbox|isolated)\b/
+    .test(targetIdentity.replace(/[_-]/g, ' '));
+  if (!isLocal && !hasIsolationMarker) {
+    throw new Error('Restore target must be local or visibly marked as non-production');
+  }
+}
+
 function assertKey(passphrase) {
   if (typeof passphrase !== 'string' || passphrase.length < 32) {
     throw new Error('BACKUP_ENCRYPTION_KEY must contain at least 32 characters');
