@@ -179,6 +179,9 @@ operations, pull-request creation, and merging remain explicit confirmation poin
 - Cross-role authentication now restores valid applicant requests and revalidates current account
   state before Socket.IO room assignment. Revoked or stale role claims can no longer retain realtime
   room access. See `docs/CROSS_ROLE_REALTIME_AUDIT_SEP_3_2026.md`.
+- Data-integrity review found release-blocking gaps in migration reproducibility, backup model
+  coverage, and backup confidentiality. Production row inspection remains blocked by unavailable
+  read-only credentials. See `docs/DATA_INTEGRITY_MIGRATION_AUDIT_SEP_4_2026.md`.
 
 ## Risks
 

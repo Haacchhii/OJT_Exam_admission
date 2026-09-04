@@ -139,7 +139,11 @@ Data backup and restore infrastructure is production-ready. Procedures documente
 
 ## Approval for GA
 
-**Data Integrity Status:** ✅ **READY FOR GA**
+**Data Integrity Status:** ❌ **NOT READY FOR GA — superseded by the September 4, 2026 audit**
+
+See `docs/DATA_INTEGRITY_MIGRATION_AUDIT_SEP_4_2026.md`. The backup omits current models, stores
+authentication material in plaintext JSON, has no verified isolated restore, and the checked-in
+migration history has no reproducible baseline.
 
 **Rationale:**
 - ✅ Backup/restore infrastructure complete and tested

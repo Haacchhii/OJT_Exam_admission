@@ -1,6 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { PrismaClient } from '../generated/prisma-client/index.js';
+import { BACKUP_MODELS, encryptBackup } from './backup-support.js';
 
 const prisma = new PrismaClient();
 
@@ -16,6 +17,7 @@ function timestamp() {
 }
 
 async function main() {
+  const encryptionKey = process.env.BACKUP_ENCRYPTION_KEY;
   const root = process.cwd();
   const outDir = path.join(root, 'backups');
   await fs.mkdir(outDir, { recursive: true });
@@ -24,30 +26,14 @@ async function main() {
     meta: {
       createdAt: new Date().toISOString(),
       source: 'golden-key-backend',
-      version: '1',
+      version: '2',
     },
-    tables: {
-      users: await prisma.user.findMany({ orderBy: { id: 'asc' } }),
-      applicantProfiles: await prisma.applicantProfile.findMany({ orderBy: { id: 'asc' } }),
-      staffProfiles: await prisma.staffProfile.findMany({ orderBy: { id: 'asc' } }),
-      academicYears: await prisma.academicYear.findMany({ orderBy: { id: 'asc' } }),
-      semesters: await prisma.semester.findMany({ orderBy: { id: 'asc' } }),
-      admissions: await prisma.admission.findMany({ orderBy: { id: 'asc' } }),
-      admissionDocuments: await prisma.admissionDocument.findMany({ orderBy: { id: 'asc' } }),
-      exams: await prisma.exam.findMany({ orderBy: { id: 'asc' } }),
-      examQuestions: await prisma.examQuestion.findMany({ orderBy: { id: 'asc' } }),
-      questionChoices: await prisma.questionChoice.findMany({ orderBy: { id: 'asc' } }),
-      examSchedules: await prisma.examSchedule.findMany({ orderBy: { id: 'asc' } }),
-      examRegistrations: await prisma.examRegistration.findMany({ orderBy: { id: 'asc' } }),
-      submittedAnswers: await prisma.submittedAnswer.findMany({ orderBy: { id: 'asc' } }),
-      essayAnswers: await prisma.essayAnswer.findMany({ orderBy: { id: 'asc' } }),
-      examResults: await prisma.examResult.findMany({ orderBy: { id: 'asc' } }),
-      auditLogs: await prisma.auditLog.findMany({ orderBy: { id: 'asc' } }),
-    },
+    tables: Object.fromEntries(await Promise.all(BACKUP_MODELS.map(async ({ table, model }) =>
+      [table, await prisma[model].findMany({ orderBy: { id: 'asc' } })]))),
   };
 
   const filePath = path.join(outDir, `backup-${timestamp()}.json`);
-  await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf8');
+  await fs.writeFile(filePath, JSON.stringify(encryptBackup(data, encryptionKey)), { encoding: 'utf8', mode: 0o600 });
 
   console.log(`✅ Backup complete: ${filePath}`);
 }
