@@ -45,3 +45,14 @@ current code and must not be used as release evidence.
 4. Restore into an isolated non-production database and compare per-table counts and relationships.
 5. Replace the prior “READY FOR GA” statement only after the restore drill passes.
 
+## Local remediation added after the audit
+
+- Backup coverage now derives from one manifest and includes every current Prisma model; a schema
+  comparison test will fail when a future model is omitted.
+- Backup payloads now require `BACKUP_ENCRYPTION_KEY` of at least 32 characters and are encrypted
+  with AES-256-GCM using a random salt and IV. Files are requested with owner-only permissions on
+  platforms that support POSIX modes.
+- Restore accepts only the authenticated encrypted format and includes the five previously omitted
+  models in deletion, creation, and sequence-reset ordering.
+- This remediation is locally verified only. The release blocker remains until an encrypted backup
+  is restored into an isolated non-production database and counts/relationships are compared.

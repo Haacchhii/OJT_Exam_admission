@@ -1,6 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { PrismaClient } from '../generated/prisma-client/index.js';
+import { decryptBackup } from './backup-support.js';
 
 const prisma = new PrismaClient();
 
@@ -18,10 +19,15 @@ async function clearAll() {
     prisma.questionChoice.deleteMany(),
     prisma.examQuestion.deleteMany(),
     prisma.exam.deleteMany(),
+    prisma.admissionComment.deleteMany(),
+    prisma.admissionDocumentSubmission.deleteMany(),
     prisma.admissionDocument.deleteMany(),
     prisma.admission.deleteMany(),
     prisma.staffProfile.deleteMany(),
     prisma.applicantProfile.deleteMany(),
+    prisma.questionTemplate.deleteMany(),
+    prisma.notificationPreference.deleteMany(),
+    prisma.notificationRolePreference.deleteMany(),
     prisma.auditLog.deleteMany(),
     prisma.semester.deleteMany(),
     prisma.academicYear.deleteMany(),
@@ -33,11 +39,12 @@ async function resetSequences() {
   const tables = [
     'users', 'applicant_profiles', 'staff_profiles',
     'academic_years', 'semesters',
-    'admissions', 'admission_documents',
+    'question_templates', 'admissions', 'admission_documents',
+    'admission_document_submissions', 'admission_comments',
     'exams', 'exam_questions', 'question_choices',
     'exam_schedules', 'exam_registrations',
     'submitted_answers', 'essay_answers', 'exam_results',
-    'audit_logs',
+    'notification_preferences', 'notification_role_preferences', 'audit_logs',
   ];
 
   for (const table of tables) {
@@ -61,7 +68,7 @@ async function main() {
 
   const filePath = path.resolve(process.cwd(), fileArg);
   const content = await fs.readFile(filePath, 'utf8');
-  const parsed = JSON.parse(content);
+  const parsed = decryptBackup(JSON.parse(content), process.env.BACKUP_ENCRYPTION_KEY);
   const t = parsed?.tables;
 
   if (!t) {
@@ -75,8 +82,11 @@ async function main() {
   await createManyIf(prisma.semester, t.semesters);
   await createManyIf(prisma.applicantProfile, t.applicantProfiles);
   await createManyIf(prisma.staffProfile, t.staffProfiles);
+  await createManyIf(prisma.questionTemplate, t.questionTemplates);
   await createManyIf(prisma.admission, t.admissions);
   await createManyIf(prisma.admissionDocument, t.admissionDocuments);
+  await createManyIf(prisma.admissionDocumentSubmission, t.admissionDocumentSubmissions);
+  await createManyIf(prisma.admissionComment, t.admissionComments);
   await createManyIf(prisma.exam, t.exams);
   await createManyIf(prisma.examQuestion, t.examQuestions);
   await createManyIf(prisma.questionChoice, t.questionChoices);
@@ -85,6 +95,8 @@ async function main() {
   await createManyIf(prisma.submittedAnswer, t.submittedAnswers);
   await createManyIf(prisma.essayAnswer, t.essayAnswers);
   await createManyIf(prisma.examResult, t.examResults);
+  await createManyIf(prisma.notificationPreference, t.notificationPreferences);
+  await createManyIf(prisma.notificationRolePreference, t.notificationRolePreferences);
   await createManyIf(prisma.auditLog, t.auditLogs);
 
   await resetSequences();
