@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
   BACKUP_MODELS,
+  assertCompleteBackup,
   assertIsolatedRestoreTarget,
   buildRecoveryReport,
   decryptBackup,
@@ -55,5 +56,12 @@ describe('backup safety', () => {
     const report = buildRecoveryReport(expected, mismatched);
     expect(report.ok).toBe(false);
     expect(report.tables.admissions).toMatchObject({ countMatches: true, contentMatches: false });
+  });
+
+  it('rejects incomplete backups before destructive restore work', () => {
+    const tables = Object.fromEntries(BACKUP_MODELS.map(({ table }) => [table, []]));
+    expect(() => assertCompleteBackup({ tables })).not.toThrow();
+    delete tables.users;
+    expect(() => assertCompleteBackup({ tables })).toThrow(/users/);
   });
 });

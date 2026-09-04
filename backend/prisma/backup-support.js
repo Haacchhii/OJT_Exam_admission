@@ -73,6 +73,18 @@ export function buildRecoveryReport(expectedTables, restoredTables) {
   return { ok: Object.values(tables).every((table) => table.countMatches && table.contentMatches), tables };
 }
 
+export function assertCompleteBackup(backup) {
+  if (!backup?.tables || typeof backup.tables !== 'object') {
+    throw new Error('Invalid backup file: missing tables object');
+  }
+  const missing = BACKUP_MODELS
+    .map(({ table }) => table)
+    .filter((table) => !Array.isArray(backup.tables[table]));
+  if (missing.length > 0) {
+    throw new Error(`Invalid backup file: missing table data for ${missing.join(', ')}`);
+  }
+}
+
 function assertKey(passphrase) {
   if (typeof passphrase !== 'string' || passphrase.length < 32) {
     throw new Error('BACKUP_ENCRYPTION_KEY must contain at least 32 characters');

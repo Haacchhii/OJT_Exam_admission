@@ -3,6 +3,7 @@ import path from 'path';
 import { PrismaClient } from '../generated/prisma-client/index.js';
 import {
   BACKUP_MODELS,
+  assertCompleteBackup,
   assertIsolatedRestoreTarget,
   buildRecoveryReport,
   decryptBackup,
@@ -21,6 +22,7 @@ async function main() {
 
   const envelope = JSON.parse(await fs.readFile(path.resolve(process.cwd(), fileArg), 'utf8'));
   const backup = decryptBackup(envelope, process.env.BACKUP_ENCRYPTION_KEY);
+  assertCompleteBackup(backup);
   const restoredTables = Object.fromEntries(await Promise.all(BACKUP_MODELS.map(async ({ table, model }) =>
     [table, await prisma[model].findMany({ orderBy: { id: 'asc' } })])));
   const report = buildRecoveryReport(backup.tables, restoredTables);
