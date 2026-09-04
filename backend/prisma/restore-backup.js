@@ -1,7 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { PrismaClient } from '../generated/prisma-client/index.js';
-import { decryptBackup } from './backup-support.js';
+import { assertCompleteBackup, assertIsolatedRestoreTarget, decryptBackup } from './backup-support.js';
 
 const prisma = new PrismaClient();
 
@@ -66,14 +66,16 @@ async function main() {
     process.exit(1);
   }
 
+  assertIsolatedRestoreTarget({
+    databaseUrl: process.env.DATABASE_URL,
+    confirmation: process.env.RESTORE_CONFIRMATION,
+  });
+
   const filePath = path.resolve(process.cwd(), fileArg);
   const content = await fs.readFile(filePath, 'utf8');
   const parsed = decryptBackup(JSON.parse(content), process.env.BACKUP_ENCRYPTION_KEY);
+  assertCompleteBackup(parsed);
   const t = parsed?.tables;
-
-  if (!t) {
-    throw new Error('Invalid backup file: missing tables object');
-  }
 
   await clearAll();
 

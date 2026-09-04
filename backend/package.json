@@ -18,6 +18,7 @@
     "db:seed": "node prisma/seed.js",
     "db:backup": "node prisma/backup-data.js",
     "db:restore": "node prisma/restore-backup.js",
+    "db:verify-restore": "node prisma/verify-restore.js",
     "db:audit-accounts": "node prisma/audit-accounts.js",
     "db:audit-exam-registrations": "node prisma/audit-exam-registrations.js",
     "db:test-role-aspects": "node prisma/test-role-aspects.js",
