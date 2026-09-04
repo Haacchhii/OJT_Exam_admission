@@ -56,3 +56,6 @@ current code and must not be used as release evidence.
   models in deletion, creation, and sequence-reset ordering.
 - This remediation is locally verified only. The release blocker remains until an encrypted backup
   is restored into an isolated non-production database and counts/relationships are compared.
+- Restore now requires explicit isolated-target confirmation and rejects production-looking URLs.
+  A verifier compares counts and canonical row-content digests for every model. See
+  `docs/BACKUP_RESTORE_DRILL_RUNBOOK.md`. Live execution remains blocked on database access.

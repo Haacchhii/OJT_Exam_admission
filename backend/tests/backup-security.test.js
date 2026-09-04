@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import {
   BACKUP_MODELS,
   assertIsolatedRestoreTarget,
+  buildRecoveryReport,
   decryptBackup,
   encryptBackup,
 } from '../prisma/backup-support.js';
@@ -39,5 +40,20 @@ describe('backup safety', () => {
       databaseUrl: 'postgresql://user:pass@localhost:5432/golden_key_restore_drill',
       confirmation: 'RESTORE_ISOLATED_NON_PRODUCTION',
     })).not.toThrow();
+  });
+
+  it('reports count and content mismatches after a restore drill', () => {
+    const expected = {
+      users: [{ id: 1, email: 'applicant@example.test' }],
+      admissions: [{ id: 7, userId: 1, status: 'Pending' }],
+    };
+
+    expect(buildRecoveryReport(expected, structuredClone(expected))).toMatchObject({ ok: true });
+
+    const mismatched = structuredClone(expected);
+    mismatched.admissions[0].userId = 2;
+    const report = buildRecoveryReport(expected, mismatched);
+    expect(report.ok).toBe(false);
+    expect(report.tables.admissions).toMatchObject({ countMatches: true, contentMatches: false });
   });
 });

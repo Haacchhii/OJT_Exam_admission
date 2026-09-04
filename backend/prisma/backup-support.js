@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, randomBytes, scryptSync } from 'node:crypto';
 
 export const BACKUP_MODELS = [
   ['users', 'user'], ['applicantProfiles', 'applicantProfile'], ['staffProfiles', 'staffProfile'],
@@ -37,6 +37,40 @@ export function assertIsolatedRestoreTarget({ databaseUrl, confirmation }) {
   if (!isLocal && !hasIsolationMarker) {
     throw new Error('Restore target must be local or visibly marked as non-production');
   }
+}
+
+function canonicalize(value) {
+  if (value instanceof Date) return value.toISOString();
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalize(value[key])]));
+  }
+  return value;
+}
+
+function tableDigest(rows) {
+  const normalized = rows.map(canonicalize)
+    .map((row) => JSON.stringify(row))
+    .sort();
+  return createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
+}
+
+export function buildRecoveryReport(expectedTables, restoredTables) {
+  const tables = Object.fromEntries(Object.keys(expectedTables).sort().map((table) => {
+    const expected = Array.isArray(expectedTables[table]) ? expectedTables[table] : [];
+    const restored = Array.isArray(restoredTables[table]) ? restoredTables[table] : [];
+    const expectedDigest = tableDigest(expected);
+    const restoredDigest = tableDigest(restored);
+    return [table, {
+      expectedCount: expected.length,
+      restoredCount: restored.length,
+      countMatches: expected.length === restored.length,
+      contentMatches: expectedDigest === restoredDigest,
+      expectedDigest,
+      restoredDigest,
+    }];
+  }));
+  return { ok: Object.values(tables).every((table) => table.countMatches && table.contentMatches), tables };
 }
 
 function assertKey(passphrase) {

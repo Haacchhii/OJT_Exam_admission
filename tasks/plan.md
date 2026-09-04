@@ -182,6 +182,9 @@ operations, pull-request creation, and merging remain explicit confirmation poin
 - Data-integrity review found release-blocking gaps in migration reproducibility, backup model
   coverage, and backup confidentiality. Production row inspection remains blocked by unavailable
   read-only credentials. See `docs/DATA_INTEGRITY_MIGRATION_AUDIT_SEP_4_2026.md`.
+- The backup recovery drill is prepared with a production-target guard and count/content
+  verification across every model. Execution remains blocked on an isolated PostgreSQL target and
+  authorized source connection.
 
 ## Risks
 
